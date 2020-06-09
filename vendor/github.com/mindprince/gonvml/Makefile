@@ -18,3 +18,6 @@ PKG=github.com/mindprince/gonvml
 build:
 	docker run -v $(shell pwd):/go/src/$(PKG) --workdir=/go/src/$(PKG) golang:1.8 go build cmd/example/example.go
 
+.PHONY: presubmit
+presubmit:
+	./.travis.gofmt.sh

@@ -20,38 +20,23 @@ package preflight
 
 import (
 	"github.com/pkg/errors"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/proxy/ipvs"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/utils/exec"
-
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 )
 
 // Check validates if Docker is setup to use systemd as the cgroup driver.
 func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
-	warnings = []error{}
-	driver, err := util.GetCgroupDriverDocker(exec.New())
+	driver, err := kubeadmutil.GetCgroupDriverDocker(exec.New())
 	if err != nil {
-		errorList = append(errorList, err)
-		return nil, errorList
+		return nil, []error{err}
 	}
-	if driver != util.CgroupDriverSystemd {
+	if driver != kubeadmutil.CgroupDriverSystemd {
 		err = errors.Errorf("detected %q as the Docker cgroup driver. "+
 			"The recommended driver is %q. "+
 			"Please follow the guide at https://kubernetes.io/docs/setup/cri/",
 			driver,
-			util.CgroupDriverSystemd)
-		warnings = append(warnings, err)
-	}
-	return warnings, nil
-}
-
-// Check determines if IPVS proxier can be used or not
-func (ipvspc IPVSProxierCheck) Check() (warnings, errors []error) {
-	ipsetInterface := utilipset.New(ipvspc.exec)
-	kernelHandler := ipvs.NewLinuxKernelHandler()
-	if _, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface); err != nil {
-		return nil, append(errors, err)
+			kubeadmutil.CgroupDriverSystemd)
+		return []error{err}, nil
 	}
 	return nil, nil
 }

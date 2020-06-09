@@ -11,7 +11,7 @@ var nativeEndian binary.ByteOrder
 
 func detectEndianness() binary.ByteOrder {
 	var x uint32 = 0x01020304
-		if *(*byte)(unsafe.Pointer(&x)) == 0x01 {
+	if *(*byte)(unsafe.Pointer(&x)) == 0x01 {
 		return binary.BigEndian
 	}
 	return binary.LittleEndian

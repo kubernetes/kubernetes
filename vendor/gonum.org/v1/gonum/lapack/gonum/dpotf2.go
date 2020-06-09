@@ -13,7 +13,7 @@ import (
 
 // Dpotf2 computes the Cholesky decomposition of the symmetric positive definite
 // matrix a. If ul == blas.Upper, then a is stored as an upper-triangular matrix,
-// and a = U^T U is stored in place into a. If ul == blas.Lower, then a = L L^T
+// and a = Uᵀ U is stored in place into a. If ul == blas.Lower, then a = L Lᵀ
 // is computed and stored in-place into a. If a is not positive definite, false
 // is returned. This is the unblocked version of the algorithm.
 //

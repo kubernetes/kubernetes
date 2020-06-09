@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -24,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -117,7 +118,7 @@ func getIP(iptype v1.NodeAddressType, node *v1.Node) (string, error) {
 
 func getSchedulable(nodes []v1.Node) (*v1.Node, error) {
 	for _, node := range nodes {
-		if node.Spec.Unschedulable == false {
+		if !node.Spec.Unschedulable {
 			return &node, nil
 		}
 	}
@@ -138,11 +139,10 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		nc := cs.CoreV1().Nodes()
 
 		ginkgo.By("creating a test pod on each Node")
-		nodes, err := nc.List(metav1.ListOptions{})
+		nodes, err := nc.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		if len(nodes.Items) == 0 {
-			framework.ExpectNoError(fmt.Errorf("no Nodes in the cluster"))
-		}
+		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+
 		for _, node := range nodes.Items {
 			// find the Node's internal ip address to feed to the Pod
 			inIP, err := getIP(v1.NodeInternalIP, &node)
@@ -150,7 +150,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 			// target Pod at Node and feed Pod Node's InternalIP
 			pod := newTestPod(node.Name, inIP)
-			_, err = pc.Create(pod)
+			_, err = pc.Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 		}
 
@@ -171,12 +171,12 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		framework.ExpectNoError(err)
 		proxyNodeIP := extIP + ":" + strconv.Itoa(testProxyPort)
 
-		_, err = pc.Create(newTestProxyPod(node.Name))
+		_, err = pc.Create(context.TODO(), newTestProxyPod(node.Name), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")
 		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
-			pods, err := pc.List(metav1.ListOptions{LabelSelector: "no-snat-test"})
+			pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: "no-snat-test"})
 			if err != nil {
 				return false, err
 			}
@@ -196,7 +196,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 		ginkgo.By("waiting for the no-snat-test-proxy Pod to be scheduled and running")
 		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
-			pod, err := pc.Get("no-snat-test-proxy", metav1.GetOptions{})
+			pod, err := pc.Get(context.TODO(), "no-snat-test-proxy", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -211,7 +211,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
-		pods, err := pc.List(metav1.ListOptions{LabelSelector: "no-snat-test"})
+		pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: "no-snat-test"})
 		framework.ExpectNoError(err)
 
 		// collect pod IPs

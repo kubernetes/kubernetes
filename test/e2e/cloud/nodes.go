@@ -17,17 +17,18 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
@@ -37,34 +38,44 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 	ginkgo.BeforeEach(func() {
 		// Only supported in AWS/GCE because those are the only cloud providers
 		// where E2E test are currently running.
-		framework.SkipUnlessProviderIs("aws", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
 	})
 
 	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func() {
 		ginkgo.By("deleting a node on the cloud provider")
 
-		nodeDeleteCandidates := framework.GetReadySchedulableNodesOrDie(c)
-		nodeToDelete := nodeDeleteCandidates.Items[0]
+		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(c)
+		framework.ExpectNoError(err)
 
-		origNodes := framework.GetReadyNodesIncludingTaintedOrDie(c)
-		e2elog.Logf("Original number of ready nodes: %d", len(origNodes.Items))
-
-		err := framework.DeleteNodeOnCloudProvider(&nodeToDelete)
+		origNodes, err := e2enode.GetReadyNodesIncludingTainted(c)
 		if err != nil {
-			e2elog.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
+			framework.Logf("Unexpected error occurred: %v", err)
+		}
+		framework.ExpectNoErrorWithOffset(0, err)
+
+		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
+
+		err = deleteNodeOnCloudProvider(nodeToDelete)
+		if err != nil {
+			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
 
 		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
-		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
+		_, err = c.CoreV1().Nodes().Get(context.TODO(), nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
-			e2elog.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
-		} else if !apierrs.IsNotFound(err) {
-			e2elog.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
+			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
+		} else if !apierrors.IsNotFound(err) {
+			framework.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
 		}
 
 	})
 })
+
+// DeleteNodeOnCloudProvider deletes the specified node.
+func deleteNodeOnCloudProvider(node *v1.Node) error {
+	return framework.TestContext.CloudConfig.Provider.DeleteNode(node)
+}

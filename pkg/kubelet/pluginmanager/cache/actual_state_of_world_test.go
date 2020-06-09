@@ -19,6 +19,8 @@ package cache
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Calls AddPlugin() to add a plugin
@@ -26,9 +28,10 @@ import (
 // Verifies PluginExistsWithCorrectTimestamp returns true for the plugin
 func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 	pluginInfo := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
+		Handler:    nil,
+		Name:       "test",
 	}
 	asw := NewActualStateOfWorld()
 	err := asw.AddPlugin(pluginInfo)
@@ -58,15 +61,13 @@ func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
-		SocketPath:           "",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "",
+		Timestamp:  time.Now(),
+		Handler:    nil,
+		Name:       "test",
 	}
 	err := asw.AddPlugin(pluginInfo)
-	// Assert
-	if err == nil || err.Error() != "Socket path is empty" {
-		t.Fatalf("AddOrUpdatePlugin failed. Expected: <Socket path is empty> Actual: <%v>", err)
-	}
+	require.EqualError(t, err, "socket path is empty")
 
 	// Get registered plugins and check the newly added plugin is there
 	aswPlugins := asw.GetRegisteredPlugins()
@@ -87,9 +88,10 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
+		Handler:    nil,
+		Name:       "test",
 	}
 	err := asw.AddPlugin(pluginInfo)
 	// Assert
@@ -118,9 +120,10 @@ func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testin
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
+		Handler:    nil,
+		Name:       "test",
 	}
 	err := asw.AddPlugin(pluginInfo)
 	// Assert
@@ -129,9 +132,8 @@ func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testin
 	}
 
 	newerPlugin := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
 	}
 	// Check PluginExistsWithCorrectTimestamp returns false
 	if asw.PluginExistsWithCorrectTimestamp(newerPlugin) {

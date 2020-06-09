@@ -20,12 +20,11 @@ import "k8s.io/api/core/v1"
 
 // FakeVolumeBinderConfig holds configurations for fake volume binder.
 type FakeVolumeBinderConfig struct {
-	AllBound             bool
-	FindUnboundSatsified bool
-	FindBoundSatsified   bool
-	FindErr              error
-	AssumeErr            error
-	BindErr              error
+	AllBound    bool
+	FindReasons ConflictReasons
+	FindErr     error
+	AssumeErr   error
+	BindErr     error
 }
 
 // NewFakeVolumeBinder sets up all the caches needed for the scheduler to make
@@ -44,8 +43,8 @@ type FakeVolumeBinder struct {
 }
 
 // FindPodVolumes implements SchedulerVolumeBinder.FindPodVolumes.
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatsified bool, err error) {
-	return b.config.FindUnboundSatsified, b.config.FindBoundSatsified, b.config.FindErr
+func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons ConflictReasons, err error) {
+	return b.config.FindReasons, b.config.FindErr
 }
 
 // AssumePodVolumes implements SchedulerVolumeBinder.AssumePodVolumes.
@@ -64,3 +63,6 @@ func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
 func (b *FakeVolumeBinder) GetBindingsCache() PodBindingCache {
 	return nil
 }
+
+// DeletePodBindings implements SchedulerVolumeBinder.DeletePodBindings.
+func (b *FakeVolumeBinder) DeletePodBindings(pod *v1.Pod) {}

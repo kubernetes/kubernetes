@@ -21,17 +21,18 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // NewAttacher implements AttachableVolumePlugin.NewAttacher.
 func (plugin *rbdPlugin) NewAttacher() (volume.Attacher, error) {
-	return plugin.newAttacherInternal(&RBDUtil{})
+	return plugin.newAttacherInternal(&rbdUtil{})
 }
 
 // NewDeviceMounter implements DeviceMountableVolumePlugin.NewDeviceMounter
@@ -49,7 +50,7 @@ func (plugin *rbdPlugin) newAttacherInternal(manager diskManager) (volume.Attach
 
 // NewDetacher implements AttachableVolumePlugin.NewDetacher.
 func (plugin *rbdPlugin) NewDetacher() (volume.Detacher, error) {
-	return plugin.newDetacherInternal(&RBDUtil{})
+	return plugin.newDetacherInternal(&rbdUtil{})
 }
 
 // NewDeviceUnmounter implements DeviceMountableVolumePlugin.NewDeviceUnmounter

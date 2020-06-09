@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "kind_string.go",
         "tables10.0.0.go",
+        "tables11.0.0.go",
         "tables9.0.0.go",
         "transform.go",
         "trieval.go",

@@ -19,32 +19,100 @@ package stats
 import (
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
+
+// This file contains a series of deprecated metrics which we emit them by endpoint `/metrics/resource/v1alpha1`.
+// These metrics have been adapted to new endpoint `/metrics/resource` as well as new `Desc`s.
+// In general, we don't need to maintain these deprecated metrics any more.
+// TODO(RainbowMango): Remove this file in release 1.20.0+.
+
+var (
+	nodeCPUUsageDesc = metrics.NewDesc("node_cpu_usage_seconds_total",
+		"Cumulative cpu time consumed by the node in core-seconds",
+		nil,
+		nil,
+		metrics.ALPHA,
+		"1.18.0")
+
+	nodeMemoryUsageDesc = metrics.NewDesc("node_memory_working_set_bytes",
+		"Current working set of the node in bytes",
+		nil,
+		nil,
+		metrics.ALPHA,
+		"1.18.0")
+
+	containerCPUUsageDesc = metrics.NewDesc("container_cpu_usage_seconds_total",
+		"Cumulative cpu time consumed by the container in core-seconds",
+		[]string{"container", "pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"1.18.0")
+
+	containerMemoryUsageDesc = metrics.NewDesc("container_memory_working_set_bytes",
+		"Current working set of the container in bytes",
+		[]string{"container", "pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"1.18.0")
+)
+
+// getNodeCPUMetrics returns CPU utilization of a node.
+func getNodeCPUMetrics(s stats.NodeStats) (*float64, time.Time) {
+	if s.CPU == nil {
+		return nil, time.Time{}
+	}
+	v := float64(*s.CPU.UsageCoreNanoSeconds) / float64(time.Second)
+	return &v, s.CPU.Time.Time
+}
+
+// getNodeMemoryMetrics returns memory utilization of a node.
+func getNodeMemoryMetrics(s stats.NodeStats) (*float64, time.Time) {
+	if s.Memory == nil {
+		return nil, time.Time{}
+	}
+	v := float64(*s.Memory.WorkingSetBytes)
+	return &v, s.Memory.Time.Time
+}
+
+// getContainerCPUMetrics returns CPU utilization of a container.
+func getContainerCPUMetrics(s stats.ContainerStats) (*float64, time.Time) {
+	if s.CPU == nil {
+		return nil, time.Time{}
+	}
+	v := float64(*s.CPU.UsageCoreNanoSeconds) / float64(time.Second)
+	return &v, s.CPU.Time.Time
+}
+
+// getContainerMemoryMetrics returns memory utilization of a container.
+func getContainerMemoryMetrics(s stats.ContainerStats) (*float64, time.Time) {
+	if s.Memory == nil {
+		return nil, time.Time{}
+	}
+	v := float64(*s.Memory.WorkingSetBytes)
+	return &v, s.Memory.Time.Time
+}
 
 // NodeResourceMetric describes a metric for the node
 type NodeResourceMetric struct {
-	Name        string
-	Description string
-	ValueFn     func(stats.NodeStats) (*float64, time.Time)
+	Desc    *metrics.Desc
+	ValueFn func(stats.NodeStats) (*float64, time.Time)
 }
 
-func (n *NodeResourceMetric) desc() *prometheus.Desc {
-	return prometheus.NewDesc(n.Name, n.Description, []string{}, nil)
+func (n *NodeResourceMetric) desc() *metrics.Desc {
+	return n.Desc
 }
 
 // ContainerResourceMetric describes a metric for containers
 type ContainerResourceMetric struct {
-	Name        string
-	Description string
-	ValueFn     func(stats.ContainerStats) (*float64, time.Time)
+	Desc    *metrics.Desc
+	ValueFn func(stats.ContainerStats) (*float64, time.Time)
 }
 
-func (n *ContainerResourceMetric) desc() *prometheus.Desc {
-	return prometheus.NewDesc(n.Name, n.Description, []string{"container", "pod", "namespace"}, nil)
+func (n *ContainerResourceMetric) desc() *metrics.Desc {
+	return n.Desc
 }
 
 // ResourceMetricsConfig specifies which metrics to collect and export
@@ -53,29 +121,60 @@ type ResourceMetricsConfig struct {
 	ContainerMetrics []ContainerResourceMetric
 }
 
-// NewPrometheusResourceMetricCollector returns a prometheus.Collector which exports resource metrics
-func NewPrometheusResourceMetricCollector(provider SummaryProvider, config ResourceMetricsConfig) prometheus.Collector {
+// Config is the v1alpha1 resource metrics definition
+func Config() ResourceMetricsConfig {
+	return ResourceMetricsConfig{
+		NodeMetrics: []NodeResourceMetric{
+			{
+				Desc:    nodeCPUUsageDesc,
+				ValueFn: getNodeCPUMetrics,
+			},
+			{
+				Desc:    nodeMemoryUsageDesc,
+				ValueFn: getNodeMemoryMetrics,
+			},
+		},
+		ContainerMetrics: []ContainerResourceMetric{
+			{
+				Desc:    containerCPUUsageDesc,
+				ValueFn: getContainerCPUMetrics,
+			},
+			{
+				Desc:    containerMemoryUsageDesc,
+				ValueFn: getContainerMemoryMetrics,
+			},
+		},
+	}
+}
+
+// NewPrometheusResourceMetricCollector returns a metrics.StableCollector which exports resource metrics
+func NewPrometheusResourceMetricCollector(provider SummaryProvider, config ResourceMetricsConfig) metrics.StableCollector {
 	return &resourceMetricCollector{
 		provider: provider,
 		config:   config,
-		errors: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "scrape_error",
-			Help: "1 if there was an error while getting container metrics, 0 otherwise",
-		}),
+		errors: metrics.NewDesc("scrape_error",
+			"1 if there was an error while getting container metrics, 0 otherwise",
+			nil,
+			nil,
+			metrics.ALPHA,
+			"1.18.0"),
 	}
 }
 
 type resourceMetricCollector struct {
+	metrics.BaseStableCollector
+
 	provider SummaryProvider
 	config   ResourceMetricsConfig
-	errors   prometheus.Gauge
+	errors   *metrics.Desc
 }
 
-var _ prometheus.Collector = &resourceMetricCollector{}
+var _ metrics.StableCollector = &resourceMetricCollector{}
 
-// Describe implements prometheus.Collector
-func (rc *resourceMetricCollector) Describe(ch chan<- *prometheus.Desc) {
-	rc.errors.Describe(ch)
+// DescribeWithStability implements metrics.StableCollector
+func (rc *resourceMetricCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- rc.errors
+
 	for _, metric := range rc.config.NodeMetrics {
 		ch <- metric.desc()
 	}
@@ -84,24 +183,26 @@ func (rc *resourceMetricCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// Collect implements prometheus.Collector
-// Since new containers are frequently created and removed, using the prometheus.Gauge Collector would
+// CollectWithStability implements metrics.StableCollector
+// Since new containers are frequently created and removed, using the Gauge would
 // leak metric collectors for containers or pods that no longer exist.  Instead, implement
-// prometheus.Collector in a way that only collects metrics for active containers.
-func (rc *resourceMetricCollector) Collect(ch chan<- prometheus.Metric) {
-	rc.errors.Set(0)
-	defer rc.errors.Collect(ch)
+// custom collector in a way that only collects metrics for active containers.
+func (rc *resourceMetricCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	var errorCount float64
+	defer func() {
+		ch <- metrics.NewLazyConstMetric(rc.errors, metrics.GaugeValue, errorCount)
+	}()
 	summary, err := rc.provider.GetCPUAndMemoryStats()
 	if err != nil {
-		rc.errors.Set(1)
+		errorCount = 1
 		klog.Warningf("Error getting summary for resourceMetric prometheus endpoint: %v", err)
 		return
 	}
 
 	for _, metric := range rc.config.NodeMetrics {
 		if value, timestamp := metric.ValueFn(summary.Node); value != nil {
-			ch <- prometheus.NewMetricWithTimestamp(timestamp,
-				prometheus.MustNewConstMetric(metric.desc(), prometheus.GaugeValue, *value))
+			ch <- metrics.NewLazyMetricWithTimestamp(timestamp,
+				metrics.NewLazyConstMetric(metric.desc(), metrics.GaugeValue, *value))
 		}
 	}
 
@@ -109,8 +210,8 @@ func (rc *resourceMetricCollector) Collect(ch chan<- prometheus.Metric) {
 		for _, container := range pod.Containers {
 			for _, metric := range rc.config.ContainerMetrics {
 				if value, timestamp := metric.ValueFn(container); value != nil {
-					ch <- prometheus.NewMetricWithTimestamp(timestamp,
-						prometheus.MustNewConstMetric(metric.desc(), prometheus.GaugeValue, *value, container.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+					ch <- metrics.NewLazyMetricWithTimestamp(timestamp,
+						metrics.NewLazyConstMetric(metric.desc(), metrics.GaugeValue, *value, container.Name, pod.PodRef.Name, pod.PodRef.Namespace))
 				}
 			}
 		}

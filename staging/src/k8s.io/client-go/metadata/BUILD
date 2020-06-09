@@ -10,7 +10,7 @@ go_library(
     importpath = "k8s.io/client-go/metadata",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -18,7 +18,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

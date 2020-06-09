@@ -122,7 +122,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 // Verities generated names are different for different pods if volume is not device mountble and attachable
 func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *testing.T) {
 	// Arrange
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(
+	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
 		"",  /* rootDir */
 		nil, /* kubeClient */
 		nil, /* plugins */

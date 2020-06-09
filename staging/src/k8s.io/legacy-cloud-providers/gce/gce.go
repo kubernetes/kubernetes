@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -36,6 +38,7 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
+	"google.golang.org/api/option"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
@@ -51,7 +54,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -65,8 +68,9 @@ const (
 	// AffinityTypeClientIP - affinity based on Client IP.
 	gceAffinityTypeClientIP = "CLIENT_IP"
 
-	operationPollInterval        = time.Second
-	maxTargetPoolCreateInstances = 200
+	operationPollInterval           = time.Second
+	maxTargetPoolCreateInstances    = 200
+	maxInstancesPerTargetPoolUpdate = 1000
 
 	// HTTP Load Balancer parameters
 	// Configure 8 second period for external health checks.
@@ -95,6 +99,13 @@ type Cloud struct {
 	// for the cloudprovider to start watching the configmap.
 	ClusterID ClusterID
 
+	// initializer is used for lazy initialization of subnetworkURL
+	// and isLegacyNetwork fields if they are not passed via the config.
+	// The reason is to avoid GCE API calls to initialize them if they
+	// will never be used. This is especially important when
+	// it is run from Kubelets, as there can be thousands  of them.
+	subnetworkURLAndIsLegacyNetworkInitializer sync.Once
+
 	service          *compute.Service
 	serviceBeta      *computebeta.Service
 	serviceAlpha     *computealpha.Service
@@ -111,10 +122,14 @@ type Cloud struct {
 	// managedZones will be set to the 1 zone if running a single zone cluster
 	// it will be set to ALL zones in region for any multi-zone cluster
 	// Use GetAllCurrentZones to get only zones that contain nodes
-	managedZones             []string
-	networkURL               string
-	isLegacyNetwork          bool
-	subnetworkURL            string
+	managedZones []string
+	networkURL   string
+	// unsafeIsLegacyNetwork should be used only via IsLegacyNetwork() accessor,
+	// to ensure it was properly initialized.
+	unsafeIsLegacyNetwork bool
+	// unsafeSubnetworkURL should be used only via SubnetworkURL() accessor,
+	// to ensure it was properly initialized.
+	unsafeSubnetworkURL      string
 	secondaryRangeName       string
 	networkProjectID         string
 	onXPN                    bool
@@ -186,6 +201,11 @@ type ConfigGlobal struct {
 }
 
 // ConfigFile is the struct used to parse the /etc/gce.conf configuration file.
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type ConfigFile struct {
 	Global ConfigGlobal `gcfg:"global"`
 }
@@ -388,31 +408,19 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		config.NetworkProjectID = config.ProjectID
 	}
 
-	client, err := newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	service, err := compute.New(client)
+	service, err := compute.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
 	service.UserAgent = userAgent
 
-	client, err = newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	serviceBeta, err := computebeta.New(client)
+	serviceBeta, err := computebeta.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
 	serviceBeta.UserAgent = userAgent
 
-	client, err = newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	serviceAlpha, err := computealpha.New(client)
+	serviceAlpha, err := computealpha.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +436,7 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(config.APIEndpoint, "v1", "alpha", -1))
 	}
 
-	containerService, err := container.New(client)
+	containerService, err := container.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
@@ -437,6 +445,10 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		containerService.BasePath = config.ContainerAPIEndpoint
 	}
 
+	client, err := newOauthClient(config.TokenSource)
+	if err != nil {
+		return nil, err
+	}
 	tpuService, err := newTPUService(client)
 	if err != nil {
 		return nil, err
@@ -464,32 +476,12 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		subnetURL = config.SubnetworkURL
 	} else if config.SubnetworkName != "" {
 		subnetURL = gceSubnetworkURL(config.APIEndpoint, netProjID, config.Region, config.SubnetworkName)
-	} else {
-		// Determine the type of network and attempt to discover the correct subnet for AUTO mode.
-		// Gracefully fail because kubelet calls CreateGCECloud without any config, and minions
-		// lack the proper credentials for API calls.
-		if networkName := lastComponent(networkURL); networkName != "" {
-			var n *compute.Network
-			if n, err = getNetwork(service, netProjID, networkName); err != nil {
-				klog.Warningf("Could not retrieve network %q; err: %v", networkName, err)
-			} else {
-				switch typeOfNetwork(n) {
-				case netTypeLegacy:
-					klog.Infof("Network %q is type legacy - no subnetwork", networkName)
-					isLegacyNetwork = true
-				case netTypeCustom:
-					klog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
-				case netTypeAuto:
-					subnetURL, err = determineSubnetURL(service, netProjID, networkName, config.Region)
-					if err != nil {
-						klog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, config.Region, err)
-					} else {
-						klog.Infof("Auto selecting subnetwork %q", subnetURL)
-					}
-				}
-			}
-		}
 	}
+	// If neither SubnetworkURL nor SubnetworkName are provided, defer to
+	// lazy initialization. Determining subnetURL and isLegacyNetwork requires
+	// GCE API call. Given that it's not used in many cases and the fact that
+	// the provider is initialized also for Kubelets (and there can be thousands
+	// of them) we defer to lazy initialization here.
 
 	if len(config.ManagedZones) == 0 {
 		config.ManagedZones, err = getZonesForRegion(service, config.ProjectID, config.Region)
@@ -517,8 +509,8 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		localZone:                config.Zone,
 		managedZones:             config.ManagedZones,
 		networkURL:               networkURL,
-		isLegacyNetwork:          isLegacyNetwork,
-		subnetworkURL:            subnetURL,
+		unsafeIsLegacyNetwork:    isLegacyNetwork,
+		unsafeSubnetworkURL:      subnetURL,
 		secondaryRangeName:       config.SecondaryRangeName,
 		nodeTags:                 config.NodeTags,
 		nodeInstancePrefix:       config.NodeInstancePrefix,
@@ -539,6 +531,45 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	gce.c = cloud.NewGCE(gce.s)
 
 	return gce, nil
+}
+
+// initializeNetworkConfig() is supposed to be called under sync.Once()
+// for accessors to subnetworkURL and isLegacyNetwork fields.
+func (g *Cloud) initializeSubnetworkURLAndIsLegacyNetwork() {
+	if g.unsafeSubnetworkURL != "" {
+		// This has already been initialized via the config.
+		return
+	}
+
+	var subnetURL string
+	var isLegacyNetwork bool
+
+	// Determine the type of network and attempt to discover the correct subnet for AUTO mode.
+	// Gracefully fail because kubelet calls CreateGCECloud without any config, and minions
+	// lack the proper credentials for API calls.
+	if networkName := lastComponent(g.NetworkURL()); networkName != "" {
+		if n, err := getNetwork(g.service, g.NetworkProjectID(), networkName); err != nil {
+			klog.Warningf("Could not retrieve network %q; err: %v", networkName, err)
+		} else {
+			switch typeOfNetwork(n) {
+			case netTypeLegacy:
+				klog.Infof("Network %q is type legacy - no subnetwork", networkName)
+				isLegacyNetwork = true
+			case netTypeCustom:
+				klog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
+			case netTypeAuto:
+				subnetURL, err = determineSubnetURL(g.service, g.NetworkProjectID(), networkName, g.Region())
+				if err != nil {
+					klog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, g.Region(), err)
+				} else {
+					klog.Infof("Auto selecting subnetwork %q", subnetURL)
+				}
+			}
+		}
+	}
+
+	g.unsafeSubnetworkURL = subnetURL
+	g.unsafeIsLegacyNetwork = isLegacyNetwork
 }
 
 // SetRateLimiter adds a custom cloud.RateLimiter implementation.
@@ -607,11 +638,9 @@ func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	g.clientBuilder = clientBuilder
 	g.client = clientBuilder.ClientOrDie("cloud-provider")
 
-	if g.OnXPN() {
-		g.eventBroadcaster = record.NewBroadcaster()
-		g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
-		g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
-	}
+	g.eventBroadcaster = record.NewBroadcaster()
+	g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
+	g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
 
 	go g.watchClusterID(stop)
 }
@@ -673,12 +702,14 @@ func (g *Cloud) NetworkURL() string {
 
 // SubnetworkURL returns the subnetwork url
 func (g *Cloud) SubnetworkURL() string {
-	return g.subnetworkURL
+	g.subnetworkURLAndIsLegacyNetworkInitializer.Do(g.initializeSubnetworkURLAndIsLegacyNetwork)
+	return g.unsafeSubnetworkURL
 }
 
 // IsLegacyNetwork returns true if the cluster is still running a legacy network configuration.
 func (g *Cloud) IsLegacyNetwork() bool {
-	return g.isLegacyNetwork
+	g.subnetworkURLAndIsLegacyNetworkInitializer.Do(g.initializeSubnetworkURLAndIsLegacyNetwork)
+	return g.unsafeIsLegacyNetwork
 }
 
 // SetInformers sets up the zone handlers we need watching for node changes.
@@ -856,7 +887,7 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
-			oauth2.NoContext,
+			context.Background(),
 			compute.CloudPlatformScope,
 			compute.ComputeScope)
 		klog.Infof("Using DefaultTokenSource %#v", tokenSource)
@@ -883,22 +914,13 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 		return nil, err
 	}
 
-	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
+	return oauth2.NewClient(context.Background(), tokenSource), nil
 }
 
 func (manager *gceServiceManager) getProjectsAPIEndpoint() string {
 	projectsAPIEndpoint := gceComputeAPIEndpoint + "projects/"
 	if manager.gce.service != nil {
 		projectsAPIEndpoint = manager.gce.service.BasePath
-	}
-
-	return projectsAPIEndpoint
-}
-
-func (manager *gceServiceManager) getProjectsAPIEndpointBeta() string {
-	projectsAPIEndpoint := gceComputeAPIEndpointBeta + "projects/"
-	if manager.gce.service != nil {
-		projectsAPIEndpoint = manager.gce.serviceBeta.BasePath
 	}
 
 	return projectsAPIEndpoint

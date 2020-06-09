@@ -12,6 +12,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
         "//pkg/registry/core/service/allocator/storage:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",

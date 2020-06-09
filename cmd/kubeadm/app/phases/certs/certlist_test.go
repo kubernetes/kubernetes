@@ -27,6 +27,7 @@ import (
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 func TestCertListOrder(t *testing.T) {
@@ -160,16 +161,18 @@ func TestCreateCertificateChain(t *testing.T) {
 
 	caCfg := Certificates{
 		{
-			config:   certutil.Config{},
+			config:   pkiutil.CertConfig{},
 			Name:     "test-ca",
 			BaseName: "test-ca",
 		},
 		{
-			config: certutil.Config{
-				AltNames: certutil.AltNames{
-					DNSNames: []string{"test-domain.space"},
+			config: pkiutil.CertConfig{
+				Config: certutil.Config{
+					AltNames: certutil.AltNames{
+						DNSNames: []string{"test-domain.space"},
+					},
+					Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 				},
-				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 			configMutators: []configMutatorsFunc{
 				setCommonNameToNodeName(),

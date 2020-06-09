@@ -20,14 +20,18 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 type fakeCsiDriverClient struct {
@@ -77,12 +81,18 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		VolumePath: targetPath,
 	}
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	usages := resp.GetUsage()
 	metrics := &volume.Metrics{}
 	if usages == nil {
 		return nil, nil
 	}
 	for _, usage := range usages {
+		if usage == nil {
+			continue
+		}
 		unit := usage.GetUnit()
 		switch unit {
 		case csipbv1.VolumeUsage_BYTES:
@@ -143,16 +153,26 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
 				Mode: asCSIAccessModeV1(accessMode),
 			},
-			AccessType: &csipbv1.VolumeCapability_Mount{
-				Mount: &csipbv1.VolumeCapability_MountVolume{
-					FsType:     fsType,
-					MountFlags: mountOptions,
-				},
-			},
 		},
 	}
 
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Block{
+			Block: &csipbv1.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
+			Mount: &csipbv1.VolumeCapability_MountVolume{
+				FsType:     fsType,
+				MountFlags: mountOptions,
+			},
+		}
+	}
+
 	_, err := c.nodeClient.NodePublishVolume(ctx, req)
+	if err != nil && !isFinalError(err) {
+		return volumetypes.NewUncertainProgressError(err.Error())
+	}
 	return err
 }
 
@@ -186,18 +206,27 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
 				Mode: asCSIAccessModeV1(accessMode),
 			},
-			AccessType: &csipbv1.VolumeCapability_Mount{
-				Mount: &csipbv1.VolumeCapability_MountVolume{
-					FsType:     fsType,
-					MountFlags: mountOptions,
-				},
-			},
 		},
 		Secrets:       secrets,
 		VolumeContext: volumeContext,
 	}
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Block{
+			Block: &csipbv1.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
+			Mount: &csipbv1.VolumeCapability_MountVolume{
+				FsType:     fsType,
+				MountFlags: mountOptions,
+			},
+		}
+	}
 
 	_, err := c.nodeClient.NodeStageVolume(ctx, req)
+	if err != nil && !isFinalError(err) {
+		return volumetypes.NewUncertainProgressError(err.Error())
+	}
 	return err
 }
 
@@ -360,6 +389,13 @@ func TestClientNodeGetInfo(t *testing.T) {
 }
 
 func TestClientNodePublishVolume(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	testPath := filepath.Join(tmpDir, "path")
+
 	testCases := []struct {
 		name       string
 		volID      string
@@ -368,11 +404,11 @@ func TestClientNodePublishVolume(t *testing.T) {
 		mustFail   bool
 		err        error
 	}{
-		{name: "test ok", volID: "vol-test", targetPath: "/test/path"},
-		{name: "missing volID", targetPath: "/test/path", mustFail: true},
+		{name: "test ok", volID: "vol-test", targetPath: testPath},
+		{name: "missing volID", targetPath: testPath, mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
-		{name: "bad fs", volID: "vol-test", targetPath: "/test/path", fsType: "badfs", mustFail: true},
-		{name: "grpc error", volID: "vol-test", targetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
+		{name: "bad fs", volID: "vol-test", targetPath: testPath, fsType: "badfs", mustFail: true},
+		{name: "grpc error", volID: "vol-test", targetPath: testPath, mustFail: true, err: errors.New("grpc error")},
 	}
 
 	for _, tc := range testCases {
@@ -409,6 +445,13 @@ func TestClientNodePublishVolume(t *testing.T) {
 }
 
 func TestClientNodeUnpublishVolume(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	testPath := filepath.Join(tmpDir, "path")
+
 	testCases := []struct {
 		name       string
 		volID      string
@@ -416,10 +459,10 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 		mustFail   bool
 		err        error
 	}{
-		{name: "test ok", volID: "vol-test", targetPath: "/test/path"},
-		{name: "missing volID", targetPath: "/test/path", mustFail: true},
-		{name: "missing target path", volID: "vol-test", mustFail: true},
-		{name: "grpc error", volID: "vol-test", targetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
+		{name: "test ok", volID: "vol-test", targetPath: testPath},
+		{name: "missing volID", targetPath: testPath, mustFail: true},
+		{name: "missing target path", volID: testPath, mustFail: true},
+		{name: "grpc error", volID: "vol-test", targetPath: testPath, mustFail: true, err: errors.New("grpc error")},
 	}
 
 	for _, tc := range testCases {
@@ -444,6 +487,13 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestClientNodeStageVolume(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	testPath := filepath.Join(tmpDir, "/test/path")
+
 	testCases := []struct {
 		name              string
 		volID             string
@@ -454,11 +504,11 @@ func TestClientNodeStageVolume(t *testing.T) {
 		mustFail          bool
 		err               error
 	}{
-		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4", mountOptions: []string{"unvalidated"}},
-		{name: "missing volID", stagingTargetPath: "/test/path", mustFail: true},
+		{name: "test ok", volID: "vol-test", stagingTargetPath: testPath, fsType: "ext4", mountOptions: []string{"unvalidated"}},
+		{name: "missing volID", stagingTargetPath: testPath, mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
-		{name: "bad fs", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "badfs", mustFail: true},
-		{name: "grpc error", volID: "vol-test", stagingTargetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
+		{name: "bad fs", volID: "vol-test", stagingTargetPath: testPath, fsType: "badfs", mustFail: true},
+		{name: "grpc error", volID: "vol-test", stagingTargetPath: testPath, mustFail: true, err: errors.New("grpc error")},
 	}
 
 	for _, tc := range testCases {
@@ -493,6 +543,13 @@ func TestClientNodeStageVolume(t *testing.T) {
 }
 
 func TestClientNodeUnstageVolume(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	testPath := filepath.Join(tmpDir, "/test/path")
+
 	testCases := []struct {
 		name              string
 		volID             string
@@ -500,10 +557,10 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		mustFail          bool
 		err               error
 	}{
-		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path"},
-		{name: "missing volID", stagingTargetPath: "/test/path", mustFail: true},
+		{name: "test ok", volID: "vol-test", stagingTargetPath: testPath},
+		{name: "missing volID", stagingTargetPath: testPath, mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
-		{name: "grpc error", volID: "vol-test", stagingTargetPath: "/test/path", mustFail: true, err: errors.New("grpc error")},
+		{name: "grpc error", volID: "vol-test", stagingTargetPath: testPath, mustFail: true, err: errors.New("grpc error")},
 	}
 
 	for _, tc := range testCases {
@@ -661,14 +718,16 @@ func TestVolumeStats(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
-		defer cancel()
-		csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-		csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
-		_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
-		if err != nil && tc.success {
-			t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if err != nil && tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
+			}
+		})
 	}
 
 }

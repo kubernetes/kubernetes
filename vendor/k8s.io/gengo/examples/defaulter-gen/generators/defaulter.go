@@ -29,7 +29,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // CustomArgs is used tby the go2idl framework to pass args specific to this
@@ -248,7 +248,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		shouldCreateObjectDefaulterFn := func(t *types.Type) bool {
 			if defaults, ok := existingDefaulters[t]; ok && defaults.object != nil {
 				// A default generator is defined
-				klog.V(5).Infof("  an object defaulter already exists as %s", defaults.base.Name)
+				baseTypeName := "<unknown>"
+				if defaults.base != nil {
+					baseTypeName = defaults.base.Name.String()
+				}
+				klog.V(5).Infof("  an object defaulter already exists as %s", baseTypeName)
 				return false
 			}
 			// opt-out

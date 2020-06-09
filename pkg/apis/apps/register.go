@@ -23,8 +23,10 @@ import (
 )
 
 var (
+	// SchemeBuilder stores functions to add things to a scheme.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme applies all stored functions t oa scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 // GroupName is the group name use in this package

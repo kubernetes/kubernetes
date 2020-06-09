@@ -54,16 +54,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta2.ScaleStatus)(nil), (*scheme.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_ScaleStatus_To_scheme_ScaleStatus(a.(*v1beta2.ScaleStatus), b.(*scheme.ScaleStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*scheme.ScaleStatus)(nil), (*v1beta2.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_scheme_ScaleStatus_To_v1beta2_ScaleStatus(a.(*scheme.ScaleStatus), b.(*v1beta2.ScaleStatus), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*scheme.ScaleStatus)(nil), (*v1beta2.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_scheme_ScaleStatus_To_v1beta2_ScaleStatus(a.(*scheme.ScaleStatus), b.(*v1beta2.ScaleStatus), scope)
 	}); err != nil {

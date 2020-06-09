@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -61,9 +63,9 @@ type CheckpointData struct {
 type PodSandboxCheckpoint struct {
 	// Version of the pod sandbox checkpoint schema.
 	Version string `json:"version"`
-	// Pod name of the sandbox. Same as the pod name in the PodSpec.
+	// Pod name of the sandbox. Same as the pod name in the Pod ObjectMeta.
 	Name string `json:"name"`
-	// Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+	// Pod namespace of the sandbox. Same as the pod namespace in the Pod ObjectMeta.
 	Namespace string `json:"namespace"`
 	// Data to checkpoint for pod sandbox.
 	Data *CheckpointData `json:"data,omitempty"`

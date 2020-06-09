@@ -25,6 +25,7 @@ import (
 // 2. evaluation of RoleBindings in the namespace requested - short circuit on match
 // 3. deny by default
 
+// APIGroupAll and these consts are default values for rbac authorization.
 const (
 	APIGroupAll    = "*"
 	ResourceAll    = "*"

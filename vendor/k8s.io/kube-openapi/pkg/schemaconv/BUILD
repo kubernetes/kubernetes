@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/schema:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v3/schema:go_default_library",
     ],
 )
 

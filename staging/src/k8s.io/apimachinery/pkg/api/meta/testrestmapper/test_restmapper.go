@@ -152,7 +152,7 @@ var rootScopedKinds = map[schema.GroupKind]bool{
 
 	{Group: "metrics.k8s.io", Kind: "NodeMetrics"}: true,
 
-	{Group: "wardle.k8s.io", Kind: "Fischer"}: true,
+	{Group: "wardle.example.com", Kind: "Fischer"}: true,
 }
 
 // hardcoded is good enough for the test we're running

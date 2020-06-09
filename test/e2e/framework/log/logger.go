@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package log will be removed after switching to use core framework log.
+// Do not make further changes here!
 package log
 
 import (
@@ -22,7 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
 func nowStamp() string {
@@ -47,6 +49,6 @@ func Failf(format string, args ...interface{}) {
 // (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
 func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	log("INFO", msg)
-	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
+	log("FAIL", msg)
+	e2eginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }

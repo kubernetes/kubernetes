@@ -23,6 +23,15 @@ rm -rf ./kubernetes/; rm -f kubernetes.tar.gz; rm -f ~/.kube/config
 # if you're working with multiple projects and don't want to repeatedly switch
 # between gcloud config configurations.
 export CLOUDSDK_CORE_PROJECT=<your_project_name>
+
+# To run e2e test locally, make sure "Application Default Credentials" is set in any of the places:
+# References: https://cloud.google.com/sdk/docs/authorizing#authorizing_with_a_service_account
+#             https://cloud.google.com/sdk/gcloud/reference/auth/application-default/
+#    1. $HOME/.config/gcloud/application_default_credentials.json, if doesn't exist, run this command:
+gcloud auth application-default login
+# Or 2. Create a json format credential file as per http://cloud/docs/authentication/production,
+#       then export to environment variable
+export GOOGLE_APPLICATION_CREDENTIAL=[path_to_the_json_file]
 ```
 
 ### 1. Build Kubernetes
@@ -47,9 +56,8 @@ make quick-release
 
 ### 2. Create a Kubernetes cluster
 
-You can create a regular Kubernetes cluster or an end-to-end test cluster.
-End-to-end test clusters support running the Kubernetes e2e tests and enable
-some debugging features such as SSH access on the Windows nodes.
+You can create a regular Kubernetes cluster or an end-to-end test cluster.<br />
+Only end-to-end test clusters support running the Kubernetes e2e tests (as both [e2e cluster creation](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/e2e-internal/e2e-up.sh#L24) and [e2e test scripts](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/ginkgo-e2e.sh#L42) are setup based on `cluster/gce/config-test.sh`), also enables some debugging features such as SSH access on the Windows nodes.
 
 Please make sure you set the environment variables properly following the
 instructions in the previous section.
@@ -76,35 +84,33 @@ Now bring up a cluster using one of the following two methods:
 ```
 # Invoke kube-up.sh with these environment variables:
 #   PROJECT: text name of your GCP project.
-#   KUBERNETES_SKIP_CONFIRM: skips any kube-up prompts.
-PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-up.sh
+#   WINDOWS_NODE_OS_DISTRIBUTION: the Windows version you want your nodes to
+#     run, e.g. win2019 or win1909.
+#   KUBE_UP_AUTOMATIC_CLEANUP (optional): cleans up existing cluster without
+#     prompting.
+PROJECT=${CLOUDSDK_CORE_PROJECT} WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
+  KUBE_UP_AUTOMATIC_CLEANUP=true ./cluster/kube-up.sh
 ```
 
 To teardown the cluster run:
 
 ```
-PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./cluster/kube-down.sh
 ```
 
 #### 2b. Create a Kubernetes end-to-end (E2E) test cluster
-
 If you have built your own release binaries following step 1, run the following
 command:
 ```
-PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up
+PROJECT=${CLOUDSDK_CORE_PROJECT} WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
+  ./hack/e2e-internal/e2e-up.sh
 ```
 
-Otherwise, you can specify what branch from which to get the release artifacts:
+If any e2e cluster exists already, this command will prompt you to tear down and
+create a new one. To teardown existing e2e cluster only, run the command:
 ```
-# Get the latest build from the stable1 branch
-PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up --extract=ci/k8s-stable1
-# Or Get the latest build from master
-PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up --extract=ci-cross/latest
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-down.sh
 ```
-
-This command, by default, tears down any existing E2E cluster and creates a new
-one. To teardown the cluster run the same command with `--down` instead of
-`--up`.
 
 No matter what type of cluster you chose to create, the result should be a
 Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes
@@ -154,7 +160,7 @@ use the steps below to run K8s e2e tests. These steps are based on
 
 *   The canonical arguments for running all Windows e2e tests against a cluster
     on GCE can be seen by searching for `--test-cmd-args` in the [test
-    configuration](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-gcp/sig-gcp-windows.yaml#L78)
+    configuration](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-windows/windows-gce.yaml#L78)
     for the `ci-kubernetes-e2e-windows-gce` continuous test job. These arguments
     should be passed to the `run-e2e` script; escape the ginkgo arguments by
     adding quotes around them. For example:

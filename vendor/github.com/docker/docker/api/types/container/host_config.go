@@ -338,7 +338,6 @@ type Resources struct {
 	Devices              []DeviceMapping // List of devices to map inside the container
 	DeviceCgroupRules    []string        // List of rule to be added to the device cgroup
 	DeviceRequests       []DeviceRequest // List of device requests for device drivers
-	DiskQuota            int64           // Disk limit (in bytes)
 	KernelMemory         int64           // Kernel memory limit (in bytes)
 	KernelMemoryTCP      int64           // Hard limit for kernel TCP buffer memory (in bytes)
 	MemoryReservation    int64           // Memory soft limit (in bytes)

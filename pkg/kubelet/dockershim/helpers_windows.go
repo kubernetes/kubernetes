@@ -1,4 +1,4 @@
-// +build windows
+// +build windows,!dockerless
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -20,12 +20,13 @@ package dockershim
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -69,11 +70,12 @@ func (ds *dockerService) updateCreateConfig(
 	if wc := config.GetWindows(); wc != nil {
 		rOpts := wc.GetResources()
 		if rOpts != nil {
+			// Precedence and units for these are described at length in kuberuntime_container_windows.go - generateWindowsContainerConfig()
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
-				Memory:     rOpts.MemoryLimitInBytes,
-				CPUShares:  rOpts.CpuShares,
-				CPUCount:   rOpts.CpuCount,
-				CPUPercent: rOpts.CpuMaximum,
+				Memory:    rOpts.MemoryLimitInBytes,
+				CPUShares: rOpts.CpuShares,
+				CPUCount:  rOpts.CpuCount,
+				NanoCPUs:  rOpts.CpuMaximum * int64(runtime.NumCPU()) * (1e9 / 10000),
 			}
 		}
 
@@ -119,7 +121,7 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) []string {
 
 		// Versions and feature support
 		// ============================
-		// Windows version == Windows Server, Version 1709,, Supports both sandbox and non-sandbox case
+		// Windows version == Windows Server, Version 1709, Supports both sandbox and non-sandbox case
 		// Windows version == Windows Server 2016   Support only non-sandbox case
 		// Windows version < Windows Server 2016 is Not Supported
 

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -113,21 +113,26 @@ type imageCache struct {
 	images []container.Image
 }
 
-// set updates image cache.
+// set sorts the input list and updates image cache.
+// 'i' takes ownership of the list, you should not reference the list again
+// after calling this function.
 func (i *imageCache) set(images []container.Image) {
 	i.Lock()
 	defer i.Unlock()
+	// The image list needs to be sorted when it gets read and used in
+	// setNodeStatusImages. We sort the list on write instead of on read,
+	// because the image cache is more often read than written
+	sort.Sort(sliceutils.ByImageSize(images))
 	i.images = images
 }
 
-// get gets a sorted (by image size) image list from image cache.
-// There is a potentical data race in this function. See PR #60448
-// Because there is deepcopy function available currently, move sort
-// function inside this function
+// get gets image list from image cache.
+// NOTE: The caller of get() should not do mutating operations on the
+// returned list that could cause data race against other readers (e.g.
+// in-place sorting the returned list)
 func (i *imageCache) get() []container.Image {
 	i.Lock()
 	defer i.Unlock()
-	sort.Sort(sliceutils.ByImageSize(i.images))
 	return i.images
 }
 

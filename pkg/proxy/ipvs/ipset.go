@@ -22,7 +22,9 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 
 	"fmt"
-	"k8s.io/klog"
+	"strings"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -37,6 +39,9 @@ const (
 
 	kubeExternalIPSetComment = "Kubernetes service external ip + port for masquerade and filter purpose"
 	kubeExternalIPSet        = "KUBE-EXTERNAL-IP"
+
+	kubeExternalIPLocalSetComment = "Kubernetes service external ip + port with externalTrafficPolicy=local"
+	kubeExternalIPLocalSet        = "KUBE-EXTERNAL-IP-LOCAL"
 
 	kubeLoadBalancerSetComment = "Kubernetes service lb portal"
 	kubeLoadBalancerSet        = "KUBE-LOAD-BALANCER"
@@ -65,16 +70,6 @@ const (
 	kubeNodePortLocalSetUDPComment = "Kubernetes nodeport UDP port with externalTrafficPolicy=local"
 	kubeNodePortLocalSetUDP        = "KUBE-NODE-PORT-LOCAL-UDP"
 
-	// This ipset is no longer active but still used in previous versions.
-	// DO NOT create an ipset using this name
-	legacyKubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose"
-	legacyKubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP"
-
-	// This ipset is no longer active but still used in previous versions.
-	// DO NOT create an ipset using this name
-	legacyKubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local"
-	legacyKubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP"
-
 	kubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose with type 'hash ip:port'"
 	kubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP-HASH"
 
@@ -102,6 +97,20 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	hashFamily := utilipset.ProtocolFamilyIPV4
 	if isIPv6 {
 		hashFamily = utilipset.ProtocolFamilyIPV6
+		// In dual-stack both ipv4 and ipv6 ipset's can co-exist. To
+		// ensure unique names the prefix for ipv6 is changed from
+		// "KUBE-" to "KUBE-6-". The "KUBE-" prefix is kept for
+		// backward compatibility. The maximum name length of an ipset
+		// is 31 characters which must be taken into account.  The
+		// ipv4 names are not altered to minimize the risk for
+		// problems on upgrades.
+		if strings.HasPrefix(name, "KUBE-") {
+			name = strings.Replace(name, "KUBE-", "KUBE-6-", 1)
+			if len(name) > 31 {
+				klog.Warningf("ipset name truncated; [%s] -> [%s]", name, name[:31])
+				name = name[:31]
+			}
+		}
 	}
 	set := &IPSet{
 		IPSet: utilipset.IPSet{

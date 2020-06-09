@@ -73,36 +73,46 @@ func New(fn ListPageFunc) *ListPager {
 // List returns a single list object, but attempts to retrieve smaller chunks from the
 // server to reduce the impact on the server. If the chunk attempt fails, it will load
 // the full list instead. The Limit field on options, if unset, will default to the page size.
-func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runtime.Object, bool, error) {
 	if options.Limit == 0 {
 		options.Limit = p.PageSize
 	}
+	requestedResourceVersion := options.ResourceVersion
 	var list *metainternalversion.List
+	paginatedResult := false
+
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, paginatedResult, ctx.Err()
 		default:
 		}
 
 		obj, err := p.PageFn(ctx, options)
 		if err != nil {
-			if !errors.IsResourceExpired(err) || !p.FullListIfExpired {
-				return nil, err
+			// Only fallback to full list if an "Expired" errors is returned, FullListIfExpired is true, and
+			// the "Expired" error occurred in page 2 or later (since full list is intended to prevent a pager.List from
+			// failing when the resource versions is established by the first page request falls out of the compaction
+			// during the subsequent list requests).
+			if !errors.IsResourceExpired(err) || !p.FullListIfExpired || options.Continue == "" {
+				return nil, paginatedResult, err
 			}
-			// the list expired while we were processing, fall back to a full list
+			// the list expired while we were processing, fall back to a full list at
+			// the requested ResourceVersion.
 			options.Limit = 0
 			options.Continue = ""
-			return p.PageFn(ctx, options)
+			options.ResourceVersion = requestedResourceVersion
+			result, err := p.PageFn(ctx, options)
+			return result, paginatedResult, err
 		}
 		m, err := meta.ListAccessor(obj)
 		if err != nil {
-			return nil, fmt.Errorf("returned object must be a list: %v", err)
+			return nil, paginatedResult, fmt.Errorf("returned object must be a list: %v", err)
 		}
 
 		// exit early and return the object we got if we haven't processed any pages
 		if len(m.GetContinue()) == 0 && list == nil {
-			return obj, nil
+			return obj, paginatedResult, nil
 		}
 
 		// initialize the list and fill its contents
@@ -115,16 +125,22 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 			list.Items = append(list.Items, obj)
 			return nil
 		}); err != nil {
-			return nil, err
+			return nil, paginatedResult, err
 		}
 
 		// if we have no more items, return the list
 		if len(m.GetContinue()) == 0 {
-			return list, nil
+			return list, paginatedResult, nil
 		}
 
 		// set the next loop up
 		options.Continue = m.GetContinue()
+		// Clear the ResourceVersion on the subsequent List calls to avoid the
+		// `specifying resource version is not allowed when using continue` error.
+		// See https://github.com/kubernetes/kubernetes/issues/85221#issuecomment-553748143.
+		options.ResourceVersion = ""
+		// At this point, result is already paginated.
+		paginatedResult = true
 	}
 }
 

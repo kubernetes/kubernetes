@@ -19,6 +19,7 @@ limitations under the License.
 package v2alpha1
 
 import (
+	"context"
 	"time"
 
 	v2alpha1 "k8s.io/api/batch/v2alpha1"
@@ -37,15 +38,15 @@ type CronJobsGetter interface {
 
 // CronJobInterface has methods to work with CronJob resources.
 type CronJobInterface interface {
-	Create(*v2alpha1.CronJob) (*v2alpha1.CronJob, error)
-	Update(*v2alpha1.CronJob) (*v2alpha1.CronJob, error)
-	UpdateStatus(*v2alpha1.CronJob) (*v2alpha1.CronJob, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v2alpha1.CronJob, error)
-	List(opts v1.ListOptions) (*v2alpha1.CronJobList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error)
+	Create(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.CreateOptions) (*v2alpha1.CronJob, error)
+	Update(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (*v2alpha1.CronJob, error)
+	UpdateStatus(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (*v2alpha1.CronJob, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2alpha1.CronJob, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v2alpha1.CronJobList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.CronJob, err error)
 	CronJobExpansion
 }
 
@@ -64,20 +65,20 @@ func newCronJobs(c *BatchV2alpha1Client, namespace string) *cronJobs {
 }
 
 // Get takes name of the cronJob, and returns the corresponding cronJob object, and an error if there is any.
-func (c *cronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CronJobs that match those selectors.
-func (c *cronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
+func (c *cronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -88,13 +89,13 @@ func (c *cronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err 
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *cronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -105,87 +106,90 @@ func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Create(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.CreateOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("cronjobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a cronJob and updates it. Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Update(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Update(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *cronJobs) UpdateStatus(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v2alpha1.CronJob, opts v1.UpdateOptions) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
-func (c *cronJobs) Delete(name string, options *v1.DeleteOptions) error {
+func (c *cronJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *cronJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *cronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error) {
+func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.CronJob, err error) {
 	result = &v2alpha1.CronJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("cronjobs").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

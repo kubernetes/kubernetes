@@ -22,7 +22,7 @@ import "gonum.org/v1/gonum/blas"
 //  v[j] = 0           j < i
 //  v[j] = 1           j == i
 //  v[j] = a[j*lda+i]  j > i
-// and computing H_i = I - tau[i] * v * v^T.
+// and computing H_i = I - tau[i] * v * vᵀ.
 //
 // The orthonormal matrix Q can be constructed from a product of these elementary
 // reflectors, Q = H_0 * H_1 * ... * H_{k-1}, where k = min(m,n).

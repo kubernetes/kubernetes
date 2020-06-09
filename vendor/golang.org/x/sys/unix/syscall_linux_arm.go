@@ -19,12 +19,18 @@ func setTimeval(sec, usec int64) Timeval {
 	return Timeval{Sec: int32(sec), Usec: int32(usec)}
 }
 
+//sysnb	pipe(p *[2]_C_int) (err error)
+
 func Pipe(p []int) (err error) {
 	if len(p) != 2 {
 		return EINVAL
 	}
 	var pp [2]_C_int
+	// Try pipe2 first for Android O, then try pipe for kernel 2.6.23.
 	err = pipe2(&pp, 0)
+	if err == ENOSYS {
+		err = pipe(&pp)
+	}
 	p[0] = int(pp[0])
 	p[1] = int(pp[1])
 	return
@@ -265,4 +271,17 @@ func SyncFileRange(fd int, off int64, n int64, flags int) error {
 	// The sync_file_range and arm_sync_file_range syscalls differ only in the
 	// order of their arguments.
 	return armSyncFileRange(fd, flags, off, n)
+}
+
+//sys	kexecFileLoad(kernelFd int, initrdFd int, cmdlineLen int, cmdline string, flags int) (err error)
+
+func KexecFileLoad(kernelFd int, initrdFd int, cmdline string, flags int) error {
+	cmdlineLen := len(cmdline)
+	if cmdlineLen > 0 {
+		// Account for the additional NULL byte added by
+		// BytePtrFromString in kexecFileLoad. The kexec_file_load
+		// syscall expects a NULL-terminated string.
+		cmdlineLen++
+	}
+	return kexecFileLoad(kernelFd, initrdFd, cmdlineLen, cmdline, flags)
 }

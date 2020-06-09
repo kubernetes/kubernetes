@@ -15,14 +15,13 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.1.0
+          image: gcr.io/k8s-staging-csi/csi-attacher:v3.0.0-rc1
           args:
             - --v=5
             - --csi-address=$(ADDRESS)
           env:
             - name: ADDRESS
               value: /csi/csi.sock
-          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:

@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// GroupName is the name of this API group.
 const GroupName = "rbac.authorization.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
@@ -36,6 +37,7 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
+// SchemeBuilder is a function that calls Register for you.
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme

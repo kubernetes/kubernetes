@@ -6,6 +6,7 @@ go_library(
         "context.go",
         "grpc.go",
         "store.go",
+        "ttrpc.go",
         "validate.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/namespaces",
@@ -13,8 +14,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/containerd/containerd/errdefs:go_default_library",
+        "//vendor/github.com/containerd/ttrpc:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc/metadata:go_default_library",
     ],
 )

@@ -25,7 +25,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/klog"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -197,11 +198,16 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("could not open %q: %v", certPath, err)
 	}
 	defer f.Close()
-	certBlock, _ := pem.Decode(certData)
-	if certBlock == nil {
-		return nil, fmt.Errorf("invalid certificate data")
+
+	// First cert is leaf, remainder are intermediates
+	certs, err := certutil.ParseCertsPEM(certData)
+	if err != nil {
+		return nil, fmt.Errorf("invalid certificate data: %v", err)
 	}
-	pem.Encode(f, certBlock)
+	for _, c := range certs {
+		pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: c.Raw})
+	}
+
 	keyBlock, _ := pem.Decode(keyData)
 	if keyBlock == nil {
 		return nil, fmt.Errorf("invalid key data")

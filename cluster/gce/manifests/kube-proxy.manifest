@@ -1,3 +1,5 @@
+# Please keep kube-proxy configuration in-sync with:
+# cluster/addons/kube-proxy/kube-proxy-ds.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -8,6 +10,7 @@ metadata:
     component: kube-proxy
 spec:
   priorityClassName: system-node-critical
+  priority: 2000001000
   hostNetwork: true
   tolerations:
   - operator: "Exists"
@@ -16,7 +19,7 @@ spec:
     effect: "NoSchedule"
   containers:
   - name: kube-proxy
-    image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    image: {{pillar['kube_docker_registry']}}/kube-proxy-amd64:{{pillar['kube-proxy_docker_tag']}}
     resources:
       requests:
         cpu: {{ cpurequest }}

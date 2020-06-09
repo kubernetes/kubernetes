@@ -21,8 +21,10 @@ var SYS_SETNS = map[string]uintptr{
 	"arm":     375,
 	"mips":    4344,
 	"mipsle":  4344,
+	"mips64le":  4344,
 	"ppc64":   350,
 	"ppc64le": 350,
+	"riscv64": 268,
 	"s390x":   339,
 }[runtime.GOARCH]
 
@@ -52,7 +54,8 @@ func Set(ns NsHandle) (err error) {
 	return Setns(ns, CLONE_NEWNET)
 }
 
-// New creates a new network namespace and returns a handle to it.
+// New creates a new network namespace, sets it as current and returns
+// a handle to it.
 func New() (ns NsHandle, err error) {
 	if err := syscall.Unshare(CLONE_NEWNET); err != nil {
 		return -1, err
@@ -190,6 +193,10 @@ func getPidForContainer(id string) (int, error) {
 		filepath.Join(cgroupRoot, "..", "systemd", "docker", id, "tasks"),
 		// Kubernetes with docker and CNI is even more different
 		filepath.Join(cgroupRoot, "..", "systemd", "kubepods", "*", "pod*", id, "tasks"),
+		// Another flavor of containers location in recent kubernetes 1.11+
+		filepath.Join(cgroupRoot, cgroupThis, "kubepods.slice", "kubepods-besteffort.slice", "*", "docker-"+id+".scope", "tasks"),
+		// When runs inside of a container with recent kubernetes 1.11+
+		filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-besteffort.slice", "*", "docker-"+id+".scope", "tasks"),
 	}
 
 	var filename string

@@ -24,7 +24,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,11 +46,11 @@ import (
 func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Update " + req.URL.Path)
+		trace := utiltrace.New("Update", utiltrace.Field{Key: "url", Value: req.URL.Path}, utiltrace.Field{Key: "user-agent", Value: &lazyTruncatedUserAgent{req}}, utiltrace.Field{Key: "client", Value: &lazyClientIP{req}})
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
+			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
 			return
 		}
 
@@ -61,7 +62,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			scope.err(err, w, req)
 			return
 		}
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
@@ -77,7 +79,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		}
 
 		options := &metav1.UpdateOptions{}
-		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
@@ -123,15 +125,18 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		userInfo, _ := request.UserFrom(ctx)
 		transformers := []rest.TransformFunc{}
+
+		// allows skipping managedFields update if the resulting object is too big
+		shouldUpdateManagedFields := true
 		if scope.FieldManager != nil {
 			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
-				obj, err := scope.FieldManager.Update(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-				if err != nil {
-					return nil, fmt.Errorf("failed to update object (Update for %v) managed fields: %v", scope.Kind, err)
+				if shouldUpdateManagedFields {
+					return scope.FieldManager.UpdateNoErrors(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
 				}
-				return obj, nil
+				return newObj, nil
 			})
 		}
+
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)
@@ -139,16 +144,15 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 					return nil, fmt.Errorf("unexpected error when extracting UID from oldObj: %v", err.Error())
 				} else if !isNotZeroObject {
 					if mutatingAdmission.Handles(admission.Create) {
-						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope)
+						return newObj, mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope)
 					}
 				} else {
 					if mutatingAdmission.Handles(admission.Update) {
-						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope)
+						return newObj, mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope)
 					}
 				}
 				return newObj, nil
 			})
-
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -166,7 +170,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		trace.Step("About to store object in database")
 		wasCreated := false
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		requestFunc := func() (runtime.Object, error) {
 			obj, created, err := r.Update(
 				ctx,
 				name,
@@ -183,6 +187,19 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			)
 			wasCreated = created
 			return obj, err
+		}
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			result, err := requestFunc()
+			// If the object wasn't committed to storage because it's serialized size was too large,
+			// it is safe to remove managedFields (which can be large) and try again.
+			if isTooLargeError(err) && scope.FieldManager != nil {
+				if accessor, accessorErr := meta.Accessor(obj); accessorErr == nil {
+					accessor.SetManagedFields(nil)
+					shouldUpdateManagedFields = false
+					result, err = requestFunc()
+				}
+			}
+			return result, err
 		})
 		if err != nil {
 			scope.err(err, w, req)
@@ -204,17 +221,17 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 	var authorizerDecision authorizer.Decision
 	var authorizerReason string
 	var authorizerErr error
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
 		if a == nil {
 			return errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize a create on update"))
 		}
 		once.Do(func() {
-			authorizerDecision, authorizerReason, authorizerErr = a.Authorize(attributes)
+			authorizerDecision, authorizerReason, authorizerErr = a.Authorize(ctx, attributes)
 		})
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorizerDecision == authorizer.DecisionAllow {
 			// Continue to validating admission
-			return validate(obj)
+			return validate(ctx, obj)
 		}
 		if authorizerErr != nil {
 			return errors.NewInternalError(authorizerErr)

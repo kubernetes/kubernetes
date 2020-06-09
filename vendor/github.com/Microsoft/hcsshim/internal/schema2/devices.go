@@ -10,7 +10,6 @@
 package hcsschema
 
 type Devices struct {
-
 	ComPorts map[string]ComPort `json:"ComPorts,omitempty"`
 
 	Scsi map[string]Scsi `json:"Scsi,omitempty"`
@@ -40,4 +39,8 @@ type Devices struct {
 	FlexibleIov map[string]FlexibleIoDevice `json:"FlexibleIov,omitempty"`
 
 	SharedMemory *SharedMemoryConfiguration `json:"SharedMemory,omitempty"`
+
+	// TODO: This is pre-release support in schema 2.3. Need to add build number
+	// docs when a public build with this is out.
+	VirtualPci map[string]VirtualPciDevice `json:",omitempty"`
 }

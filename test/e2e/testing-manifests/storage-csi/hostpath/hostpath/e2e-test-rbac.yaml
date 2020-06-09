@@ -8,13 +8,13 @@ subjects:
     name: csi-attacher
     namespace: default
   - kind: ServiceAccount
-    name: csi-node-sa
-    namespace: default
-  - kind: ServiceAccount
     name: csi-provisioner
     namespace: default
   - kind: ServiceAccount
     name: csi-snapshotter
+    namespace: default
+  - kind: ServiceAccount
+    name: csi-resizer
     namespace: default
 roleRef:
   kind: ClusterRole

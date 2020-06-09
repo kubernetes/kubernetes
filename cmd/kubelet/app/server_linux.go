@@ -17,8 +17,8 @@ limitations under the License.
 package app
 
 import (
-	"github.com/sigma/go-inotify"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/inotify"
 )
 
 func watchForLockfileContention(path string, done chan struct{}) error {
@@ -27,7 +27,7 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 		klog.Errorf("unable to create watcher for lockfile: %v", err)
 		return err
 	}
-	if err = watcher.AddWatch(path, inotify.IN_OPEN|inotify.IN_DELETE_SELF); err != nil {
+	if err = watcher.AddWatch(path, inotify.InOpen|inotify.InDeleteSelf); err != nil {
 		klog.Errorf("unable to watch lockfile: %v", err)
 		return err
 	}

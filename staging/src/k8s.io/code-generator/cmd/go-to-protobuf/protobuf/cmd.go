@@ -29,9 +29,6 @@ import (
 	"strings"
 
 	flag "github.com/spf13/pflag"
-	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/simple"
-	"gonum.org/v1/gonum/graph/topo"
 
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
@@ -279,7 +276,7 @@ func Run(g *Generator) {
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -300,7 +297,7 @@ func Run(g *Generator) {
 		cmd = exec.Command("goimports", "-w", outputPath)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -311,7 +308,7 @@ func Run(g *Generator) {
 		cmd = exec.Command("gofmt", "-s", "-w", outputPath)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -374,38 +371,73 @@ func deps(c *generator.Context, pkgs []*protobufPackage) map[string][]string {
 	return ret
 }
 
+// given a set of pkg->[]deps, return the order that ensures all deps are processed before the things that depend on them
 func importOrder(deps map[string][]string) ([]string, error) {
-	nodes := map[string]graph.Node{}
-	names := map[int64]string{}
-	g := simple.NewDirectedGraph()
-	for pkg, imports := range deps {
-		for _, imp := range imports {
-			if _, found := nodes[pkg]; !found {
-				n := g.NewNode()
-				g.AddNode(n)
-				nodes[pkg] = n
-				names[n.ID()] = pkg
-			}
-			if _, found := nodes[imp]; !found {
-				n := g.NewNode()
-				g.AddNode(n)
-				nodes[imp] = n
-				names[n.ID()] = imp
-			}
-			g.SetEdge(g.NewEdge(nodes[imp], nodes[pkg]))
+	// add all nodes and edges
+	var remainingNodes = map[string]struct{}{}
+	var graph = map[edge]struct{}{}
+	for to, froms := range deps {
+		remainingNodes[to] = struct{}{}
+		for _, from := range froms {
+			remainingNodes[from] = struct{}{}
+			graph[edge{from: from, to: to}] = struct{}{}
 		}
 	}
 
-	ret := []string{}
-	sorted, err := topo.Sort(g)
-	if err != nil {
-		return nil, err
+	// find initial nodes without any dependencies
+	sorted := findAndRemoveNodesWithoutDependencies(remainingNodes, graph)
+	for i := 0; i < len(sorted); i++ {
+		node := sorted[i]
+		removeEdgesFrom(node, graph)
+		sorted = append(sorted, findAndRemoveNodesWithoutDependencies(remainingNodes, graph)...)
+	}
+	if len(remainingNodes) > 0 {
+		return nil, fmt.Errorf("cycle: remaining nodes: %#v, remaining edges: %#v", remainingNodes, graph)
 	}
 	for _, n := range sorted {
-		ret = append(ret, names[n.ID()])
-		fmt.Println("topological order", names[n.ID()])
+		fmt.Println("topological order", n)
 	}
-	return ret, nil
+	return sorted, nil
+}
+
+// edge describes a from->to relationship in a graph
+type edge struct {
+	from string
+	to   string
+}
+
+// findAndRemoveNodesWithoutDependencies finds nodes in the given set which are not pointed to by any edges in the graph,
+// removes them from the set of nodes, and returns them in sorted order
+func findAndRemoveNodesWithoutDependencies(nodes map[string]struct{}, graph map[edge]struct{}) []string {
+	roots := []string{}
+	// iterate over all nodes as potential "to" nodes
+	for node := range nodes {
+		incoming := false
+		// iterate over all remaining edges
+		for edge := range graph {
+			// if there's any edge to the node we care about, it's not a root
+			if edge.to == node {
+				incoming = true
+				break
+			}
+		}
+		// if there are no incoming edges, remove from the set of remaining nodes and add to our results
+		if !incoming {
+			delete(nodes, node)
+			roots = append(roots, node)
+		}
+	}
+	sort.Strings(roots)
+	return roots
+}
+
+// removeEdgesFrom removes any edges from the graph where edge.from == node
+func removeEdgesFrom(node string, graph map[edge]struct{}) {
+	for edge := range graph {
+		if edge.from == node {
+			delete(graph, edge)
+		}
+	}
 }
 
 type positionOrder struct {

@@ -4,17 +4,16 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conn.go",
-        "defs.go",
         "netlink.go",
         "reader.go",
     ],
-    cgo = True,
     importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/utils/cpuload/netlink",
     importpath = "github.com/google/cadvisor/utils/cpuload/netlink",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -5,7 +5,6 @@ package fs
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,7 +17,7 @@ import (
 )
 
 var (
-	subsystems = subsystemSet{
+	subsystemsLegacy = subsystemSet{
 		&CpusetGroup{},
 		&DevicesGroup{},
 		&MemoryGroup{},
@@ -129,6 +128,10 @@ func isIgnorableError(rootless bool, err error) bool {
 	return errno == unix.EROFS || errno == unix.EPERM || errno == unix.EACCES
 }
 
+func (m *Manager) getSubsystems() subsystemSet {
+	return subsystemsLegacy
+}
+
 func (m *Manager) Apply(pid int) (err error) {
 	if m.Cgroups == nil {
 		return nil
@@ -158,7 +161,7 @@ func (m *Manager) Apply(pid int) (err error) {
 		return cgroups.EnterPid(m.Paths, pid)
 	}
 
-	for _, sys := range subsystems {
+	for _, sys := range m.getSubsystems() {
 		// TODO: Apply should, ideally, be reentrant or be broken up into a separate
 		// create and join phase so that the cgroup hierarchy for a container can be
 		// created then join consists of writing the process pids to cgroup.procs
@@ -209,12 +212,16 @@ func (m *Manager) GetPaths() map[string]string {
 	return paths
 }
 
+func (m *Manager) GetUnifiedPath() (string, error) {
+	return "", errors.New("unified path is only supported when running in unified mode")
+}
+
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
 	for name, path := range m.Paths {
-		sys, err := subsystems.Get(name)
+		sys, err := m.getSubsystems().Get(name)
 		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
 			continue
 		}
@@ -226,14 +233,18 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
+	if container.Cgroups == nil {
+		return nil
+	}
+
 	// If Paths are set, then we are just joining cgroups paths
 	// and there is no need to set any values.
-	if m.Cgroups.Paths != nil {
+	if m.Cgroups != nil && m.Cgroups.Paths != nil {
 		return nil
 	}
 
 	paths := m.GetPaths()
-	for _, sys := range subsystems {
+	for _, sys := range m.getSubsystems() {
 		path := paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
 			if m.Rootless && sys.Name() == "devices" {
@@ -262,11 +273,15 @@ func (m *Manager) Set(container *configs.Config) error {
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
 func (m *Manager) Freeze(state configs.FreezerState) error {
+	if m.Cgroups == nil {
+		return errors.New("cannot toggle freezer: cgroups not configured for container")
+	}
+
 	paths := m.GetPaths()
 	dir := paths["freezer"]
 	prevState := m.Cgroups.Resources.Freezer
 	m.Cgroups.Resources.Freezer = state
-	freezer, err := subsystems.Get("freezer")
+	freezer, err := m.getSubsystems().Get("freezer")
 	if err != nil {
 		return err
 	}
@@ -354,23 +369,6 @@ func (raw *cgroupData) join(subsystem string) (string, error) {
 	return path, nil
 }
 
-func writeFile(dir, file, data string) error {
-	// Normally dir should not be empty, one case is that cgroup subsystem
-	// is not mounted, we will get empty dir, and we want it fail here.
-	if dir == "" {
-		return fmt.Errorf("no such directory for %s", file)
-	}
-	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700); err != nil {
-		return fmt.Errorf("failed to write %v to %v: %v", data, file, err)
-	}
-	return nil
-}
-
-func readFile(dir, file string) (string, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, file))
-	return string(data), err
-}
-
 func removePath(p string, err error) error {
 	if err != nil {
 		return err
@@ -406,4 +404,8 @@ func CheckCpushares(path string, c uint64) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) GetCgroups() (*configs.Cgroup, error) {
+	return m.Cgroups, nil
 }

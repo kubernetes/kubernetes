@@ -12,7 +12,7 @@ import (
 
 // Dlaqr04 computes the eigenvalues of a block of an n×n upper Hessenberg matrix
 // H, and optionally the matrices T and Z from the Schur decomposition
-//  H = Z T Z^T
+//  H = Z T Zᵀ
 // where T is an upper quasi-triangular matrix (the Schur form), and Z is the
 // orthogonal matrix of Schur vectors.
 //
@@ -24,8 +24,8 @@ import (
 // Z[iloz:ihiz+1,ilo:ihi+1], otherwise Z will not be referenced.
 //
 // ilo and ihi determine the block of H on which Dlaqr04 operates. It must hold that
-//  0 <= ilo <= ihi < n,     if n > 0,
-//  ilo == 0 and ihi == -1,  if n == 0,
+//  0 <= ilo <= ihi < n     if n > 0,
+//  ilo == 0 and ihi == -1  if n == 0,
 // and the block must be isolated, that is,
 //  ilo == 0   or H[ilo,ilo-1] == 0,
 //  ihi == n-1 or H[ihi+1,ihi] == 0,
@@ -39,8 +39,8 @@ import (
 // otherwise Dlaqr04 will panic.
 //
 // work must have length at least lwork and lwork must be
-//  lwork >= 1,  if n <= 11,
-//  lwork >= n,  if n > 11,
+//  lwork >= 1  if n <= 11,
+//  lwork >= n  if n > 11,
 // otherwise Dlaqr04 will panic. lwork as large as 6*n may be required for
 // optimal performance. On return, work[0] will contain the optimal value of
 // lwork.

@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script does a fast type check of kubernetes code for all platforms.
+# Usage: `hack/verify-typecheck.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

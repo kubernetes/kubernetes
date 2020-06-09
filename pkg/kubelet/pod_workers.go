@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -241,9 +241,7 @@ func (p *podWorkers) removeWorker(uid types.UID) {
 		// If there is an undelivered work update for this pod we need to remove it
 		// since per-pod goroutine won't be able to put it to the already closed
 		// channel when it finishes processing the current work update.
-		if _, cached := p.lastUndeliveredWorkUpdate[uid]; cached {
-			delete(p.lastUndeliveredWorkUpdate, uid)
-		}
+		delete(p.lastUndeliveredWorkUpdate, uid)
 	}
 }
 func (p *podWorkers) ForgetWorker(uid types.UID) {

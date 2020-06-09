@@ -93,7 +93,7 @@ func (impl Implementation) Dlaqp2(m, n, offset int, a []float64, lda int, jpvt [
 		}
 
 		if i < n-1 {
-			// Apply H_i^T to A[offset+i:m, i:n] from the left.
+			// Apply H_iᵀ to A[offset+i:m, i:n] from the left.
 			aii := a[offpi*lda+i]
 			a[offpi*lda+i] = 1
 			impl.Dlarf(blas.Left, m-offpi, n-i-1, a[offpi*lda+i:], lda, tau[i], a[offpi*lda+i+1:], lda, work)

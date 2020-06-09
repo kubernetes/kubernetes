@@ -64,5 +64,5 @@ When Describing a Resource, it may aggregate information from several other Reso
 a Node will aggregate Pod Resources to print the Node utilization.
 
 When Getting a Resource, it will only print information available from reading that Resource.  While Get may aggregate
-data from the the *fields* of that Resource, it won't look at fields from other Resources.
+data from the *fields* of that Resource, it won't look at fields from other Resources.
 {% endpanel %}

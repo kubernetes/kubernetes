@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -35,7 +37,7 @@ func (h *fakeSyncer) OpenPodHostportsAndSync(newPortMapping *hostport.PodPortMap
 func (h *fakeSyncer) SyncHostports(natInterfaceName string, activePortMapping []*hostport.PodPortMapping) error {
 	for _, r := range activePortMapping {
 		if r.IP.To4() == nil {
-			return fmt.Errorf("Invalid or missing pod %s/%s IP", r.Namespace, r.Name)
+			return fmt.Errorf("invalid or missing pod %s/%s IP", r.Namespace, r.Name)
 		}
 	}
 

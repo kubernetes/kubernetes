@@ -56,6 +56,7 @@ func (in *CertificateSigningRequest) DeepCopyObject() runtime.Object {
 func (in *CertificateSigningRequestCondition) DeepCopyInto(out *CertificateSigningRequestCondition) {
 	*out = *in
 	in.LastUpdateTime.DeepCopyInto(&out.LastUpdateTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
 	return
 }
 
@@ -109,6 +110,11 @@ func (in *CertificateSigningRequestSpec) DeepCopyInto(out *CertificateSigningReq
 		in, out := &in.Request, &out.Request
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
+	}
+	if in.SignerName != nil {
+		in, out := &in.SignerName, &out.SignerName
+		*out = new(string)
+		**out = **in
 	}
 	if in.Usages != nil {
 		in, out := &in.Usages, &out.Usages

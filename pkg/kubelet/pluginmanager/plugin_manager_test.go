@@ -28,29 +28,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
 )
 
-const (
-	testHostname = "test-hostname"
-)
-
 var (
-	socketDir           string
-	deprecatedSocketDir string
-	supportedVersions   = []string{"v1beta1", "v1beta2"}
+	socketDir         string
+	supportedVersions = []string{"v1beta1", "v1beta2"}
 )
-
-// fake cache.PluginHandler
-type PluginHandler interface {
-	ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error
-	RegisterPlugin(pluginName, endpoint string, versions []string) error
-	DeRegisterPlugin(pluginName string)
-}
 
 type fakePluginHandler struct {
 	validatePluginCalled   bool
@@ -68,7 +54,7 @@ func newFakePluginHandler() *fakePluginHandler {
 }
 
 // ValidatePlugin is a fake method
-func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.validatePluginCalled = true
@@ -88,7 +74,6 @@ func (f *fakePluginHandler) DeRegisterPlugin(pluginName string) {
 	f.Lock()
 	defer f.Unlock()
 	f.deregisterPluginCalled = true
-	return
 }
 
 func init() {
@@ -97,34 +82,12 @@ func init() {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}
 
-	d2, err := ioutil.TempDir("", "deprecateddir_plugin_manager_test")
-	if err != nil {
-		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
-	}
-
 	socketDir = d
-	deprecatedSocketDir = d2
 }
 
 func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(socketDir))
-	require.NoError(t, os.RemoveAll(deprecatedSocketDir))
 	os.MkdirAll(socketDir, 0755)
-	os.MkdirAll(deprecatedSocketDir, 0755)
-}
-
-func newWatcher(
-	t *testing.T, testDeprecatedDir bool,
-	desiredStateOfWorldCache cache.DesiredStateOfWorld) *pluginwatcher.Watcher {
-
-	depSocketDir := ""
-	if testDeprecatedDir {
-		depSocketDir = deprecatedSocketDir
-	}
-	w := pluginwatcher.NewWatcher(socketDir, depSocketDir, desiredStateOfWorldCache)
-	require.NoError(t, w.Start(wait.NeverStop))
-
-	return w
 }
 
 func waitForRegistration(t *testing.T, fakePluginHandler *fakePluginHandler) {
@@ -157,7 +120,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 func TestPluginRegistration(t *testing.T) {
 	defer cleanup(t)
 
-	pluginManager := newTestPluginManager(socketDir, deprecatedSocketDir)
+	pluginManager := newTestPluginManager(socketDir)
 
 	// Start the plugin manager
 	stopChan := make(chan struct{})
@@ -169,7 +132,7 @@ func TestPluginRegistration(t *testing.T) {
 
 	// Add handler for device plugin
 	fakeHandler := newFakePluginHandler()
-	pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, fakeHandler)
+	pluginManager.AddHandler(registerapi.DevicePlugin, fakeHandler)
 
 	// Add a new plugin
 	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
@@ -182,12 +145,10 @@ func TestPluginRegistration(t *testing.T) {
 }
 
 func newTestPluginManager(
-	sockDir string,
-	deprecatedSockDir string) PluginManager {
+	sockDir string) PluginManager {
 
 	pm := NewPluginManager(
 		sockDir,
-		deprecatedSockDir,
 		&record.FakeRecorder{},
 	)
 	return pm

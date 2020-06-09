@@ -19,8 +19,9 @@
 #>
 
 # IMPORTANT PLEASE NOTE:
-# Any time the file structure in the `windows` directory changes, `windows/BUILD`
-# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# Any time the file structure in the `windows` directory changes,
+# `windows/BUILD` and `k8s.io/release/lib/releaselib.sh` must be manually
+# updated with the changes.
 # We HIGHLY recommend not changing the file structure, because consumers of
 # Kubernetes releases depend on the release structure remaining stable.
 
@@ -106,30 +107,33 @@ function Get-InstanceMetadataAttribute {
   return Get-InstanceMetadata "attributes/$Key" $Default
 }
 
-function Validate-SHA1 {
+function Validate-SHA {
   param(
     [parameter(Mandatory=$true)] [string]$Hash,
-    [parameter(Mandatory=$true)] [string]$Path
+    [parameter(Mandatory=$true)] [string]$Path,
+    [parameter(Mandatory=$true)] [string]$Algorithm
   )
-  $actual = Get-FileHash -Path $Path -Algorithm SHA1
+  $actual = Get-FileHash -Path $Path -Algorithm $Algorithm
   # Note: Powershell string comparisons are case-insensitive by default, and this
   # is important here because Linux shell scripts produce lowercase hashes but
   # Powershell Get-FileHash produces uppercase hashes. This must be case-insensitive
   # to work.
   if ($actual.Hash -ne $Hash) {
-    Log-Output "$Path corrupted, sha1 $actual doesn't match expected $Hash"
-    Throw ("$Path corrupted, sha1 $actual doesn't match expected $Hash")
+    Log-Output "$Path corrupted, $Algorithm $actual doesn't match expected $Hash"
+    Throw ("$Path corrupted, $Algorithm $actual doesn't match expected $Hash")
   }
 }
 
 # Attempts to download the file from URLs, trying each URL until it succeeds.
 # It will loop through the URLs list forever until it has a success. If
 # successful, it will write the file to OutFile. You can optionally provide a
-# SHA1 Hash argument, in which case it will attempt to validate the downloaded
-# file against the hash.
+# Hash argument with an optional Algorithm, in which case it will attempt to
+# validate the downloaded file against the hash. SHA1 will be used if Algorithm
+# is not provided.
 function MustDownload-File {
   param (
     [parameter(Mandatory=$false)] [string]$Hash,
+    [parameter(Mandatory=$false)] [string]$Algorithm = 'SHA1',
     [parameter(Mandatory=$true)] [string]$OutFile,
     [parameter(Mandatory=$true)] [System.Collections.Generic.List[String]]$URLs,
     [parameter(Mandatory=$false)] [System.Collections.IDictionary]$Headers = @{}
@@ -156,13 +160,13 @@ function MustDownload-File {
       # Attempt to validate the hash
       if ($Hash) {
         Try {
-            Validate-SHA1 -Hash $Hash -Path $OutFile
+            Validate-SHA -Hash $Hash -Path $OutFile -Algorithm $Algorithm
         } Catch {
             $message = $_.Exception.ToString()
             Log-Output "Hash validation of $url failed. Will retry. Error: $message"
             continue
         }
-        Log-Output "Downloaded $url (SHA1 = $Hash)"
+        Log-Output "Downloaded $url ($Algorithm = $Hash)"
         return
       }
       Log-Output "Downloaded $url"
@@ -539,6 +543,17 @@ function Test-IsTestCluster {
     return $true
   }
   return $false
+}
+
+# Returns true if this node uses a plugin to support authentication to the
+# master, e.g. for TPM-based authentication. $KubeEnv is a hash table
+# containing the kube-env metadata keys+values.
+function Test-NodeUsesAuthPlugin {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  return $KubeEnv.Contains('EXEC_AUTH_PLUGIN_URL')
 }
 
 # Export all public functions:

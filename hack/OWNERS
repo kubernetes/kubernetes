@@ -6,8 +6,8 @@ reviewers:
   - eparis
   - fejta
   - ixdy
-  - jbeda
   - juanvallejo
+  - hwdef
   - lavalamp
   - SataQiu
   - spiffxp
@@ -15,6 +15,7 @@ reviewers:
   - vishh
   - xichengliudui
   - zmerlynn
+  - mikedanese
 approvers:
   - bentheelder
   - cblecker
@@ -23,12 +24,15 @@ approvers:
   - eparis
   - fejta
   - ixdy
-  - jbeda
   - lavalamp
   - liggitt
   - pwittrock
+  - SataQiu
   - soltysh # for sig-cli related stuff
   - spiffxp
   - sttts
   - vishh
   - zmerlynn
+  - mikedanese
+emeritus_approvers:
+  - jbeda

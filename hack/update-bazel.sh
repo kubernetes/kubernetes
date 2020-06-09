@@ -24,12 +24,11 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install tools we need, but only from vendor/...
-pushd "${KUBE_ROOT}/vendor"
-  go install ./github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-  go install ./github.com/bazelbuild/buildtools/buildozer
-  go install ./k8s.io/repo-infra/kazel
-popd
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+  GO111MODULE=on go install github.com/bazelbuild/buildtools/buildozer
+  GO111MODULE=on go install k8s.io/repo-infra/cmd/kazel
+popd >/dev/null
 
 # Find all of the staging repos.
 while IFS='' read -r repo; do staging_repos+=("${repo}"); done <\
@@ -91,9 +90,19 @@ if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi
 
+# restrict ./vendor/github.com/prometheus/* targets visibility
+# see comment above re: buildozer exit codes
+buildozer -quiet 'set visibility //build/visible_to:vendor_githubcom_prometheus_CONSUMERS' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
+if [[ $ret != 0 && $ret != 3 ]]; then
+  exit 1
+fi
+
 # we need to set this because gazelle doesn't support pkg-config, which would set this link option
 # see comment above re: buildozer exit codes
 buildozer -quiet 'set clinkopts select({"@io_bazel_rules_go//go/platform:linux":["-lseccomp",],"//conditions:default":[],})' //vendor/github.com/seccomp/libseccomp-golang:go_default_library && ret=$? || ret=$?
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi
+
+# Avoid bazel stuff in tools/ directory
+rm hack/tools/BUILD

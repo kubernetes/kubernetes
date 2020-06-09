@@ -18,11 +18,12 @@ package runtime
 
 import (
 	"fmt"
+	"net/http"
 	"runtime"
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -40,11 +41,7 @@ var PanicHandlers = []func(interface{}){logPanic}
 // called in case of panic.  HandleCrash actually crashes, after calling the
 // handlers and logging the panic message.
 //
-// TODO: remove this function. We are switching to a world where it's safe for
-// apiserver to panic, since it will be restarted by kubelet. At the beginning
-// of the Kubernetes project, nothing was going to restart apiserver and so
-// catching panics was important. But it's actually much simpler for monitoring
-// software if we just exit when an unexpected panic happens.
+// E.g., you can provide one or more additional handlers for something like shutting down go routines gracefully.
 func HandleCrash(additionalHandlers ...func(interface{})) {
 	if r := recover(); r != nil {
 		for _, fn := range PanicHandlers {
@@ -60,8 +57,16 @@ func HandleCrash(additionalHandlers ...func(interface{})) {
 	}
 }
 
-// logPanic logs the caller tree when a panic occurs.
+// logPanic logs the caller tree when a panic occurs (except in the special case of http.ErrAbortHandler).
 func logPanic(r interface{}) {
+	if r == http.ErrAbortHandler {
+		// honor the http.ErrAbortHandler sentinel panic value:
+		//   ErrAbortHandler is a sentinel panic value to abort a handler.
+		//   While any panic from ServeHTTP aborts the response to the client,
+		//   panicking with ErrAbortHandler also suppresses logging of a stack trace to the server's error log.
+		return
+	}
+
 	// Same as stdlib http server code. Manually allocate stack trace buffer size
 	// to prevent excessively large logs
 	const size = 64 << 10

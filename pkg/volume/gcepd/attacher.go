@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -27,11 +29,13 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/gce"
@@ -141,11 +145,46 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 	return volumesAttachedCheck, nil
 }
 
+func (attacher *gcePersistentDiskAttacher) BulkVerifyVolumes(volumesByNode map[types.NodeName][]*volume.Spec) (map[types.NodeName]map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[types.NodeName]map[*volume.Spec]bool)
+	diskNamesByNode := make(map[types.NodeName][]string)
+	volumeSpecToDiskName := make(map[*volume.Spec]string)
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		diskNames := []string{}
+		for _, spec := range volumeSpecs {
+			volumeSource, _, err := getVolumeSource(spec)
+			if err != nil {
+				klog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+				continue
+			}
+			diskNames = append(diskNames, volumeSource.PDName)
+			volumeSpecToDiskName[spec] = volumeSource.PDName
+		}
+		diskNamesByNode[nodeName] = diskNames
+	}
+
+	attachedDisksByNode, err := attacher.gceDisks.BulkDisksAreAttached(diskNamesByNode)
+	if err != nil {
+		return nil, err
+	}
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		volumesAreAttachedToNode := make(map[*volume.Spec]bool)
+		for _, spec := range volumeSpecs {
+			diskName := volumeSpecToDiskName[spec]
+			volumesAreAttachedToNode[spec] = attachedDisksByNode[nodeName][diskName]
+		}
+		volumesAttachedCheck[nodeName] = volumesAreAttachedToNode
+	}
+	return volumesAttachedCheck, nil
+}
+
 // search Windows disk number by LUN
-func getDiskID(pdName string, exec mount.Exec) (string, error) {
+func getDiskID(pdName string, exec utilexec.Interface) (string, error) {
 	// TODO: replace Get-GcePdName with native windows support of Get-Disk, see issue #74674
 	cmd := `Get-GcePdName | select Name, DeviceId | ConvertTo-Json`
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("Get-GcePdName failed, error: %v, output: %q", err, string(output))
 		err = errors.New(err.Error() + " " + string(output))
@@ -347,6 +386,14 @@ func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName ty
 }
 
 func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	if runtime.GOOS == "windows" {
+		// Flush data cache for windows because it does not do so automatically during unmount device
+		exec := detacher.host.GetExec(gcePersistentDiskPluginName)
+		err := volumeutil.WriteVolumeCache(deviceMountPath, exec)
+		if err != nil {
+			return err
+		}
+	}
 	return mount.CleanupMountPoint(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName), false)
 }
 

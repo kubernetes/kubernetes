@@ -119,7 +119,18 @@ func (n *XMLNode) findElem(name string) (string, bool) {
 
 // StructToXML writes an XMLNode to a xml.Encoder as tokens.
 func StructToXML(e *xml.Encoder, node *XMLNode, sorted bool) error {
-	e.EncodeToken(xml.StartElement{Name: node.Name, Attr: node.Attr})
+	// Sort Attributes
+	attrs := node.Attr
+	if sorted {
+		sortedAttrs := make([]xml.Attr, len(attrs))
+		for _, k := range node.Attr {
+			sortedAttrs = append(sortedAttrs, k)
+		}
+		sort.Sort(xmlAttrSlice(sortedAttrs))
+		attrs = sortedAttrs
+	}
+
+	e.EncodeToken(xml.StartElement{Name: node.Name, Attr: attrs})
 
 	if node.Text != "" {
 		e.EncodeToken(xml.CharData([]byte(node.Text)))

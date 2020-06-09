@@ -23,7 +23,7 @@ import (
 	"fmt"
 
 	"github.com/Microsoft/hcsshim/hcn"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"strings"
 )
@@ -83,6 +83,9 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 	}
 
 	endpoints, err := hcn.ListEndpoints()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list endpoints: %v", err)
+	}
 	for _, endpoint := range endpoints {
 		equal := false
 		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
@@ -229,16 +232,37 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		lbFlags |= hcn.LoadBalancerFlagsDSR
 	}
 
-	lb, err := hcn.AddLoadBalancer(
-		hnsEndpoints,
-		lbFlags,
-		lbPortMappingFlags,
-		sourceVip,
-		vips,
-		protocol,
-		internalPort,
-		externalPort,
-	)
+	lbDistributionType := hcn.LoadBalancerDistributionNone
+
+	if flags.sessionAffinity {
+		lbDistributionType = hcn.LoadBalancerDistributionSourceIP
+	}
+
+	loadBalancer := &hcn.HostComputeLoadBalancer{
+		SourceVIP: sourceVip,
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{
+				Protocol:         uint32(protocol),
+				InternalPort:     internalPort,
+				ExternalPort:     externalPort,
+				DistributionType: lbDistributionType,
+				Flags:            lbPortMappingFlags,
+			},
+		},
+		FrontendVIPs: vips,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: lbFlags,
+	}
+
+	for _, endpoint := range hnsEndpoints {
+		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, endpoint.Id)
+	}
+
+	lb, err := loadBalancer.Create()
+
 	if err != nil {
 		return nil, err
 	}

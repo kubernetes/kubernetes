@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations for the kubelet
@@ -77,9 +77,10 @@ var _ ActualStateOfWorld = &actualStateOfWorld{}
 
 // PluginInfo holds information of a plugin
 type PluginInfo struct {
-	SocketPath           string
-	FoundInDeprecatedDir bool
-	Timestamp            time.Time
+	SocketPath string
+	Timestamp  time.Time
+	Handler    PluginHandler
+	Name       string
 }
 
 func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
@@ -87,7 +88,7 @@ func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
 	defer asw.Unlock()
 
 	if pluginInfo.SocketPath == "" {
-		return fmt.Errorf("Socket path is empty")
+		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := asw.socketFileToInfo[pluginInfo.SocketPath]; ok {
 		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)

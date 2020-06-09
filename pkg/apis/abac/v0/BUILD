@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/abac/v0",
@@ -22,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

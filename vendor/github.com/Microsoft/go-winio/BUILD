@@ -7,6 +7,7 @@ go_library(
         "ea.go",
         "file.go",
         "fileinfo.go",
+        "hvsock.go",
         "pipe.go",
         "privilege.go",
         "reparse.go",
@@ -17,7 +18,9 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/go-winio",
     importpath = "github.com/Microsoft/go-winio",
     visibility = ["//visibility:public"],
-    deps = select({
+    deps = [
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
@@ -34,7 +37,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:all-srcs",
+        "//vendor/github.com/Microsoft/go-winio/vhd:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

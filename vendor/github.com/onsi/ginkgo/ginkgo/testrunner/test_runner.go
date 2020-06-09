@@ -156,7 +156,7 @@ func (t *TestRunner) CompileTo(path string) error {
 		fmt.Println(string(output))
 	}
 
-	if fileExists(path) == false {
+	if !fileExists(path) {
 		compiledFile := t.Suite.PackageName + ".test"
 		if fileExists(compiledFile) {
 			// seems like we are on an old go version that does not support the -o flag on go test
@@ -182,7 +182,7 @@ func (t *TestRunner) CompileTo(path string) error {
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return err == nil || os.IsNotExist(err) == false
+	return err == nil || !os.IsNotExist(err)
 }
 
 // copyFile copies the contents of the file named src to the file named
@@ -523,7 +523,7 @@ func (t *TestRunner) combineCoverprofiles() {
 	lines := map[string]int{}
 	lineOrder := []string{}
 	for i, coverProfile := range profiles {
-		for _, line := range strings.Split(string(coverProfile), "\n")[1:] {
+		for _, line := range strings.Split(coverProfile, "\n")[1:] {
 			if len(line) == 0 {
 				continue
 			}

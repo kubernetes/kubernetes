@@ -15,10 +15,10 @@ import (
 // and scaling. Both steps are optional and depend on the value of job.
 //
 // Permuting consists of applying a permutation matrix P such that the matrix
-// that results from P^T*A*P takes the upper block triangular form
-//            [ T1  X  Y  ]
-//  P^T A P = [  0  B  Z  ],
-//            [  0  0  T2 ]
+// that results from Pᵀ*A*P takes the upper block triangular form
+//           [ T1  X  Y  ]
+//  Pᵀ A P = [  0  B  Z  ],
+//           [  0  0  T2 ]
 // where T1 and T2 are upper triangular matrices and B contains at least one
 // nonzero off-diagonal element in each row and column. The indices ilo and ihi
 // mark the starting and ending columns of the submatrix B. The eigenvalues of A

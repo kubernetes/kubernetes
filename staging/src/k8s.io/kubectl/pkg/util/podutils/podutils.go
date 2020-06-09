@@ -170,12 +170,10 @@ func afterOrZero(t1, t2 *metav1.Time) bool {
 }
 
 func podReadyTime(pod *corev1.Pod) *metav1.Time {
-	if IsPodReady(pod) {
-		for _, c := range pod.Status.Conditions {
-			// we only care about pod ready conditions
-			if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
-				return &c.LastTransitionTime
-			}
+	for _, c := range pod.Status.Conditions {
+		// we only care about pod ready conditions
+		if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
+			return &c.LastTransitionTime
 		}
 	}
 	return &metav1.Time{}

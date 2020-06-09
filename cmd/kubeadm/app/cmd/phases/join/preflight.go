@@ -23,7 +23,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -99,10 +99,6 @@ func runPreflight(c workflow.RunData) error {
 
 	// Continue with more specific checks based on the init configuration
 	klog.V(1).Infoln("[preflight] Running configuration dependant checks")
-	if err := preflight.RunOptionalJoinNodeChecks(utilsexec.New(), &initCfg.ClusterConfiguration, j.IgnorePreflightErrors()); err != nil {
-		return err
-	}
-
 	if j.Cfg().ControlPlane != nil {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided

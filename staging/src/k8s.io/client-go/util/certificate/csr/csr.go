@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +46,7 @@ import (
 // status, once approved by API server, it will return the API server's issued
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error.
-func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, signerName string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
 	csr := &certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -54,20 +54,21 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 			Name: name,
 		},
 		Spec: certificates.CertificateSigningRequestSpec{
-			Request: csrData,
-			Usages:  usages,
+			Request:    csrData,
+			Usages:     usages,
+			SignerName: &signerName,
 		},
 	}
 	if len(csr.Name) == 0 {
 		csr.GenerateName = "csr-"
 	}
 
-	req, err = client.Create(csr)
+	req, err = client.Create(context.TODO(), csr, metav1.CreateOptions{})
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
 		klog.Infof("csr for this node already exists, reusing")
-		req, err = client.Get(name, metav1.GetOptions{})
+		req, err = client.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, formatError("cannot retrieve certificate signing request: %v", err)
 		}
@@ -87,11 +88,11 @@ func WaitForCertificate(ctx context.Context, client certificatesclient.Certifica
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return client.List(options)
+			return client.List(context.TODO(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return client.Watch(options)
+			return client.Watch(context.TODO(), options)
 		},
 	}
 	event, err := watchtools.UntilWithSync(
@@ -111,13 +112,24 @@ func WaitForCertificate(ctx context.Context, client certificatesclient.Certifica
 			if csr.UID != req.UID {
 				return false, fmt.Errorf("csr %q changed UIDs", csr.Name)
 			}
+			approved := false
 			for _, c := range csr.Status.Conditions {
 				if c.Type == certificates.CertificateDenied {
-					return false, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
+					return false, fmt.Errorf("certificate signing request is denied, reason: %v, message: %v", c.Reason, c.Message)
 				}
-				if c.Type == certificates.CertificateApproved && csr.Status.Certificate != nil {
+				if c.Type == certificates.CertificateFailed {
+					return false, fmt.Errorf("certificate signing request failed, reason: %v, message: %v", c.Reason, c.Message)
+				}
+				if c.Type == certificates.CertificateApproved {
+					approved = true
+				}
+			}
+			if approved {
+				if len(csr.Status.Certificate) > 0 {
+					klog.V(2).Infof("certificate signing request %s is issued", csr.Name)
 					return true, nil
 				}
+				klog.V(2).Infof("certificate signing request %s is approved, waiting to be issued", csr.Name)
 			}
 			return false, nil
 		},
@@ -144,6 +156,9 @@ func ensureCompatible(new, orig *certificates.CertificateSigningRequest, private
 	}
 	if !reflect.DeepEqual(newCSR.Subject, origCSR.Subject) {
 		return fmt.Errorf("csr subjects differ: new: %#v, orig: %#v", newCSR.Subject, origCSR.Subject)
+	}
+	if new.Spec.SignerName != nil && orig.Spec.SignerName != nil && *new.Spec.SignerName != *orig.Spec.SignerName {
+		return fmt.Errorf("csr signerNames differ: new %q, orig: %q", *new.Spec.SignerName, *orig.Spec.SignerName)
 	}
 	signer, ok := privateKey.(crypto.Signer)
 	if !ok {

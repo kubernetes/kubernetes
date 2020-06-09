@@ -33,7 +33,7 @@ func AddCustomGlobalFlags(fs *pflag.FlagSet) {
 	// Lookup flags in global flag set and re-register the values with our flagset.
 
 	// Adds flags from k8s.io/kubernetes/pkg/cloudprovider/providers.
-	globalflag.Register(fs, "cloud-provider-gce-lb-src-cidrs")
+	registerLegacyGlobalFlags(fs)
 
 	// Adds flags from k8s.io/apiserver/pkg/admission.
 	globalflag.Register(fs, "default-not-ready-toleration-seconds")

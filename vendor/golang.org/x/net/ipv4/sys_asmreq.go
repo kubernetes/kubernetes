@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin dragonfly freebsd netbsd openbsd solaris windows
+// +build aix darwin dragonfly freebsd netbsd openbsd solaris windows
 
 package ipv4
 
 import (
+	"errors"
 	"net"
 	"unsafe"
 
 	"golang.org/x/net/internal/socket"
 )
+
+var errNoSuchInterface = errors.New("no such interface")
 
 func (so *sockOpt) setIPMreq(c *socket.Conn, ifi *net.Interface, grp net.IP) error {
 	mreq := ipMreq{Multiaddr: [4]byte{grp[0], grp[1], grp[2], grp[3]}}

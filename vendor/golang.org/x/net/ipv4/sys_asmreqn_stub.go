@@ -13,9 +13,9 @@ import (
 )
 
 func (so *sockOpt) getIPMreqn(c *socket.Conn) (*net.Interface, error) {
-	return nil, errOpNoSupport
+	return nil, errNotImplemented
 }
 
 func (so *sockOpt) setIPMreqn(c *socket.Conn, ifi *net.Interface, grp net.IP) error {
-	return errOpNoSupport
+	return errNotImplemented
 }

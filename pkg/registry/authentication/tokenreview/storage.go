@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
@@ -69,7 +69,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	}
 
 	if createValidation != nil {
-		if err := createValidation(obj.DeepCopyObject()); err != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}

@@ -1,6 +1,6 @@
 # Generating Markdown Docs For Your Own cobra.Command
 
-Generating man pages from a cobra command is incredibly easy. An example is as follows:
+Generating Markdown pages from a cobra command is incredibly easy. An example is as follows:
 
 ```go
 package main

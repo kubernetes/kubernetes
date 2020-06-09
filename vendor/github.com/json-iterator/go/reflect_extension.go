@@ -341,10 +341,10 @@ func describeStruct(ctx *ctx, typ reflect2.Type) *StructDescriptor {
 		if ctx.onlyTaggedField && !hastag && !field.Anonymous() {
 			continue
 		}
-		tagParts := strings.Split(tag, ",")
-		if tag == "-" {
+		if tag == "-" || field.Name() == "_" {
 			continue
 		}
+		tagParts := strings.Split(tag, ",")
 		if field.Anonymous() && (tag == "" || tagParts[0] == "") {
 			if field.Type().Kind() == reflect.Struct {
 				structDescriptor := describeStruct(ctx, field.Type())

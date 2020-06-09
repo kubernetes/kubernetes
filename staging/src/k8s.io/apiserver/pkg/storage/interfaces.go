@@ -73,20 +73,24 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// TriggerPublisherFunc is a function that for a given object computes
+// IndexerFunc is a function that for a given object computes
 // <value of an index> for a particular <index>.
-// TODO(wojtek-t): Rename to IndexerFunc?
-type TriggerPublisherFunc func(obj runtime.Object) string
+type IndexerFunc func(obj runtime.Object) string
 
-// TriggerPublisherFuncs is a mapping from <index name> to function that
+// IndexerFuncs is a mapping from <index name> to function that
 // for a given object computes <value for that index>.
-// TODO(wojtek-t): Rename to IndexerFuncs?
-type TriggerPublisherFuncs map[string]TriggerPublisherFunc
+type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
 var Everything = SelectionPredicate{
 	Label: labels.Everything(),
 	Field: fields.Everything(),
+}
+
+// MatchValue defines a pair (<index name>, <value for that index>).
+type MatchValue struct {
+	IndexName string
+	Value     string
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
@@ -97,10 +101,10 @@ type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Obj
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. The function may NOT transform the provided
 // object.
-type ValidateObjectFunc func(obj runtime.Object) error
+type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
 // ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
-func ValidateAllObjectFunc(obj runtime.Object) error {
+func ValidateAllObjectFunc(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 
@@ -171,7 +175,7 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will get current object at given key
 	// and send it in an "ADDED" event, before watch starts.
-	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
+	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item selected by 'p' are sent down to returned watch.Interface.
@@ -180,26 +184,23 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will list current objects directory defined by key
 	// and send them in "ADDED" events, before watch starts.
-	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
-	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
+	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
-	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error
+	// The returned contents may be delayed according to the semantics of GetOptions.ResourceVersion.
+	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
+	// The returned contents may be delayed according to the semantics of ListOptions.ResourceVersion.
+	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
+	// The returned contents may be delayed according to the semantics of ListOptions.ResourceVersion.
+	List(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
@@ -220,7 +221,7 @@ type Interface interface {
 	// err := s.GuaranteedUpdate(
 	//     "myKey", &MyType{}, true,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
-	//       // Before each incovation of the user defined function, "input" is reset to
+	//       // Before each invocation of the user defined function, "input" is reset to
 	//       // current contents for "myKey" in database.
 	//       curr := input.(*MyType)  // Guaranteed to succeed.
 	//
@@ -238,4 +239,27 @@ type Interface interface {
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+}
+
+// GetOptions provides the options that may be provided for storage get operations.
+type GetOptions struct {
+	// IgnoreNotFound determines what is returned if the requested object is not found. If
+	// true, a zero object is returned. If false, an error is returned.
+	IgnoreNotFound bool
+	// ResourceVersion provides a resource version constraint to apply to the get operation
+	// as a "not older than" constraint: the result contains data at least as new as the provided
+	// ResourceVersion. The newest available data is preferred, but any data not older than this
+	// ResourceVersion may be served.
+	ResourceVersion string
+}
+
+// ListOptions provides the options that may be provided for storage list operations.
+type ListOptions struct {
+	// ResourceVersion provides a resource version constraint to apply to the list operation
+	// as a "not older than" constraint: the result contains data at least as new as the provided
+	// ResourceVersion. The newest available data is preferred, but any data not older than this
+	// ResourceVersion may be served.
+	ResourceVersion string
+	// Predicate provides the selection rules for the list operation.
+	Predicate SelectionPredicate
 }

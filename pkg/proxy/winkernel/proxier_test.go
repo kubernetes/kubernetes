@@ -20,8 +20,10 @@ package winkernel
 
 import (
 	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 
 	"net"
 	"strings"
@@ -37,27 +39,6 @@ const clusterCIDR = "192.168.1.0/24"
 const destinationPrefix = "192.168.2.0/24"
 const providerAddress = "10.0.0.3"
 const guid = "123ABC"
-
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		endpoints: map[types.NamespacedName]int{},
-	}
-}
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.endpoints = newEndpoints
-	return nil
-}
 
 type fakeHNS struct{}
 
@@ -89,7 +70,7 @@ func (hns fakeHNS) getEndpointByIpAddress(ip string, networkName string) (*endpo
 	if ipNet.Contains(net.ParseIP(ip)) {
 		return &endpointsInfo{
 			ip:         ip,
-			isLocal:    true,
+			isLocal:    false,
 			macAddress: macAddress,
 			hnsID:      guid,
 			hns:        hns,
@@ -121,24 +102,26 @@ func (hns fakeHNS) deleteLoadBalancer(hnsID string) error {
 func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
 	sourceVip := "192.168.1.2"
 	hnsNetworkInfo := &hnsNetworkInfo{
+		id:          strings.ToUpper(guid),
 		name:        "TestNetwork",
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		portsMap:         make(map[localPort]closeable),
-		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   newServiceChangeMap(),
-		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(hostname),
-		clusterCIDR:      clusterCIDR,
-		hostname:         testHostName,
-		nodeIP:           nodeIP,
-		healthChecker:    newFakeHealthChecker(),
-		network:          *hnsNetworkInfo,
-		sourceVip:        sourceVip,
-		hostMac:          macAddress,
-		isDSR:            false,
-		hns:              newFakeHNS(),
+		portsMap:            make(map[localPort]closeable),
+		serviceMap:          make(proxyServiceMap),
+		serviceChanges:      newServiceChangeMap(),
+		endpointsMap:        make(proxyEndpointsMap),
+		endpointsChanges:    newEndpointsChangeMap(hostname),
+		clusterCIDR:         clusterCIDR,
+		hostname:            testHostName,
+		nodeIP:              nodeIP,
+		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
+		network:             *hnsNetworkInfo,
+		sourceVip:           sourceVip,
+		hostMac:             macAddress,
+		isDSR:               false,
+		hns:                 newFakeHNS(),
+		endPointsRefCount:   make(endPointsReferenceCountMap),
 	}
 	return proxier
 }
@@ -236,6 +219,14 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	if proxier.endpointsMap[svcPortName][0].hnsID != guid {
 		t.Errorf("%v does not match %v", proxier.endpointsMap[svcPortName][0].hnsID, guid)
 	}
+
+	if *proxier.endPointsRefCount[guid] <= 0 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	}
+
+	if *proxier.endPointsRefCount[guid] != *proxier.endpointsMap[svcPortName][0].refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *proxier.endpointsMap[svcPortName][0].refCount)
+	}
 }
 func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	syncPeriod := 30 * time.Second
@@ -283,7 +274,16 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	if proxier.endpointsMap[svcPortName][0].hnsID != guid {
 		t.Errorf("%v does not match %v", proxier.endpointsMap[svcPortName][0].hnsID, guid)
 	}
+
+	if *proxier.endPointsRefCount[guid] <= 0 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	}
+
+	if *proxier.endPointsRefCount[guid] != *proxier.endpointsMap[svcPortName][0].refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *proxier.endpointsMap[svcPortName][0].refCount)
+	}
 }
+
 func TestCreateLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay")
@@ -331,6 +331,15 @@ func TestCreateLoadBalancer(t *testing.T) {
 		t.Errorf("%v does not match %v", proxier.serviceMap[svcPortName].hnsID, guid)
 	}
 }
+
+func TestNoopEndpointSlice(t *testing.T) {
+	p := Proxier{}
+	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
+	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
+	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
+	p.OnEndpointSlicesSynced()
+}
+
 func makeNSN(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }

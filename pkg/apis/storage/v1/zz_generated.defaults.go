@@ -30,11 +30,24 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v1.CSIDriver{}, func(obj interface{}) { SetObjectDefaults_CSIDriver(obj.(*v1.CSIDriver)) })
+	scheme.AddTypeDefaultingFunc(&v1.CSIDriverList{}, func(obj interface{}) { SetObjectDefaults_CSIDriverList(obj.(*v1.CSIDriverList)) })
 	scheme.AddTypeDefaultingFunc(&v1.StorageClass{}, func(obj interface{}) { SetObjectDefaults_StorageClass(obj.(*v1.StorageClass)) })
 	scheme.AddTypeDefaultingFunc(&v1.StorageClassList{}, func(obj interface{}) { SetObjectDefaults_StorageClassList(obj.(*v1.StorageClassList)) })
 	scheme.AddTypeDefaultingFunc(&v1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*v1.VolumeAttachment)) })
 	scheme.AddTypeDefaultingFunc(&v1.VolumeAttachmentList{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachmentList(obj.(*v1.VolumeAttachmentList)) })
 	return nil
+}
+
+func SetObjectDefaults_CSIDriver(in *v1.CSIDriver) {
+	SetDefaults_CSIDriver(in)
+}
+
+func SetObjectDefaults_CSIDriverList(in *v1.CSIDriverList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_CSIDriver(a)
+	}
 }
 
 func SetObjectDefaults_StorageClass(in *v1.StorageClass) {

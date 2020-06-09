@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/url"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/gomega"
 )
@@ -49,7 +49,7 @@ type ExecOptions struct {
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
 func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
-	e2elog.Logf("ExecWithOptions %+v", options)
+	Logf("ExecWithOptions %+v", options)
 
 	config, err := LoadConfig()
 	ExpectNoError(err, "failed to load restclient config")
@@ -98,7 +98,7 @@ func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName 
 // ExecCommandInContainer executes a command in the specified container.
 func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) string {
 	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	e2elog.Logf("Exec stderr: %q", stderr)
+	Logf("Exec stderr: %q", stderr)
 	ExpectNoError(err,
 		"failed to execute command in pod %v, container %v: %v",
 		podName, containerName, err)
@@ -111,14 +111,14 @@ func (f *Framework) ExecShellInContainer(podName, containerName string, cmd stri
 }
 
 func (f *Framework) execCommandInPod(podName string, cmd ...string) string {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return f.ExecCommandInContainer(podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
 func (f *Framework) execCommandInPodWithFullOutput(podName string, cmd ...string) (string, string, error) {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return f.ExecCommandInContainerWithFullOutput(podName, pod.Spec.Containers[0].Name, cmd...)

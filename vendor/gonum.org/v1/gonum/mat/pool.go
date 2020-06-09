@@ -87,10 +87,12 @@ func init() {
 			}}
 		}
 		poolFloats[i].New = func() interface{} {
-			return make([]float64, l)
+			s := make([]float64, l)
+			return &s
 		}
 		poolInts[i].New = func() interface{} {
-			return make([]int, l)
+			s := make([]int, l)
+			return &s
 		}
 	}
 }
@@ -200,7 +202,7 @@ func putWorkspaceVec(v *VecDense) {
 // getFloats returns a []float64 of length l and a cap that is
 // less than 2*l. If clear is true, the slice visible is zeroed.
 func getFloats(l int, clear bool) []float64 {
-	w := poolFloats[bits(uint64(l))].Get().([]float64)
+	w := *poolFloats[bits(uint64(l))].Get().(*[]float64)
 	w = w[:l]
 	if clear {
 		zero(w)
@@ -212,13 +214,13 @@ func getFloats(l int, clear bool) []float64 {
 // workspace pool. putFloats must not be called with a slice
 // where references to the underlying data have been kept.
 func putFloats(w []float64) {
-	poolFloats[bits(uint64(cap(w)))].Put(w)
+	poolFloats[bits(uint64(cap(w)))].Put(&w)
 }
 
 // getInts returns a []ints of length l and a cap that is
 // less than 2*l. If clear is true, the slice visible is zeroed.
 func getInts(l int, clear bool) []int {
-	w := poolInts[bits(uint64(l))].Get().([]int)
+	w := *poolInts[bits(uint64(l))].Get().(*[]int)
 	w = w[:l]
 	if clear {
 		for i := range w {
@@ -232,5 +234,5 @@ func getInts(l int, clear bool) []int {
 // workspace pool. putInts must not be called with a slice
 // where references to the underlying data have been kept.
 func putInts(w []int) {
-	poolInts[bits(uint64(cap(w)))].Put(w)
+	poolInts[bits(uint64(cap(w)))].Put(&w)
 }

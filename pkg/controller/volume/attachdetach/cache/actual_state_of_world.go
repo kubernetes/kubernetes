@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,7 +120,7 @@ type ActualStateOfWorld interface {
 	GetAttachedVolumesPerNode() map[types.NodeName][]operationexecutor.AttachedVolume
 
 	// GetNodesForAttachedVolume returns the nodes on which the volume is attached.
-	// This function is used by reconciler for mutli-attach check.
+	// This function is used by reconciler for multi-attach check.
 	GetNodesForAttachedVolume(volumeName v1.UniqueVolumeName) []types.NodeName
 
 	// GetVolumesToReportAttached returns a map containing the set of nodes for
@@ -357,7 +357,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
-		return fmt.Errorf("Failed to SetVolumeMountedByNode with error: %v", err)
+		return fmt.Errorf("failed to SetVolumeMountedByNode with error: %v", err)
 	}
 
 	nodeObj.mountedByNode = mounted
@@ -390,7 +390,7 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
-		return 0, fmt.Errorf("Failed to set detach request time with error: %v", err)
+		return 0, fmt.Errorf("failed to set detach request time with error: %v", err)
 	}
 	// If there is no previous detach request, set it to the current time
 	if nodeObj.detachRequestedTime.IsZero() {
@@ -569,13 +569,10 @@ func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
 	attachedVolumes := make(
 		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
-		for actualNodeName, nodeObj := range volumeObj.nodesAttachedTo {
-			if actualNodeName == nodeName {
-				attachedVolumes = append(
-					attachedVolumes,
-					getAttachedVolume(&volumeObj, &nodeObj))
-				break
-			}
+		if nodeObj, nodeExists := volumeObj.nodesAttachedTo[nodeName]; nodeExists {
+			attachedVolumes = append(
+				attachedVolumes,
+				getAttachedVolume(&volumeObj, &nodeObj))
 		}
 	}
 
@@ -610,9 +607,9 @@ func (asw *actualStateOfWorld) GetNodesForAttachedVolume(volumeName v1.UniqueVol
 	}
 
 	nodes := []types.NodeName{}
-	for k, nodesAttached := range volumeObj.nodesAttachedTo {
+	for nodeName, nodesAttached := range volumeObj.nodesAttachedTo {
 		if nodesAttached.attachedConfirmed {
-			nodes = append(nodes, k)
+			nodes = append(nodes, nodeName)
 		}
 	}
 	return nodes
@@ -627,14 +624,14 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 		if nodeToUpdateObj.statusUpdateNeeded {
 			attachedVolumes := make(
 				[]v1.AttachedVolume,
+				0,
 				len(nodeToUpdateObj.volumesToReportAsAttached) /* len */)
-			i := 0
 			for _, volume := range nodeToUpdateObj.volumesToReportAsAttached {
-				attachedVolumes[i] = v1.AttachedVolume{
-					Name:       volume,
-					DevicePath: asw.attachedVolumes[volume].devicePath,
-				}
-				i++
+				attachedVolumes = append(attachedVolumes,
+					v1.AttachedVolume{
+						Name:       volume,
+						DevicePath: asw.attachedVolumes[volume].devicePath,
+					})
 			}
 			volumesToReportAttached[nodeToUpdateObj.nodeName] = attachedVolumes
 		}

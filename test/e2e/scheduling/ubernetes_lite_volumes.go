@@ -17,21 +17,23 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
@@ -40,14 +42,14 @@ var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
 	var err error
 	image := framework.ServeHostnameImage
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.ClientSet)
 			framework.ExpectNoError(err)
 		}
 		ginkgo.By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
 		msg := fmt.Sprintf("Zone count is %d, only run for multi-zone clusters, skipping test", zoneCount)
-		framework.SkipUnlessAtLeast(zoneCount, 2, msg)
+		e2eskipper.SkipUnlessAtLeast(zoneCount, 2, msg)
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should schedule pods in the same zones as statically provisioned PVs", func() {
@@ -67,7 +69,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	// Get all the zones that the nodes are in
 	expectedZones, err := gceCloud.GetAllZonesFromCloudProvider()
 	framework.ExpectNoError(err)
-	e2elog.Logf("Expected zones: %v", expectedZones)
+	framework.Logf("Expected zones: %v", expectedZones)
 
 	// Get all the zones in this current region
 	region := gceCloud.Region()
@@ -122,7 +124,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	defer func() {
 		// Teardown of the compute instance
-		e2elog.Logf("Deleting compute resource: %v", name)
+		framework.Logf("Deleting compute resource: %v", name)
 		err := gceCloud.DeleteInstance(project, zone, name)
 		framework.ExpectNoError(err)
 	}()
@@ -136,23 +138,23 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	for index := 1; index <= zoneCount+1; index++ {
 		pvc := newNamedDefaultClaim(ns, index)
-		pvc, err = framework.CreatePVC(c, ns, pvc)
+		pvc, err = e2epv.CreatePVC(c, ns, pvc)
 		framework.ExpectNoError(err)
 		pvcList = append(pvcList, pvc)
 
 		// Defer the cleanup
 		defer func() {
-			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
-			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
+			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			if err != nil {
-				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
 	}
 
 	// Wait for all claims bound
 	for _, claim := range pvcList {
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 	}
 
@@ -160,18 +162,18 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	ginkgo.By("Checking that PDs have been provisioned in only the expected zones")
 	for _, claim := range pvcList {
 		// Get a new copy of the claim to have all fields populated
-		claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		// Get the related PV
-		pv, err := c.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		gomega.Expect(ok).To(gomega.BeTrue(), "PV has no LabelZone to be found")
+		framework.ExpectEqual(ok, true, "PV has no LabelZone to be found")
 		pvZones.Insert(pvZone)
 	}
-	gomega.Expect(pvZones.Equal(expectedZones)).To(gomega.BeTrue(), fmt.Sprintf("PDs provisioned in unwanted zones. We want zones: %v, got: %v", expectedZones, pvZones))
+	framework.ExpectEqual(pvZones.Equal(expectedZones), true, fmt.Sprintf("PDs provisioned in unwanted zones. We want zones: %v, got: %v", expectedZones, pvZones))
 }
 
 type staticPVTestConfig struct {
@@ -188,7 +190,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	c := f.ClientSet
 	ns := f.Namespace.Name
 
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	zonelist := zones.List()
 	ginkgo.By("Creating static PVs across zones")
@@ -204,38 +206,38 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 		}
 		for _, config := range configs {
 			e2epod.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
-			framework.PVPVCCleanup(c, ns, config.pv, config.pvc)
-			err = framework.DeletePVSource(config.pvSource)
+			e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
+			err = e2epv.DeletePVSource(config.pvSource)
 			framework.ExpectNoError(err)
 		}
 	}()
 
 	for i, config := range configs {
 		zone := zonelist[i%len(zones)]
-		config.pvSource, err = framework.CreatePVSource(zone)
+		config.pvSource, err = e2epv.CreatePVSource(zone)
 		framework.ExpectNoError(err)
 
-		pvConfig := framework.PersistentVolumeConfig{
+		pvConfig := e2epv.PersistentVolumeConfig{
 			NamePrefix: "multizone-pv",
 			PVSource:   *config.pvSource,
 			Prebind:    nil,
 		}
 		className := ""
-		pvcConfig := framework.PersistentVolumeClaimConfig{StorageClassName: &className}
+		pvcConfig := e2epv.PersistentVolumeClaimConfig{StorageClassName: &className}
 
-		config.pv, config.pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+		config.pv, config.pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("Waiting for all PVCs to be bound")
 	for _, config := range configs {
-		framework.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
+		e2epv.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
 	}
 
 	ginkgo.By("Creating pods for each static PV")
 	for _, config := range configs {
-		podConfig := framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
-		config.pod, err = c.CoreV1().Pods(ns).Create(podConfig)
+		podConfig := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
+		config.pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), podConfig, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 

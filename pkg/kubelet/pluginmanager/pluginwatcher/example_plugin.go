@@ -17,6 +17,7 @@ limitations under the License.
 package pluginwatcher
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -24,11 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta1"
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2"
@@ -88,10 +88,9 @@ func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string,
 }
 
 // GetPluginInfo returns a PluginInfo object
-func GetPluginInfo(plugin *examplePlugin, foundInDeprecatedDir bool) cache.PluginInfo {
+func GetPluginInfo(plugin *examplePlugin) cache.PluginInfo {
 	return cache.PluginInfo{
-		SocketPath:           plugin.endpoint,
-		FoundInDeprecatedDir: foundInDeprecatedDir,
+		SocketPath: plugin.endpoint,
 	}
 }
 
@@ -134,13 +133,11 @@ func (e *examplePlugin) Serve(services ...string) error {
 		case "v1beta1":
 			v1beta1 := &pluginServiceV1Beta1{server: e}
 			v1beta1.RegisterService()
-			break
 		case "v1beta2":
 			v1beta2 := &pluginServiceV1Beta2{server: e}
 			v1beta2.RegisterService()
-			break
 		default:
-			return fmt.Errorf("Unsupported service: '%s'", service)
+			return fmt.Errorf("unsupported service: '%s'", service)
 		}
 	}
 
@@ -171,7 +168,7 @@ func (e *examplePlugin) Stop() error {
 	case <-c:
 		break
 	case <-time.After(time.Second):
-		return errors.New("Timed out on waiting for stop completion")
+		return errors.New("timed out on waiting for stop completion")
 	}
 
 	if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {

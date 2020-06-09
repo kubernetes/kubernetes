@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -158,7 +159,7 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 	}()
 
 	// get the Node so we can check the current status
-	oldNode, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	oldNode, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		err = fmt.Errorf("could not get Node %q, will not sync status, error: %v", nodeName, err)
 		return

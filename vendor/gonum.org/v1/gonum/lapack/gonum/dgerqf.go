@@ -22,7 +22,7 @@ import (
 // The matrix Q is represented as a product of elementary reflectors
 //  Q = H_0 H_1 . . . H_{min(m,n)-1}.
 // Each H(i) has the form
-//  H_i = I - tau_i * v * v^T
+//  H_i = I - tau_i * v * vᵀ
 // where v is a vector with v[0:n-k+i-1] stored in A[m-k+i, 0:n-k+i-1],
 // v[n-k+i:n] = 0 and v[n-k+i] = 1.
 //

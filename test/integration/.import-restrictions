@@ -1,0 +1,7 @@
+rules:
+  # Discourage import of k8s.io/kubernetes/test/e2e
+  - selectorRegexp: k8s[.]io/kubernetes/test/e2e
+    # TODO: import-boss --include-test-files is catching these; drive to zero
+    allowedPrefixes:
+      # test/integration/auth/bootstraptoken_test.go is using this
+      - k8s.io/kubernetes/test/e2e/lifecycle/bootstrap

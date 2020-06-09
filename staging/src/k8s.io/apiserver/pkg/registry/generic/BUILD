@@ -23,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

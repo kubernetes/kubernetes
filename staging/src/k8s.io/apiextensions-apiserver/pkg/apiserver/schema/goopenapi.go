@@ -78,6 +78,15 @@ func (x *Extensions) toGoOpenAPI(ret *spec.Schema) {
 	if x.XIntOrString {
 		ret.VendorExtensible.AddExtension("x-kubernetes-int-or-string", true)
 	}
+	if len(x.XListMapKeys) > 0 {
+		ret.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", x.XListMapKeys)
+	}
+	if x.XListType != nil {
+		ret.VendorExtensible.AddExtension("x-kubernetes-list-type", *x.XListType)
+	}
+	if x.XMapType != nil {
+		ret.VendorExtensible.AddExtension("x-kubernetes-map-type", *x.XMapType)
+	}
 }
 
 func (v *ValueValidation) toGoOpenAPI(ret *spec.Schema) {

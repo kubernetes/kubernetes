@@ -47,7 +47,7 @@ func TestInt(t *testing.T) {
 func TestLower(t *testing.T) {
 	flags := flag.NewFlagSet("test", 0)
 	var context struct {
-		Ähem      string
+		Ahem      string
 		MixedCase string
 	}
 	require.NotPanics(t, func() {
@@ -55,10 +55,10 @@ func TestLower(t *testing.T) {
 	})
 	require.Equal(t, []simpleFlag{
 		{
-			name: "mixedCase",
+			name: "ahem",
 		},
 		{
-			name: "ähem",
+			name: "mixedCase",
 		},
 	},
 		allFlags(flags))

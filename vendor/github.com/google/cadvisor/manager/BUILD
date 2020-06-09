@@ -22,6 +22,9 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/google/cadvisor/machine:go_default_library",
+        "//vendor/github.com/google/cadvisor/nvm:go_default_library",
+        "//vendor/github.com/google/cadvisor/perf:go_default_library",
+        "//vendor/github.com/google/cadvisor/stats:go_default_library",
         "//vendor/github.com/google/cadvisor/summary:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/cpuload:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/oomparser:go_default_library",
@@ -29,7 +32,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/version:go_default_library",
         "//vendor/github.com/google/cadvisor/watcher:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/clock:go_default_library",
     ],
 )

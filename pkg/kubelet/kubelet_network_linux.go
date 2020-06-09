@@ -20,10 +20,19 @@ package kubelet
 
 import (
 	"fmt"
+	"time"
 
-	"k8s.io/klog"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
+
+func (kl *Kubelet) initNetworkUtil() {
+	kl.syncNetworkUtil()
+	go kl.iptClient.Monitor(utiliptables.Chain("KUBE-KUBELET-CANARY"),
+		[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
+		kl.syncNetworkUtil, 1*time.Minute, wait.NeverStop)
+}
 
 // syncNetworkUtil ensures the network utility are present on host.
 // Network util includes:
@@ -68,6 +77,22 @@ func (kl *Kubelet) syncNetworkUtil() {
 		klog.Errorf("Failed to ensure rule to drop packet marked by %v in %v chain %v: %v", KubeMarkDropChain, utiliptables.TableFilter, KubeFirewallChain, err)
 		return
 	}
+
+	// drop all non-local packets to localhost if they're not part of an existing
+	// forwarded connection. See #90259
+	if !kl.iptClient.IsIPv6() { // ipv6 doesn't have this issue
+		if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallChain,
+			"-m", "comment", "--comment", "block incoming localnet connections",
+			"--dst", "127.0.0.0/8",
+			"!", "--src", "127.0.0.0/8",
+			"-m", "conntrack",
+			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
+			"-j", "DROP"); err != nil {
+			klog.Errorf("Failed to ensure rule to drop invalid localhost packets in %v chain %v: %v", utiliptables.TableFilter, KubeFirewallChain, err)
+			return
+		}
+	}
+
 	if _, err := kl.iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainOutput, "-j", string(KubeFirewallChain)); err != nil {
 		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableFilter, utiliptables.ChainOutput, KubeFirewallChain, err)
 		return
@@ -96,9 +121,18 @@ func (kl *Kubelet) syncNetworkUtil() {
 		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, KubePostroutingChain, err)
 		return
 	}
-	if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain,
+	// Establish the masquerading rule.
+	// NB: THIS MUST MATCH the corresponding code in the iptables and ipvs
+	// modes of kube-proxy
+	masqRule := []string{
 		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", masqueradeMark, "-j", "MASQUERADE"); err != nil {
+		"-m", "mark", "--mark", masqueradeMark,
+		"-j", "MASQUERADE",
+	}
+	if kl.iptClient.HasRandomFully() {
+		masqRule = append(masqRule, "--random-fully")
+	}
+	if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain, masqRule...); err != nil {
 		klog.Errorf("Failed to ensure SNAT rule for packets marked by %v in %v chain %v: %v", KubeMarkMasqChain, utiliptables.TableNAT, KubePostroutingChain, err)
 		return
 	}

@@ -57,60 +57,60 @@ func NewTimedStore(age time.Duration, maxItems int) *TimedStore {
 }
 
 // Adds an element to the start of the buffer (removing one from the end if necessary).
-func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
+func (s *TimedStore) Add(timestamp time.Time, item interface{}) {
 	data := timedStoreData{
 		timestamp: timestamp,
 		data:      item,
 	}
 	// Common case: data is added in order.
-	if len(self.buffer) == 0 || !timestamp.Before(self.buffer[len(self.buffer)-1].timestamp) {
-		self.buffer = append(self.buffer, data)
+	if len(s.buffer) == 0 || !timestamp.Before(s.buffer[len(s.buffer)-1].timestamp) {
+		s.buffer = append(s.buffer, data)
 	} else {
 		// Data is out of order; insert it in the correct position.
-		index := sort.Search(len(self.buffer), func(index int) bool {
-			return self.buffer[index].timestamp.After(timestamp)
+		index := sort.Search(len(s.buffer), func(index int) bool {
+			return s.buffer[index].timestamp.After(timestamp)
 		})
-		self.buffer = append(self.buffer, timedStoreData{}) // Make room to shift the elements
-		copy(self.buffer[index+1:], self.buffer[index:])    // Shift the elements over
-		self.buffer[index] = data
+		s.buffer = append(s.buffer, timedStoreData{}) // Make room to shift the elements
+		copy(s.buffer[index+1:], s.buffer[index:])    // Shift the elements over
+		s.buffer[index] = data
 	}
 
 	// Remove any elements before eviction time.
 	// TODO(rjnagal): This is assuming that the added entry has timestamp close to now.
-	evictTime := timestamp.Add(-self.age)
-	index := sort.Search(len(self.buffer), func(index int) bool {
-		return self.buffer[index].timestamp.After(evictTime)
+	evictTime := timestamp.Add(-s.age)
+	index := sort.Search(len(s.buffer), func(index int) bool {
+		return s.buffer[index].timestamp.After(evictTime)
 	})
-	if index < len(self.buffer) {
-		self.buffer = self.buffer[index:]
+	if index < len(s.buffer) {
+		s.buffer = s.buffer[index:]
 	}
 
 	// Remove any elements if over our max size.
-	if self.maxItems >= 0 && len(self.buffer) > self.maxItems {
-		startIndex := len(self.buffer) - self.maxItems
-		self.buffer = self.buffer[startIndex:]
+	if s.maxItems >= 0 && len(s.buffer) > s.maxItems {
+		startIndex := len(s.buffer) - s.maxItems
+		s.buffer = s.buffer[startIndex:]
 	}
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).
 // Results are from first to last. maxResults of -1 means no limit.
-func (self *TimedStore) InTimeRange(start, end time.Time, maxResults int) []interface{} {
+func (s *TimedStore) InTimeRange(start, end time.Time, maxResults int) []interface{} {
 	// No stats, return empty.
-	if len(self.buffer) == 0 {
+	if len(s.buffer) == 0 {
 		return []interface{}{}
 	}
 
 	var startIndex int
 	if start.IsZero() {
 		// None specified, start at the beginning.
-		startIndex = len(self.buffer) - 1
+		startIndex = len(s.buffer) - 1
 	} else {
 		// Start is the index before the elements smaller than it. We do this by
 		// finding the first element smaller than start and taking the index
 		// before that element
-		startIndex = sort.Search(len(self.buffer), func(index int) bool {
+		startIndex = sort.Search(len(s.buffer), func(index int) bool {
 			// buffer[index] < start
-			return self.getData(index).timestamp.Before(start)
+			return s.getData(index).timestamp.Before(start)
 		}) - 1
 		// Check if start is after all the data we have.
 		if startIndex < 0 {
@@ -124,12 +124,12 @@ func (self *TimedStore) InTimeRange(start, end time.Time, maxResults int) []inte
 		endIndex = 0
 	} else {
 		// End is the first index smaller than or equal to it (so, not larger).
-		endIndex = sort.Search(len(self.buffer), func(index int) bool {
+		endIndex = sort.Search(len(s.buffer), func(index int) bool {
 			// buffer[index] <= t -> !(buffer[index] > t)
-			return !self.getData(index).timestamp.After(end)
+			return !s.getData(index).timestamp.After(end)
 		})
 		// Check if end is before all the data we have.
-		if endIndex == len(self.buffer) {
+		if endIndex == len(s.buffer) {
 			return []interface{}{}
 		}
 	}
@@ -144,21 +144,21 @@ func (self *TimedStore) InTimeRange(start, end time.Time, maxResults int) []inte
 	// Return in sorted timestamp order so from the "back" to "front".
 	result := make([]interface{}, numResults)
 	for i := 0; i < numResults; i++ {
-		result[i] = self.Get(startIndex - i)
+		result[i] = s.Get(startIndex - i)
 	}
 	return result
 }
 
 // Gets the element at the specified index. Note that elements are output in LIFO order.
-func (self *TimedStore) Get(index int) interface{} {
-	return self.getData(index).data
+func (s *TimedStore) Get(index int) interface{} {
+	return s.getData(index).data
 }
 
 // Gets the data at the specified index. Note that elements are output in LIFO order.
-func (self *TimedStore) getData(index int) timedStoreData {
-	return self.buffer[len(self.buffer)-index-1]
+func (s *TimedStore) getData(index int) timedStoreData {
+	return s.buffer[len(s.buffer)-index-1]
 }
 
-func (self *TimedStore) Size() int {
-	return len(self.buffer)
+func (s *TimedStore) Size() int {
+	return len(s.buffer)
 }

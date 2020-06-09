@@ -54,6 +54,15 @@ type KubeProxyIPVSConfiguration struct {
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
 	StrictARP bool `json:"strictARP"`
+	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPTimeout metav1.Duration `json:"tcpTimeout"`
+	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPFinTimeout metav1.Duration `json:"tcpFinTimeout"`
+	// udpTimeout is the timeout value used for IPVS UDP packets.
+	// The default value is 0, which preserves the current timeout value on the system.
+	UDPTimeout metav1.Duration `json:"udpTimeout"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -107,6 +116,8 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
+	// bindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
+	BindAddressHardFail bool `json:"bindAddressHardFail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool `json:"enableProfiling"`
@@ -149,6 +160,10 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string `json:"nodePortAddresses"`
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode `json:"detectLocalMode"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
@@ -165,3 +180,6 @@ type KubeProxyConfiguration struct {
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
 type ProxyMode string
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string

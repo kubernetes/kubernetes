@@ -5,8 +5,11 @@ go_test(
     srcs = [
         "admission_test.go",
         "broken_webhook_test.go",
+        "client_auth_test.go",
+        "load_balance_test.go",
         "main_test.go",
         "reinvocation_test.go",
+        "timeout_test.go",
     ],
     rundir = ".",
     tags = [
@@ -15,7 +18,9 @@ go_test(
     ],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//staging/src/k8s.io/api/admission/v1:go_default_library",
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
@@ -32,12 +37,15 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//test/integration/etcd:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//test/utils:go_default_library",
     ],
 )
 

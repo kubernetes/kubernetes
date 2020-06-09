@@ -55,7 +55,7 @@ type testRESTMapper struct {
 	meta.RESTMapper
 }
 
-func (_ *testRESTMapper) Reset() {}
+func (*testRESTMapper) Reset() {}
 
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
@@ -406,6 +406,16 @@ func TestProcessEvent(t *testing.T) {
 			dependencyGraphBuilder.processGraphChanges()
 			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
+	}
+}
+
+func BenchmarkReferencesDiffs(t *testing.B) {
+	t.ReportAllocs()
+	t.ResetTimer()
+	for n := 0; n < t.N; n++ {
+		old := []metav1.OwnerReference{{UID: "1"}, {UID: "2"}}
+		new := []metav1.OwnerReference{{UID: "2"}, {UID: "3"}}
+		referencesDiffs(old, new)
 	}
 }
 
@@ -837,7 +847,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	//        wait.PollImmediateUntil() loops with 100ms (hardcode) util the `stopCh` is closed:
 	//            GetDeletableResources()
 	//            gc.resyncMonitors()
-	//            controller.WaitForCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
+	//            cache.WaitForNamedCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
 	//
 	// Setting the period to 200ms allows the WaitForCacheSync() to check
 	// for cache sync ~2 times in every wait.PollImmediateUntil() loop.
@@ -857,7 +867,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	// Simulate the discovery client returning an error
 	fakeDiscoveryClient.setPreferredResources(nil)
-	fakeDiscoveryClient.setError(fmt.Errorf("Error calling discoveryClient.ServerPreferredResources()"))
+	fakeDiscoveryClient.setError(fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
 
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
@@ -918,16 +928,16 @@ type fakeServerResources struct {
 	InterfaceUsedCount int
 }
 
-func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
 // Deprecated: use ServerGroupsAndResources instead.
-func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return nil, nil, nil
 }
 
@@ -956,6 +966,6 @@ func (f *fakeServerResources) getInterfaceUsedCount() int {
 	return f.InterfaceUsedCount
 }
 
-func (_ *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }

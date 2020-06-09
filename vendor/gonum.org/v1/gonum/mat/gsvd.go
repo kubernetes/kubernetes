@@ -62,12 +62,12 @@ func (gsvd *GSVD) succFact() bool {
 // input kind.
 //
 // The full singular value decomposition (kind == GSVDAll) deconstructs A and B as
-//  A = U * Σ₁ * [ 0 R ] * Q^T
+//  A = U * Σ₁ * [ 0 R ] * Qᵀ
 //
-//  B = V * Σ₂ * [ 0 R ] * Q^T
+//  B = V * Σ₂ * [ 0 R ] * Qᵀ
 // where Σ₁ and Σ₂ are r×(k+l) and p×(k+l) diagonal matrices of singular values, and
 // U, V and Q are r×r, p×p and c×c orthogonal matrices of singular vectors. k+l is the
-// effective numerical rank of the matrix [ A^T B^T ]^T.
+// effective numerical rank of the matrix [ Aᵀ Bᵀ ]ᵀ.
 //
 // It is frequently not necessary to compute the full GSVD. Computation time and
 // storage costs can be reduced using the appropriate kind. Either only the singular
@@ -156,7 +156,7 @@ func (gsvd *GSVD) Kind() GSVDKind {
 	return gsvd.kind
 }
 
-// Rank returns the k and l terms of the rank of [ A^T B^T ]^T.
+// Rank returns the k and l terms of the rank of [ Aᵀ Bᵀ ]ᵀ.
 func (gsvd *GSVD) Rank() (k, l int) {
 	return gsvd.k, gsvd.l
 }
@@ -236,12 +236,13 @@ func (gsvd *GSVD) ValuesB(s []float64) []float64 {
 	return s
 }
 
-// ZeroRTo extracts the matrix [ 0 R ] from the singular value decomposition, storing
-// the result in-place into dst. [ 0 R ] is size (k+l)×c.
-// If dst is nil, a new matrix is allocated. The resulting ZeroR matrix is returned.
+// ZeroRTo extracts the matrix [ 0 R ] from the singular value decomposition,
+// storing the result into dst. [ 0 R ] is of size (k+l)×c.
 //
-// ZeroRTo will panic if the receiver does not contain a successful factorization.
-func (gsvd *GSVD) ZeroRTo(dst *Dense) *Dense {
+// If dst is empty, ZeroRTo will resize dst to be (k+l)×c. When dst is
+// non-empty, ZeroRTo will panic if dst is not (k+l)×c. ZeroRTo will also panic
+// if the receiver does not contain a successful factorization.
+func (gsvd *GSVD) ZeroRTo(dst *Dense) {
 	if !gsvd.succFact() {
 		panic(badFact)
 	}
@@ -250,10 +251,14 @@ func (gsvd *GSVD) ZeroRTo(dst *Dense) *Dense {
 	k := gsvd.k
 	l := gsvd.l
 	h := min(k+l, r)
-	if dst == nil {
-		dst = NewDense(k+l, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(k+l, c)
 	} else {
-		dst.reuseAsZeroed(k+l, c)
+		r2, c2 := dst.Dims()
+		if r2 != k+l || c != c2 {
+			panic(ErrShape)
+		}
+		dst.Zero()
 	}
 	a := Dense{
 		mat:     gsvd.a,
@@ -271,25 +276,29 @@ func (gsvd *GSVD) ZeroRTo(dst *Dense) *Dense {
 		dst.Slice(r, k+l, c+r-k-l, c).(*Dense).
 			Copy(b.Slice(r-k, l, c+r-k-l, c))
 	}
-	return dst
 }
 
 // SigmaATo extracts the matrix Σ₁ from the singular value decomposition, storing
-// the result in-place into dst. Σ₁ is size r×(k+l).
-// If dst is nil, a new matrix is allocated. The resulting SigmaA matrix is returned.
+// the result into dst. Σ₁ is size r×(k+l).
 //
-// SigmaATo will panic if the receiver does not contain a successful factorization.
-func (gsvd *GSVD) SigmaATo(dst *Dense) *Dense {
+// If dst is empty, SigmaATo will resize dst to be r×(k+l). When dst is
+// non-empty, SigmATo will panic if dst is not r×(k+l). SigmaATo will also
+// panic if the receiver does not contain a successful factorization.
+func (gsvd *GSVD) SigmaATo(dst *Dense) {
 	if !gsvd.succFact() {
 		panic(badFact)
 	}
 	r := gsvd.r
 	k := gsvd.k
 	l := gsvd.l
-	if dst == nil {
-		dst = NewDense(r, k+l, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(r, k+l)
 	} else {
-		dst.reuseAsZeroed(r, k+l)
+		r2, c := dst.Dims()
+		if r2 != r || c != k+l {
+			panic(ErrShape)
+		}
+		dst.Zero()
 	}
 	for i := 0; i < k; i++ {
 		dst.set(i, i, 1)
@@ -297,15 +306,15 @@ func (gsvd *GSVD) SigmaATo(dst *Dense) *Dense {
 	for i := k; i < min(r, k+l); i++ {
 		dst.set(i, i, gsvd.s1[i])
 	}
-	return dst
 }
 
 // SigmaBTo extracts the matrix Σ₂ from the singular value decomposition, storing
-// the result in-place into dst. Σ₂ is size p×(k+l).
-// If dst is nil, a new matrix is allocated. The resulting SigmaB matrix is returned.
+// the result into dst. Σ₂ is size p×(k+l).
 //
-// SigmaBTo will panic if the receiver does not contain a successful factorization.
-func (gsvd *GSVD) SigmaBTo(dst *Dense) *Dense {
+// If dst is empty, SigmaBTo will resize dst to be p×(k+l). When dst is
+// non-empty, SigmBTo will panic if dst is not p×(k+l). SigmaBTo will also
+// panic if the receiver does not contain a successful factorization.
+func (gsvd *GSVD) SigmaBTo(dst *Dense) {
 	if !gsvd.succFact() {
 		panic(badFact)
 	}
@@ -313,10 +322,14 @@ func (gsvd *GSVD) SigmaBTo(dst *Dense) *Dense {
 	p := gsvd.p
 	k := gsvd.k
 	l := gsvd.l
-	if dst == nil {
-		dst = NewDense(p, k+l, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(p, k+l)
 	} else {
-		dst.reuseAsZeroed(p, k+l)
+		r, c := dst.Dims()
+		if r != p || c != k+l {
+			panic(ErrShape)
+		}
+		dst.Zero()
 	}
 	for i := 0; i < min(l, r-k); i++ {
 		dst.set(i, i+k, gsvd.s2[k+i])
@@ -324,15 +337,15 @@ func (gsvd *GSVD) SigmaBTo(dst *Dense) *Dense {
 	for i := r - k; i < l; i++ {
 		dst.set(i, i+k, 1)
 	}
-	return dst
 }
 
 // UTo extracts the matrix U from the singular value decomposition, storing
-// the result in-place into dst. U is size r×r.
-// If dst is nil, a new matrix is allocated. The resulting U matrix is returned.
+// the result into dst. U is size r×r.
 //
-// UTo will panic if the receiver does not contain a successful factorization.
-func (gsvd *GSVD) UTo(dst *Dense) *Dense {
+// If dst is empty, UTo will resize dst to be r×r. When dst is
+// non-empty, UTo will panic if dst is not r×r. UTo will also
+// panic if the receiver does not contain a successful factorization.
+func (gsvd *GSVD) UTo(dst *Dense) {
 	if !gsvd.succFact() {
 		panic(badFact)
 	}
@@ -341,10 +354,13 @@ func (gsvd *GSVD) UTo(dst *Dense) *Dense {
 	}
 	r := gsvd.u.Rows
 	c := gsvd.u.Cols
-	if dst == nil {
-		dst = NewDense(r, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(r, c)
 	} else {
-		dst.reuseAs(r, c)
+		r2, c2 := dst.Dims()
+		if r != r2 || c != c2 {
+			panic(ErrShape)
+		}
 	}
 
 	tmp := &Dense{
@@ -353,15 +369,15 @@ func (gsvd *GSVD) UTo(dst *Dense) *Dense {
 		capCols: c,
 	}
 	dst.Copy(tmp)
-	return dst
 }
 
 // VTo extracts the matrix V from the singular value decomposition, storing
-// the result in-place into dst. V is size p×p.
-// If dst is nil, a new matrix is allocated. The resulting V matrix is returned.
+// the result into dst. V is size p×p.
 //
-// VTo will panic if the receiver does not contain a successful factorization.
-func (gsvd *GSVD) VTo(dst *Dense) *Dense {
+// If dst is empty, VTo will resize dst to be p×p. When dst is
+// non-empty, VTo will panic if dst is not p×p. VTo will also
+// panic if the receiver does not contain a successful factorization.
+func (gsvd *GSVD) VTo(dst *Dense) {
 	if !gsvd.succFact() {
 		panic(badFact)
 	}
@@ -370,10 +386,13 @@ func (gsvd *GSVD) VTo(dst *Dense) *Dense {
 	}
 	r := gsvd.v.Rows
 	c := gsvd.v.Cols
-	if dst == nil {
-		dst = NewDense(r, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(r, c)
 	} else {
-		dst.reuseAs(r, c)
+		r2, c2 := dst.Dims()
+		if r != r2 || c != c2 {
+			panic(ErrShape)
+		}
 	}
 
 	tmp := &Dense{
@@ -382,15 +401,15 @@ func (gsvd *GSVD) VTo(dst *Dense) *Dense {
 		capCols: c,
 	}
 	dst.Copy(tmp)
-	return dst
 }
 
 // QTo extracts the matrix Q from the singular value decomposition, storing
-// the result in-place into dst. Q is size c×c.
-// If dst is nil, a new matrix is allocated. The resulting Q matrix is returned.
+// the result into dst. Q is size c×c.
 //
-// QTo will panic if the receiver does not contain a successful factorization.
-func (gsvd *GSVD) QTo(dst *Dense) *Dense {
+// If dst is empty, QTo will resize dst to be c×c. When dst is
+// non-empty, QTo will panic if dst is not c×c. QTo will also
+// panic if the receiver does not contain a successful factorization.
+func (gsvd *GSVD) QTo(dst *Dense) {
 	if !gsvd.succFact() {
 		panic(badFact)
 	}
@@ -399,10 +418,13 @@ func (gsvd *GSVD) QTo(dst *Dense) *Dense {
 	}
 	r := gsvd.q.Rows
 	c := gsvd.q.Cols
-	if dst == nil {
-		dst = NewDense(r, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(r, c)
 	} else {
-		dst.reuseAs(r, c)
+		r2, c2 := dst.Dims()
+		if r != r2 || c != c2 {
+			panic(ErrShape)
+		}
 	}
 
 	tmp := &Dense{
@@ -411,5 +433,4 @@ func (gsvd *GSVD) QTo(dst *Dense) *Dense {
 		capCols: c,
 	}
 	dst.Copy(tmp)
-	return dst
 }

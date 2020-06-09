@@ -71,6 +71,7 @@ type ClusterOverrideFlags struct {
 	APIVersion            FlagInfo
 	CertificateAuthority  FlagInfo
 	InsecureSkipTLSVerify FlagInfo
+	TLSServerName         FlagInfo
 }
 
 // FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
@@ -145,6 +146,7 @@ const (
 	FlagContext          = "context"
 	FlagNamespace        = "namespace"
 	FlagAPIServer        = "server"
+	FlagTLSServerName    = "tls-server-name"
 	FlagInsecure         = "insecure-skip-tls-verify"
 	FlagCertFile         = "client-certificate"
 	FlagKeyFile          = "client-key"
@@ -189,6 +191,7 @@ func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
 		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert file for the certificate authority"},
 		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
+		TLSServerName:         FlagInfo{prefix + FlagTLSServerName, "", "", "If provided, this name will be used to validate server certificate. If this is not provided, hostname used to contact the server is used."},
 	}
 }
 
@@ -226,6 +229,7 @@ func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, f
 	flagNames.APIServer.BindStringFlag(flags, &clusterInfo.Server)
 	flagNames.CertificateAuthority.BindStringFlag(flags, &clusterInfo.CertificateAuthority)
 	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
+	flagNames.TLSServerName.BindStringFlag(flags, &clusterInfo.TLSServerName)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables

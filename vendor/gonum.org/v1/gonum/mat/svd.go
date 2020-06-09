@@ -40,7 +40,7 @@ const (
 
 	// SVDThin is a convenience value for computing both thin vectors.
 	SVDThin SVDKind = SVDThinU | SVDThinV
-	// SVDThin is a convenience value for computing both full vectors.
+	// SVDFull is a convenience value for computing both full vectors.
 	SVDFull SVDKind = SVDFullU | SVDFullV
 )
 
@@ -55,7 +55,7 @@ func (svd *SVD) succFact() bool {
 //
 // The full singular value decomposition (kind == SVDFull) is a factorization
 // of an m×n matrix A of the form
-//  A = U * Σ * V^T
+//  A = U * Σ * Vᵀ
 // where Σ is an m×n diagonal matrix, U is an m×m orthogonal matrix, and V is an
 // n×n orthogonal matrix. The diagonal elements of Σ are the singular values of A.
 // The first min(m,n) columns of U and V are, respectively, the left and right
@@ -64,7 +64,7 @@ func (svd *SVD) succFact() bool {
 // Significant storage space can be saved by using the thin representation of
 // the SVD (kind == SVDThin) instead of the full SVD, especially if
 // m >> n or m << n. The thin SVD finds
-//  A = U~ * Σ * V~^T
+//  A = U~ * Σ * V~ᵀ
 // where U~ is of size m×min(m,n), Σ is a diagonal matrix of size min(m,n)×min(m,n)
 // and V~ is of size n×min(m,n).
 //
@@ -182,11 +182,12 @@ func (svd *SVD) Values(s []float64) []float64 {
 // min(m,n) columns are the left singular vectors and correspond to the singular
 // values as returned from SVD.Values.
 //
-// If dst is not nil, U is stored in-place into dst, and dst must have size
-// m×m if the full U was computed, size m×min(m,n) if the thin U was computed,
-// and UTo panics otherwise. If dst is nil, a new matrix of the appropriate size
-// is allocated and returned.
-func (svd *SVD) UTo(dst *Dense) *Dense {
+// If dst is empty, UTo will resize dst to be m×m if the full U was computed
+// and size m×min(m,n) if the thin U was computed. When dst is non-empty, then
+// UTo will panic if dst is not the appropriate size. UTo will also panic if
+// the receiver does not contain a successful factorization, or if U was
+// not computed during factorization.
+func (svd *SVD) UTo(dst *Dense) {
 	if !svd.succFact() {
 		panic(badFact)
 	}
@@ -196,10 +197,13 @@ func (svd *SVD) UTo(dst *Dense) *Dense {
 	}
 	r := svd.u.Rows
 	c := svd.u.Cols
-	if dst == nil {
-		dst = NewDense(r, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(r, c)
 	} else {
-		dst.reuseAs(r, c)
+		r2, c2 := dst.Dims()
+		if r != r2 || c != c2 {
+			panic(ErrShape)
+		}
 	}
 
 	tmp := &Dense{
@@ -208,19 +212,18 @@ func (svd *SVD) UTo(dst *Dense) *Dense {
 		capCols: c,
 	}
 	dst.Copy(tmp)
-
-	return dst
 }
 
 // VTo extracts the matrix V from the singular value decomposition. The first
 // min(m,n) columns are the right singular vectors and correspond to the singular
 // values as returned from SVD.Values.
 //
-// If dst is not nil, V is stored in-place into dst, and dst must have size
-// n×n if the full V was computed, size n×min(m,n) if the thin V was computed,
-// and VTo panics otherwise. If dst is nil, a new matrix of the appropriate size
-// is allocated and returned.
-func (svd *SVD) VTo(dst *Dense) *Dense {
+// If dst is empty, VTo will resize dst to be n×n if the full V was computed
+// and size n×min(m,n) if the thin V was computed. When dst is non-empty, then
+// VTo will panic if dst is not the appropriate size. VTo will also panic if
+// the receiver does not contain a successful factorization, or if V was
+// not computed during factorization.
+func (svd *SVD) VTo(dst *Dense) {
 	if !svd.succFact() {
 		panic(badFact)
 	}
@@ -230,10 +233,13 @@ func (svd *SVD) VTo(dst *Dense) *Dense {
 	}
 	r := svd.vt.Rows
 	c := svd.vt.Cols
-	if dst == nil {
-		dst = NewDense(c, r, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(c, r)
 	} else {
-		dst.reuseAs(c, r)
+		r2, c2 := dst.Dims()
+		if c != r2 || r != c2 {
+			panic(ErrShape)
+		}
 	}
 
 	tmp := &Dense{
@@ -242,6 +248,4 @@ func (svd *SVD) VTo(dst *Dense) *Dense {
 		capCols: c,
 	}
 	dst.Copy(tmp.T())
-
-	return dst
 }

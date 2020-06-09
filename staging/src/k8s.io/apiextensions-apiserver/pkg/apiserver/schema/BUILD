@@ -6,6 +6,7 @@ go_library(
         "complete.go",
         "convert.go",
         "goopenapi.go",
+        "skeleton.go",
         "structural.go",
         "unfold.go",
         "validation.go",
@@ -35,6 +36,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning:all-srcs",
     ],
@@ -47,6 +49,7 @@ go_test(
     srcs = [
         "convert_test.go",
         "goopenapi_test.go",
+        "unfold_test.go",
         "validation_test.go",
     ],
     embed = [":go_default_library"],
@@ -55,7 +58,6 @@ go_test(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )

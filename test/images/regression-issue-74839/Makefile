@@ -13,6 +13,7 @@
 # limitations under the License.
 
 SRCS=regression-issue-74839
+OS ?= linux
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
 GOARM ?= 7

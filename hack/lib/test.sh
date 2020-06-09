@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
+
 # A set of helpers for tests
 
 readonly reset=$(tput sgr0)
@@ -24,6 +26,8 @@ readonly green=$(tput setaf 2)
 
 kube::test::clear_all() {
   if kube::test::if_supports_resource "rc" ; then
+    # shellcheck disable=SC2154
+    # Disabling because "kube_flags" is set in a parent script
     kubectl delete "${kube_flags[@]}" rc --all --grace-period=0 --force
   fi
   if kube::test::if_supports_resource "pods" ; then
@@ -43,7 +47,7 @@ kube::test::get_caller() {
 # Force exact match of a returned result for a object query.  Wrap this with || to support multiple
 # valid return types.
 # This runs `kubectl get` once and asserts that the result is as expected.
-## $1: Object on which get should be run
+# $1: Object on which get should be run
 # $2: The go-template to run on the result
 # $3: The expected output
 # $4: Additional args to be passed to kubectl
@@ -75,8 +79,10 @@ kube::test::object_assert() {
   local expected=$4
   local args=${5:-}
 
-  for j in $(seq 1 ${tries}); do
-    res=$(eval kubectl get "${kube_flags[@]}" ${args} ${object} -o go-template=\"${request}\")
+  for j in $(seq 1 "${tries}"); do
+    # shellcheck disable=SC2086
+    # Disabling because "args" needs to allow for expansion here
+    res=$(eval kubectl get "${kube_flags[@]}" ${args} "${object}" -o go-template=\""${request}"\")
     if [[ "${res}" =~ ^$expected$ ]]; then
         echo -n "${green}"
         echo "$(kube::test::get_caller 3): Successful get ${object} ${request}: ${res}"
@@ -84,7 +90,7 @@ kube::test::object_assert() {
         return 0
     fi
     echo "Waiting for Get ${object} ${request} ${args}: expected: ${expected}, got: ${res}"
-    sleep $((${j}-1))
+    sleep $((j-1))
   done
 
   echo "${bold}${red}"
@@ -103,7 +109,7 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" ${object} -o jsonpath=\"${request}\")
+  res=$(eval kubectl get "${kube_flags[@]}" "${object}" -o jsonpath=\""${request}"\")
 
   if [[ "${res}" =~ ^$expected$ ]]; then
       echo -n "${green}"
@@ -126,12 +132,14 @@ kube::test::get_object_jsonpath_assert() {
 kube::test::describe_object_assert() {
   local resource=$1
   local object=$2
-  local matches=${@:3}
+  local matches=( "${@:3}" )
 
-  result=$(eval kubectl describe "${kube_flags[@]}" ${resource} ${object})
+  result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
 
-  for match in ${matches}; do
-    if [[ ! $(echo "${result}" | grep ${match}) ]]; then
+  for match in "${matches[@]}"; do
+    if grep -q "${match}" <<< "${result}"; then
+      echo "matched ${match}"
+    else
       echo "${bold}${red}"
       echo "$(kube::test::get_caller): FAIL!"
       echo "Describe ${resource} ${object}"
@@ -158,12 +166,12 @@ kube::test::describe_object_events_assert() {
     local showevents=${3:-"true"}
 
     if [[ -z "${3:-}" ]]; then
-        result=$(eval kubectl describe "${kube_flags[@]}" ${resource} ${object})
+        result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
     else
-        result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" ${resource} ${object})
+        result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}" "${object}")
     fi
 
-    if [[ -n $(echo "${result}" | grep "No events.\|Events:") ]]; then
+    if grep -q "No events.\|Events:" <<< "${result}"; then
         local has_events="true"
     else
         local has_events="false"
@@ -192,12 +200,14 @@ kube::test::describe_object_events_assert() {
 
 kube::test::describe_resource_assert() {
   local resource=$1
-  local matches=${@:2}
+  local matches=( "${@:2}" )
 
-  result=$(eval kubectl describe "${kube_flags[@]}" ${resource})
+  result=$(eval kubectl describe "${kube_flags[@]}" "${resource}")
 
-  for match in ${matches}; do
-    if [[ ! $(echo "${result}" | grep ${match}) ]]; then
+  for match in "${matches[@]}"; do
+    if grep -q "${match}" <<< "${result}"; then
+      echo "matched ${match}"
+    else
       echo "${bold}${red}"
       echo "FAIL!"
       echo "Describe ${resource}"
@@ -222,9 +232,9 @@ kube::test::describe_resource_events_assert() {
     local resource=$1
     local showevents=${2:-"true"}
 
-    result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" ${resource})
+    result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}")
 
-    if [[ $(echo "${result}" | grep "No events.\|Events:") ]]; then
+    if grep -q "No events.\|Events:" <<< "${result}"; then
         local has_events="true"
     else
         local has_events="false"
@@ -250,14 +260,10 @@ kube::test::describe_resource_events_assert() {
     fi
 }
 
-# Compare sort-by resource name output with expected order specify in the last parameter
+# Compare sort-by resource name output (first column, skipping first line) with expected order specify in the last parameter
 kube::test::if_sort_by_has_correct_order() {
-  local array=($(echo "$1" |awk '{if(NR!=1) print $1}'))
   local var
-  for i in "${array[@]}"; do
-    var+="${i}:"
-  done
-
+  var="$(echo "$1" | awk '{if(NR!=1) print $1}' | tr '\n' ':')"
   kube::test::if_has_string "${var}" "${@:$#}"
 }
 
@@ -332,12 +338,16 @@ kube::test::version::object_to_file() {
   name=$1
   flags=${2:-""}
   file=$3
+  # shellcheck disable=SC2086
+  # Disabling because "flags" needs to allow for expansion here
   kubectl version ${flags} | grep "${name} Version:" | sed -e s/"${name} Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > "${file}"
 }
 
 kube::test::version::json_object_to_file() {
   flags=$1
   file=$2
+  # shellcheck disable=SC2086
+  # Disabling because "flags" needs to allow for expansion here
   kubectl version ${flags} --output json | sed -e s/' '/''/g -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > "${file}"
 }
 
@@ -345,12 +355,16 @@ kube::test::version::json_client_server_object_to_file() {
   flags=$1
   name=$2
   file=$3
+  # shellcheck disable=SC2086
+  # Disabling because "flags" needs to allow for expansion here
   kubectl version ${flags} --output json | jq -r ".${name}" | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e /^$/d -e s/','/''/g  -e s/':'/'='/g > "${file}"
 }
 
 kube::test::version::yaml_object_to_file() {
   flags=$1
   file=$2
+  # shellcheck disable=SC2086
+  # Disabling because "flags" needs to allow for expansion here
   kubectl version ${flags} --output yaml | sed -e s/' '/''/g -e s/'\"'/''/g -e /^$/d > "${file}"
 }
 
@@ -381,11 +395,11 @@ kube::test::version::diff_assert() {
         return 1
   fi
 
-  sort ${original} > "${original}.sorted"
-  sort ${latest} > "${latest}.sorted"
+  sort "${original}" > "${original}.sorted"
+  sort "${latest}" > "${latest}.sorted"
 
   if [ "${comparator}" == "eq" ]; then
-    if [ "$(diff -iwB ${original}.sorted ${latest}.sorted)" == "" ] ; then
+    if [ "$(diff -iwB "${original}".sorted "${latest}".sorted)" == "" ] ; then
         echo -n "${green}"
         echo "Successful: ${diff_msg}"
         echo -n "${reset}"
@@ -394,16 +408,16 @@ kube::test::version::diff_assert() {
         echo "${bold}${red}"
         echo "FAIL! ${diff_msg}"
         echo "  Expected: "
-        echo "$(cat ${original})"
+        cat "${original}"
         echo "  Got: "
-        echo "$(cat ${latest})"
+        cat "${latest}"
         echo "${reset}${red}"
         caller
         echo "${reset}"
         return 1
     fi
   else
-    if [ ! -z "$(diff -iwB ${original}.sorted ${latest}.sorted)" ] ; then
+    if [ -n "$(diff -iwB "${original}".sorted "${latest}".sorted)" ] ; then
         echo -n "${green}"
         echo "Successful: ${diff_msg}"
         echo -n "${reset}"
@@ -412,9 +426,9 @@ kube::test::version::diff_assert() {
         echo "${bold}${red}"
         echo "FAIL! ${diff_msg}"
         echo "  Expected: "
-        echo "$(cat ${original})"
+        cat "${original}"
         echo "  Got: "
-        echo "$(cat ${latest})"
+        cat "${latest}"
         echo "${reset}${red}"
         caller
         echo "${reset}"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -163,16 +164,26 @@ func (r *SpecRunner) combineCoverprofiles(runners []*testrunner.TestRunner) erro
 
 	fmt.Println("path is " + path)
 
-	combined, err := os.OpenFile(filepath.Join(path, r.getCoverprofile()),
-		os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	combined, err := os.OpenFile(
+		filepath.Join(path, r.getCoverprofile()),
+		os.O_WRONLY|os.O_CREATE,
+		0666,
+	)
 
 	if err != nil {
 		fmt.Printf("Unable to create combined profile, %v\n", err)
 		return nil // non-fatal error
 	}
 
-	for _, runner := range runners {
+	modeRegex := regexp.MustCompile(`^mode: .*\n`)
+	for index, runner := range runners {
 		contents, err := ioutil.ReadFile(runner.CoverageFile)
+
+		// remove the cover mode line from every file
+		// except the first one
+		if index > 0 {
+			contents = modeRegex.ReplaceAll(contents, []byte{})
+		}
 
 		if err != nil {
 			fmt.Printf("Unable to read coverage file %s to combine, %v\n", runner.CoverageFile, err)

@@ -32,6 +32,15 @@ run_kubectl_delete_allnamespaces_tests() {
   kubectl create configmap "two" --namespace="${ns_two}"
   kubectl label configmap "one" --namespace="${ns_one}" deletetest=true
   kubectl label configmap "two" --namespace="${ns_two}" deletetest=true
+
+  # dry-run
+  kubectl delete configmap --dry-run=client -l deletetest=true --all-namespaces
+  kubectl delete configmap --dry-run=server -l deletetest=true --all-namespaces
+  kubectl config set-context "${CONTEXT}" --namespace="${ns_one}"
+  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" 'one:'
+  kubectl config set-context "${CONTEXT}" --namespace="${ns_two}"
+  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" 'two:'
+
   kubectl delete configmap -l deletetest=true --all-namespaces
 
   # no configmaps should be in either of those namespaces

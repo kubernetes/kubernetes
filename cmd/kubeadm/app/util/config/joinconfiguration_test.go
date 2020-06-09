@@ -94,6 +94,8 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 					return
 				}
 				t2.Fatalf("couldn't unmarshal test data: %v", err)
+			} else if rt.expectedErr {
+				t2.Fatalf("expected error, but no error returned")
 			}
 
 			actual, err := kubeadmutil.MarshalToYamlForCodecs(internalcfg, rt.groupVersion, scheme.Codecs)

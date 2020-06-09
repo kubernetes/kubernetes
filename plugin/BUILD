@@ -14,6 +14,8 @@ filegroup(
         "//plugin/pkg/admission/admit:all-srcs",
         "//plugin/pkg/admission/alwayspullimages:all-srcs",
         "//plugin/pkg/admission/antiaffinity:all-srcs",
+        "//plugin/pkg/admission/certificates:all-srcs",
+        "//plugin/pkg/admission/defaultingressclass:all-srcs",
         "//plugin/pkg/admission/defaulttolerationseconds:all-srcs",
         "//plugin/pkg/admission/deny:all-srcs",
         "//plugin/pkg/admission/eventratelimit:all-srcs",

@@ -169,3 +169,18 @@ func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
 	}
 	return allErrs
 }
+
+func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, fields := range fieldsList {
+		switch fields.Operation {
+		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`"))
+		}
+		if fields.FieldsType != "FieldsV1" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
+		}
+	}
+	return allErrs
+}

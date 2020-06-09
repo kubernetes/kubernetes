@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -344,12 +345,12 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	informer := informerFactory.Core().V1().Pods()
 
-	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
+	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingTolerance, defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
-	if !controller.WaitForCacheSync("HPA", stop, informer.Informer().HasSynced) {
+	if !cache.WaitForNamedCacheSync("HPA", stop, informer.Informer().HasSynced) {
 		return
 	}
 
@@ -479,7 +480,7 @@ func TestReplicaCalcScaleUpHotCpuLessScale(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 4,
-		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
+		podStartTime:     []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -516,7 +517,7 @@ func TestReplicaCalcScaleHotCpuNoScale(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
-		podStartTime:     []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
+		podStartTime:     []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -589,7 +590,7 @@ func TestReplicaCalcScaleUpCMUnreadyHotCpuNoLessScale(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 6,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
-		podStartTime:     []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
+		podStartTime:     []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{50000, 10000, 30000},
@@ -606,7 +607,7 @@ func TestReplicaCalcScaleUpCMUnreadyHotCpuScaleWouldScaleDown(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 7,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
-		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
+		podStartTime:     []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{50000, 15000, 30000},
@@ -885,7 +886,7 @@ func TestReplicaCalcScaleDownIgnoreHotCpuPods(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 2,
-		podStartTime:     []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
+		podStartTime:     []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -1177,7 +1178,7 @@ func TestReplicaCalcMissingMetricsHotCpuNoChange(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
-		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
+		podStartTime:     []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -1214,7 +1215,7 @@ func TestReplicaCalcMissingMetricsHotCpuScaleUp(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
-		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
+		podStartTime:     []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -1237,6 +1238,24 @@ func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 			levels:   []int64{100, 100, 100},
+
+			targetUtilization:   50,
+			expectedUtilization: 10,
+			expectedValue:       numContainersPerPod * 100,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcDuringRollingUpdateWithMaxSurge(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 2,
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 100},
 
 			targetUtilization:   50,
 			expectedUtilization: 10,
@@ -1656,7 +1675,7 @@ func TestGroupPods(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			readyPodCount, ignoredPods, missingPods := groupPods(tc.pods, tc.metrics, tc.resource, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
+			readyPodCount, ignoredPods, missingPods := groupPods(tc.pods, tc.metrics, tc.resource, defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 			if readyPodCount != tc.expectReadyPodCount {
 				t.Errorf("%s got readyPodCount %d, expected %d", tc.name, readyPodCount, tc.expectReadyPodCount)
 			}

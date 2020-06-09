@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,14 +25,13 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -50,7 +50,7 @@ type Waiter interface {
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
 	// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-	WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error
+	WaitForHealthyKubelet(initialTimeout time.Duration, healthzEndpoint string) error
 	// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
 	WaitForKubeletAndFunc(f func() error) error
 	// SetTimeout adjusts the timeout to the specified duration
@@ -78,7 +78,7 @@ func (w *KubeWaiter) WaitForAPI() error {
 	start := time.Now()
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		healthStatus := 0
-		w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
 		if healthStatus != http.StatusOK {
 			return false, nil
 		}
@@ -95,7 +95,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 	lastKnownPodNumber := -1
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		listOpts := metav1.ListOptions{LabelSelector: kvLabel}
-		pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
+		pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
 		if err != nil {
 			fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 			return false, nil
@@ -123,7 +123,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 // WaitForPodToDisappear blocks until it timeouts or gets a "NotFound" response from the API Server when getting the Static Pod in question
 func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(podName, metav1.GetOptions{})
+		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
 			return true, nil
@@ -133,9 +133,9 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 }
 
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
-	time.Sleep(initalTimeout)
-	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initalTimeout)
+func (w *KubeWaiter) WaitForHealthyKubelet(initialTimeout time.Duration, healthzEndpoint string) error {
+	time.Sleep(initialTimeout)
+	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initialTimeout)
 	return TryRunCommand(func() error {
 		client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 		resp, err := client.Get(healthzEndpoint)
@@ -157,7 +157,7 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 // WaitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
 // /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
 func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
-	errorChan := make(chan error)
+	errorChan := make(chan error, 1)
 
 	go func(errC chan error, waiter Waiter) {
 		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
@@ -241,12 +241,12 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
 
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
-	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(staticPodName, metav1.GetOptions{})
+	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	staticPodHash := staticPod.Annotations[kubetypes.ConfigHashAnnotationKey]
+	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
 	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
 	return staticPodHash, nil
 }

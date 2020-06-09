@@ -17,11 +17,12 @@ limitations under the License.
 package disruption
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -123,7 +124,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	createdResource, err := resourceClient.Create(resource, metav1.CreateOptions{})
+	createdResource, err := resourceClient.Create(context.TODO(), resource, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -156,13 +157,16 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Error creating PodDisruptionBudget: %v", err)
 	}
 
 	waitPDBStable(t, clientSet, 4, nsName, pdb.Name)
 
-	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(pdb.Name, metav1.GetOptions{})
+	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(context.TODO(), pdb.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Error getting PodDisruptionBudget: %v", err)
+	}
 
 	if expected, found := int32(replicas), newPdb.Status.ExpectedPods; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
@@ -170,7 +174,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	if expected, found := int32(replicas)-maxUnavailable, newPdb.Status.DesiredHealthy; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
 	}
-	if expected, found := maxUnavailable, newPdb.Status.PodDisruptionsAllowed; expected != found {
+	if expected, found := maxUnavailable, newPdb.Status.DisruptionsAllowed; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
 	}
 }
@@ -194,22 +198,22 @@ func createPod(t *testing.T, name, namespace, labelValue string, clientSet clien
 			},
 		},
 	}
-	_, err := clientSet.CoreV1().Pods(namespace).Create(pod)
+	_, err := clientSet.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
 	addPodConditionReady(pod)
-	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 		t.Error(err)
 	}
 }
 
 func createNs(t *testing.T, name string, clientSet clientset.Interface) {
-	_, err := clientSet.CoreV1().Namespaces().Create(&v1.Namespace{
+	_, err := clientSet.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Error creating namespace: %v", err)
 	}
@@ -252,7 +256,7 @@ func newCustomResourceDefinition() *apiextensionsv1beta1.CustomResourceDefinitio
 
 func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

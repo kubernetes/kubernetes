@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // EtcdMigrateServer manages starting and stopping a versioned etcd server binary.
@@ -87,7 +87,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 			if err != nil {
 				return fmt.Errorf("error killing etcd: %v", err)
 			}
-			return fmt.Errorf("Timed out waiting for etcd on port %d", r.cfg.port)
+			return fmt.Errorf("timed out waiting for etcd on port %d", r.cfg.port)
 		}
 	}
 }

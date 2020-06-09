@@ -1,8 +1,11 @@
 package dbus
 
 import (
+	"context"
 	"errors"
 )
+
+var errSignature = errors.New("dbus: mismatched signature")
 
 // Call represents a pending or completed method call.
 type Call struct {
@@ -20,9 +23,25 @@ type Call struct {
 
 	// Holds the response once the call is done.
 	Body []interface{}
+
+	// tracks context and canceler
+	ctx         context.Context
+	ctxCanceler context.CancelFunc
 }
 
-var errSignature = errors.New("dbus: mismatched signature")
+func (c *Call) Context() context.Context {
+	if c.ctx == nil {
+		return context.Background()
+	}
+
+	return c.ctx
+}
+
+func (c *Call) ContextCancel() {
+	if c.ctxCanceler != nil {
+		c.ctxCanceler()
+	}
+}
 
 // Store stores the body of the reply into the provided pointers. It returns
 // an error if the signatures of the body and retvalues don't match, or if
@@ -33,4 +52,9 @@ func (c *Call) Store(retvalues ...interface{}) error {
 	}
 
 	return Store(c.Body, retvalues...)
+}
+
+func (c *Call) done() {
+	c.Done <- c
+	c.ContextCancel()
 }

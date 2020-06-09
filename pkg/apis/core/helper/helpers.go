@@ -281,34 +281,6 @@ func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
 }
 
-// LoadBalancerStatusEqual checks if the status of the load balancer is equal to the target status
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusEqual(l, r *core.LoadBalancerStatus) bool {
-	return ingressSliceEqual(l.Ingress, r.Ingress)
-}
-
-func ingressSliceEqual(lhs, rhs []core.LoadBalancerIngress) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for i := range lhs {
-		if !ingressEqual(&lhs[i], &rhs[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func ingressEqual(lhs, rhs *core.LoadBalancerIngress) bool {
-	if lhs.IP != rhs.IP {
-		return false
-	}
-	if lhs.Hostname != rhs.Hostname {
-		return false
-	}
-	return true
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {

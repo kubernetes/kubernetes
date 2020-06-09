@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,20 +25,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"github.com/onsi/ginkgo"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
 const (
 	dnsReadyTimeout = time.Minute
+
+	// RespondingTimeout is how long to wait for a service to be responding.
+	RespondingTimeout = 2 * time.Minute
 )
 
 const queryDNSPythonTemplate string = `
@@ -88,30 +95,30 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendRcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
 		}
 
 		// wait for objects
 		for _, ns := range namespaces {
-			e2epod.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
-			framework.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
+			e2eresource.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
+			e2enetwork.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but
 		// the application itself may have not been initialized. Just query the application.
 		for _, ns := range namespaces {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
-			pods, err := c.CoreV1().Pods(ns.Name).List(options)
+			pods, err := c.CoreV1().Pods(ns.Name).List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
 			err = e2epod.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			framework.ExpectNoError(err, "waiting for all pods to respond")
-			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
+			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
-			err = framework.ServiceResponding(c, ns.Name, backendSvcName)
+			err = waitForServiceResponding(c, ns.Name, backendSvcName)
 			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 
@@ -125,10 +132,10 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// This code is probably unnecessary, but let's stay on the safe side.
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.CoreV1().Pods(namespaces[0].Name).List(options)
+		pods, err := c.CoreV1().Pods(namespaces[0].Name).List(context.TODO(), options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
-			e2elog.Failf("no running pods found")
+			framework.Failf("no running pods found")
 		}
 		podName := pods.Items[0].Name
 
@@ -140,7 +147,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			framework.NewKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie()
+			framework.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
@@ -171,4 +178,40 @@ func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	framework.ExpectNoError(err, "failed to read from file: %s", inputFile)
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
+}
+
+// waitForServiceResponding waits for the service to be responding.
+func waitForServiceResponding(c clientset.Interface, ns, name string) error {
+	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
+
+	return wait.PollImmediate(framework.Poll, RespondingTimeout, func() (done bool, err error) {
+		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
+		if errProxy != nil {
+			framework.Logf("Failed to get services proxy request: %v:", errProxy)
+			return false, nil
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
+		body, err := proxyRequest.Namespace(ns).
+			Name(name).
+			Do(ctx).
+			Raw()
+		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Failed to GET from service %s: %v", name, err)
+				return true, err
+			}
+			framework.Logf("Failed to GET from service %s: %v:", name, err)
+			return false, nil
+		}
+		got := string(body)
+		if len(got) == 0 {
+			framework.Logf("Service %s: expected non-empty response", name)
+			return false, err // stop polling
+		}
+		framework.Logf("Service %s: found nonempty answer: %s", name, got)
+		return true, nil
+	})
 }

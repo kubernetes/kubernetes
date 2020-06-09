@@ -17,6 +17,7 @@ limitations under the License.
 package evictions
 
 import (
+	"context"
 	"fmt"
 
 	"net/http/httptest"
@@ -26,9 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -72,7 +73,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	var gracePeriodSeconds int64 = 30
-	deleteOption := &metav1.DeleteOptions{
+	deleteOption := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 
@@ -81,12 +82,12 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
-		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		addPodConditionReady(pod)
-		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -94,7 +95,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), numOfEvictions, v1.PodRunning)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -112,11 +113,11 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			eviction := newEviction(ns.Name, podName, deleteOption)
 
 			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(eviction)
+				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 				switch {
-				case errors.IsTooManyRequests(e):
+				case apierrors.IsTooManyRequests(e):
 					return false, nil
-				case errors.IsConflict(e):
+				case apierrors.IsConflict(e):
 					return false, fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
 				case e == nil:
 					return true, nil
@@ -130,9 +131,9 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 				// should not return here otherwise we would leak the pod
 			}
 
-			_, err = clientSet.CoreV1().Pods(ns.Name).Get(podName, metav1.GetOptions{})
+			_, err = clientSet.CoreV1().Pods(ns.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 			switch {
-			case errors.IsNotFound(err):
+			case apierrors.IsNotFound(err):
 				atomic.AddUint32(&numberPodsEvicted, 1)
 				// pod was evicted and deleted so return from goroutine immediately
 				return
@@ -144,7 +145,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			}
 
 			// delete pod which still exists due to error
-			e := clientSet.CoreV1().Pods(ns.Name).Delete(podName, deleteOption)
+			e := clientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podName, deleteOption)
 			if e != nil {
 				errCh <- e
 			}
@@ -156,7 +157,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	close(errCh)
 	var errList []error
-	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(pdb.Name, deleteOption); err != nil {
+	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to delete PodDisruptionBudget: %v", err))
 	}
 	for err := range errCh {
@@ -191,40 +192,40 @@ func TestTerminalPodEviction(t *testing.T) {
 	}
 
 	var gracePeriodSeconds int64 = 30
-	deleteOption := &metav1.DeleteOptions{
+	deleteOption := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 	pod := newPod("test-terminal-pod1")
-	if _, err := clientSet.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 
 	addPodConditionSucceeded(pod)
-	if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodSucceeded)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(pdb); err != nil {
+	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
 	waitPDBStable(t, clientSet, 1, ns.Name, pdb.Name)
 
-	pdbList, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).List(metav1.ListOptions{})
+	pdbList, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Error while listing pod disruption budget")
 	}
 	oldPdb := pdbList.Items[0]
 	eviction := newEviction(ns.Name, pod.Name, deleteOption)
 	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(eviction)
+		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 		switch {
-		case errors.IsTooManyRequests(e):
+		case apierrors.IsTooManyRequests(e):
 			return false, nil
-		case errors.IsConflict(e):
+		case apierrors.IsConflict(e):
 			return false, fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
 		case e == nil:
 			return true, nil
@@ -235,7 +236,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Eviction of pod failed %v", err)
 	}
-	pdbList, err = clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).List(metav1.ListOptions{})
+	pdbList, err = clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Error while listing pod disruption budget")
 	}
@@ -245,7 +246,7 @@ func TestTerminalPodEviction(t *testing.T) {
 		t.Fatalf("Expected the pdb generation to be of same value %v but got %v", newPdb.Status.ObservedGeneration, oldPdb.Status.ObservedGeneration)
 	}
 
-	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(pdb.Name, deleteOption); err != nil {
+	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
 		t.Fatalf("Failed to delete pod disruption budget")
 	}
 }
@@ -308,7 +309,7 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 	}
 }
 
-func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v1beta1.Eviction {
+func newEviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *v1beta1.Eviction {
 	return &v1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "Policy/v1beta1",
@@ -318,7 +319,7 @@ func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v
 			Name:      evictionName,
 			Namespace: ns,
 		},
-		DeleteOptions: deleteOption,
+		DeleteOptions: &deleteOption,
 	}
 }
 
@@ -382,7 +383,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 
 func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

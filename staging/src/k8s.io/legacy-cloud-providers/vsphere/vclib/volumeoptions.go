@@ -19,7 +19,8 @@ package vclib
 import (
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 )
 
 // VolumeOptions specifies various options for a volume.
@@ -34,6 +35,7 @@ type VolumeOptions struct {
 	StoragePolicyID        string
 	SCSIControllerType     string
 	Zone                   []string
+	SelectedNode           *v1.Node
 }
 
 var (

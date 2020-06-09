@@ -62,6 +62,7 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
+
 	client := &http.Client{
 		Transport:     transport,
 		CheckRedirect: s.RedirectChecker,

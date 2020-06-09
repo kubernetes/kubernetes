@@ -153,6 +153,16 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
+// ToUnstructured implements the value.UnstructuredConverter interface.
+func (t Time) ToUnstructured() interface{} {
+	if t.IsZero() {
+		return nil
+	}
+	buf := make([]byte, 0, len(time.RFC3339))
+	buf = t.UTC().AppendFormat(buf, time.RFC3339)
+	return string(buf)
+}
+
 // OpenAPISchemaType is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
 //

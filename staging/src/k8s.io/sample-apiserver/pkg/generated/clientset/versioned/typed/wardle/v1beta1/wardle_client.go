@@ -29,7 +29,7 @@ type WardleV1beta1Interface interface {
 	FlundersGetter
 }
 
-// WardleV1beta1Client is used to interact with features provided by the wardle.k8s.io group.
+// WardleV1beta1Client is used to interact with features provided by the wardle.example.com group.
 type WardleV1beta1Client struct {
 	restClient rest.Interface
 }

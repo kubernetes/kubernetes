@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -24,7 +26,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
@@ -34,6 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	utilnet "k8s.io/utils/net"
+)
+
+const (
+	eventMsgFirewallChange = "Firewall change required by security admin"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -53,6 +58,13 @@ func TestEnsureStaticIP(t *testing.T) {
 
 	// Second ensure call
 	var ipPrime string
+	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, gce.region, ip, cloud.NetworkTierDefault)
+	if err != nil || !existed || ip != ipPrime {
+		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, gce.region, ip, ipPrime, existed, err, ip)
+	}
+
+	// Ensure call with different name
+	ipName = "another-name-for-static-ip"
 	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, gce.region, ip, cloud.NetworkTierDefault)
 	if err != nil || !existed || ip != ipPrime {
 		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, gce.region, ip, ipPrime, existed, err, ip)
@@ -90,9 +102,9 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 			assert.NotEqual(t, ip, "")
 			// Get the Address from the fake address service and verify that the tier
 			// is set correctly.
-			alphaAddr, err := s.GetAlphaRegionAddress(tc.name, s.region)
+			Addr, err := s.GetRegionAddress(tc.name, s.region)
 			require.NoError(t, err)
-			assert.Equal(t, tc.expected, alphaAddr.NetworkTier)
+			assert.Equal(t, tc.expected, Addr.NetworkTier)
 		})
 	}
 }
@@ -106,14 +118,14 @@ func TestVerifyRequestedIP(t *testing.T) {
 		requestedIP     string
 		fwdRuleIP       string
 		netTier         cloud.NetworkTier
-		addrList        []*computealpha.Address
+		addrList        []*compute.Address
 		expectErr       bool
 		expectUserOwned bool
 	}{
 		"requested IP exists": {
 			requestedIP:     "1.1.1.1",
 			netTier:         cloud.NetworkTierPremium,
-			addrList:        []*computealpha.Address{{Name: "foo", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
+			addrList:        []*compute.Address{{Name: "foo", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
 			expectErr:       false,
 			expectUserOwned: true,
 		},
@@ -136,7 +148,7 @@ func TestVerifyRequestedIP(t *testing.T) {
 		"requested IP exists, but network tier does not match": {
 			requestedIP: "1.1.1.1",
 			netTier:     cloud.NetworkTierStandard,
-			addrList:    []*computealpha.Address{{Name: "foo", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
+			addrList:    []*compute.Address{{Name: "foo", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
 			expectErr:   true,
 		},
 	} {
@@ -145,7 +157,7 @@ func TestVerifyRequestedIP(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, addr := range tc.addrList {
-				s.ReserveAlphaRegionAddress(addr, s.region)
+				s.ReserveRegionAddress(addr, s.region)
 			}
 			isUserOwnedIP, err := verifyUserRequestedIP(s, s.region, tc.requestedIP, tc.fwdRuleIP, lbRef, tc.netTier)
 			assert.Equal(t, tc.expectErr, err != nil, fmt.Sprintf("err: %v", err))
@@ -167,11 +179,11 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 
 	for desc, tc := range map[string]struct {
 		netTier      cloud.NetworkTier
-		expectedRule *computealpha.ForwardingRule
+		expectedRule *compute.ForwardingRule
 	}{
 		"Premium tier": {
 			netTier: cloud.NetworkTierPremium,
-			expectedRule: &computealpha.ForwardingRule{
+			expectedRule: &compute.ForwardingRule{
 				Name:        "lb-1",
 				Description: `{"kubernetes.io/service-name":"foo-svc"}`,
 				IPAddress:   "1.1.1.1",
@@ -184,7 +196,7 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 		},
 		"Standard tier": {
 			netTier: cloud.NetworkTierStandard,
-			expectedRule: &computealpha.ForwardingRule{
+			expectedRule: &compute.ForwardingRule{
 				Name:        "lb-2",
 				Description: `{"kubernetes.io/service-name":"foo-svc"}`,
 				IPAddress:   "2.2.2.2",
@@ -192,7 +204,7 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "STANDARD",
-				SelfLink:    fmt.Sprintf(baseLinkURL, "alpha", vals.ProjectID, vals.Region, "lb-2"),
+				SelfLink:    fmt.Sprintf(baseLinkURL, "v1", vals.ProjectID, vals.Region, "lb-2"),
 			},
 		},
 	} {
@@ -206,9 +218,9 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 			err = createForwardingRule(s, lbName, serviceName, s.region, ipAddr, target, ports, tc.netTier)
 			assert.NoError(t, err)
 
-			alphaRule, err := s.GetAlphaRegionForwardingRule(lbName, s.region)
+			Rule, err := s.GetRegionForwardingRule(lbName, s.region)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedRule, alphaRule)
+			assert.Equal(t, tc.expectedRule, Rule)
 		})
 	}
 }
@@ -221,41 +233,38 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	s, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
-	// Enable the cloud.NetworkTiers feature
-	s.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
-
 	for desc, tc := range map[string]struct {
 		addrName     string
 		netTier      cloud.NetworkTier
-		addrList     []*computealpha.Address
+		addrList     []*compute.Address
 		expectDelete bool
 	}{
 		"Network tiers (premium) match; do nothing": {
 			addrName: "foo1",
 			netTier:  cloud.NetworkTierPremium,
-			addrList: []*computealpha.Address{{Name: "foo1", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
+			addrList: []*compute.Address{{Name: "foo1", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
 		},
 		"Network tiers (standard) match; do nothing": {
 			addrName: "foo2",
 			netTier:  cloud.NetworkTierStandard,
-			addrList: []*computealpha.Address{{Name: "foo2", Address: "1.1.1.2", NetworkTier: "STANDARD"}},
+			addrList: []*compute.Address{{Name: "foo2", Address: "1.1.1.2", NetworkTier: "STANDARD"}},
 		},
 		"Wrong network tier (standard); delete address": {
 			addrName:     "foo3",
 			netTier:      cloud.NetworkTierPremium,
-			addrList:     []*computealpha.Address{{Name: "foo3", Address: "1.1.1.3", NetworkTier: "STANDARD"}},
+			addrList:     []*compute.Address{{Name: "foo3", Address: "1.1.1.3", NetworkTier: "STANDARD"}},
 			expectDelete: true,
 		},
 		"Wrong network tier (premium); delete address": {
 			addrName:     "foo4",
 			netTier:      cloud.NetworkTierStandard,
-			addrList:     []*computealpha.Address{{Name: "foo4", Address: "1.1.1.4", NetworkTier: "PREMIUM"}},
+			addrList:     []*compute.Address{{Name: "foo4", Address: "1.1.1.4", NetworkTier: "PREMIUM"}},
 			expectDelete: true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			for _, addr := range tc.addrList {
-				s.ReserveAlphaRegionAddress(addr, s.region)
+				s.ReserveRegionAddress(addr, s.region)
 			}
 
 			// Sanity check to ensure we inject the right address.
@@ -389,8 +398,6 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	// Enable the cloud.NetworkTiers feature
-	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	svc := fakeLoadbalancerService("")
 	svc.Annotations = map[string]string{NetworkTierAnnotationKey: "Premium"}
 
@@ -415,13 +422,13 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	addressObj := &computealpha.Address{
+	addressObj := &compute.Address{
 		Name:        lbName,
 		Description: serviceName.String(),
 		NetworkTier: cloud.NetworkTierStandard.ToGCEValue(),
 	}
 
-	err = gce.ReserveAlphaRegionAddress(addressObj, gce.region)
+	err = gce.ReserveRegionAddress(addressObj, gce.region)
 	require.NoError(t, err)
 
 	_, err = createExternalLoadBalancer(gce, svc, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
@@ -448,8 +455,6 @@ func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 
-	// Enable the cloud.NetworkTiers feature
-	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	svc := fakeLoadbalancerService("")
 	svc.Annotations = map[string]string{NetworkTierAnnotationKey: wrongTier}
 
@@ -555,6 +560,53 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 	}
 }
 
+func TestTargetPoolAddsAndRemoveInstancesInBatches(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	addInstanceCalls := 0
+	addInstanceHook := func(req *compute.TargetPoolsAddInstanceRequest) {
+		addInstanceCalls++
+	}
+	removeInstanceCalls := 0
+	removeInstanceHook := func(req *compute.TargetPoolsRemoveInstanceRequest) {
+		removeInstanceCalls++
+	}
+
+	err = registerTargetPoolAddInstanceHook(gce, addInstanceHook)
+	assert.NoError(t, err)
+	err = registerTargetPoolRemoveInstanceHook(gce, removeInstanceHook)
+	assert.NoError(t, err)
+
+	svc := fakeLoadbalancerService("")
+	nodeName := "default-node"
+	_, err = createExternalLoadBalancer(gce, svc, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	assert.NoError(t, err)
+
+	// Insert large number of nodes to test batching.
+	additionalNodeNames := []string{}
+	for i := 0; i < 2*maxInstancesPerTargetPoolUpdate+2; i++ {
+		additionalNodeNames = append(additionalNodeNames, fmt.Sprintf("node-%d", i))
+	}
+	allNodes, err := createAndInsertNodes(gce, append([]string{nodeName}, additionalNodeNames...), vals.ZoneName)
+	assert.NoError(t, err)
+	err = gce.updateExternalLoadBalancer("", svc, allNodes)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 3, addInstanceCalls)
+
+	// Remove large number of nodes to test batching.
+	allNodes, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	assert.NoError(t, err)
+	err = gce.updateExternalLoadBalancer("", svc, allNodes)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 3, removeInstanceCalls)
+}
+
 func TestTargetPoolNeedsRecreation(t *testing.T) {
 	t.Parallel()
 
@@ -569,6 +621,7 @@ func TestTargetPoolNeedsRecreation(t *testing.T) {
 	require.NoError(t, err)
 	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
+	require.NoError(t, err)
 
 	var instances []string
 	for _, host := range hosts {
@@ -760,6 +813,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			fw.Allowed[0].IPProtocol = "tcp"
 			fw.SourceRanges[0] = trueSourceRange
 			fw, err = gce.GetFirewall(MakeFirewallName(tc.lbName))
+			require.NoError(t, err)
 			require.Equal(t, fw.Allowed[0].IPProtocol, "tcp")
 			require.Equal(t, fw.SourceRanges[0], trueSourceRange)
 
@@ -773,7 +827,6 @@ func TestDeleteWrongNetworkTieredResourcesSucceedsWhenNotFound(t *testing.T) {
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
-	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	assert.Nil(t, gce.deleteWrongNetworkTieredResources("Wrong_LB_Name", "", cloud.NetworkTier("")))
 }
 
@@ -799,6 +852,7 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 
 	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
+	require.NoError(t, err)
 	clusterID := vals.ClusterID
 
 	ipAddr := status.Ingress[0].IP
@@ -811,15 +865,19 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	// Apply a tag on the target pool. By verifying the change of the tag, target pool update can be ensured.
 	tag := "A Tag"
 	pool, err := gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	pool.CreationTimestamp = tag
 	pool, err = gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	require.Equal(t, tag, pool.CreationTimestamp)
 	err = gce.ensureTargetPoolAndHealthCheck(true, true, svc, lbName, clusterID, ipAddr, hosts, hcToCreate, hcToDelete)
 	assert.NoError(t, err)
 	pool, err = gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	assert.NotEqual(t, pool.CreationTimestamp, tag)
 
 	pool, err = gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(pool.Instances))
 	var manyNodeName [maxTargetPoolCreateInstances + 1]string
 	for i := 0; i < maxTargetPoolCreateInstances+1; i++ {
@@ -829,15 +887,18 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	require.NoError(t, err)
 	manyHostNames := nodeNames(manyNodes)
 	manyHosts, err := gce.getInstancesByNames(manyHostNames)
+	require.NoError(t, err)
 	err = gce.ensureTargetPoolAndHealthCheck(true, true, svc, lbName, clusterID, ipAddr, manyHosts, hcToCreate, hcToDelete)
 	assert.NoError(t, err)
 
 	pool, err = gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	assert.Equal(t, maxTargetPoolCreateInstances+1, len(pool.Instances))
 
 	err = gce.ensureTargetPoolAndHealthCheck(true, false, svc, lbName, clusterID, ipAddr, hosts, hcToCreate, hcToDelete)
 	assert.NoError(t, err)
 	pool, err = gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(pool.Instances))
 }
 
@@ -1009,6 +1070,7 @@ func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
 			nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 			require.NoError(t, err)
 			svc := fakeLoadbalancerService("")

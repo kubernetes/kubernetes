@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -24,7 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -17,7 +19,7 @@ limitations under the License.
 package gce
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
@@ -26,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 )
 

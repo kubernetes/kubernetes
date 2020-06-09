@@ -36,9 +36,5 @@ func ServeJSON(w http.ResponseWriter, err error) error {
 
 	w.WriteHeader(sc)
 
-	if err := json.NewEncoder(w).Encode(err); err != nil {
-		return err
-	}
-
-	return nil
+	return json.NewEncoder(w).Encode(err)
 }

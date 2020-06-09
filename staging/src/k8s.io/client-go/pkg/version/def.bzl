@@ -16,7 +16,7 @@
 def version_x_defs():
   # This should match the list of packages in kube::version::ldflag
   stamp_pkgs = [
-      "k8s.io/kubernetes/pkg/version",
+      "k8s.io/component-base/version",
       # In hack/lib/version.sh, this has a vendor/ prefix. That isn't needed here?
       "k8s.io/client-go/pkg/version",
       ]

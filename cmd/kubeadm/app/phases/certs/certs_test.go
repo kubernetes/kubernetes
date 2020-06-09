@@ -42,8 +42,10 @@ import (
 
 func createTestCSR(t *testing.T) (*x509.CertificateRequest, crypto.Signer) {
 	csr, key, err := pkiutil.NewCSRAndKey(
-		&certutil.Config{
-			CommonName: "testCert",
+		&pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "testCert",
+			},
 		})
 	if err != nil {
 		t.Fatalf("couldn't create test cert: %v", err)
@@ -52,7 +54,7 @@ func createTestCSR(t *testing.T) (*x509.CertificateRequest, crypto.Signer) {
 	return csr, key
 }
 
-func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
+func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
 	setupCert, setupKey := certstestutil.CreateCACert(t)
 	caCert, caKey := certstestutil.CreateCACert(t)
 
@@ -66,7 +68,7 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 		},
 		{ // ca cert exists, is ca > existing ca used
 			setupFunc: func(pkiDir string) error {
-				return writeCertificateAuthorithyFilesIfNotExist(pkiDir, "dummy", setupCert, setupKey)
+				return writeCertificateAuthorityFilesIfNotExist(pkiDir, "dummy", setupCert, setupKey)
 			},
 			expectedCa: setupCert,
 		},
@@ -100,13 +102,13 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 		}
 
 		// executes create func
-		err := writeCertificateAuthorithyFilesIfNotExist(tmpdir, "dummy", caCert, caKey)
+		err := writeCertificateAuthorityFilesIfNotExist(tmpdir, "dummy", caCert, caKey)
 
 		if !test.expectedError && err != nil {
-			t.Errorf("error writeCertificateAuthorithyFilesIfNotExist failed when not expected to fail: %v", err)
+			t.Errorf("error writeCertificateAuthorityFilesIfNotExist failed when not expected to fail: %v", err)
 			continue
 		} else if test.expectedError && err == nil {
-			t.Error("error writeCertificateAuthorithyFilesIfNotExist didn't failed when expected")
+			t.Error("error writeCertificateAuthorityFilesIfNotExist didn't failed when expected")
 			continue
 		} else if test.expectedError {
 			continue
@@ -344,7 +346,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 				}
 			}
 
-			err := CreateServiceAccountKeyAndPublicKeyFiles(dir)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, x509.RSA)
 			if (err != nil) != tt.expectedErr {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
 			} else if tt.expectedErr {

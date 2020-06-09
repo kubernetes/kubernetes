@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -30,12 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOptions) (string, volume.Provisioner) {
+func newTestableProvisioner(t *testing.T, assert *assert.Assertions, options volume.VolumeOptions) (string, volume.Provisioner) {
 	tmpDir, err := utiltesting.MkTmpdir("flockervolumeTest")
 	assert.NoError(err, fmt.Sprintf("can't make a temp dir: %v", err))
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(pluginName)
 	assert.NoError(err, "Can't find the plugin by name")
@@ -54,7 +54,7 @@ func TestProvision(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 
-	dir, provisioner := newTestableProvisioner(assert, options)
+	dir, provisioner := newTestableProvisioner(t, assert, options)
 	defer os.RemoveAll(dir)
 
 	persistentSpec, err := provisioner.Provision(nil, nil)
@@ -83,9 +83,9 @@ func TestProvision(t *testing.T) {
 		},
 	}
 
-	dir, provisioner = newTestableProvisioner(assert, options)
+	dir, provisioner = newTestableProvisioner(t, assert, options)
 	defer os.RemoveAll(dir)
-	persistentSpec, err = provisioner.Provision(nil, nil)
+	_, err = provisioner.Provision(nil, nil)
 	assert.Error(err, "Provision() did not fail with Parameters specified")
 
 	// selectors are not supported
@@ -95,8 +95,8 @@ func TestProvision(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 
-	dir, provisioner = newTestableProvisioner(assert, options)
+	dir, provisioner = newTestableProvisioner(t, assert, options)
 	defer os.RemoveAll(dir)
-	persistentSpec, err = provisioner.Provision(nil, nil)
+	_, err = provisioner.Provision(nil, nil)
 	assert.Error(err, "Provision() did not fail with Selector specified")
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package clientcmd
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
@@ -77,6 +79,32 @@ var (
 		CurrentContext: "federal-context",
 	}
 )
+
+func TestNilOutMap(t *testing.T) {
+	var fakeKubeconfigData = `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: UEhPTlkK
+    server: https://1.1.1.1
+  name: production
+contexts:
+- context:
+    cluster: production
+    user: production
+  name: production
+current-context: production
+users:
+- name: production
+  user:
+    auth-provider:
+      name: gcp`
+
+	_, _, err := clientcmdlatest.Codec.Decode([]byte(fakeKubeconfigData), nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
 func TestNonExistentCommandLineFile(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
@@ -172,6 +200,56 @@ func TestConflictingCurrentContext(t *testing.T) {
 
 	if mergedConfig.CurrentContext != mockCommandLineConfig.CurrentContext {
 		t.Errorf("expected %v, got %v", mockCommandLineConfig.CurrentContext, mergedConfig.CurrentContext)
+	}
+}
+
+func TestEncodeYAML(t *testing.T) {
+	config := clientcmdapi.Config{
+		CurrentContext: "any-context-value",
+		Contexts: map[string]*clientcmdapi.Context{
+			"433e40": {
+				Cluster: "433e40",
+			},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"0": {
+				Server: "https://localhost:1234",
+			},
+			"1": {
+				Server: "https://localhost:1234",
+			},
+			"433e40": {
+				Server: "https://localhost:1234",
+			},
+		},
+	}
+	data, err := Write(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []byte(`apiVersion: v1
+clusters:
+- cluster:
+    server: https://localhost:1234
+  name: "0"
+- cluster:
+    server: https://localhost:1234
+  name: "1"
+- cluster:
+    server: https://localhost:1234
+  name: "433e40"
+contexts:
+- context:
+    cluster: "433e40"
+    user: ""
+  name: "433e40"
+current-context: any-context-value
+kind: Config
+preferences: {}
+users: null
+`)
+	if !bytes.Equal(expected, data) {
+		t.Error(diff.ObjectReflectDiff(string(expected), string(data)))
 	}
 }
 

@@ -21,6 +21,7 @@ limitations under the License.
 package v2beta2
 
 import (
+	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -28,5 +29,22 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v2beta2.HorizontalPodAutoscaler{}, func(obj interface{}) {
+		SetObjectDefaults_HorizontalPodAutoscaler(obj.(*v2beta2.HorizontalPodAutoscaler))
+	})
+	scheme.AddTypeDefaultingFunc(&v2beta2.HorizontalPodAutoscalerList{}, func(obj interface{}) {
+		SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*v2beta2.HorizontalPodAutoscalerList))
+	})
 	return nil
+}
+
+func SetObjectDefaults_HorizontalPodAutoscaler(in *v2beta2.HorizontalPodAutoscaler) {
+	SetDefaults_HorizontalPodAutoscaler(in)
+}
+
+func SetObjectDefaults_HorizontalPodAutoscalerList(in *v2beta2.HorizontalPodAutoscalerList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_HorizontalPodAutoscaler(a)
+	}
 }

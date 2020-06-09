@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "credentialmanager.go",
+        "doc.go",
         "nodemanager.go",
         "vsphere.go",
         "vsphere_util.go",
@@ -43,7 +44,7 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

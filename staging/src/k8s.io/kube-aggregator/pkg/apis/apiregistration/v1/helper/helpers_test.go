@@ -26,7 +26,6 @@ import (
 var (
 	a v1.APIServiceConditionType = "A"
 	b v1.APIServiceConditionType = "B"
-	c v1.APIServiceConditionType = "C"
 )
 
 func TestIsAPIServiceConditionTrue(t *testing.T) {

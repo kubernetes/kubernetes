@@ -19,7 +19,6 @@ package record
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -42,11 +41,8 @@ func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageF
 	}
 }
 
-func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-}
-
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Eventf(object, eventtype, reason, messageFmt, args)
+	f.Eventf(object, eventtype, reason, messageFmt, args...)
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with

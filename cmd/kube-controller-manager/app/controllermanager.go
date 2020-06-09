@@ -41,7 +41,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/apiserver/pkg/util/term"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -56,7 +55,11 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
-	"k8s.io/klog"
+	"k8s.io/component-base/configz"
+	"k8s.io/component-base/term"
+	"k8s.io/component-base/version"
+	"k8s.io/component-base/version/verflag"
+	"k8s.io/klog/v2"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -65,10 +68,6 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/configz"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const (
@@ -107,7 +106,7 @@ Kubernetes today are the replication controller, endpoints controller, namespace
 controller, and serviceaccounts controller.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cmd.Flags())
+			cliflag.PrintFlags(cmd.Flags())
 
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
@@ -120,16 +119,21 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 		},
+		Args: func(cmd *cobra.Command, args []string) error {
+			for _, arg := range args {
+				if len(arg) > 0 {
+					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
+				}
+			}
+			return nil
+		},
 	}
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
-	// hoist this flag from the global flagset to preserve the commandline until
-	// the gce cloudprovider is removed.
-	globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-lb-src-cidrs")
-	namedFlagSets.FlagSet("generic").MarkDeprecated("cloud-provider-gce-lb-src-cidrs", "This flag will be removed once the GCE Cloud Provider is removed from kube-controller-manager")
+	registerLegacyGlobalFlags(namedFlagSets)
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -166,11 +170,11 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
-		klog.Errorf("unable to register configz: %c", err)
+		klog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthzChecker
+	var checks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
@@ -257,9 +261,10 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
+
 	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"kube-controller-manager",
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		c.LeaderElectionClient.CoreV1(),
 		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
@@ -374,6 +379,7 @@ const (
 func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
+	controllers["endpointslice"] = startEndpointSliceController
 	controllers["replicationcontroller"] = startReplicationController
 	controllers["podgc"] = startPodGCController
 	controllers["resourcequota"] = startResourceQuotaController
@@ -421,7 +427,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	client := clientBuilder.ClientOrDie("controller-discovery")
 	discoveryClient := client.Discovery()
-	resourceMap, err := discoveryClient.ServerResources()
+	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
 	}

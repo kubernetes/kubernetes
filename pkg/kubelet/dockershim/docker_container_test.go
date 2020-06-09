@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -248,7 +250,7 @@ func TestContainerCreationConflict(t *testing.T) {
 	containerName := makeContainerName(sConfig, config)
 	const sandboxId = "sandboxid"
 	const containerId = "containerid"
-	conflictError := fmt.Errorf("Error response from daemon: Conflict. The name \"/%s\" is already in use by container %s. You have to remove (or rename) that container to be able to reuse that name.",
+	conflictError := fmt.Errorf("Error response from daemon: Conflict. The name \"/%s\" is already in use by container %q. You have to remove (or rename) that container to be able to reuse that name.",
 		containerName, containerId)
 	noContainerError := fmt.Errorf("Error response from daemon: No such container: %s", containerId)
 	randomError := fmt.Errorf("random error")

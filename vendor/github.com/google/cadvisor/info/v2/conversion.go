@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
@@ -101,7 +101,8 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 	var last *v1.ContainerStats
 	for _, val := range stats {
 		stat := &ContainerStats{
-			Timestamp: val.Timestamp,
+			Timestamp:        val.Timestamp,
+			ReferencedMemory: val.ReferencedMemory,
 		}
 		if spec.HasCpu {
 			stat.Cpu = &val.Cpu
@@ -116,6 +117,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		if spec.HasMemory {
 			stat.Memory = &val.Memory
 		}
+		if spec.HasHugetlb {
+			stat.Hugetlb = &val.Hugetlb
+		}
 		if spec.HasNetwork {
 			// TODO: Handle TcpStats
 			stat.Network = &NetworkStats{
@@ -123,6 +127,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 				Tcp6:       TcpStat(val.Network.Tcp6),
 				Interfaces: val.Network.Interfaces,
 			}
+		}
+		if spec.HasProcesses {
+			stat.Processes = &val.Processes
 		}
 		if spec.HasFilesystem {
 			if len(val.Filesystem) == 1 {
@@ -145,6 +152,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		if len(val.Accelerators) > 0 {
 			stat.Accelerators = val.Accelerators
 		}
+		if len(val.PerfStats) > 0 {
+			stat.PerfStats = val.PerfStats
+		}
 		// TODO(rjnagal): Handle load stats.
 		newStats = append(newStats, stat)
 	}
@@ -163,6 +173,7 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 			HasFilesystem:    cont.Spec.HasFilesystem,
 			HasDiskIo:        cont.Spec.HasDiskIo,
 			HasCustomMetrics: cont.Spec.HasCustomMetrics,
+			ReferencedMemory: val.ReferencedMemory,
 		}
 		if stat.HasCpu {
 			stat.Cpu = val.Cpu
@@ -179,6 +190,9 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 		}
 		if stat.HasNetwork {
 			stat.Network.Interfaces = val.Network.Interfaces
+		}
+		if stat.HasProcesses {
+			stat.Processes = val.Processes
 		}
 		if stat.HasFilesystem {
 			stat.Filesystem = val.Filesystem
@@ -253,8 +267,10 @@ func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace s
 		CreationTime:     specV1.CreationTime,
 		HasCpu:           specV1.HasCpu,
 		HasMemory:        specV1.HasMemory,
+		HasHugetlb:       specV1.HasHugetlb,
 		HasFilesystem:    specV1.HasFilesystem,
 		HasNetwork:       specV1.HasNetwork,
+		HasProcesses:     specV1.HasProcesses,
 		HasDiskIo:        specV1.HasDiskIo,
 		HasCustomMetrics: specV1.HasCustomMetrics,
 		Image:            specV1.Image,

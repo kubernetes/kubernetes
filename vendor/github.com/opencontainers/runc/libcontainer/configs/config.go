@@ -44,6 +44,7 @@ const (
 	Trap
 	Allow
 	Trace
+	Log
 )
 
 // Operator is a comparison operator to be used when matching syscall arguments in Seccomp

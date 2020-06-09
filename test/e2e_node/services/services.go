@@ -24,7 +24,7 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/test/e2e/framework"

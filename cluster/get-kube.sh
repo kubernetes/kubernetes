@@ -122,6 +122,10 @@ function create_cluster {
   )
 }
 
+function valid-storage-scope {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
+}
+
 if [[ -n "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   create_cluster
   exit 0
@@ -179,11 +183,16 @@ release=${KUBERNETES_RELEASE:-"release/stable"}
 # Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
 set_binary_version "${release}"
 if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
-  if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+  if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+    # Use KUBERNETES_RELEASE_URL for Releases and Pre-Releases
+    # ie. 1.18.0 or 1.19.0-beta.0
+    KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
     # this will be used by get-kube-binaries.sh.
+    # ie. v1.19.0-beta.0.318+b618411f1edb98
     KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
-  elif ! [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+  else
     echo "Version doesn't match regexp" >&2
     exit 1
   fi
@@ -228,7 +237,13 @@ fi
 
 if "${need_download}"; then
   if [[ $(which curl) ]]; then
-    curl -fL --retry 5 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
+    # if the url belongs to GCS API we should use oauth2_token in the headers
+    curl_headers=""
+    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+       [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com.* ]] ; then
+      curl_headers="Authorization: Bearer $(gcloud auth print-access-token)"
+    fi
+    curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else

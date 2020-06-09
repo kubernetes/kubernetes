@@ -24,17 +24,15 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/klog/v2"
 )
 
 // ErrVersionConflict is the error returned when resource version of requested
@@ -114,7 +112,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 
 		// mimic apiserver defaulting
-		if volume.Spec.VolumeMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		if volume.Spec.VolumeMode == nil {
 			volume.Spec.VolumeMode = new(v1.PersistentVolumeMode)
 			*volume.Spec.VolumeMode = v1.PersistentVolumeFilesystem
 		}
@@ -223,7 +221,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			return true, volume.DeepCopy(), nil
 		}
 		klog.V(4).Infof("GetVolume: volume %s not found", name)
-		return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
+		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("get", "persistentvolumeclaims"):
 		name := action.(core.GetAction).GetName()
@@ -233,7 +231,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			return true, claim.DeepCopy(), nil
 		}
 		klog.V(4).Infof("GetClaim: claim %s not found", name)
-		return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
+		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("delete", "persistentvolumes"):
 		name := action.(core.DeleteAction).GetName()
@@ -466,34 +464,6 @@ func (r *VolumeReactor) DeleteClaimEvent(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
-// addVolumeEvent simulates that a volume has been added in etcd and the
-// controller receives 'volume added' event.
-func (r *VolumeReactor) addVolumeEvent(volume *v1.PersistentVolume) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.volumes[volume.Name] = volume
-	// Generate event. No cloning is needed, this claim is not stored in the
-	// controller cache yet.
-	if r.fakeVolumeWatch != nil {
-		r.fakeVolumeWatch.Add(volume)
-	}
-}
-
-// modifyVolumeEvent simulates that a volume has been modified in etcd and the
-// controller receives 'volume modified' event.
-func (r *VolumeReactor) modifyVolumeEvent(volume *v1.PersistentVolume) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.volumes[volume.Name] = volume
-	// Generate deletion event. Cloned volume is needed to prevent races (and we
-	// would get a clone from etcd too).
-	if r.fakeVolumeWatch != nil {
-		r.fakeVolumeWatch.Modify(volume.DeepCopy())
-	}
-}
-
 // AddClaimEvent simulates that a claim has been deleted in etcd and the
 // controller receives 'claim added' event.
 func (r *VolumeReactor) AddClaimEvent(claim *v1.PersistentVolumeClaim) {
@@ -557,8 +527,8 @@ func (r *VolumeReactor) AddClaimBoundToVolume(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
-// MarkVolumeAvaiable marks a PV available by name.
-func (r *VolumeReactor) MarkVolumeAvaiable(name string) {
+// MarkVolumeAvailable marks a PV available by name.
+func (r *VolumeReactor) MarkVolumeAvailable(name string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if volume, ok := r.volumes[name]; ok {

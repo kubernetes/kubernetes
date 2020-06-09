@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"sync"
 
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -31,6 +31,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
@@ -60,10 +61,10 @@ var _ rangeallocation.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource schema.GroupResource, config *storagebackend.Config) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource schema.GroupResource, config *storagebackend.Config) (*Etcd, error) {
 	storage, d, err := generic.NewRawStorage(config)
 	if err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
 	// TODO : Remove RegisterStorageCleanup below when PR
@@ -76,7 +77,7 @@ func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource schema.Grou
 		storage:  storage,
 		baseKey:  baseKey,
 		resource: resource,
-	}
+	}, nil
 }
 
 // Allocate attempts to allocate the item locally and then in etcd.
@@ -189,7 +190,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(context.TODO(), e.baseKey, "", existing, true); err != nil {
+	if err := e.storage.Get(context.TODO(), e.baseKey, storage.GetOptions{IgnoreNotFound: true}, existing); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.resource, "")
 	}
 	return existing, nil
@@ -208,10 +209,10 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
-					return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match"))
+					return nil, apierrors.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match"))
 				}
 			case len(existing.ResourceVersion) != 0:
-				return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("another caller has already initialized the resource"))
+				return nil, apierrors.NewConflict(e.resource, "", fmt.Errorf("another caller has already initialized the resource"))
 			}
 			last = snapshot.ResourceVersion
 			return snapshot, nil

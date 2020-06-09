@@ -11,6 +11,8 @@ go_library(
         "field.go",
         "flag.go",
         "global.go",
+        "global_go112.go",
+        "global_prego112.go",
         "http_handler.go",
         "level.go",
         "logger.go",

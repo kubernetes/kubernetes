@@ -22,6 +22,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -33,29 +36,33 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.BeforeEach(func() {
 		//Only for Windows containers
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
 	ginkgo.It("should be able to create a functioning NodePort service for Windows", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := framework.NewServiceTestJig(cs, serviceName)
-		nodeIP := framework.PickNodeIP(jig.Client)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		nodeIP, err := e2enode.PickIP(jig.Client)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		service := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(service, v1.ServiceTypeNodePort)
-		nodePort := int(service.Spec.Ports[0].NodePort)
+		framework.ExpectNoError(err)
+
+		nodePort := int(svc.Spec.Ports[0].NodePort)
 
 		ginkgo.By("creating Pod to be part of service " + serviceName)
-		jig.RunOrFail(ns, nil)
+		_, err = jig.Run(nil)
+		framework.ExpectNoError(err)
 
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
 		assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s:%d", nodeIP, nodePort)))

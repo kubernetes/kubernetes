@@ -56,7 +56,7 @@ var _ container.ContainerHandler = &containerdContainerHandler{}
 
 // newContainerdContainerHandler returns a new container.ContainerHandler
 func newContainerdContainerHandler(
-	client containerdClient,
+	client ContainerdClient,
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
@@ -149,47 +149,47 @@ func newContainerdContainerHandler(
 	return handler, nil
 }
 
-func (self *containerdContainerHandler) ContainerReference() (info.ContainerReference, error) {
-	return self.reference, nil
+func (h *containerdContainerHandler) ContainerReference() (info.ContainerReference, error) {
+	return h.reference, nil
 }
 
-func (self *containerdContainerHandler) needNet() bool {
+func (h *containerdContainerHandler) needNet() bool {
 	// Since containerd does not handle networking ideally we need to return based
 	// on includedMetrics list. Here the assumption is the presence of cri-containerd
 	// label
-	if self.includedMetrics.Has(container.NetworkUsageMetrics) {
+	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
 		//TODO change it to exported cri-containerd constants
-		return self.labels["io.cri-containerd.kind"] == "sandbox"
+		return h.labels["io.cri-containerd.kind"] == "sandbox"
 	}
 	return false
 }
 
-func (self *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
+func (h *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	// TODO: Since we dont collect disk usage stats for containerd, we set hasFilesystem
 	// to false. Revisit when we support disk usage stats for containerd
 	hasFilesystem := false
-	spec, err := common.GetSpec(self.cgroupPaths, self.machineInfoFactory, self.needNet(), hasFilesystem)
-	spec.Labels = self.labels
-	spec.Envs = self.envs
-	spec.Image = self.image
+	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, h.needNet(), hasFilesystem)
+	spec.Labels = h.labels
+	spec.Envs = h.envs
+	spec.Image = h.image
 
 	return spec, err
 }
 
-func (self *containerdContainerHandler) getFsStats(stats *info.ContainerStats) error {
-	mi, err := self.machineInfoFactory.GetMachineInfo()
+func (h *containerdContainerHandler) getFsStats(stats *info.ContainerStats) error {
+	mi, err := h.machineInfoFactory.GetMachineInfo()
 	if err != nil {
 		return err
 	}
 
-	if self.includedMetrics.Has(container.DiskIOMetrics) {
+	if h.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 	return nil
 }
 
-func (self *containerdContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := self.libcontainerHandler.GetStats()
+func (h *containerdContainerHandler) GetStats() (*info.ContainerStats, error) {
+	stats, err := h.libcontainerHandler.GetStats()
 	if err != nil {
 		return stats, err
 	}
@@ -197,50 +197,50 @@ func (self *containerdContainerHandler) GetStats() (*info.ContainerStats, error)
 	// includes containers running in Kubernetes pods that use the network of the
 	// infrastructure container. This stops metrics being reported multiple times
 	// for each container in a pod.
-	if !self.needNet() {
+	if !h.needNet() {
 		stats.Network = info.NetworkStats{}
 	}
 
 	// Get filesystem stats.
-	err = self.getFsStats(stats)
+	err = h.getFsStats(stats)
 	return stats, err
 }
 
-func (self *containerdContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
+func (h *containerdContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
 	return []info.ContainerReference{}, nil
 }
 
-func (self *containerdContainerHandler) GetCgroupPath(resource string) (string, error) {
-	path, ok := self.cgroupPaths[resource]
+func (h *containerdContainerHandler) GetCgroupPath(resource string) (string, error) {
+	path, ok := h.cgroupPaths[resource]
 	if !ok {
-		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, self.reference.Name)
+		return "", fmt.Errorf("could not find path for resource %q for container %q", resource, h.reference.Name)
 	}
 	return path, nil
 }
 
-func (self *containerdContainerHandler) GetContainerLabels() map[string]string {
-	return self.labels
+func (h *containerdContainerHandler) GetContainerLabels() map[string]string {
+	return h.labels
 }
 
-func (self *containerdContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return self.libcontainerHandler.GetProcesses()
+func (h *containerdContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
+	return h.libcontainerHandler.GetProcesses()
 }
 
-func (self *containerdContainerHandler) Exists() bool {
-	return common.CgroupExists(self.cgroupPaths)
+func (h *containerdContainerHandler) Exists() bool {
+	return common.CgroupExists(h.cgroupPaths)
 }
 
-func (self *containerdContainerHandler) Type() container.ContainerType {
+func (h *containerdContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeContainerd
 }
 
-func (self *containerdContainerHandler) Start() {
+func (h *containerdContainerHandler) Start() {
 }
 
-func (self *containerdContainerHandler) Cleanup() {
+func (h *containerdContainerHandler) Cleanup() {
 }
 
-func (self *containerdContainerHandler) GetContainerIPAddress() string {
+func (h *containerdContainerHandler) GetContainerIPAddress() string {
 	// containerd doesnt take care of networking.So it doesnt maintain networking states
 	return ""
 }

@@ -1,7 +1,7 @@
 # Files that should be ignored by tools which do not want to consider generated
 # code.
 #
-# https://github.com/kubernetes/contrib/blob/master/mungegithub/mungers/size.go
+# https://github.com/kubernetes/test-infra/blob/master/prow/plugins/size/size.go
 #
 # This file is a series of lines, each of the form:
 #     <type> <name>
@@ -22,6 +22,5 @@ file-name	generated.pb.go
 file-name	generated.proto
 file-name	types_swagger_doc_generated.go
 
-path-prefix	Godeps/
 path-prefix	vendor/
 path-prefix	pkg/generated/

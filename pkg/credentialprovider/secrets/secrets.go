@@ -30,7 +30,7 @@ func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring credentialprovi
 	passedCredentials := []credentialprovider.DockerConfig{}
 	for _, passedSecret := range passedSecrets {
 		if dockerConfigJSONBytes, dockerConfigJSONExists := passedSecret.Data[v1.DockerConfigJsonKey]; (passedSecret.Type == v1.SecretTypeDockerConfigJson) && dockerConfigJSONExists && (len(dockerConfigJSONBytes) > 0) {
-			dockerConfigJSON := credentialprovider.DockerConfigJson{}
+			dockerConfigJSON := credentialprovider.DockerConfigJSON{}
 			if err := json.Unmarshal(dockerConfigJSONBytes, &dockerConfigJSON); err != nil {
 				return nil, err
 			}

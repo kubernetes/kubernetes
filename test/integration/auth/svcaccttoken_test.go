@@ -17,15 +17,22 @@ limitations under the License.
 package auth
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -39,6 +46,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -57,18 +65,20 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 
 func TestServiceAccountTokenCreate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountIssuerDiscovery, true)()
 
 	// Build client config, clientset, and informers
 	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
+
 	pk := sk.(*ecdsa.PrivateKey).PublicKey
 
 	const iss = "https://foo.bar.example.com"
 	aud := authenticator.Audiences{"api"}
 
-	maxExpirationSeconds := int64(60 * 60)
+	maxExpirationSeconds := int64(60 * 60 * 2)
 	maxExpirationDuration, err := time.ParseDuration(fmt.Sprintf("%ds", maxExpirationSeconds))
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -88,17 +98,18 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(
 				gcs,
 				v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
-					return gcs.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+					return gcs.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 				})),
 				v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
-					return gcs.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+					return gcs.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 				})),
 				v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
-					return gcs.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+					return gcs.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 				})),
 			)),
 		),
 	)
+
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -106,6 +117,11 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 	masterConfig.GenericConfig.Authentication.APIAudiences = aud
+	masterConfig.ExtraConfig.ExtendExpiration = true
+
+	masterConfig.ExtraConfig.ServiceAccountIssuerURL = iss
+	masterConfig.ExtraConfig.ServiceAccountJWKSURI = ""
+	masterConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
@@ -115,6 +131,11 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		t.Fatalf("err: %v", err)
 	}
 	*gcs = *cs
+
+	rc, err := rest.UnversionedRESTClientFor(master.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var (
 		sa = &v1.ServiceAccount{
@@ -161,13 +182,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
 		}
 		sa, delSvcAcct := createDeleteSvcAcct(t, cs, sa)
 		defer delSvcAcct()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -199,13 +220,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
 		}
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to nonexistant pod but got: %#v", resp)
 		}
 		pod, delPod := createDeletePod(t, cs, pod)
@@ -213,17 +234,17 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// right uid
 		treq.Spec.BoundObjectRef.UID = pod.UID
-		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		// wrong uid
 		treq.Spec.BoundObjectRef.UID = wrongUID
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to pod with wrong uid but got: %#v", resp)
 		}
 		// no uid
 		treq.Spec.BoundObjectRef.UID = noUID
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -262,13 +283,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			},
 		}
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token for nonexistant svcacct but got: %#v", resp)
 		}
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to nonexistant secret but got: %#v", resp)
 		}
 		secret, delSecret := createDeleteSecret(t, cs, secret)
@@ -276,17 +297,17 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// right uid
 		treq.Spec.BoundObjectRef.UID = secret.UID
-		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+		if _, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 		// wrong uid
 		treq.Spec.BoundObjectRef.UID = wrongUID
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err creating token bound to secret with wrong uid but got: %#v", resp)
 		}
 		// no uid
 		treq.Spec.BoundObjectRef.UID = noUID
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -320,7 +341,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		_, del = createDeletePod(t, cs, otherpod)
 		defer del()
 
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err == nil {
 			t.Fatalf("expected err but got: %#v", resp)
 		}
 	})
@@ -335,7 +356,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -354,7 +375,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		coresa := core.ServiceAccount{
 			ObjectMeta: sa.ObjectMeta,
 		}
-		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, nil)
+		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, 0, nil)
 		tok, err := masterConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
 		if err != nil {
 			t.Fatalf("err signing expired token: %v", err)
@@ -362,6 +383,60 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		treq.Status.Token = tok
 		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("expiration extended token", func(t *testing.T) {
+		var requestExp int64 = 60*60 + 7
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &requestExp,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       pod.Name,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+		pod, delPod := createDeletePod(t, cs, pod)
+		defer delPod()
+		treq.Spec.BoundObjectRef.UID = pod.UID
+
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		doTokenReview(t, cs, treq, false)
+
+		// Give some tolerance to avoid flakiness since we are using real time.
+		var leeway int64 = 2
+		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(24*365) * time.Hour))
+		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+		exp, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "exp"), 10, 64)
+		if err != nil {
+			t.Fatalf("error parsing exp: %v", err)
+		}
+		warnafter, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "kubernetes.io", "warnafter"), 10, 64)
+		if err != nil {
+			t.Fatalf("error parsing warnafter: %v", err)
+		}
+
+		if exp < int64(actualExpiry)-leeway || exp > int64(actualExpiry)+leeway {
+			t.Errorf("unexpected token exp %d, should within range of %d +- %d seconds", exp, actualExpiry, leeway)
+		}
+		if warnafter < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+			t.Errorf("unexpected token warnafter %d, should within range of %d +- %d seconds", warnafter, assumedExpiry, leeway)
+		}
+
+		checkExpiration(t, treq, requestExp)
+		expStatus := treq.Status.ExpirationTimestamp.Time.Unix()
+		if expStatus < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+			t.Errorf("unexpected expiration returned in tokenrequest status %d, should within range of %d +- %d seconds", expStatus, assumedExpiry, leeway)
+		}
 	})
 
 	t.Run("a token without an api audience is invalid", func(t *testing.T) {
@@ -374,7 +449,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -390,7 +465,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa, del := createDeleteSvcAcct(t, cs, sa)
 		defer del()
 
-		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq)
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
@@ -418,7 +493,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelPod()
 
 		treq.Spec.BoundObjectRef.UID = originalPod.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -459,7 +534,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelSecret()
 
 		treq.Spec.BoundObjectRef.UID = originalSecret.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -502,7 +577,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelSecret()
 
 		treq.Spec.BoundObjectRef.UID = originalSecret.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -546,7 +621,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		defer originalDelSecret()
 
 		treq.Spec.BoundObjectRef.UID = originalSecret.UID
-		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
@@ -567,15 +642,146 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		doTokenReview(t, cs, treq, true)
 	})
+
+	t.Run("a token is valid against the HTTP-provided service account issuer metadata", func(t *testing.T) {
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		t.Log("get token")
+		tokenRequest, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(
+			context.TODO(),
+			sa.Name,
+			&authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{
+					Audiences: []string{"api"},
+				},
+			}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error creating token: %v", err)
+		}
+		token := tokenRequest.Status.Token
+		if token == "" {
+			t.Fatal("no token")
+		}
+
+		t.Log("get discovery doc")
+		discoveryDoc := struct {
+			Issuer string `json:"issuer"`
+			JWKS   string `json:"jwks_uri"`
+		}{}
+
+		// A little convoluted, but the base path is hidden inside the RESTClient.
+		// We can't just use the RESTClient, because it throws away the headers
+		// before returning a result, and we need to check the headers.
+		discoveryURL := rc.Get().AbsPath("/.well-known/openid-configuration").URL().String()
+		resp, err := rc.Client.Get(discoveryURL)
+		if err != nil {
+			t.Fatalf("error getting metadata: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("got status: %v, want: %v", resp.StatusCode, http.StatusOK)
+		}
+		if got, want := resp.Header.Get("Content-Type"), "application/json"; got != want {
+			t.Errorf("got Content-Type: %v, want: %v", got, want)
+		}
+		if got, want := resp.Header.Get("Cache-Control"), "public, max-age=3600"; got != want {
+			t.Errorf("got Cache-Control: %v, want: %v", got, want)
+		}
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		md := bytes.NewBuffer(b)
+		t.Logf("raw discovery doc response:\n---%s\n---", md.String())
+		if md.Len() == 0 {
+			t.Fatal("empty response for discovery doc")
+		}
+
+		if err := json.NewDecoder(md).Decode(&discoveryDoc); err != nil {
+			t.Fatalf("could not decode metadata: %v", err)
+		}
+		if discoveryDoc.Issuer != iss {
+			t.Fatalf("invalid issuer in discovery doc: got %s, want %s",
+				discoveryDoc.Issuer, iss)
+		}
+		// Parse the JWKSURI see if the path is what we expect. Since the
+		// integration test framework hardcodes 192.168.10.4 as the PublicAddress,
+		// which results in the same for ExternalAddress, we expect the JWKS URI
+		// to be 192.168.10.4:443, even if that's not necessarily the external
+		// IP of the test machine.
+		expectJWKSURI := (&url.URL{
+			Scheme: "https",
+			Host:   "192.168.10.4:443",
+			Path:   serviceaccount.JWKSPath,
+		}).String()
+		if discoveryDoc.JWKS != expectJWKSURI {
+			t.Fatalf("unexpected jwks_uri in discovery doc: got %s, want %s",
+				discoveryDoc.JWKS, expectJWKSURI)
+		}
+
+		// Since the test framework hardcodes the host, we combine our client's
+		// scheme and host with serviceaccount.JWKSPath. We know that this is what was
+		// in the discovery doc because we checked that it matched above.
+		jwksURI := rc.Get().AbsPath(serviceaccount.JWKSPath).URL().String()
+		t.Log("get jwks from", jwksURI)
+		resp, err = rc.Client.Get(jwksURI)
+		if err != nil {
+			t.Fatalf("error getting jwks: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("got status: %v, want: %v", resp.StatusCode, http.StatusOK)
+		}
+		if got, want := resp.Header.Get("Content-Type"), "application/jwk-set+json"; got != want {
+			t.Errorf("got Content-Type: %v, want: %v", got, want)
+		}
+		if got, want := resp.Header.Get("Cache-Control"), "public, max-age=3600"; got != want {
+			t.Errorf("got Cache-Control: %v, want: %v", got, want)
+		}
+
+		b, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ks := bytes.NewBuffer(b)
+		if ks.Len() == 0 {
+			t.Fatal("empty jwks")
+		}
+		t.Logf("raw JWKS: \n---\n%s\n---", ks.String())
+
+		jwks := jose.JSONWebKeySet{}
+		if err := json.NewDecoder(ks).Decode(&jwks); err != nil {
+			t.Fatalf("could not decode JWKS: %v", err)
+		}
+		if len(jwks.Keys) != 1 {
+			t.Fatalf("len(jwks.Keys) = %d, want 1", len(jwks.Keys))
+		}
+		key := jwks.Keys[0]
+		tok, err := jwt.ParseSigned(token)
+		if err != nil {
+			t.Fatalf("could not parse token %q: %v", token, err)
+		}
+		var claims jwt.Claims
+		if err := tok.Claims(key, &claims); err != nil {
+			t.Fatalf("could not validate claims on token: %v", err)
+		}
+		if err := claims.Validate(jwt.Expected{Issuer: discoveryDoc.Issuer}); err != nil {
+			t.Fatalf("invalid claims: %v", err)
+		}
+	})
 }
 
 func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) authenticationv1.UserInfo {
 	t.Helper()
-	trev, err := cs.AuthenticationV1().TokenReviews().Create(&authenticationv1.TokenReview{
+	trev, err := cs.AuthenticationV1().TokenReviews().Create(context.TODO(), &authenticationv1.TokenReview{
 		Spec: authenticationv1.TokenReviewSpec{
 			Token: treq.Status.Token,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -642,7 +848,7 @@ func getPayload(t *testing.T, b string) string {
 
 func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAccount) (*v1.ServiceAccount, func()) {
 	t.Helper()
-	sa, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(sa)
+	sa, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(context.TODO(), sa, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -653,7 +859,7 @@ func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAcc
 			return
 		}
 		done = true
-		if err := cs.CoreV1().ServiceAccounts(sa.Namespace).Delete(sa.Name, nil); err != nil {
+		if err := cs.CoreV1().ServiceAccounts(sa.Namespace).Delete(context.TODO(), sa.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
@@ -661,7 +867,7 @@ func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAcc
 
 func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod, func()) {
 	t.Helper()
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -672,7 +878,7 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 			return
 		}
 		done = true
-		if err := cs.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
+		if err := cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
@@ -680,7 +886,7 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 
 func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*v1.Secret, func()) {
 	t.Helper()
-	sec, err := cs.CoreV1().Secrets(sec.Namespace).Create(sec)
+	sec, err := cs.CoreV1().Secrets(sec.Namespace).Create(context.TODO(), sec, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -691,7 +897,7 @@ func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*
 			return
 		}
 		done = true
-		if err := cs.CoreV1().Secrets(sec.Namespace).Delete(sec.Name, nil); err != nil {
+		if err := cs.CoreV1().Secrets(sec.Namespace).Delete(context.TODO(), sec.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}

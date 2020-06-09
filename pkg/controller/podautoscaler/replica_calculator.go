@@ -35,10 +35,11 @@ const (
 	// defaultTestingTolerance is default value for calculating when to
 	// scale up/scale down.
 	defaultTestingTolerance                     = 0.1
-	defaultTestingCpuInitializationPeriod       = 2 * time.Minute
+	defaultTestingCPUInitializationPeriod       = 2 * time.Minute
 	defaultTestingDelayOfInitialReadinessStatus = 10 * time.Second
 )
 
+// ReplicaCalculator bundles all needed information to calculate the target amount of replicas
 type ReplicaCalculator struct {
 	metricsClient                 metricsclient.MetricsClient
 	podLister                     corelisters.PodLister
@@ -47,6 +48,7 @@ type ReplicaCalculator struct {
 	delayOfInitialReadinessStatus time.Duration
 }
 
+// NewReplicaCalculator creates a new ReplicaCalculator and passes all necessary information to the new instance
 func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister, tolerance float64, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) *ReplicaCalculator {
 	return &ReplicaCalculator{
 		metricsClient:                 metricsClient,
@@ -134,9 +136,15 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
 	}
 
+	newReplicas := int32(math.Ceil(newUsageRatio * float64(len(metrics))))
+	if (newUsageRatio < 1.0 && newReplicas > currentReplicas) || (newUsageRatio > 1.0 && newReplicas < currentReplicas) {
+		// return the current replicas if the change of metrics length would cause a change in scale direction
+		return currentReplicas, utilization, rawUtilization, timestamp, nil
+	}
+
 	// return the result, where the number of replicas considered is
 	// however many replicas factored into our calculation
-	return int32(math.Ceil(newUsageRatio * float64(len(metrics)))), utilization, rawUtilization, timestamp, nil
+	return newReplicas, utilization, rawUtilization, timestamp, nil
 }
 
 // GetRawResourceReplicas calculates the desired replica count based on a target resource utilization (as a raw milli-value)

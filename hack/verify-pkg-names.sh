@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Verify whether codes follow golang convention.
+# This script verifies whether codes follow golang convention.
+# Usage: `hack/verify-pkg-names.sh`.
 
 set -o errexit
 set -o nounset
@@ -26,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
-if git --no-pager grep -E $'^(import |\t)[a-z]+[A-Z_][a-zA-Z]* "[^"]+"$' -- '**/*.go' ':(exclude)vendor/*' ':(exclude)**.*.pb.go'; then
+if git --no-pager grep -E $'^(import |\t)[a-z]+[A-Z_][a-zA-Z]* "[^"]+"$' -- '**/*.go' ':(exclude)vendor/*' ':(exclude)**/*.pb.go'; then
   echo "!!! Some package aliases break go conventions."
   echo "To fix these errors, do not use capitalized or underlined characters"
   echo "in pkg aliases. Refer to https://blog.golang.org/package-names for more info."

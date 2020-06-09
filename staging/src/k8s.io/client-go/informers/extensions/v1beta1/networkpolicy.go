@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -61,13 +62,13 @@ func NewFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace str
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ExtensionsV1beta1().NetworkPolicies(namespace).List(options)
+				return client.ExtensionsV1beta1().NetworkPolicies(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ExtensionsV1beta1().NetworkPolicies(namespace).Watch(options)
+				return client.ExtensionsV1beta1().NetworkPolicies(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&extensionsv1beta1.NetworkPolicy{},

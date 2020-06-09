@@ -10,7 +10,6 @@
 package hcsschema
 
 type Layer struct {
-
 	Id string `json:"Id,omitempty"`
 
 	Path string `json:"Path,omitempty"`

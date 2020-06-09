@@ -146,7 +146,9 @@ func TestHandlePackage(t *testing.T) {
 }
 
 func TestHandlePath(t *testing.T) {
-	c := collector{}
+	c := collector{
+		ignoreDirs: standardIgnoreDirs,
+	}
 	e := errors.New("ex")
 	i, _ := os.Stat(".") // i.IsDir() == true
 	if c.handlePath("foo", nil, e) != e {

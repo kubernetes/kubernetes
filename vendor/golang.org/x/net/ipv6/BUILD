@@ -25,8 +25,6 @@ go_library(
         "icmp_windows.go",
         "payload.go",
         "payload_cmsg.go",
-        "payload_cmsg_go1_8.go",
-        "payload_cmsg_go1_9.go",
         "payload_nocmsg.go",
         "sockopt.go",
         "sockopt_posix.go",
@@ -65,7 +63,6 @@ go_library(
         "zsys_openbsd.go",
         "zsys_solaris.go",
     ],
-    cgo = True,
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/ipv6",
     importpath = "golang.org/x/net/ipv6",
     visibility = ["//visibility:public"],
@@ -73,7 +70,15 @@ go_library(
         "//vendor/golang.org/x/net/bpf:go_default_library",
         "//vendor/golang.org/x/net/internal/iana:go_default_library",
         "//vendor/golang.org/x/net/internal/socket:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

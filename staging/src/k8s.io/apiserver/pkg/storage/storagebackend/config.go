@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
@@ -27,7 +28,8 @@ const (
 	StorageTypeUnset = ""
 	StorageTypeETCD3 = "etcd3"
 
-	DefaultCompactInterval = 5 * time.Minute
+	DefaultCompactInterval      = 5 * time.Minute
+	DefaultDBMetricPollInterval = 30 * time.Second
 )
 
 // TransportConfig holds all connection related info,  i.e. equal TransportConfig means equal servers we talk to.
@@ -35,9 +37,11 @@ type TransportConfig struct {
 	// ServerList is the list of storage servers to connect with.
 	ServerList []string
 	// TLS credentials
-	KeyFile  string
-	CertFile string
-	CAFile   string
+	KeyFile       string
+	CertFile      string
+	TrustedCAFile string
+	// function to determine the egress dialer. (i.e. konnectivity server dialer)
+	EgressLookup egressselector.Lookup
 }
 
 // Config is configuration for creating a storage backend.
@@ -68,13 +72,16 @@ type Config struct {
 	CompactionInterval time.Duration
 	// CountMetricPollPeriod specifies how often should count metric be updated
 	CountMetricPollPeriod time.Duration
+	// DBMetricPollInterval specifies how often should storage backend metric be updated.
+	DBMetricPollInterval time.Duration
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
-		Paging:             true,
-		Prefix:             prefix,
-		Codec:              codec,
-		CompactionInterval: DefaultCompactInterval,
+		Paging:               true,
+		Prefix:               prefix,
+		Codec:                codec,
+		CompactionInterval:   DefaultCompactInterval,
+		DBMetricPollInterval: DefaultDBMetricPollInterval,
 	}
 }

@@ -49,7 +49,7 @@ func TestMakeCSR(t *testing.T) {
 	}
 	csrBlock, rest := pem.Decode(csrPEM)
 	if csrBlock == nil {
-		t.Error("Unable to decode MakeCSR result.")
+		t.Fatal("Unable to decode MakeCSR result.")
 	}
 	if len(rest) != 0 {
 		t.Error("Found more than one PEM encoded block in the result.")

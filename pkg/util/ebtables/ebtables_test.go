@@ -26,17 +26,17 @@ import (
 
 func TestEnsureChain(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Does not Exists
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Exists
-			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 			// Does not Exists
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			// Fail to create chain
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -78,23 +78,23 @@ func TestEnsureChain(t *testing.T) {
 
 func TestEnsureRule(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Exists
-			func() ([]byte, error) {
+			func() ([]byte, []byte, error) {
 				return []byte(`Bridge table: filter
 
 Bridge chain: OUTPUT, entries: 4, policy: ACCEPT
 -j TEST
-`), nil
+`), nil, nil
 			},
 			// Does not Exists.
-			func() ([]byte, error) {
+			func() ([]byte, []byte, error) {
 				return []byte(`Bridge table: filter
 
-Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil
+Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil, nil
 			},
 			// Fail to create
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := fakeexec.FakeExec{

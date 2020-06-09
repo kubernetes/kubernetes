@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks version dependencies of modules. It checks whether all
+# pinned versions of checked dependencies match their preferred version or not.
+# Usage: `hack/lint-dependencies.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -54,6 +58,23 @@ case "${1:-}" in
   ;;
 esac
 
+# let us log all errors before we exit
+rc=0
+
+# List of dependencies we need to avoid dragging back into kubernetes/kubernetes
+forbidden_repos=(
+  "k8s.io/klog"  # we have switched to klog v2, so avoid klog v1
+)
+for forbidden_repo in "${forbidden_repos[@]}"; do
+  deps_on_forbidden=$(go mod graph | grep " ${forbidden_repo}@" || echo "")
+  if [ -n "${deps_on_forbidden}" ]; then
+    kube::log::error "The following have transitive dependencies on ${forbidden_repo}, which is not allowed:"
+    echo "${deps_on_forbidden}"
+    echo ""
+    rc=1
+  fi
+done
+
 outdated=$(go list -m -json all | jq -r "
   select(.Replace.Version != null) | 
   select(.Version != .Replace.Version) | 
@@ -85,8 +106,8 @@ if [[ -n "${unused}" ]]; then
 fi
 
 if [[ -n "${unused}${outdated}" ]]; then
-  exit 1
+  rc=1
 fi
 
 echo "All pinned versions of checked dependencies match their preferred version."
-exit 0
+exit $rc

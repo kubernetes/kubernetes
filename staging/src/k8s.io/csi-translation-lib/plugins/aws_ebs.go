@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,6 +33,8 @@ const (
 	AWSEBSDriverName = "ebs.csi.aws.com"
 	// AWSEBSInTreePluginName is the name of the intree plugin for EBS
 	AWSEBSInTreePluginName = "kubernetes.io/aws-ebs"
+	// AWSEBSTopologyKey is the zonal topology key for AWS EBS CSI driver
+	AWSEBSTopologyKey = "topology." + AWSEBSDriverName + "/zone"
 )
 
 var _ InTreePlugin = &awsElasticBlockStoreCSITranslator{}
@@ -45,8 +47,39 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 	return &awsElasticBlockStoreCSITranslator{}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree EBS storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree EBS storage class parameters to CSI storage class
 func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	var (
+		generatedTopologies []v1.TopologySelectorTerm
+		params              = map[string]string{}
+	)
+	for k, v := range sc.Parameters {
+		switch strings.ToLower(k) {
+		case fsTypeKey:
+			params[csiFsTypeKey] = v
+		case zoneKey:
+			generatedTopologies = generateToplogySelectors(AWSEBSTopologyKey, []string{v})
+		case zonesKey:
+			generatedTopologies = generateToplogySelectors(AWSEBSTopologyKey, strings.Split(v, ","))
+		default:
+			params[k] = v
+		}
+	}
+
+	if len(generatedTopologies) > 0 && len(sc.AllowedTopologies) > 0 {
+		return nil, fmt.Errorf("cannot simultaneously set allowed topologies and zone/zones parameters")
+	} else if len(generatedTopologies) > 0 {
+		sc.AllowedTopologies = generatedTopologies
+	} else if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, AWSEBSTopologyKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
+	}
+
+	sc.Parameters = params
+
 	return sc, nil
 }
 
@@ -57,16 +90,21 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(vol
 		return nil, fmt.Errorf("volume is nil or AWS EBS not defined on volume")
 	}
 	ebsSource := volume.AWSElasticBlockStore
+	volumeHandle, err := KubernetesVolumeIDToEBSVolumeID(ebsSource.VolumeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate Kubernetes ID to EBS Volume ID %v", err)
+	}
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			// A.K.A InnerVolumeSpecName required to match for Unmount
-			Name: volume.Name,
+			// Must be unique per disk as it is used as the unique part of the
+			// staging path
+			Name: fmt.Sprintf("%s-%s", AWSEBSDriverName, ebsSource.VolumeID),
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:       AWSEBSDriverName,
-					VolumeHandle: ebsSource.VolumeID,
+					VolumeHandle: volumeHandle,
 					ReadOnly:     ebsSource.ReadOnly,
 					FSType:       ebsSource.FSType,
 					VolumeAttributes: map[string]string{
@@ -102,6 +140,10 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.Persis
 		VolumeAttributes: map[string]string{
 			"partition": strconv.FormatInt(int64(ebsSource.Partition), 10),
 		},
+	}
+
+	if err := translateTopology(pv, AWSEBSTopologyKey); err != nil {
+		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
 	pv.Spec.AWSElasticBlockStore = nil
@@ -159,6 +201,10 @@ func (t *awsElasticBlockStoreCSITranslator) GetInTreePluginName() string {
 // GetCSIPluginName returns the name of the CSI plugin
 func (t *awsElasticBlockStoreCSITranslator) GetCSIPluginName() string {
 	return AWSEBSDriverName
+}
+
+func (t *awsElasticBlockStoreCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string) (string, error) {
+	return volumeHandle, nil
 }
 
 // awsVolumeRegMatch represents Regex Match for AWS volume.

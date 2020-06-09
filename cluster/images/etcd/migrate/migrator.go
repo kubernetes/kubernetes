@@ -19,11 +19,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/blang/semver"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // EtcdMigrateCfg provides all configuration required to perform etcd data upgrade/downgrade migrations.
@@ -159,7 +158,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 	if err != nil {
 		return nil, err
 	}
-	err = exec.Command("mv", m.dataDirectory.path, backupDir).Run()
+	err = os.Rename(m.dataDirectory.path, backupDir)
 	if err != nil {
 		return nil, err
 	}

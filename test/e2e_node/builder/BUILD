@@ -11,7 +11,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e_node/builder",
     deps = [
         "//test/utils:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

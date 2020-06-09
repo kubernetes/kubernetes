@@ -26,12 +26,14 @@ import (
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	exampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example/internalversion"
 	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion"
+	thirdexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example3.io/internalversion"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Example() exampleinternalversion.ExampleInterface
 	SecondExample() secondexampleinternalversion.SecondExampleInterface
+	ThirdExample() thirdexampleinternalversion.ThirdExampleInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -40,6 +42,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	example       *exampleinternalversion.ExampleClient
 	secondExample *secondexampleinternalversion.SecondExampleClient
+	thirdExample  *thirdexampleinternalversion.ThirdExampleClient
 }
 
 // Example retrieves the ExampleClient
@@ -50,6 +53,11 @@ func (c *Clientset) Example() exampleinternalversion.ExampleInterface {
 // SecondExample retrieves the SecondExampleClient
 func (c *Clientset) SecondExample() secondexampleinternalversion.SecondExampleInterface {
 	return c.secondExample
+}
+
+// ThirdExample retrieves the ThirdExampleClient
+func (c *Clientset) ThirdExample() thirdexampleinternalversion.ThirdExampleInterface {
+	return c.thirdExample
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -67,7 +75,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		if configShallowCopy.Burst <= 0 {
-			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
@@ -78,6 +86,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.secondExample, err = secondexampleinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.thirdExample, err = thirdexampleinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +107,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.example = exampleinternalversion.NewForConfigOrDie(c)
 	cs.secondExample = secondexampleinternalversion.NewForConfigOrDie(c)
+	cs.thirdExample = thirdexampleinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -105,6 +118,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.example = exampleinternalversion.New(c)
 	cs.secondExample = secondexampleinternalversion.New(c)
+	cs.thirdExample = thirdexampleinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

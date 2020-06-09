@@ -54,15 +54,18 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
-	// StrictTopologyManagerPolicy is a mode in which kubelet only allows
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with optimal NUMA node alignment for requested resources
+	RestrictedTopologyManagerPolicy = "restricted"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
-	StrictTopologyManagerPolicy = "strict"
-	// PreferredTopologyManagerPolicy is a mode in which kubelet will favour
-	// pods with NUMA alignment of CPU and device resources.
-	PreferredTopologyManagerPolicy = "preferred"
+	BestEffortTopologyManagerPolicy = "best-effort"
 	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
 	NoneTopologyManagerPolicy = "none"
+	// SingleNumaNodeTopologyManager Policy iis a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNumaNodeTopologyManager = "single-numa-node"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -71,6 +74,9 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// enableServer enables Kubelet's secured server.
+	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
+	EnableServer bool
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string
@@ -94,6 +100,12 @@ type KubeletConfiguration struct {
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	VolumePluginDir string
+	// providerID, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node
+	ProviderID string
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
@@ -235,6 +247,9 @@ type KubeletConfiguration struct {
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
 	ResolverConfig string
+	// RunOnce causes the Kubelet to check the API server once for pods,
+	// run those in addition to the pods specified by static pod files, and exit.
+	RunOnce bool
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
@@ -242,6 +257,8 @@ type KubeletConfiguration struct {
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	NodeStatusMaxImages int32
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
@@ -328,8 +345,19 @@ type KubeletConfiguration struct {
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
+	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
+	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
+	// This option overwrites CPUs provided by system-reserved and kube-reserved.
+	ReservedSystemCPUs string
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	ShowHiddenMetricsForVersion string
 }
 
+// KubeletAuthorizationMode denotes the authorization mode for the kubelet
 type KubeletAuthorizationMode string
 
 const (
@@ -339,6 +367,7 @@ const (
 	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
 )
 
+// KubeletAuthorization holds the state related to the authorization in the kublet.
 type KubeletAuthorization struct {
 	// mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
@@ -349,6 +378,8 @@ type KubeletAuthorization struct {
 	Webhook KubeletWebhookAuthorization
 }
 
+// KubeletWebhookAuthorization holds the state related to the Webhook
+// Authorization in the Kubelet.
 type KubeletWebhookAuthorization struct {
 	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
 	CacheAuthorizedTTL metav1.Duration
@@ -356,6 +387,7 @@ type KubeletWebhookAuthorization struct {
 	CacheUnauthorizedTTL metav1.Duration
 }
 
+// KubeletAuthentication holds the Kubetlet Authentication setttings.
 type KubeletAuthentication struct {
 	// x509 contains settings related to x509 client certificate authentication
 	X509 KubeletX509Authentication
@@ -365,6 +397,7 @@ type KubeletAuthentication struct {
 	Anonymous KubeletAnonymousAuthentication
 }
 
+// KubeletX509Authentication contains settings related to x509 client certificate authentication
 type KubeletX509Authentication struct {
 	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
 	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
@@ -372,6 +405,7 @@ type KubeletX509Authentication struct {
 	ClientCAFile string
 }
 
+// KubeletWebhookAuthentication contains settings related to webhook authentication
 type KubeletWebhookAuthentication struct {
 	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
 	Enabled bool
@@ -379,6 +413,7 @@ type KubeletWebhookAuthentication struct {
 	CacheTTL metav1.Duration
 }
 
+// KubeletAnonymousAuthentication enables anonymous requests to the kubelet server.
 type KubeletAnonymousAuthentication struct {
 	// enabled allows anonymous requests to the kubelet server.
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.

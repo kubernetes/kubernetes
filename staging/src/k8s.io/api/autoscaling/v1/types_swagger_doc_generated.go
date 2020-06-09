@@ -29,7 +29,7 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CrossVersionObjectReference = map[string]string{
 	"":           "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
-	"kind":       "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds\"",
+	"kind":       "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds\"",
 	"name":       "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
 	"apiVersion": "API version of the referent",
 }
@@ -64,8 +64,8 @@ func (ExternalMetricStatus) SwaggerDoc() map[string]string {
 
 var map_HorizontalPodAutoscaler = map[string]string{
 	"":         "configuration of a horizontal pod autoscaler.",
-	"metadata": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
+	"metadata": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 	"status":   "current information about the autoscaler.",
 }
 
@@ -219,9 +219,9 @@ func (ResourceMetricStatus) SwaggerDoc() map[string]string {
 
 var map_Scale = map[string]string{
 	"":         "Scale represents a scaling request for a resource.",
-	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
-	"spec":     "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
-	"status":   "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.",
+	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+	"spec":     "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
+	"status":   "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
 }
 
 func (Scale) SwaggerDoc() map[string]string {

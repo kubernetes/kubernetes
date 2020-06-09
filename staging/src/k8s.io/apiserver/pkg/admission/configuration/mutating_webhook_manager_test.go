@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -43,12 +43,12 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 		t.Errorf("expected empty webhooks, but got %v", configurations)
 	}
 
-	webhookConfiguration := &v1beta1.MutatingWebhookConfiguration{
+	webhookConfiguration := &v1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
-		Webhooks:   []v1beta1.MutatingWebhook{{Name: "webhook1.1"}},
+		Webhooks:   []v1.MutatingWebhook{{Name: "webhook1.1"}},
 	}
 
-	mutatingInformer := informerFactory.Admissionregistration().V1beta1().MutatingWebhookConfigurations()
+	mutatingInformer := informerFactory.Admissionregistration().V1().MutatingWebhookConfigurations()
 	mutatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
 	configManager.updateConfiguration()
 

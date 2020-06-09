@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 )
 
@@ -33,8 +34,9 @@ func TestDriverParameter(t *testing.T) {
 				"", // Default fsType
 			),
 		},
-		ShortName: "foo",
-		ClaimSize: "5Gi",
+		SupportedSizeRange: e2evolume.SizeRange{
+			Min: "5Gi",
+		},
 	}
 	testcases := []struct {
 		name     string

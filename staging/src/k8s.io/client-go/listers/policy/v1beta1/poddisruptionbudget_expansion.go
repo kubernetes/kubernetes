@@ -23,7 +23,7 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // PodDisruptionBudgetListerExpansion allows custom methods to be added to

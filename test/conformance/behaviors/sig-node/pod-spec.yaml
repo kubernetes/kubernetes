@@ -1,0 +1,49 @@
+suite: pod/spec
+description: Base suite for pods
+behaviors:
+- id: pod/spec/basic-create
+  description: When a Pod resource is created with a single container and sufficient resources, a Pod MUST be created on a node with the specified container image.
+- id: pod/spec/basic-delete
+  description: When a Pod resource is delete, the Pod containers must receive a TERM signal and the Pod MUST be deleted.
+- id: pod/spec/hostname
+  description: When the hostname field is set, a container running in the Pod MUST report the hostname as the specified value.
+- id: pod/spec/subdomain
+  description: If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod
+    namespace>.svc.<cluster domain>". If not specified, the pod will not have a
+    domainname at all.
+- id: pod/spec/terminationGracePeriodSeconds/in-spec
+  description: When the terminationGracePeriodSeconds is specified in the spec,
+    processes running in the Pod MUST NOT receive a hard termination signal for at
+    least that number of seconds after a delete request.
+- id: pod/spec/terminationGracePeriodSeconds/in-delete
+  description: When the terminationGracePeriodSeconds is specified in a delete request,
+    processes running in the Pod MUST NOT receive a hard termination signal for at
+    least that number of seconds after the delete request.
+- id: pod/spec/activeDeadlineSeconds
+  description: Optional duration in seconds the pod may be active on the node relative
+    to StartTime before the system will actively try to mark it failed and kill
+    associated containers. Value must be a positive integer.
+- id: pod/spec/hostNetwork/true
+  description: When hostNetwork is set to true, the Pod MUST use the host's network
+    namespace.
+- id: pod/spec/hostNetwork/false
+  description: When hostNetwork is set to false, the Pod MUST NOT use the host's network
+    namespace.
+- id: pod/spec/hostPID/true
+  description: When hostPID is set to true, the Pod MUST use the host's process
+    namespace.
+- id: pod/spec/hostPID/false
+  description: When hostPID is set to false, the Pod MUST NOT use the host's process
+    namespace.
+- id: pod/spec/hostIPC/true
+  description: When hostIPC is set to true, the Pod MUST use the host's inter-process
+    communication namespace.
+- id: pod/spec/hostIPC/false
+  description: When hostIPC is set to false, the Pod MUST NOT use the host's inter-process
+    communication namespace.
+- id: pod/spec/label/create
+  decription: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful.
+- id: pod/spec/label/patch
+  decription: A patch request must be able to update the pod to change the value of an existing Label. Query for the Pod with the new value for the label MUST be successful.
+- id: pod/spec/container/resources
+  description: Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.

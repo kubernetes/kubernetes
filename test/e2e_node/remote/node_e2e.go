@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -34,6 +34,7 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
+// InitNodeE2ERemote initializes the node e2e test suite.
 func InitNodeE2ERemote() TestSuite {
 	// TODO: Register flags.
 	return &NodeE2ERemote{}

@@ -14,16 +14,16 @@ import (
 // Dggsvp3 computes orthogonal matrices U, V and Q such that
 //
 //                  n-k-l  k    l
-//  U^T*A*Q =    k [ 0    A12  A13 ] if m-k-l >= 0;
+//  Uᵀ*A*Q =     k [ 0    A12  A13 ] if m-k-l >= 0;
 //               l [ 0     0   A23 ]
 //           m-k-l [ 0     0    0  ]
 //
 //                  n-k-l  k    l
-//  U^T*A*Q =    k [ 0    A12  A13 ] if m-k-l < 0;
+//  Uᵀ*A*Q =     k [ 0    A12  A13 ] if m-k-l < 0;
 //             m-k [ 0     0   A23 ]
 //
 //                  n-k-l  k    l
-//  V^T*B*Q =    l [ 0     0   B13 ]
+//  Vᵀ*B*Q =     l [ 0     0   B13 ]
 //             p-l [ 0     0    0  ]
 //
 // where the k×k matrix A12 and l×l matrix B13 are non-singular
@@ -31,7 +31,7 @@ import (
 // otherwise A23 is (m-k)×l upper trapezoidal.
 //
 // Dggsvp3 returns k and l, the dimensions of the sub-blocks. k+l
-// is the effective numerical rank of the (m+p)×n matrix [ A^T B^T ]^T.
+// is the effective numerical rank of the (m+p)×n matrix [ Aᵀ Bᵀ ]ᵀ.
 //
 // jobU, jobV and jobQ are options for computing the orthogonal matrices. The behavior
 // is as follows
@@ -174,11 +174,11 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		// RQ factorization of [ S11 S12 ]: [ S11 S12 ] = [ 0 S12 ]*Z.
 		impl.Dgerq2(l, n, b, ldb, tau, work)
 
-		// Update A := A*Z^T.
+		// Update A := A*Zᵀ.
 		impl.Dormr2(blas.Right, blas.Trans, m, n, l, b, ldb, tau, a, lda, work)
 
 		if wantq {
-			// Update Q := Q*Z^T.
+			// Update Q := Q*Zᵀ.
 			impl.Dormr2(blas.Right, blas.Trans, n, n, l, b, ldb, tau, q, ldq, work)
 		}
 
@@ -197,7 +197,7 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 	//
 	// then the following does the complete QR decomposition of A11:
 	//
-	//          A11 = U*[  0  T12 ]*P1^T.
+	//          A11 = U*[  0  T12 ]*P1ᵀ.
 	//                  [  0   0  ]
 	for i := range iwork[:n-l] {
 		iwork[i] = 0
@@ -211,7 +211,7 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		}
 	}
 
-	// Update A12 := U^T*A12, where A12 = A[0:m, n-l:n].
+	// Update A12 := Uᵀ*A12, where A12 = A[0:m, n-l:n].
 	impl.Dorm2r(blas.Left, blas.Trans, m, l, min(m, n-l), a, lda, tau, a[n-l:], lda, work)
 
 	if wantu {
@@ -245,7 +245,7 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		impl.Dgerq2(k, n-l, a, lda, tau, work)
 
 		if wantq {
-			// Update Q[0:n, 0:n-l] := Q[0:n, 0:n-l]*Z1^T.
+			// Update Q[0:n, 0:n-l] := Q[0:n, 0:n-l]*Z1ᵀ.
 			impl.Dorm2r(blas.Right, blas.Trans, n, n-l, k, a, lda, tau, q, ldq, work)
 		}
 

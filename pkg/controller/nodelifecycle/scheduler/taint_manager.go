@@ -17,9 +17,11 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"math"
 	"sync"
 	"time"
 
@@ -36,12 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
 	// TODO (k82cn): Figure out a reasonable number of workers/channels and propagate
-	// the number of workers up making it a paramater of Run() function.
+	// the number of workers up making it a parameter of Run() function.
 
 	// NodeUpdateChannelSize defines the size of channel for node update events.
 	NodeUpdateChannelSize = 10
@@ -74,7 +76,7 @@ type GetPodFunc func(name, namespace string) (*v1.Pod, error)
 type GetNodeFunc func(name string) (*v1.Node, error)
 
 // GetPodsByNodeNameFunc returns the list of pods assigned to the specified node.
-type GetPodsByNodeNameFunc func(nodeName string) ([]v1.Pod, error)
+type GetPodsByNodeNameFunc func(nodeName string) ([]*v1.Pod, error)
 
 // NoExecuteTaintManager listens to Taint/Toleration changes and is responsible for removing Pods
 // from Nodes tainted with NoExecute Taints.
@@ -107,7 +109,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		}
 		var err error
 		for i := 0; i < retries; i++ {
-			err = c.CoreV1().Pods(ns).Delete(name, &metav1.DeleteOptions{})
+			err = c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 			if err == nil {
 				break
 			}
@@ -129,7 +131,7 @@ func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
 
 // getMinTolerationTime returns minimal toleration time from the given slice, or -1 if it's infinite.
 func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
-	minTolerationTime := int64(-1)
+	minTolerationTime := int64(math.MaxInt64)
 	if len(tolerations) == 0 {
 		return 0
 	}
@@ -139,12 +141,15 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 			tolerationSeconds := *(tolerations[i].TolerationSeconds)
 			if tolerationSeconds <= 0 {
 				return 0
-			} else if tolerationSeconds < minTolerationTime || minTolerationTime == -1 {
+			} else if tolerationSeconds < minTolerationTime {
 				minTolerationTime = tolerationSeconds
 			}
 		}
 	}
 
+	if minTolerationTime == int64(math.MaxInt64) {
+		return -1
+	}
 	return time.Duration(minTolerationTime) * time.Second
 }
 
@@ -460,8 +465,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	}
 
 	now := time.Now()
-	for i := range pods {
-		pod := &pods[i]
+	for _, pod := range pods {
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 		tc.processPodOnNode(podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}

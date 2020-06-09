@@ -1,0 +1,8 @@
+apiVersion: "unit-test.test.com/v1"
+kind: Widget
+metadata:
+  name: "widget"
+  namespace: "test"
+  labels:
+    foo: bar
+key: "value"

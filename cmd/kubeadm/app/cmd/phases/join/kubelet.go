@@ -17,16 +17,19 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/version"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -93,12 +96,15 @@ func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration,
 // runKubeletStartJoinPhase executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
-func runKubeletStartJoinPhase(c workflow.RunData) error {
+func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(c)
 	if err != nil {
 		return err
 	}
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
+
+	// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap is removed from disk
+	defer os.Remove(bootstrapKubeConfigFile)
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
 	klog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
@@ -115,14 +121,31 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 		}
 	}
 
-	kubeletVersion, err := version.ParseSemantic(initCfg.ClusterConfiguration.KubernetesVersion)
-	if err != nil {
-		return err
-	}
-
 	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
 	if err != nil {
 		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
+	}
+
+	// Obtain the name of this Node.
+	nodeName, _, err := kubeletphase.GetNodeNameAndHostname(&cfg.NodeRegistration)
+	if err != nil {
+		klog.Warning(err)
+	}
+
+	// Make sure to exit before TLS bootstrap if a Node with the same name exist in the cluster
+	// and it has the "Ready" status.
+	// A new Node with the same name as an existing control-plane Node can cause undefined
+	// behavior and ultimately control-plane failure.
+	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
+	node, err := bootstrapClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "cannot get Node %q", nodeName)
+	}
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
+			return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
+				"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
+		}
 	}
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
@@ -131,7 +154,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	kubeletphase.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
-	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, kubeadmconstants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&initCfg.ClusterConfiguration, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 
@@ -144,7 +167,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	klog.V(1).Infoln("[kubelet-start] Starting the kubelet")
+	fmt.Println("[kubelet-start] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
@@ -175,7 +198,7 @@ func waitForTLSBootstrappedClient() error {
 	fmt.Println("[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...")
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
+	return wait.PollImmediate(kubeadmconstants.TLSBootstrapRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
 		// Check that we can create a client set out of the kubelet kubeconfig. This ensures not
 		// only that the kubeconfig file exists, but that other files required by it also exist (like
 		// client certificate and key)

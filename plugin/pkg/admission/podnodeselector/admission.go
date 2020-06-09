@@ -17,11 +17,12 @@ limitations under the License.
 package podnodeselector
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -96,7 +97,7 @@ func readConfig(config io.Reader) *pluginConfig {
 }
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -119,11 +120,11 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 	// second selector wins
 	podNodeSelectorLabels := labels.Merge(namespaceNodeSelector, pod.Spec.NodeSelector)
 	pod.Spec.NodeSelector = map[string]string(podNodeSelectorLabels)
-	return p.Validate(a, o)
+	return p.Validate(ctx, a, o)
 }
 
 // Validate ensures that the pod node selector is allowed
-func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -222,7 +223,7 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 func (p *Plugin) defaultGetNamespace(name string) (*corev1.Namespace, error) {
-	namespace, err := p.client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+	namespace, err := p.client.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("namespace %s does not exist", name)
 	}
@@ -231,13 +232,12 @@ func (p *Plugin) defaultGetNamespace(name string) (*corev1.Namespace, error) {
 
 func (p *Plugin) getNodeSelectorMap(namespace *corev1.Namespace) (labels.Set, error) {
 	selector := labels.Set{}
-	labelsMap := labels.Set{}
 	var err error
 	found := false
 	if len(namespace.ObjectMeta.Annotations) > 0 {
 		for _, annotation := range NamespaceNodeSelectors {
 			if ns, ok := namespace.ObjectMeta.Annotations[annotation]; ok {
-				labelsMap, err = labels.ConvertSelectorToLabelsMap(ns)
+				labelsMap, err := labels.ConvertSelectorToLabelsMap(ns)
 				if err != nil {
 					return labels.Set{}, err
 				}

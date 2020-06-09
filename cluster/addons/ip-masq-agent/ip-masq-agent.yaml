@@ -44,6 +44,7 @@ spec:
           - name: config
             mountPath: /etc/config
       nodeSelector:
+        kubernetes.io/os: linux
         node.kubernetes.io/masq-agent-ds-ready: "true"
       volumes:
         - name: config

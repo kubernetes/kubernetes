@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This command is used by bazel as the workspace_status_command
-# to implement build stamping with git information.
+# This script is used by bazel as the workspace_status_command to implement
+# build stamping with git information.
+# Usage: `hack/print-workspace-status.sh`.
 
 set -o errexit
 set -o nounset
@@ -30,7 +31,7 @@ kube::version::get_version_vars
 # Stamped rules will be retriggered by changes to stable-status.txt, but not by
 # changes to volatile-status.txt.
 # IMPORTANT: the camelCase vars should match the lists in hack/lib/version.sh
-# and pkg/version/def.bzl.
+# and staging/src/k8s.io/kubectl/pkg/version/def.bzl.
 cat <<EOF
 STABLE_BUILD_GIT_COMMIT ${KUBE_GIT_COMMIT-}
 STABLE_BUILD_SCM_STATUS ${KUBE_GIT_TREE_STATE-}

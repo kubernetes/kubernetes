@@ -13,7 +13,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1:go_default_library",
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

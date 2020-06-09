@@ -28,13 +28,12 @@ func TestRateLimitingQueue(t *testing.T) {
 	queue := NewRateLimitingQueue(limiter).(*rateLimitingType)
 	fakeClock := clock.NewFakeClock(time.Now())
 	delayingQueue := &delayingType{
-		Interface:         New(),
-		clock:             fakeClock,
-		heartbeat:         fakeClock.NewTicker(maxWait),
-		stopCh:            make(chan struct{}),
-		waitingForAddCh:   make(chan *waitFor, 1000),
-		metrics:           newRetryMetrics(""),
-		deprecatedMetrics: newDeprecatedRetryMetrics(""),
+		Interface:       New(),
+		clock:           fakeClock,
+		heartbeat:       fakeClock.NewTicker(maxWait),
+		stopCh:          make(chan struct{}),
+		waitingForAddCh: make(chan *waitFor, 1000),
+		metrics:         newRetryMetrics(""),
 	}
 	queue.DelayingInterface = delayingQueue
 

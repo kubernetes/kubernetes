@@ -30,33 +30,36 @@ func TestIntSet(t *testing.T) {
 	assert.False(t, i.has(3))
 	assert.False(t, i.has(4))
 
-	i.startNewGeneration()
-	i.mark(1)
-	i.mark(2)
-	i.sweep()
+	i.reset()
+	i.increment(1) // to 1
+	i.increment(2) // to 1
 
 	assert.True(t, i.has(1))
 	assert.True(t, i.has(2))
 	assert.False(t, i.has(3))
 	assert.False(t, i.has(4))
 
-	i.startNewGeneration()
-	i.mark(2)
-	i.mark(3)
-	i.sweep()
+	i.decrement(1) // to 0
+	i.increment(3) // to 1
 
-	assert.False(t, i.has(1))
-	assert.True(t, i.has(2))
-	assert.True(t, i.has(3))
-	assert.False(t, i.has(4))
+	assert.False(t, i.has(1)) // removed
+	assert.True(t, i.has(2))  // still present
+	assert.True(t, i.has(3))  // added
+	assert.False(t, i.has(4)) // not yet present
 
-	i.startNewGeneration()
-	i.mark(3)
-	i.mark(4)
-	i.sweep()
+	i.decrement(2) // to 0
+	i.increment(3) // to 2
+	i.decrement(3) // to 1
+	i.increment(4) // to 1
 
 	assert.False(t, i.has(1))
 	assert.False(t, i.has(2))
 	assert.True(t, i.has(3))
 	assert.True(t, i.has(4))
+
+	i.reset()
+	assert.False(t, i.has(1))
+	assert.False(t, i.has(2))
+	assert.False(t, i.has(3))
+	assert.False(t, i.has(4))
 }

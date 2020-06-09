@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // RecreateNodes recreates the given nodes in a managed instance group.
@@ -35,11 +35,19 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 	nodeNamesByZone := make(map[string][]string)
 	for i := range nodes {
 		node := &nodes[i]
-		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
-			zone = z
+
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+			continue
 		}
-		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomainStable]; ok {
+			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+			continue
+		}
+
+		defaultZone := framework.TestContext.CloudConfig.Zone
+		nodeNamesByZone[defaultZone] = append(nodeNamesByZone[defaultZone], node.Name)
 	}
 
 	// Find the sole managed instance group name
@@ -62,7 +70,7 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 
 		args = append(args, fmt.Sprintf("--instances=%s", strings.Join(nodeNames, ",")))
 		args = append(args, fmt.Sprintf("--zone=%s", zone))
-		e2elog.Logf("Recreating instance group %s.", instanceGroup)
+		framework.Logf("Recreating instance group %s.", instanceGroup)
 		stdout, stderr, err := framework.RunCmd("gcloud", args...)
 		if err != nil {
 			return fmt.Errorf("error recreating nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
@@ -77,9 +85,9 @@ func WaitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout 
 	for i := range nodes {
 		node := &nodes[i]
 		if err := wait.Poll(30*time.Second, timeout, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
-				e2elog.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
+				framework.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
 				return false, nil
 			}
 			return node.Status.NodeInfo.BootID != newNode.Status.NodeInfo.BootID, nil

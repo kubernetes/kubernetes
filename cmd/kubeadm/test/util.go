@@ -95,11 +95,11 @@ func SetupEmptyFiles(t *testing.T, tmpdir string, fileNames ...string) {
 	}
 }
 
-// SetupPkiDirWithCertificateAuthorithy is a utility function for kubeadm testing that creates a
-// CertificateAuthorithy cert/key pair into /pki subfolder of a given temporary directory.
+// SetupPkiDirWithCertificateAuthority is a utility function for kubeadm testing that creates a
+// CertificateAuthority cert/key pair into /pki subfolder of a given temporary directory.
 // The function returns the path of the created pki.
-func SetupPkiDirWithCertificateAuthorithy(t *testing.T, tmpdir string) string {
-	caCert, caKey := certtestutil.SetupCertificateAuthorithy(t)
+func SetupPkiDirWithCertificateAuthority(t *testing.T, tmpdir string) string {
+	caCert, caKey := certtestutil.SetupCertificateAuthority(t)
 
 	certDir := filepath.Join(tmpdir, "pki")
 	if err := pkiutil.WriteCertAndKey(certDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {

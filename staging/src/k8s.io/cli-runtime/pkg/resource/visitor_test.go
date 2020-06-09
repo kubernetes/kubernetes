@@ -18,9 +18,11 @@ package resource
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 
@@ -174,6 +176,21 @@ func TestFlattenListVisitor(t *testing.T) {
 
 	err := b.Do().Visit(test.Handle)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if len(test.Infos) != 6 {
+		t.Fatal(spew.Sdump(test.Infos))
+	}
+}
+
+func TestFlattenListVisitorWithVisitorError(t *testing.T) {
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/deeply-nested.yaml"}}).
+		Flatten()
+
+	test := &testVisitor{InjectErr: errors.New("visitor error")}
+	err := b.Do().Visit(test.Handle)
+	if err == nil || !strings.Contains(err.Error(), "visitor error") {
 		t.Fatal(err)
 	}
 	if len(test.Infos) != 6 {

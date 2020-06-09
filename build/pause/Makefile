@@ -14,13 +14,11 @@
 
 .PHONY: all push container clean orphan all-push push-manifest
 
-include ../../hack/make-rules/Makefile.manifest
-
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
 
-TAG = 3.1
+TAG = 3.3
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
@@ -29,7 +27,7 @@ ARCH ?= amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
+KUBE_CROSS_IMAGE ?= us.gcr.io/k8s-artifacts-prod/build-image/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause
@@ -60,8 +58,10 @@ all: all-container
 
 all-push: all-push-images push-manifest
 
-push-manifest: manifest-tool
-	manifest-tool push from-args --platforms $(call join_platforms,$(ALL_ARCH)) --template $(IMAGE)-ARCH:$(TAG) --target $(IMAGE):$(TAG)
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
+	set -x; for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
+	docker manifest push --purge ${IMAGE}:${TAG}
 
 sub-container-%:
 	$(MAKE) ARCH=$* container
@@ -86,7 +86,7 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 
 container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
-	docker build --pull -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --load --pull --platform linux/$(ARCH) -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
 	touch $@
 
 push: .push-$(ARCH)

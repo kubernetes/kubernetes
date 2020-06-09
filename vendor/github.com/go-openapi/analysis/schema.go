@@ -40,10 +40,7 @@ func Schema(opts SchemaOpts) (*AnalyzedSchema, error) {
 		return nil, err
 	}
 
-	if err := a.inferTuple(); err != nil {
-		// NOTE(fredbi): currently, inferTuple() never returns an error
-		return nil, err
-	}
+	a.inferTuple()
 
 	if err := a.inferFromRef(); err != nil {
 		return nil, err
@@ -112,21 +109,19 @@ func (a *AnalyzedSchema) inferFromRef() error {
 		if err != nil {
 			return err
 		}
-		if sch != nil {
-			// NOTE(fredbi): currently the only cause for errors in
+		rsch, err := Schema(SchemaOpts{
+			Schema:   sch,
+			Root:     a.root,
+			BasePath: a.basePath,
+		})
+		if err != nil {
+			// NOTE(fredbi): currently the only cause for errors is
 			// unresolved ref. Since spec.ExpandSchema() expands the
 			// schema recursively, there is no chance to get there,
 			// until we add more causes for error in this schema analysis.
-			rsch, err := Schema(SchemaOpts{
-				Schema:   sch,
-				Root:     a.root,
-				BasePath: a.basePath,
-			})
-			if err != nil {
-				return err
-			}
-			a.inherits(rsch)
+			return err
 		}
+		a.inherits(rsch)
 	}
 	return nil
 }
@@ -198,11 +193,10 @@ func (a *AnalyzedSchema) inferArray() error {
 	return nil
 }
 
-func (a *AnalyzedSchema) inferTuple() error {
+func (a *AnalyzedSchema) inferTuple() {
 	tuple := a.hasItems && a.schema.Items.Schemas != nil
 	a.IsTuple = tuple && !a.hasAdditionalItems
 	a.IsTupleWithExtra = tuple && a.hasAdditionalItems
-	return nil
 }
 
 func (a *AnalyzedSchema) inferBaseType() {

@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -21,15 +23,17 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/utils/net"
 )
 
 // HostportSyncer takes a list of PodPortMappings and implements hostport all at once
@@ -118,12 +122,18 @@ func getPodFullName(pod *PodPortMapping) string {
 
 // gatherAllHostports returns all hostports that should be presented on node,
 // given the list of pods running on that node and ignoring host network
-// pods (which don't need hostport <-> container port mapping).
-func gatherAllHostports(activePodPortMappings []*PodPortMapping) (map[*PortMapping]targetPod, error) {
+// pods (which don't need hostport <-> container port mapping)
+// It only returns the hosports that match the IP family passed as parameter
+func gatherAllHostports(activePodPortMappings []*PodPortMapping, isIPv6 bool) (map[*PortMapping]targetPod, error) {
 	podHostportMap := make(map[*PortMapping]targetPod)
 	for _, pm := range activePodPortMappings {
-		if pm.IP.To4() == nil {
+		// IP.To16() returns nil if IP is not a valid IPv4 or IPv6 address
+		if pm.IP.To16() == nil {
 			return nil, fmt.Errorf("Invalid or missing pod %s IP", getPodFullName(pm))
+		}
+		// return only entries from the same IP family
+		if utilnet.IsIPv6(pm.IP) != isIPv6 {
+			continue
 		}
 		// should not handle hostports for hostnetwork pods
 		if pm.HostNetwork {
@@ -191,7 +201,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 		klog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 	}()
 
-	hostportPodMap, err := gatherAllHostports(activePodPortMappings)
+	hostportPodMap, err := gatherAllHostports(activePodPortMappings, h.iptables.IsIPv6())
 	if err != nil {
 		return err
 	}
@@ -227,6 +237,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	for port, target := range hostportPodMap {
 		protocol := strings.ToLower(string(port.Protocol))
 		hostportChain := hostportChainName(port, target.podFullName)
+
 		if chain, ok := existingNATChains[hostportChain]; ok {
 			writeBytesLine(natChains, chain)
 		} else {
@@ -256,11 +267,12 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 
 		// Create hostport chain to DNAT traffic to final destination
 		// IPTables will maintained the stats for this chain
+		hostPortBinding := net.JoinHostPort(target.podIP, strconv.Itoa(int(port.ContainerPort)))
 		args = []string{
 			"-A", string(hostportChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, port.HostPort),
 			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", target.podIP, port.ContainerPort),
+			"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding),
 		}
 		writeLine(natRules, args...)
 	}
@@ -286,7 +298,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	klog.V(3).Infof("Restoring iptables rules: %s", natLines)
 	err = h.iptables.RestoreAll(natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
+		return fmt.Errorf("failed to execute iptables-restore: %v", err)
 	}
 
 	h.cleanupHostportMap(hostportPodMap)

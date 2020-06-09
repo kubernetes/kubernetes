@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -27,7 +29,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
@@ -182,14 +184,14 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 		if cleanupInfo != nil {
 			// we don't perform the clean up just yet at that could destroy information
 			// needed for the container to start (e.g. Windows credentials stored in
-			// registry keys); instead, we'll clean up after the container successfully
-			// starts or gets removed
+			// registry keys); instead, we'll clean up when the container gets removed
 			ds.containerCleanupInfos[containerID] = cleanupInfo
 		}
 		return &runtimeapi.CreateContainerResponse{ContainerId: containerID}, nil
 	}
 
-	// the creation failed, let's clean up right away
+	// the creation failed, let's clean up right away - we ignore any errors though,
+	// this is best effort
 	ds.performPlatformSpecificContainerCleanupAndLogErrors(containerName, cleanupInfo)
 
 	return nil, createErr
@@ -278,8 +280,6 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
 	}
 
-	ds.performPlatformSpecificContainerForContainer(r.ContainerId)
-
 	return &runtimeapi.StartContainerResponse{}, nil
 }
 
@@ -294,8 +294,6 @@ func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopCont
 
 // RemoveContainer removes the container.
 func (ds *dockerService) RemoveContainer(_ context.Context, r *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
-	ds.performPlatformSpecificContainerForContainer(r.ContainerId)
-
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
 	// we can't prevent that now, so we also clean up the symlink here.
@@ -303,10 +301,15 @@ func (ds *dockerService) RemoveContainer(_ context.Context, r *runtimeapi.Remove
 	if err != nil {
 		return nil, err
 	}
+	errors := ds.performPlatformSpecificContainerForContainer(r.ContainerId)
+	if len(errors) != 0 {
+		return nil, fmt.Errorf("failed to run platform-specific clean ups for container %q: %v", r.ContainerId, errors)
+	}
 	err = ds.client.RemoveContainer(r.ContainerId, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to remove container %q: %v", r.ContainerId, err)
 	}
+
 	return &runtimeapi.RemoveContainerResponse{}, nil
 }
 
@@ -346,7 +349,10 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	// Convert the image id to a pullable id.
 	ir, err := ds.client.InspectImageByID(r.Image)
 	if err != nil {
-		return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
+		if !libdocker.IsImageNotFoundError(err) {
+			return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
+		}
+		klog.Warningf("ignore error image %q not found while inspecting docker container %q: %v", r.Image, containerID, err)
 	}
 	imageID := toPullableImageID(r.Image, ir)
 
@@ -411,7 +417,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 
 	labels, annotations := extractLabels(r.Config.Labels)
 	imageName := r.Config.Image
-	if len(ir.RepoTags) > 0 {
+	if ir != nil && len(ir.RepoTags) > 0 {
 		imageName = ir.RepoTags[0]
 	}
 	status := &runtimeapi.ContainerStatus{
@@ -454,19 +460,27 @@ func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimea
 	return &runtimeapi.UpdateContainerResourcesResponse{}, nil
 }
 
-func (ds *dockerService) performPlatformSpecificContainerForContainer(containerID string) {
+func (ds *dockerService) performPlatformSpecificContainerForContainer(containerID string) (errors []error) {
 	if cleanupInfo, present := ds.containerCleanupInfos[containerID]; present {
-		ds.performPlatformSpecificContainerCleanupAndLogErrors(containerID, cleanupInfo)
-		delete(ds.containerCleanupInfos, containerID)
+		errors = ds.performPlatformSpecificContainerCleanupAndLogErrors(containerID, cleanupInfo)
+
+		if len(errors) == 0 {
+			delete(ds.containerCleanupInfos, containerID)
+		}
 	}
+
+	return
 }
 
-func (ds *dockerService) performPlatformSpecificContainerCleanupAndLogErrors(containerNameOrID string, cleanupInfo *containerCleanupInfo) {
+func (ds *dockerService) performPlatformSpecificContainerCleanupAndLogErrors(containerNameOrID string, cleanupInfo *containerCleanupInfo) []error {
 	if cleanupInfo == nil {
-		return
+		return nil
 	}
 
-	for _, err := range ds.performPlatformSpecificContainerCleanup(cleanupInfo) {
+	errors := ds.performPlatformSpecificContainerCleanup(cleanupInfo)
+	for _, err := range errors {
 		klog.Warningf("error when cleaning up after container %q: %v", containerNameOrID, err)
 	}
+
+	return errors
 }

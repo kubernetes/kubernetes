@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 			ginkgo.By("delete the pod with lifecycle hook")
-			podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), framework.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(podWithHook.Name, *metav1.NewDeleteOptions(15), framework.DefaultPodDeletionTimeout)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
 				gomega.Eventually(func() error {
@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		/*
 			Release : v1.9
 			Testname: Pod Lifecycle, post start exec hook
-			Description: When a post start handler is specified in the container lifecycle using a ‘Exec’ action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod using ExecAction to validate that the post start is executed.
+			Description: When a post start handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod using ExecAction to validate that the post start is executed.
 		*/
 		framework.ConformanceIt("should execute poststart exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		/*
 			Release : v1.9
 			Testname: Pod Lifecycle, prestop exec hook
-			Description: When a pre-stop handler is specified in the container lifecycle using a ‘Exec’ action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod using ExecAction to validate that the pre-stop is executed.
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod using ExecAction to validate that the pre-stop is executed.
 		*/
 		framework.ConformanceIt("should execute prestop exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		/*
 			Release : v1.9
 			Testname: Pod Lifecycle, prestop http hook
-			Description: When a pre-stop handler is specified in the container lifecycle using a ‘HttpGet’ action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
 		framework.ConformanceIt("should execute prestop http hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{

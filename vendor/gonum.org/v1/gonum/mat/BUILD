@@ -28,6 +28,8 @@ go_library(
         "product.go",
         "qr.go",
         "shadow.go",
+        "shadow_common.go",
+        "shadow_complex.go",
         "solve.go",
         "svd.go",
         "symband.go",

@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -106,7 +107,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	// We want to trigger token rotation here by deleting service account
 	// the dynamic client was using.
-	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(saName, nil); err != nil {
+	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), saName, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("delete service account %s failed: %v", saName, err)
 	}
 	time.Sleep(time.Second * 10)
@@ -117,12 +118,12 @@ func TestDynamicClientBuilder(t *testing.T) {
 }
 
 func testClientBuilder(dymClient clientset.Interface, ns, saName string) error {
-	_, err := dymClient.CoreV1().Namespaces().Get(ns, metav1.GetOptions{})
+	_, err := dymClient.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	_, err = dymClient.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
+	_, err = dymClient.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -39,7 +39,7 @@ const tlsPrefix = "SERVE_TLS_PORT_"
 var CmdPorter = &cobra.Command{
 	Use:   "porter",
 	Short: "Serves requested data on ports specified in ENV variables",
-	Long: `Serves requested data on ports specified in ENV variables. For example, if the the environment variable "SERVE_PORT_9001" is set, then the subcommand will start serving on the port 9001.
+	Long: `Serves requested data on ports specified in ENV variables. For example, if the environment variable "SERVE_PORT_9001" is set, then the subcommand will start serving on the port 9001.
 
 Additionally, if the environment variable "SERVE_TLS_PORT_9002" is set, then the subcommand will start a TLS server on that port.
 

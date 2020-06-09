@@ -19,6 +19,7 @@ reviewers:
 - yagonobre
 - ereslibre
 - SataQiu
+- yastij
 
 labels:
 - area/kubeadm

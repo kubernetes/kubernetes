@@ -34,7 +34,9 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
 )

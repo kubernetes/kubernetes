@@ -16,13 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"path/filepath"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 func detectMountpoint(m mount.Interface, path string) string {

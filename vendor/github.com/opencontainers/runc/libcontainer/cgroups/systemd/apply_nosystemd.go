@@ -1,4 +1,4 @@
-// +build !linux static_build
+// +build !linux
 
 package systemd
 
@@ -42,6 +42,10 @@ func (m *Manager) GetPaths() map[string]string {
 	return nil
 }
 
+func (m *Manager) GetUnifiedPath() (string, error) {
+	return "", fmt.Errorf("Systemd not supported")
+}
+
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
 	return nil, fmt.Errorf("Systemd not supported")
 }
@@ -56,4 +60,8 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 
 func Freeze(c *configs.Cgroup, state configs.FreezerState) error {
 	return fmt.Errorf("Systemd not supported")
+}
+
+func (m *Manager) GetCgroups() (*configs.Cgroup, error) {
+	return nil, fmt.Errorf("Systemd not supported")
 }

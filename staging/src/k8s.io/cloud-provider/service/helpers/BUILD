@@ -8,6 +8,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
@@ -33,6 +37,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )

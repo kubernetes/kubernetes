@@ -147,16 +147,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.Subject)(nil), (*rbac.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_Subject_To_rbac_Subject(a.(*v1alpha1.Subject), b.(*rbac.Subject), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*rbac.Subject)(nil), (*v1alpha1.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_Subject_To_v1alpha1_Subject(a.(*rbac.Subject), b.(*v1alpha1.Subject), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*rbac.Subject)(nil), (*v1alpha1.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_rbac_Subject_To_v1alpha1_Subject(a.(*rbac.Subject), b.(*v1alpha1.Subject), scope)
 	}); err != nil {

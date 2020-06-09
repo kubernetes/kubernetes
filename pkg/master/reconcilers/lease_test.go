@@ -22,6 +22,7 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 */
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"testing"
@@ -420,18 +421,20 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 		if test.endpoints != nil {
 			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
+				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 					t.Errorf("case %q: unexpected error: %v", test.testName, err)
 					continue
 				}
 			}
 		}
-		r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+
+		epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+		r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 		err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
-		actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+		actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -520,18 +523,19 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset()
 			if test.endpoints != nil {
 				for _, ep := range test.endpoints.Items {
-					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
+					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 						t.Errorf("case %q: unexpected error: %v", test.testName, err)
 						continue
 					}
 				}
 			}
-			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
@@ -614,6 +618,19 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				}},
 			},
 		},
+		{
+			testName:      "endpoint with no subset",
+			serviceName:   "foo",
+			ip:            "5.6.7.8",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpoints: &corev1.EndpointsList{
+				Items: []corev1.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets:    nil,
+				}},
+			},
+		},
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
@@ -621,17 +638,18 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			fakeLeases.SetKeys(test.endpointKeys)
 			clientset := fake.NewSimpleClientset()
 			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
+				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
 					t.Errorf("case %q: unexpected error: %v", test.testName, err)
 					continue
 				}
 			}
-			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.RemoveEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(test.serviceName, metav1.GetOptions{})
+			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

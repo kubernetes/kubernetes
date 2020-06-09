@@ -13,13 +13,13 @@ import (
 // Dlarfb applies a block reflector to a matrix.
 //
 // In the call to Dlarfb, the mxn c is multiplied by the implicitly defined matrix h as follows:
-//  c = h * c if side == Left and trans == NoTrans
-//  c = c * h if side == Right and trans == NoTrans
-//  c = h^T * c if side == Left and trans == Trans
-//  c = c * h^T if side == Right and trans == Trans
+//  c = h * c   if side == Left and trans == NoTrans
+//  c = c * h   if side == Right and trans == NoTrans
+//  c = hᵀ * c  if side == Left and trans == Trans
+//  c = c * hᵀ  if side == Right and trans == Trans
 // h is a product of elementary reflectors. direct sets the direction of multiplication
-//  h = h_1 * h_2 * ... * h_k if direct == Forward
-//  h = h_k * h_k-1 * ... * h_1 if direct == Backward
+//  h = h_1 * h_2 * ... * h_k    if direct == Forward
+//  h = h_k * h_k-1 * ... * h_1  if direct == Backward
 // The combination of direct and store defines the orientation of the elementary
 // reflectors. In all cases the ones on the diagonal are implicitly represented.
 //
@@ -118,13 +118,13 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 	// elements are copied into the columns of the working array. The
 	// loops should go in the other direction so the data is written
 	// into the rows of work so the copy is not strided. A bigger change
-	// would be to replace work with work^T, but benchmarks would be
+	// would be to replace work with workᵀ, but benchmarks would be
 	// needed to see if the change is merited.
 	if store == lapack.ColumnWise {
 		if direct == lapack.Forward {
 			// V1 is the first k rows of C. V2 is the remaining rows.
 			if side == blas.Left {
-				// W = C^T V = C1^T V1 + C2^T V2 (stored in work).
+				// W = Cᵀ V = C1ᵀ V1 + C2ᵀ V2 (stored in work).
 
 				// W = C1.
 				for j := 0; j < k; j++ {
@@ -136,27 +136,27 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 					v, ldv,
 					work, ldwork)
 				if m > k {
-					// W = W + C2^T V2.
+					// W = W + C2ᵀ V2.
 					bi.Dgemm(blas.Trans, blas.NoTrans, n, k, m-k,
 						1, c[k*ldc:], ldc, v[k*ldv:], ldv,
 						1, work, ldwork)
 				}
-				// W = W * T^T or W * T.
+				// W = W * Tᵀ or W * T.
 				bi.Dtrmm(blas.Right, blas.Upper, transt, blas.NonUnit, n, k,
 					1, t, ldt,
 					work, ldwork)
-				// C -= V * W^T.
+				// C -= V * Wᵀ.
 				if m > k {
-					// C2 -= V2 * W^T.
+					// C2 -= V2 * Wᵀ.
 					bi.Dgemm(blas.NoTrans, blas.Trans, m-k, n, k,
 						-1, v[k*ldv:], ldv, work, ldwork,
 						1, c[k*ldc:], ldc)
 				}
-				// W *= V1^T.
+				// W *= V1ᵀ.
 				bi.Dtrmm(blas.Right, blas.Lower, blas.Trans, blas.Unit, n, k,
 					1, v, ldv,
 					work, ldwork)
-				// C1 -= W^T.
+				// C1 -= Wᵀ.
 				// TODO(btracey): This should use blas.Axpy.
 				for i := 0; i < n; i++ {
 					for j := 0; j < k; j++ {
@@ -165,7 +165,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 				}
 				return
 			}
-			// Form C = C * H or C * H^T, where C = (C1 C2).
+			// Form C = C * H or C * Hᵀ, where C = (C1 C2).
 
 			// W = C1.
 			for i := 0; i < k; i++ {
@@ -180,7 +180,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 					1, c[k:], ldc, v[k*ldv:], ldv,
 					1, work, ldwork)
 			}
-			// W *= T or T^T.
+			// W *= T or Tᵀ.
 			bi.Dtrmm(blas.Right, blas.Upper, trans, blas.NonUnit, m, k,
 				1, t, ldt,
 				work, ldwork)
@@ -189,7 +189,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 					-1, work, ldwork, v[k*ldv:], ldv,
 					1, c[k:], ldc)
 			}
-			// C -= W * V^T.
+			// C -= W * Vᵀ.
 			bi.Dtrmm(blas.Right, blas.Lower, blas.Trans, blas.Unit, m, k,
 				1, v, ldv,
 				work, ldwork)
@@ -207,9 +207,9 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 		// Where V2 is unit upper triangular.
 		if side == blas.Left {
 			// Form H * C or
-			// W = C^T V.
+			// W = Cᵀ V.
 
-			// W = C2^T.
+			// W = C2ᵀ.
 			for j := 0; j < k; j++ {
 				bi.Dcopy(n, c[(m-k+j)*ldc:], 1, work[j:], ldwork)
 			}
@@ -218,26 +218,26 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 				1, v[(m-k)*ldv:], ldv,
 				work, ldwork)
 			if m > k {
-				// W += C1^T * V1.
+				// W += C1ᵀ * V1.
 				bi.Dgemm(blas.Trans, blas.NoTrans, n, k, m-k,
 					1, c, ldc, v, ldv,
 					1, work, ldwork)
 			}
-			// W *= T or T^T.
+			// W *= T or Tᵀ.
 			bi.Dtrmm(blas.Right, blas.Lower, transt, blas.NonUnit, n, k,
 				1, t, ldt,
 				work, ldwork)
-			// C -= V * W^T.
+			// C -= V * Wᵀ.
 			if m > k {
 				bi.Dgemm(blas.NoTrans, blas.Trans, m-k, n, k,
 					-1, v, ldv, work, ldwork,
 					1, c, ldc)
 			}
-			// W *= V2^T.
+			// W *= V2ᵀ.
 			bi.Dtrmm(blas.Right, blas.Upper, blas.Trans, blas.Unit, n, k,
 				1, v[(m-k)*ldv:], ldv,
 				work, ldwork)
-			// C2 -= W^T.
+			// C2 -= Wᵀ.
 			// TODO(btracey): This should use blas.Axpy.
 			for i := 0; i < n; i++ {
 				for j := 0; j < k; j++ {
@@ -246,7 +246,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 			}
 			return
 		}
-		// Form C * H or C * H^T where C = (C1 C2).
+		// Form C * H or C * Hᵀ where C = (C1 C2).
 		// W = C * V.
 
 		// W = C2.
@@ -263,18 +263,18 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 				1, c, ldc, v, ldv,
 				1, work, ldwork)
 		}
-		// W *= T or T^T.
+		// W *= T or Tᵀ.
 		bi.Dtrmm(blas.Right, blas.Lower, trans, blas.NonUnit, m, k,
 			1, t, ldt,
 			work, ldwork)
-		// C -= W * V^T.
+		// C -= W * Vᵀ.
 		if n > k {
-			// C1 -= W * V1^T.
+			// C1 -= W * V1ᵀ.
 			bi.Dgemm(blas.NoTrans, blas.Trans, m, n-k, k,
 				-1, work, ldwork, v, ldv,
 				1, c, ldc)
 		}
-		// W *= V2^T.
+		// W *= V2ᵀ.
 		bi.Dtrmm(blas.Right, blas.Upper, blas.Trans, blas.Unit, m, k,
 			1, v[(n-k)*ldv:], ldv,
 			work, ldwork)
@@ -291,14 +291,14 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 	if direct == lapack.Forward {
 		// V = (V1 V2) where v1 is unit upper triangular.
 		if side == blas.Left {
-			// Form H * C or H^T * C where C = (C1; C2).
-			// W = C^T * V^T.
+			// Form H * C or Hᵀ * C where C = (C1; C2).
+			// W = Cᵀ * Vᵀ.
 
-			// W = C1^T.
+			// W = C1ᵀ.
 			for j := 0; j < k; j++ {
 				bi.Dcopy(n, c[j*ldc:], 1, work[j:], ldwork)
 			}
-			// W *= V1^T.
+			// W *= V1ᵀ.
 			bi.Dtrmm(blas.Right, blas.Upper, blas.Trans, blas.Unit, n, k,
 				1, v, ldv,
 				work, ldwork)
@@ -307,11 +307,11 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 					1, c[k*ldc:], ldc, v[k:], ldv,
 					1, work, ldwork)
 			}
-			// W *= T or T^T.
+			// W *= T or Tᵀ.
 			bi.Dtrmm(blas.Right, blas.Upper, transt, blas.NonUnit, n, k,
 				1, t, ldt,
 				work, ldwork)
-			// C -= V^T * W^T.
+			// C -= Vᵀ * Wᵀ.
 			if m > k {
 				bi.Dgemm(blas.Trans, blas.Trans, m-k, n, k,
 					-1, v[k:], ldv, work, ldwork,
@@ -321,7 +321,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 			bi.Dtrmm(blas.Right, blas.Upper, blas.NoTrans, blas.Unit, n, k,
 				1, v, ldv,
 				work, ldwork)
-			// C1 -= W^T.
+			// C1 -= Wᵀ.
 			// TODO(btracey): This should use blas.Axpy.
 			for i := 0; i < n; i++ {
 				for j := 0; j < k; j++ {
@@ -330,14 +330,14 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 			}
 			return
 		}
-		// Form C * H or C * H^T where C = (C1 C2).
-		// W = C * V^T.
+		// Form C * H or C * Hᵀ where C = (C1 C2).
+		// W = C * Vᵀ.
 
 		// W = C1.
 		for j := 0; j < k; j++ {
 			bi.Dcopy(m, c[j:], ldc, work[j:], ldwork)
 		}
-		// W *= V1^T.
+		// W *= V1ᵀ.
 		bi.Dtrmm(blas.Right, blas.Upper, blas.Trans, blas.Unit, m, k,
 			1, v, ldv,
 			work, ldwork)
@@ -346,7 +346,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 				1, c[k:], ldc, v[k:], ldv,
 				1, work, ldwork)
 		}
-		// W *= T or T^T.
+		// W *= T or Tᵀ.
 		bi.Dtrmm(blas.Right, blas.Upper, trans, blas.NonUnit, m, k,
 			1, t, ldt,
 			work, ldwork)
@@ -371,14 +371,14 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 	}
 	// V = (V1 V2) where V2 is the last k columns and is lower unit triangular.
 	if side == blas.Left {
-		// Form H * C or H^T C where C = (C1 ; C2).
-		// W = C^T * V^T.
+		// Form H * C or Hᵀ C where C = (C1 ; C2).
+		// W = Cᵀ * Vᵀ.
 
-		// W = C2^T.
+		// W = C2ᵀ.
 		for j := 0; j < k; j++ {
 			bi.Dcopy(n, c[(m-k+j)*ldc:], 1, work[j:], ldwork)
 		}
-		// W *= V2^T.
+		// W *= V2ᵀ.
 		bi.Dtrmm(blas.Right, blas.Lower, blas.Trans, blas.Unit, n, k,
 			1, v[m-k:], ldv,
 			work, ldwork)
@@ -387,11 +387,11 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 				1, c, ldc, v, ldv,
 				1, work, ldwork)
 		}
-		// W *= T or T^T.
+		// W *= T or Tᵀ.
 		bi.Dtrmm(blas.Right, blas.Lower, transt, blas.NonUnit, n, k,
 			1, t, ldt,
 			work, ldwork)
-		// C -= V^T * W^T.
+		// C -= Vᵀ * Wᵀ.
 		if m > k {
 			bi.Dgemm(blas.Trans, blas.Trans, m-k, n, k,
 				-1, v, ldv, work, ldwork,
@@ -401,7 +401,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 		bi.Dtrmm(blas.Right, blas.Lower, blas.NoTrans, blas.Unit, n, k,
 			1, v[m-k:], ldv,
 			work, ldwork)
-		// C2 -= W^T.
+		// C2 -= Wᵀ.
 		// TODO(btracey): This should use blas.Axpy.
 		for i := 0; i < n; i++ {
 			for j := 0; j < k; j++ {
@@ -410,13 +410,13 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 		}
 		return
 	}
-	// Form C * H or C * H^T where C = (C1 C2).
-	// W = C * V^T.
+	// Form C * H or C * Hᵀ where C = (C1 C2).
+	// W = C * Vᵀ.
 	// W = C2.
 	for j := 0; j < k; j++ {
 		bi.Dcopy(m, c[n-k+j:], ldc, work[j:], ldwork)
 	}
-	// W *= V2^T.
+	// W *= V2ᵀ.
 	bi.Dtrmm(blas.Right, blas.Lower, blas.Trans, blas.Unit, m, k,
 		1, v[n-k:], ldv,
 		work, ldwork)
@@ -425,7 +425,7 @@ func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack
 			1, c, ldc, v, ldv,
 			1, work, ldwork)
 	}
-	// W *= T or T^T.
+	// W *= T or Tᵀ.
 	bi.Dtrmm(blas.Right, blas.Lower, trans, blas.NonUnit, m, k,
 		1, t, ldt,
 		work, ldwork)

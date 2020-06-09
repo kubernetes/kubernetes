@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks the description format of help message of kubectl command
+# is valid or not. And this checking is done for all kubectl sub-commands.
+# Usage: `hack/verify-cli-conventions.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

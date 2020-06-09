@@ -17,16 +17,35 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
+
+// createStatefulSetService creates a Headless Service with Name name and Selector set to match labels.
+func createStatefulSetService(name string, labels map[string]string) *v1.Service {
+	headlessService := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: labels,
+		},
+	}
+	headlessService.Spec.Ports = []v1.ServicePort{
+		{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
+	}
+	headlessService.Spec.ClusterIP = "None"
+	return headlessService
+}
 
 // StatefulSetUpgradeTest implements an upgrade test harness for StatefulSet upgrade testing.
 type StatefulSetUpgradeTest struct {
@@ -60,22 +79,22 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	statefulPodMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 	podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 	ns := f.Namespace.Name
-	t.set = e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
-	t.service = e2esset.CreateStatefulSetService(ssName, labels)
+	t.set = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+	t.service = createStatefulSetService(ssName, labels)
 	*(t.set.Spec.Replicas) = 3
-	e2esset.PauseNewPods(t.set)
+	e2estatefulset.PauseNewPods(t.set)
 
 	ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
-	_, err := f.ClientSet.CoreV1().Services(ns).Create(t.service)
+	_, err := f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), t.service, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
-	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(t.set)
+	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(context.TODO(), t.set, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Saturating stateful set " + t.set.Name)
-	e2esset.Saturate(f.ClientSet, t.set)
+	e2estatefulset.Saturate(f.ClientSet, t.set)
 	t.verify(f)
 	t.restart(f)
 	t.verify(f)
@@ -89,26 +108,26 @@ func (t *StatefulSetUpgradeTest) Test(f *framework.Framework, done <-chan struct
 
 // Teardown deletes all StatefulSets
 func (t *StatefulSetUpgradeTest) Teardown(f *framework.Framework) {
-	e2esset.DeleteAllStatefulSets(f.ClientSet, t.set.Name)
+	e2estatefulset.DeleteAllStatefulSets(f.ClientSet, t.set.Name)
 }
 
 func (t *StatefulSetUpgradeTest) verify(f *framework.Framework) {
 	ginkgo.By("Verifying statefulset mounted data directory is usable")
-	framework.ExpectNoError(e2esset.CheckMount(f.ClientSet, t.set, "/data"))
+	framework.ExpectNoError(e2estatefulset.CheckMount(f.ClientSet, t.set, "/data"))
 
 	ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
-	framework.ExpectNoError(e2esset.CheckHostname(f.ClientSet, t.set))
+	framework.ExpectNoError(e2estatefulset.CheckHostname(f.ClientSet, t.set))
 
 	ginkgo.By("Verifying statefulset set proper service name")
-	framework.ExpectNoError(e2esset.CheckServiceName(t.set, t.set.Spec.ServiceName))
+	framework.ExpectNoError(e2estatefulset.CheckServiceName(t.set, t.set.Spec.ServiceName))
 
 	cmd := "echo $(hostname) > /data/hostname; sync;"
 	ginkgo.By("Running " + cmd + " in all stateful pods")
-	framework.ExpectNoError(e2esset.ExecInStatefulPods(f.ClientSet, t.set, cmd))
+	framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(f.ClientSet, t.set, cmd))
 }
 
 func (t *StatefulSetUpgradeTest) restart(f *framework.Framework) {
 	ginkgo.By("Restarting statefulset " + t.set.Name)
-	e2esset.Restart(f.ClientSet, t.set)
-	e2esset.WaitForRunningAndReady(f.ClientSet, *t.set.Spec.Replicas, t.set)
+	e2estatefulset.Restart(f.ClientSet, t.set)
+	e2estatefulset.WaitForRunningAndReady(f.ClientSet, *t.set.Spec.Replicas, t.set)
 }

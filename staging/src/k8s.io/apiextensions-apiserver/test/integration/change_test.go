@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -73,9 +74,12 @@ func TestChangeCRD(t *testing.T) {
 			default:
 			}
 
-			noxuDefinitionToUpdate, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
+			time.Sleep(10 * time.Millisecond)
+
+			noxuDefinitionToUpdate, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
+				continue
 			}
 			if len(noxuDefinitionToUpdate.Spec.Versions) == 1 {
 				v2 := noxuDefinitionToUpdate.Spec.Versions[0]
@@ -86,10 +90,10 @@ func TestChangeCRD(t *testing.T) {
 			} else {
 				noxuDefinitionToUpdate.Spec.Versions = noxuDefinitionToUpdate.Spec.Versions[0:1]
 			}
-			if _, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(noxuDefinitionToUpdate); err != nil && !apierrors.IsConflict(err) {
-				t.Fatal(err)
+			if _, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), noxuDefinitionToUpdate, metav1.UpdateOptions{}); err != nil && !apierrors.IsConflict(err) {
+				t.Error(err)
+				continue
 			}
-			time.Sleep(10 * time.Millisecond)
 		}
 	}()
 
@@ -99,19 +103,21 @@ func TestChangeCRD(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, fmt.Sprintf("foo-%d", i))
-			if _, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{}); err != nil {
-				t.Fatal(err)
+			if _, err := noxuNamespacedResourceClient.Create(context.TODO(), noxuInstanceToCreate, metav1.CreateOptions{}); err != nil {
+				t.Error(err)
+				return
 			}
 			for {
+				time.Sleep(10 * time.Millisecond)
 				select {
 				case <-stopChan:
 					return
 				default:
-					if _, err := noxuNamespacedResourceClient.Get(noxuInstanceToCreate.GetName(), metav1.GetOptions{}); err != nil {
-						t.Fatal(err)
+					if _, err := noxuNamespacedResourceClient.Get(context.TODO(), noxuInstanceToCreate.GetName(), metav1.GetOptions{}); err != nil {
+						t.Error(err)
+						continue
 					}
 				}
-				time.Sleep(10 * time.Millisecond)
 			}
 		}(i)
 
@@ -119,13 +125,15 @@ func TestChangeCRD(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			for {
+				time.Sleep(10 * time.Millisecond)
 				select {
 				case <-stopChan:
 					return
 				default:
-					w, err := noxuNamespacedResourceClient.Watch(metav1.ListOptions{})
+					w, err := noxuNamespacedResourceClient.Watch(context.TODO(), metav1.ListOptions{})
 					if err != nil {
-						t.Fatalf("unexpected error establishing watch: %v", err)
+						t.Errorf("unexpected error establishing watch: %v", err)
+						continue
 					}
 					for event := range w.ResultChan() {
 						switch event.Type {
@@ -136,7 +144,6 @@ func TestChangeCRD(t *testing.T) {
 						}
 					}
 				}
-				time.Sleep(10 * time.Millisecond)
 			}
 		}(i)
 	}

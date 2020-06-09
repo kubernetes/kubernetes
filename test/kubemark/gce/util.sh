@@ -40,12 +40,10 @@ function create-kubemark-master {
     export KUBE_TEMP="${KUBE_TEMP}"
 
     export KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"
+    export KUBECONFIG_INTERNAL="${RESOURCE_DIRECTORY}/kubeconfig-internal.kubemark"
     export CLUSTER_NAME="${CLUSTER_NAME}-kubemark"
     export KUBE_CREATE_NODES=false
     export KUBE_GCE_INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX}-kubemark"
-
-    # Even if the "real cluster" is private, we shouldn't manage cloud nat.
-    export KUBE_GCE_PRIVATE_CLUSTER=false
 
     # Quite tricky cidr setup: we set KUBE_GCE_ENABLE_IP_ALIASES=true to avoid creating
     # cloud routes and RangeAllocator to assign cidrs by kube-controller-manager.
@@ -57,7 +55,6 @@ function create-kubemark-master {
     export KUBE_ENABLE_CLUSTER_DNS=false
     export KUBE_ENABLE_NODE_LOGGING=false
     export KUBE_ENABLE_METRICS_SERVER=false
-    export KUBE_ENABLE_CLUSTER_MONITORING="none"
     export KUBE_ENABLE_L7_LOADBALANCING="none"
 
     # Unset env variables set by kubetest for 'root cluster'. We need recompute them
@@ -83,6 +80,35 @@ function create-kubemark-master {
             "${KUBE_ROOT}/hack/e2e-internal/e2e-grow-cluster.sh"
         done
     fi
+
+    # The e2e-up.sh script is not sourced, so we don't have access to variables that
+    # it sets. Instead, we read data which was written to the KUBE_TEMP directory.
+    # The cluster-location is either ZONE (say us-east1-a) or REGION (say us-east1).
+    # To get REGION from location, only first two parts are matched.
+    REGION=$(grep -o "^[a-z]*-[a-z0-9]*" "${KUBE_TEMP}"/cluster-location.txt)
+    MASTER_NAME="${KUBE_GCE_INSTANCE_PREFIX}"-master
+
+    if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+      MASTER_INTERNAL_IP=$(gcloud compute addresses describe "${MASTER_NAME}-internal-ip" \
+          --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+    fi
+    MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
+        --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+
+    # If cluster uses private master IP, two kubeconfigs are created:
+    # - kubeconfig with public IP, which will be used to connect to the cluster
+    #     from outside of the cluster network
+    # - kubeconfig with private IP (called internal kubeconfig), which will be
+    #      used to create hollow nodes.
+    #
+    # Note that hollow nodes might use either of these kubeconfigs, but
+    # using internal one is better from performance and cost perspective, since
+    # traffic does not need to go through Cloud NAT.
+    if [[ -n "${MASTER_INTERNAL_IP:-}" ]]; then
+      echo "Writing internal kubeconfig to '${KUBECONFIG_INTERNAL}'"
+      ip_regexp=${MASTER_IP//./\\.} # escape ".", so that sed won't treat it as "any char"
+      sed "s/${ip_regexp}/${MASTER_INTERNAL_IP}/g" "${KUBECONFIG}" > "${KUBECONFIG_INTERNAL}"
+    fi
     )
 }
 
@@ -94,8 +120,6 @@ function delete-kubemark-master {
     export KUBE_GCE_INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX}-kubemark"
 
     export KUBE_DELETE_NETWORK=false
-    # Even if the "real cluster" is private, we shouldn't manage cloud nat.
-    export KUBE_GCE_PRIVATE_CLUSTER=false
 
     if [[ "${KUBEMARK_HA_MASTER:-}" == "true" && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
       for KUBE_GCE_ZONE in ${KUBEMARK_MASTER_ADDITIONAL_ZONES}; do
@@ -106,4 +130,8 @@ function delete-kubemark-master {
 
     "${KUBE_ROOT}/hack/e2e-internal/e2e-down.sh"
   )
+}
+
+function calculate-node-labels {
+  echo "cloud.google.com/metadata-proxy-ready=true"
 }

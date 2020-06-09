@@ -8,9 +8,9 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/sample-device-plugin",
     visibility = ["//visibility:private"],
     deps = [
-        "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
         "//pkg/kubelet/cm/devicemanager:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script verifies whether code update is needed or not against the
+# specific sub-projects. The sub-projects are listed below this script(the
+# line that starts with `CODEGEN_PKG`).
+# Usage: `hack/verify-codegen.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -33,6 +38,5 @@ CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/v
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/verify-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/verify-codegen.sh
-CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/node-api/hack/verify-codegen.sh
 
 "${KUBE_ROOT}/hack/update-codegen.sh" --verify-only

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -52,7 +52,6 @@ const (
 	optionReadWrite      = "kubernetes.io/readwrite"
 	optionKeySecret      = "kubernetes.io/secret"
 	optionFSGroup        = "kubernetes.io/mounterArgs.FsGroup"
-	optionMountsDir      = "kubernetes.io/mountsDir"
 	optionPVorVolumeName = "kubernetes.io/pvOrVolumeName"
 
 	optionKeyPodName      = "kubernetes.io/pod.name"

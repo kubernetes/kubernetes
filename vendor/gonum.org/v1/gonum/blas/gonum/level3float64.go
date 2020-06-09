@@ -12,10 +12,10 @@ import (
 var _ blas.Float64Level3 = Implementation{}
 
 // Dtrsm solves one of the matrix equations
-//  A * X = alpha * B    if tA == blas.NoTrans and side == blas.Left
-//  A^T * X = alpha * B  if tA == blas.Trans or blas.ConjTrans, and side == blas.Left
-//  X * A = alpha * B    if tA == blas.NoTrans and side == blas.Right
-//  X * A^T = alpha * B  if tA == blas.Trans or blas.ConjTrans, and side == blas.Right
+//  A * X = alpha * B   if tA == blas.NoTrans and side == blas.Left
+//  Aᵀ * X = alpha * B  if tA == blas.Trans or blas.ConjTrans, and side == blas.Left
+//  X * A = alpha * B   if tA == blas.NoTrans and side == blas.Right
+//  X * Aᵀ = alpha * B  if tA == blas.Trans or blas.ConjTrans, and side == blas.Right
 // where A is an n×n or m×m triangular matrix, X and B are m×n matrices, and alpha is a
 // scalar.
 //
@@ -356,8 +356,8 @@ func (Implementation) Dsymm(s blas.Side, ul blas.Uplo, m, n int, alpha float64, 
 }
 
 // Dsyrk performs one of the symmetric rank-k operations
-//  C = alpha * A * A^T + beta * C  if tA == blas.NoTrans
-//  C = alpha * A^T * A + beta * C  if tA == blas.Trans or tA == blas.ConjTrans
+//  C = alpha * A * Aᵀ + beta * C  if tA == blas.NoTrans
+//  C = alpha * Aᵀ * A + beta * C  if tA == blas.Trans or tA == blas.ConjTrans
 // where A is an n×k or k×n matrix, C is an n×n symmetric matrix, and alpha and
 // beta are scalars.
 func (Implementation) Dsyrk(ul blas.Uplo, tA blas.Transpose, n, k int, alpha float64, a []float64, lda int, beta float64, c []float64, ldc int) {
@@ -506,8 +506,8 @@ func (Implementation) Dsyrk(ul blas.Uplo, tA blas.Transpose, n, k int, alpha flo
 }
 
 // Dsyr2k performs one of the symmetric rank 2k operations
-//  C = alpha * A * B^T + alpha * B * A^T + beta * C  if tA == blas.NoTrans
-//  C = alpha * A^T * B + alpha * B^T * A + beta * C  if tA == blas.Trans or tA == blas.ConjTrans
+//  C = alpha * A * Bᵀ + alpha * B * Aᵀ + beta * C  if tA == blas.NoTrans
+//  C = alpha * Aᵀ * B + alpha * Bᵀ * A + beta * C  if tA == blas.Trans or tA == blas.ConjTrans
 // where A and B are n×k or k×n matrices, C is an n×n symmetric matrix, and
 // alpha and beta are scalars.
 func (Implementation) Dsyr2k(ul blas.Uplo, tA blas.Transpose, n, k int, alpha float64, a []float64, lda int, b []float64, ldb int, beta float64, c []float64, ldc int) {
@@ -668,10 +668,10 @@ func (Implementation) Dsyr2k(ul blas.Uplo, tA blas.Transpose, n, k int, alpha fl
 }
 
 // Dtrmm performs one of the matrix-matrix operations
-//  B = alpha * A * B    if tA == blas.NoTrans and side == blas.Left
-//  B = alpha * A^T * B  if tA == blas.Trans or blas.ConjTrans, and side == blas.Left
-//  B = alpha * B * A    if tA == blas.NoTrans and side == blas.Right
-//  B = alpha * B * A^T  if tA == blas.Trans or blas.ConjTrans, and side == blas.Right
+//  B = alpha * A * B   if tA == blas.NoTrans and side == blas.Left
+//  B = alpha * Aᵀ * B  if tA == blas.Trans or blas.ConjTrans, and side == blas.Left
+//  B = alpha * B * A   if tA == blas.NoTrans and side == blas.Right
+//  B = alpha * B * Aᵀ  if tA == blas.Trans or blas.ConjTrans, and side == blas.Right
 // where A is an n×n or m×m triangular matrix, B is an m×n matrix, and alpha is a scalar.
 func (Implementation) Dtrmm(s blas.Side, ul blas.Uplo, tA blas.Transpose, d blas.Diag, m, n int, alpha float64, a []float64, lda int, b []float64, ldb int) {
 	if s != blas.Left && s != blas.Right {

@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script updates `translations/kubectl/template.pot` for 
+# `pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go`. 
+# Usage: `update-translations.sh`.
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 

@@ -34,12 +34,12 @@ import (
 // https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
 type RuntimeClass struct {
 	metav1.TypeMeta `json:",inline"`
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the RuntimeClass
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec RuntimeClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
@@ -66,6 +66,13 @@ type RuntimeClassSpec struct {
 	// This field is alpha-level as of Kubernetes v1.15, and is only honored by servers that enable the PodOverhead feature.
 	// +optional
 	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,2,opt,name=overhead"`
+
+	// Scheduling holds the scheduling constraints to ensure that pods running
+	// with this RuntimeClass are scheduled to nodes that support it.
+	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
+	// nodes.
+	// +optional
+	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,3,opt,name=scheduling"`
 }
 
 // Overhead structure represents the resource overhead associated with running a pod.
@@ -75,13 +82,32 @@ type Overhead struct {
 	PodFixed corev1.ResourceList `json:"podFixed,omitempty" protobuf:"bytes,1,opt,name=podFixed,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName,castvalue=k8s.io/apimachinery/pkg/api/resource.Quantity"`
 }
 
+// Scheduling specifies the scheduling constraints for nodes supporting a
+// RuntimeClass.
+type Scheduling struct {
+	// nodeSelector lists labels that must be present on nodes that support this
+	// RuntimeClass. Pods using this RuntimeClass can only be scheduled to a
+	// node matched by this selector. The RuntimeClass nodeSelector is merged
+	// with a pod's existing nodeSelector. Any conflicts will cause the pod to
+	// be rejected in admission.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
+
+	// tolerations are appended (excluding duplicates) to pods running with this
+	// RuntimeClass during admission, effectively unioning the set of nodes
+	// tolerated by the pod and the RuntimeClass.
+	// +optional
+	// +listType=atomic
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,rep,name=tolerations"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

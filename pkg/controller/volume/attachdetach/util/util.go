@@ -17,20 +17,29 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
-func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) (*volume.Spec, error) {
+// A volume.Spec that refers to an in-tree plugin spec is translated to refer
+// to a migrated CSI plugin spec if all conditions for CSI migration on a node
+// for the in-tree plugin is satisfied.
+func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, nodeName types.NodeName, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 		klog.V(10).Infof(
 			"Found PVC, ClaimName: %q/%q",
@@ -66,6 +75,15 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 				err)
 		}
 
+		volumeSpec, err = translateInTreeSpecToCSIIfNeeded(volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"error performing CSI migration checks and translation for PVC %q/%q: %v",
+				podNamespace,
+				pvcSource.ClaimName,
+				err)
+		}
+
 		klog.V(10).Infof(
 			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
 			volumeSpec.Name(),
@@ -81,7 +99,15 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 	// informer it may be mutated by another consumer.
 	clonedPodVolume := podVolume.DeepCopy()
 
-	return volume.NewSpecFromVolume(clonedPodVolume), nil
+	origspec := volume.NewSpecFromVolume(clonedPodVolume)
+	spec, err := translateInTreeSpecToCSIIfNeeded(origspec, nodeName, vpm, csiMigratedPluginManager, csiTranslator)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error performing CSI migration checks and translation for inline volume %q: %v",
+			podVolume.Name,
+			err)
+	}
+	return spec, nil
 }
 
 // getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
@@ -160,7 +186,7 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world if addVolumes is true, otherwise it removes them.
-func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) {
+func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) {
 	if pod == nil {
 		return
 	}
@@ -193,7 +219,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := CreateVolumeSpec(podVolume, pod.Namespace, pvcLister, pvLister)
+		volumeSpec, err := CreateVolumeSpec(podVolume, pod.Namespace, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
 		if err != nil {
 			klog.V(10).Infof(
 				"Error processing volume %q for pod %q/%q: %v",
@@ -248,4 +274,115 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 		}
 	}
 	return
+}
+
+func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+	translatedSpec := spec
+	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
+	if err != nil {
+		return nil, err
+	}
+	if !migratable {
+		// Jump out of translation fast so we don't check the node if the spec itself is not migratable
+		return spec, nil
+	}
+	migrationSupportedOnNode, err := isCSIMigrationSupportedOnNode(nodeName, spec, vpm, csiMigratedPluginManager)
+	if err != nil {
+		return nil, err
+	}
+	if migratable && migrationSupportedOnNode {
+		translatedSpec, err = csimigration.TranslateInTreeSpecToCSI(spec, csiTranslator)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return translatedSpec, nil
+}
+
+func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		// If CSIMigration is disabled, CSI migration paths will not be taken for
+		// the node. If CSINodeInfo is disabled, checking of installation status
+		// of a migrated CSI plugin cannot be performed. Therefore stick to
+		// in-tree plugins.
+		return false, nil
+	}
+
+	pluginName, err := csiMigratedPluginManager.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
+	if err != nil {
+		return false, err
+	}
+
+	if len(pluginName) == 0 {
+		// Could not find a plugin name from translation directory, assume not translated
+		return false, nil
+	}
+
+	if csiMigratedPluginManager.IsMigrationCompleteForPlugin(pluginName) {
+		// All nodes are expected to have migrated CSI plugin installed and
+		// configured when CSI Migration Complete flag is enabled for a plugin.
+		// CSI migration is supported even if there is version skew between
+		// managers and node.
+		return true, nil
+	}
+
+	if len(nodeName) == 0 {
+		return false, errors.New("nodeName is empty")
+	}
+
+	kubeClient := vpm.Host.GetKubeClient()
+	if kubeClient == nil {
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// we are in a standalone (headless) Kubelet
+		return true, nil
+	}
+
+	adcHost, ok := vpm.Host.(volume.AttachDetachVolumeHost)
+	if !ok {
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// "enableControllerAttachDetach" is set to true on kubelet
+		return true, nil
+	}
+
+	if adcHost.CSINodeLister() == nil {
+		return false, errors.New("could not find CSINodeLister in attachDetachController")
+	}
+
+	csiNode, err := adcHost.CSINodeLister().Get(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+
+	ann := csiNode.GetAnnotations()
+	if ann == nil {
+		return false, nil
+	}
+
+	mpa := ann[v1.MigratedPluginsAnnotationKey]
+	tok := strings.Split(mpa, ",")
+	mpaSet := sets.NewString(tok...)
+
+	isMigratedOnNode := mpaSet.Has(pluginName)
+
+	if isMigratedOnNode {
+		installed := false
+		driverName, err := csiMigratedPluginManager.GetCSINameFromInTreeName(pluginName)
+		if err != nil {
+			return isMigratedOnNode, err
+		}
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == driverName {
+				installed = true
+				break
+			}
+		}
+		if !installed {
+			return true, fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
+		}
+	}
+
+	return isMigratedOnNode, nil
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package dns
 
 import (
+	"bytes"
+	"os/exec"
 	"strings"
 )
 
@@ -38,4 +40,17 @@ func getDNSServerList() []string {
 	}
 
 	panic("Could not find DNS Server list!")
+}
+
+func runCommand(name string, arg ...string) string {
+	var out bytes.Buffer
+	cmd := exec.Command(name, arg...)
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+
+	return strings.TrimSpace(out.String())
 }

@@ -98,12 +98,31 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 	}
 	instanceID, err := instances.InstanceID(ctx, nodeName)
 	if err != nil {
+		if err == NotImplemented {
+			return "", err
+		}
+
 		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
 	}
 	return cloud.ProviderName() + "://" + instanceID, nil
 }
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
+//
+// Cloud provider may chose to implement the logic for
+// constructing/destroying specific kinds of load balancers in a
+// controller separate from the ServiceController.  If this is the case,
+// then {Ensure,Update}LoadBalancer must return the ImplementedElsewhere error.
+// For the given LB service, the GetLoadBalancer must return "exists=True" if
+// there exists a LoadBalancer instance created by ServiceController.
+// In all other cases, GetLoadBalancer must return a NotFound error.
+// EnsureLoadBalancerDeleted must not return ImplementedElsewhere to ensure
+// proper teardown of resources that were allocated by the ServiceController.
+// This can happen if a user changes the type of LB via an update to the resource
+// or when migrating from ServiceController to alternate implementation.
+// The finalizer on the service will be added and removed by ServiceController
+// irrespective of the ImplementedElsewhere error. Additional finalizers for
+// LB services must be managed in the alternate implementation.
 type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
@@ -138,15 +157,13 @@ type LoadBalancer interface {
 // Instances is an abstract, pluggable interface for sets of instances.
 type Instances interface {
 	// NodeAddresses returns the addresses of the specified instance.
-	// TODO(roberthbailey): This currently is only used in such a way that it
-	// returns the address of the calling instance. We should do a rename to
-	// make this clearer.
 	NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error)
 	// NodeAddressesByProviderID returns the addresses of the specified instance.
 	// The instance is specified using the providerID of the node. The
 	// ProviderID is a unique identifier of the node. This will not be called
 	// from the node whose nodeaddresses are being queried. i.e. local metadata
 	// services cannot be used in this method to obtain nodeaddresses
+	// Deprecated: Remove once all calls are migrated to InstanceMetadataByProviderID
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
@@ -155,6 +172,7 @@ type Instances interface {
 	// InstanceType returns the type of the specified instance.
 	InstanceType(ctx context.Context, name types.NodeName) (string, error)
 	// InstanceTypeByProviderID returns the type of the specified instance.
+	// Deprecated: Remove once all calls are migrated to InstanceMetadataByProviderID
 	InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
@@ -165,9 +183,12 @@ type Instances interface {
 	// InstanceExistsByProviderID returns true if the instance for the given provider exists.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	// This method should still return true for instances that exist but are stopped/sleeping.
+	// Deprecated: Remove once all calls are migrated to InstanceMetadataByProviderID
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceMetadataByProviderID returns the instance's metadata.
+	InstanceMetadataByProviderID(ctx context.Context, providerID string) (*InstanceMetadata, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -199,9 +220,10 @@ type Routes interface {
 }
 
 var (
-	InstanceNotFound = errors.New("instance not found")
-	DiskNotFound     = errors.New("disk is not found")
-	NotImplemented   = errors.New("unimplemented")
+	DiskNotFound         = errors.New("disk is not found")
+	ImplementedElsewhere = errors.New("implemented by alternate to cloud provider")
+	InstanceNotFound     = errors.New("instance not found")
+	NotImplemented       = errors.New("unimplemented")
 )
 
 // Zone represents the location of a particular machine.
@@ -232,4 +254,14 @@ type Zones interface {
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
+}
+
+// InstanceMetadata contains metadata about the specific instance.
+type InstanceMetadata struct {
+	// ProviderID is provider's id that instance belongs to.
+	ProviderID string
+	// Type is instance's type.
+	Type string
+	// NodeAddress contains information for the instance's address.
+	NodeAddresses []v1.NodeAddress
 }

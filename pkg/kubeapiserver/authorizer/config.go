@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
@@ -46,12 +47,17 @@ type Config struct {
 
 	// Kubeconfig file for Webhook authorization plugin.
 	WebhookConfigFile string
+	// API version of subject access reviews to send to the webhook (e.g. "v1", "v1beta1")
+	WebhookVersion string
 	// TTL for caching of authorized responses from the webhook server.
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
 
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
+
+	// Optional field, custom dial function used to connect to webhook
+	CustomDial utilnet.DialFunc
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
@@ -80,6 +86,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			)
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 			authorizers = append(authorizers, nodeAuthorizer)
+			ruleResolvers = append(ruleResolvers, nodeAuthorizer)
 
 		case modes.ModeAlwaysAllow:
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
@@ -98,8 +105,10 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			ruleResolvers = append(ruleResolvers, abacAuthorizer)
 		case modes.ModeWebhook:
 			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
-				config.WebhookCacheUnauthorizedTTL)
+				config.WebhookCacheUnauthorizedTTL,
+				config.CustomDial)
 			if err != nil {
 				return nil, nil, err
 			}

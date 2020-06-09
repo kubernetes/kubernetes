@@ -7,7 +7,7 @@ go_library(
     importpath = "github.com/Microsoft/hcsshim/internal/cni",
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
     deps = [
-        "//vendor/github.com/Microsoft/hcsshim/internal/guid:go_default_library",
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/regstate:go_default_library",
     ],
 )

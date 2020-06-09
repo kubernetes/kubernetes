@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: preferred-affinity-pod-
+  labels:
+    color: red
+spec:
+  affinity:
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                color: red
+            topologyKey: kubernetes.io/hostname
+            namespaces: ["sched-test", "sched-setup"]
+          weight: 1
+  containers:
+    - image: k8s.gcr.io/pause:3.2
+      name: pause
+      ports:
+        - containerPort: 80
+      resources:
+        limits:
+          cpu: 100m
+          memory: 500Mi
+        requests:
+          cpu: 100m
+          memory: 500Mi

@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# verify-readonly-packages.sh checks whether between $KUBE_VERIFY_GIT_BRANCH and HEAD files
-# in readonly directories were modified. A directory is readonly iff it contains a .readonly
-# file. Being readonly DOES NOT apply recursively to subdirectories.
+# This script checks whether between $KUBE_VERIFY_GIT_BRANCH and HEAD files in
+# readonly directories were modified. A directory is readonly if it contains a
+# .readonly file. Being readonly DOES NOT apply recursively to subdirectories.
+# Usage: `hack/verify-readonly-packages.sh`.
 
 set -o errexit
 set -o nounset

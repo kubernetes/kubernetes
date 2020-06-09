@@ -3,6 +3,7 @@
 	"SkippedPaths": [
 		"^_.*",
 		"/_",
+		"^hack/tools",
 		"^third_party/etcd.*"
 	],
 	"AddSourcesRules": true,

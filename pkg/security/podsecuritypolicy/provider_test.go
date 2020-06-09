@@ -546,17 +546,17 @@ func TestValidateContainerFailures(t *testing.T) {
 
 	failNilAppArmorPod := defaultPod()
 	v1FailInvalidAppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, v1.AppArmorBetaProfileNamePrefix+"foo")
 	failInvalidAppArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
 
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 
 	failPrivPod := defaultPod()
-	var priv bool = true
+	var priv = true
 	failPrivPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	failProcMountPod := defaultPod()
@@ -1033,17 +1033,17 @@ func TestValidateContainerSuccess(t *testing.T) {
 
 	appArmorPSP := defaultPSP()
 	appArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	v1AppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
+	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, v1.AppArmorBetaProfileRuntimeDefault)
 	appArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1AppArmorPod, appArmorPod, nil)
 
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true
 	privPod := defaultPod()
-	var priv bool = true
+	var priv = true
 	privPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	capsPSP := defaultPSP()
@@ -1275,7 +1275,7 @@ func defaultNamedPSP(name string) *policy.PodSecurityPolicy {
 }
 
 func defaultPod() *api.Pod {
-	var notPriv bool = false
+	var notPriv = false
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
@@ -1299,7 +1299,7 @@ func defaultPod() *api.Pod {
 }
 
 func defaultV1Pod() *v1.Pod {
-	var notPriv bool = false
+	var notPriv = false
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},

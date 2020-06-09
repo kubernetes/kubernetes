@@ -36,9 +36,6 @@ release_filegroup(
         for_test = [
             ":kubernetes-test-portable.tar.gz",
             ":kubernetes-test-{OS}-{ARCH}.tar.gz",
-            # TODO(ixdy): remove once the "mondo-test" tarball is deprecated.
-            # It isn't really mondo under Bazel anyway.
-            ":kubernetes-test.tar.gz",
         ],
     ),
 )
@@ -73,13 +70,20 @@ pkg_tar(
 )
 
 # Included in node and server tarballs.
-filegroup(
-    name = "license-targets",
+pkg_tar(
+    name = "license-artifacts",
     srcs = [
-        ":kubernetes-src.tar.gz",
-        "//:Godeps/LICENSES",
+        ":kubernetes-src.tar.gz",  # we want the tar file itself
+    ],
+    mode = "0755",
+    tags = [
+        "manual",
+        "no-cache",
     ],
     visibility = ["//visibility:private"],
+    deps = [
+        "//:LICENSES",  # we want to expand this
+    ],
 )
 
 pkg_tar(
@@ -122,7 +126,7 @@ pkg_tar(
 
 [[pkg_tar(
     name = "kubernetes-node-%s-%s" % (os, arch),
-    srcs = [":license-targets"],
+    srcs = [],
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
@@ -130,7 +134,9 @@ pkg_tar(
         "manual",
         "no-cache",
     ],
-    deps = select({go_platform_constraint(os, arch): [":_node-bin"]}),
+    deps = select({go_platform_constraint(os, arch): [":_node-bin"]}) + [
+        ":license-artifacts",
+    ],
 ) for arch in archs] for os, archs in NODE_PLATFORMS.items()]
 
 pkg_tar(
@@ -173,7 +179,7 @@ pkg_tar(
 
 [[pkg_tar(
     name = "kubernetes-server-%s-%s" % (os, arch),
-    srcs = [":license-targets"],
+    srcs = [],
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
@@ -186,65 +192,10 @@ pkg_tar(
             ":_server-addons",
             ":_server-bin",
         ],
-    }),
+    }) + [
+        ":license-artifacts",
+    ],
 ) for arch in archs] for os, archs in SERVER_PLATFORMS.items()]
-
-# The mondo test tarball is deprecated.
-pkg_tar(
-    name = "_test-mondo-bin",
-    srcs = ["//build:test-targets"],
-    mode = "0755",
-    package_dir = select(for_platforms(
-        for_test = "platforms/{OS}/{ARCH}",
-    )),
-    tags = [
-        "manual",
-        "no-cache",
-    ],
-    visibility = ["//visibility:private"],
-)
-
-genrule(
-    name = "kubernetes-test-mondo-deprecation",
-    outs = ["DEPRECATION_NOTICE"],
-    cmd = """cat <<EOF >$@
-The mondo test tarball containing binaries for all platforms is
-DEPRECATED as of Kubernetes 1.14.
-
-Users of this tarball should migrate to using the platform-specific
-tarballs in combination with the "portable" tarball which contains
-scripts, test images, and other manifests.
-
-For more details, please see KEP
-sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball.
-EOF
-""",
-    visibility = ["//visibility:private"],
-)
-
-# The mondo test tarball is deprecated.
-# This one was never really correct, anyway, since we can't include
-# binaries from multiple platforms in a single tarball.
-pkg_tar(
-    name = "kubernetes-test",
-    srcs = [
-        ":kubernetes-test-mondo-deprecation",
-        "//build:test-portable-targets",
-    ],
-    extension = "tar.gz",
-    package_dir = "kubernetes",
-    remap_paths = {
-        "build/release-tars/DEPRECATION_NOTICE": "DEPRECATION_NOTICE",
-    },
-    strip_prefix = "//",
-    tags = [
-        "manual",
-        "no-cache",
-    ],
-    deps = select(for_platforms(
-        for_test = [":_test-mondo-bin"],
-    )),
-)
 
 pkg_tar(
     name = "kubernetes-test-portable",
@@ -295,7 +246,6 @@ pkg_tar(
 pkg_tar(
     name = "kubernetes",
     srcs = [
-        "//:Godeps/LICENSES",
         "//:README.md",
         "//:version",
         "//cluster:all-srcs",
@@ -305,9 +255,15 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
+    symlinks = {
+        "kubernetes/cluster/gce/cos/": "gci",
+        "kubernetes/cluster/gce/custom/": "gci",
+        "kubernetes/cluster/gce/ubuntu/": "gci",
+    },
     tags = ["no-cache"],
     deps = [
         ":_full_server",
+        ":license-artifacts",
     ],
 )
 

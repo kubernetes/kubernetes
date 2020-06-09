@@ -19,6 +19,7 @@ package aggregator
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/go-openapi/spec"
@@ -184,78 +185,63 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 			source = FilterSpecByPathsWithoutSideEffects(source, keepPaths)
 		}
 	}
-	// Check for model conflicts
-	conflicts := false
-	for k, v := range source.Definitions {
-		v2, found := dest.Definitions[k]
-		if found && !deepEqualDefinitionsModuloGVKs(&v2, &v) {
-			if !renameModelConflicts {
-				return fmt.Errorf("model name conflict in merging OpenAPI spec: %s", k)
-			}
-			conflicts = true
-			break
-		}
+
+	// Check for model conflicts and rename to make definitions conflict-free (modulo different GVKs)
+	usedNames := map[string]bool{}
+	for k := range dest.Definitions {
+		usedNames[k] = true
 	}
-
-	if conflicts {
-		usedNames := map[string]bool{}
-		for k := range dest.Definitions {
-			usedNames[k] = true
+	renames := map[string]string{}
+DEFINITIONLOOP:
+	for k, v := range source.Definitions {
+		existing, found := dest.Definitions[k]
+		if !found || deepEqualDefinitionsModuloGVKs(&existing, &v) {
+			// skip for now, we copy them after the rename loop
+			continue
 		}
-		renames := map[string]string{}
 
-	OUTERLOOP:
-		for k, v := range source.Definitions {
-			if usedNames[k] {
-				v2, found := dest.Definitions[k]
-				// Reuse model if they are exactly the same.
-				if found && deepEqualDefinitionsModuloGVKs(&v2, &v) {
-					if gvks, found, err := mergedGVKs(&v2, &v); err != nil {
-						return err
-					} else if found {
-						v2.Extensions[gvkKey] = gvks
-					}
-					continue
-				}
+		if !renameModelConflicts {
+			return fmt.Errorf("model name conflict in merging OpenAPI spec: %s", k)
+		}
 
-				// Reuse previously renamed model if one exists
-				var newName string
-				i := 1
-				for found {
-					i++
-					newName = fmt.Sprintf("%s_v%d", k, i)
-					v2, found = dest.Definitions[newName]
-					if found && deepEqualDefinitionsModuloGVKs(&v2, &v) {
-						renames[k] = newName
-						if gvks, found, err := mergedGVKs(&v2, &v); err != nil {
-							return err
-						} else if found {
-							v2.Extensions[gvkKey] = gvks
-						}
-						continue OUTERLOOP
-					}
-				}
-
-				_, foundInSource := source.Definitions[newName]
-				for usedNames[newName] || foundInSource {
-					i++
-					newName = fmt.Sprintf("%s_v%d", k, i)
-					_, foundInSource = source.Definitions[newName]
-				}
+		// Reuse previously renamed model if one exists
+		var newName string
+		i := 1
+		for found {
+			i++
+			newName = fmt.Sprintf("%s_v%d", k, i)
+			existing, found = dest.Definitions[newName]
+			if found && deepEqualDefinitionsModuloGVKs(&existing, &v) {
 				renames[k] = newName
-				usedNames[newName] = true
+				continue DEFINITIONLOOP
 			}
 		}
-		source = renameDefinition(source, renames)
+
+		_, foundInSource := source.Definitions[newName]
+		for usedNames[newName] || foundInSource {
+			i++
+			newName = fmt.Sprintf("%s_v%d", k, i)
+			_, foundInSource = source.Definitions[newName]
+		}
+		renames[k] = newName
+		usedNames[newName] = true
 	}
+	source = renameDefinition(source, renames)
+
+	// now without conflict (modulo different GVKs), copy definitions to dest
 	for k, v := range source.Definitions {
-		if _, found := dest.Definitions[k]; !found {
+		if existing, found := dest.Definitions[k]; !found {
 			if dest.Definitions == nil {
 				dest.Definitions = spec.Definitions{}
 			}
 			dest.Definitions[k] = v
+		} else if merged, changed, err := mergedGVKs(&existing, &v); err != nil {
+			return err
+		} else if changed {
+			existing.Extensions[gvkKey] = merged
 		}
 	}
+
 	// Check for path conflicts
 	for k, v := range source.Paths.Paths {
 		if _, found := dest.Paths.Paths[k]; found {
@@ -267,6 +253,7 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 		}
 		dest.Paths.Paths[k] = v
 	}
+
 	return nil
 }
 
@@ -336,6 +323,7 @@ func mergedGVKs(s1, s2 *spec.Schema) (interface{}, bool, error) {
 	}
 
 	ret := make([]interface{}, len(slice1), len(slice1)+len(slice2))
+	keys := make([]string, 0, len(slice1)+len(slice2))
 	copy(ret, slice1)
 	seen := make(map[string]bool, len(slice1))
 	for _, x := range slice1 {
@@ -344,6 +332,7 @@ func mergedGVKs(s1, s2 *spec.Schema) (interface{}, bool, error) {
 			return nil, false, fmt.Errorf(`expected {"group": <group>, "kind": <kind>, "version": <version>}, got: %#v`, x)
 		}
 		k := fmt.Sprintf("%s/%s.%s", gvk["group"], gvk["version"], gvk["kind"])
+		keys = append(keys, k)
 		seen[k] = true
 	}
 	changed := false
@@ -357,8 +346,31 @@ func mergedGVKs(s1, s2 *spec.Schema) (interface{}, bool, error) {
 			continue
 		}
 		ret = append(ret, x)
+		keys = append(keys, k)
 		changed = true
 	}
 
+	if changed {
+		sort.Sort(byKeys{ret, keys})
+	}
+
 	return ret, changed, nil
+}
+
+type byKeys struct {
+	values []interface{}
+	keys   []string
+}
+
+func (b byKeys) Len() int {
+	return len(b.values)
+}
+
+func (b byKeys) Less(i, j int) bool {
+	return b.keys[i] < b.keys[j]
+}
+
+func (b byKeys) Swap(i, j int) {
+	b.values[i], b.values[j] = b.values[j], b.values[i]
+	b.keys[i], b.keys[j] = b.keys[j], b.keys[i]
 }

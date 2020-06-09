@@ -17,30 +17,21 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"fmt"
+	"time"
 
-	"github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	testutils "k8s.io/kubernetes/test/utils"
 )
-
-// RunReplicaSet launches (and verifies correctness) of a replicaset.
-func RunReplicaSet(config testutils.ReplicaSetConfig) error {
-	ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = framework.LogFailedContainers
-	return testutils.RunReplicaSet(config)
-}
 
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
 func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	err := wait.Poll(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		rs, err := c.AppsV1().ReplicaSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -52,43 +43,17 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	return err
 }
 
-// WaitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
-func WaitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, replicaSet *appsv1.ReplicaSet) error {
-	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
-	})
-	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
-	}
-	return err
-}
-
-// WaitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
-func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
-	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
-	})
-	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
-	}
-	return err
-}
-
 // WaitForReplicaSetTargetAvailableReplicas waits for .status.availableReplicas of a RS to equal targetReplicaNum
 func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
+	return WaitForReplicaSetTargetAvailableReplicasWithTimeout(c, replicaSet, targetReplicaNum, framework.PollShortTimeout)
+}
+
+// WaitForReplicaSetTargetAvailableReplicasWithTimeout waits for .status.availableReplicas of a RS to equal targetReplicaNum
+// with given timeout.
+func WaitForReplicaSetTargetAvailableReplicasWithTimeout(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32, timeout time.Duration) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(context.TODO(), replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

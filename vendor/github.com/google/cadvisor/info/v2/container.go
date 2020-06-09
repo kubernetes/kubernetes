@@ -87,8 +87,13 @@ type ContainerSpec struct {
 	HasMemory bool       `json:"has_memory"`
 	Memory    MemorySpec `json:"memory,omitempty"`
 
+	HasHugetlb bool `json:"has_hugetlb"`
+
 	HasCustomMetrics bool            `json:"has_custom_metrics"`
 	CustomMetrics    []v1.MetricSpec `json:"custom_metrics,omitempty"`
+
+	HasProcesses bool           `json:"has_processes"`
+	Processes    v1.ProcessSpec `json:"processes,omitempty"`
 
 	// Following resources have no associated spec, but are being isolated.
 	HasNetwork    bool `json:"has_network"`
@@ -114,9 +119,14 @@ type DeprecatedContainerStats struct {
 	// Memory statistics
 	HasMemory bool           `json:"has_memory"`
 	Memory    v1.MemoryStats `json:"memory,omitempty"`
+	// Hugepage statistics
+	HasHugetlb bool `json:"has_hugetlb"`
 	// Network statistics
 	HasNetwork bool         `json:"has_network"`
 	Network    NetworkStats `json:"network,omitempty"`
+	// Processes statistics
+	HasProcesses bool            `json:"has_processes"`
+	Processes    v1.ProcessStats `json:"processes,omitempty"`
 	// Filesystem statistics
 	HasFilesystem bool         `json:"has_filesystem"`
 	Filesystem    []v1.FsStats `json:"filesystem,omitempty"`
@@ -126,6 +136,8 @@ type DeprecatedContainerStats struct {
 	// Custom Metrics
 	HasCustomMetrics bool                      `json:"has_custom_metrics"`
 	CustomMetrics    map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
+	// Referenced memory
+	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
 }
 
 type ContainerStats struct {
@@ -140,8 +152,12 @@ type ContainerStats struct {
 	DiskIo *v1.DiskIoStats `json:"diskio,omitempty"`
 	// Memory statistics
 	Memory *v1.MemoryStats `json:"memory,omitempty"`
+	// Hugepage statistics
+	Hugetlb *map[string]v1.HugetlbStats `json:"hugetlb,omitempty"`
 	// Network statistics
 	Network *NetworkStats `json:"network,omitempty"`
+	// Processes statistics
+	Processes *v1.ProcessStats `json:"processes,omitempty"`
 	// Filesystem statistics
 	Filesystem *FilesystemStats `json:"filesystem,omitempty"`
 	// Task load statistics
@@ -150,6 +166,10 @@ type ContainerStats struct {
 	Accelerators []v1.AcceleratorStats `json:"accelerators,omitempty"`
 	// Custom Metrics
 	CustomMetrics map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
+	// Perf events counters
+	PerfStats []v1.PerfStat `json:"perf_stats,omitempty"`
+	// Referenced memory
+	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
 }
 
 type Percentiles struct {
@@ -282,6 +302,8 @@ type NetworkStats struct {
 	Udp v1.UdpStat `json:"udp"`
 	// UDP6 connection stats
 	Udp6 v1.UdpStat `json:"udp6"`
+	// TCP advanced stats
+	TcpAdvanced v1.TcpAdvancedStat `json:"tcp_advanced"`
 }
 
 // Instantaneous CPU stats

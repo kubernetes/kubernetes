@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,22 +23,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
-	"k8s.io/klog"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
-// interface exposed by the cloud provider implementing Disk functionality
+// DiskController interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error
@@ -118,11 +118,6 @@ func (plugin *azureDataDiskPlugin) GetVolumeName(spec *volume.Spec) (string, err
 func (plugin *azureDataDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.AzureDisk != nil)
-}
-
-func (plugin *azureDataDiskPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 }
 
 func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
@@ -298,7 +293,15 @@ func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
 }
 
 func (plugin *azureDataDiskPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	// if volume is not a fs file system, there is nothing for us to do here.
+	if !fsVolume {
+		return true, nil
+	}
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	if err != nil {
 		return false, err
 	}

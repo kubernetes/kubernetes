@@ -17,12 +17,17 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -36,8 +41,8 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// Skip tests unless number of nodes is 2
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-		framework.SkipIfProviderIs("local")
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+		e2eskipper.SkipIfProviderIs("local")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
@@ -65,7 +70,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			pv        *v1.PersistentVolume
 		)
 		ginkgo.BeforeEach(func() {
-			e2elog.Logf("Initializing pod and pvcs for test")
+			framework.Logf("Initializing pod and pvcs for test")
 			clientPod, pvc, pv = createPodPVCFromSC(f, c, ns)
 		})
 		for _, test := range disruptiveTestTable {
@@ -77,7 +82,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			}(test)
 		}
 		ginkgo.AfterEach(func() {
-			e2elog.Logf("Tearing down test spec")
+			framework.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv, false)
 			pvc, clientPod = nil, nil
 		})
@@ -90,16 +95,24 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		Name:      "default",
 		ClaimSize: "2Gi",
 	}
-	pvc := newClaim(test, ns, "default")
-	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+	pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+		ClaimSize:  test.ClaimSize,
+		VolumeMode: &test.VolumeMode,
+	}, ns)
+	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-	pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 	framework.ExpectEqual(len(pvs), 1)
 
 	ginkgo.By("Creating a pod with dynamically provisioned volume")
-	pod, err := framework.CreateNginxPod(c, ns, nil, pvcClaims)
+	podConfig := e2epod.Config{
+		NS:           ns,
+		PVCs:         pvcClaims,
+		SeLinuxLabel: e2epv.SELinuxLabel,
+	}
+	pod, err := e2epod.CreateSecPod(c, &podConfig, framework.PodStartTimeout)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

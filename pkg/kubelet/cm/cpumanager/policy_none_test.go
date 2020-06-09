@@ -33,7 +33,7 @@ func TestNonePolicyName(t *testing.T) {
 	}
 }
 
-func TestNonePolicyAdd(t *testing.T) {
+func TestNonePolicyAllocate(t *testing.T) {
 	policy := &nonePolicy{}
 
 	st := &mockState{
@@ -41,12 +41,12 @@ func TestNonePolicyAdd(t *testing.T) {
 		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 
-	testPod := makePod("1000m", "1000m")
+	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
 
 	container := &testPod.Spec.Containers[0]
-	err := policy.AddContainer(st, testPod, container, "fakeID")
+	err := policy.Allocate(st, testPod, container)
 	if err != nil {
-		t.Errorf("NonePolicy AddContainer() error. expected no error but got: %v", err)
+		t.Errorf("NonePolicy Allocate() error. expected no error but got: %v", err)
 	}
 }
 
@@ -58,7 +58,10 @@ func TestNonePolicyRemove(t *testing.T) {
 		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 
-	err := policy.RemoveContainer(st, "fakeID")
+	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
+
+	container := &testPod.Spec.Containers[0]
+	err := policy.RemoveContainer(st, string(testPod.UID), container.Name)
 	if err != nil {
 		t.Errorf("NonePolicy RemoveContainer() error. expected no error but got %v", err)
 	}

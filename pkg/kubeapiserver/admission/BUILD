@@ -15,15 +15,15 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/initializer:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

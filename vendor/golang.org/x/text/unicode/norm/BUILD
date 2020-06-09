@@ -10,6 +10,7 @@ go_library(
         "normalize.go",
         "readwriter.go",
         "tables10.0.0.go",
+        "tables11.0.0.go",
         "tables9.0.0.go",
         "transform.go",
         "trie.go",

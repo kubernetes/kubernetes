@@ -92,8 +92,8 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 	body.Close()
 	respErr := <-respErrCh
-	if err != nil {
-		t.Fatal(err)
+	if respErr.err != nil {
+		t.Fatal(respErr.err)
 	}
 	defer respErr.resp.Body.Close()
 	bs, err := ioutil.ReadAll(respErr.resp.Body)

@@ -121,7 +121,7 @@ func main(cmd *cobra.Command, args []string) {
 		}()
 	}
 	log.Printf("Serving on port %d.\n", port)
-	signals := make(chan os.Signal)
+	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM)
 	sig := <-signals
 	log.Printf("Shutting down after receiving signal: %s.\n", sig)

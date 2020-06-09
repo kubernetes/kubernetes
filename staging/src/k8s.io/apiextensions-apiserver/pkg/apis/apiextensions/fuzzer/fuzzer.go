@@ -46,6 +46,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
 				obj.Names.ListKind = obj.Names.Kind + "List"
 			}
+			if len(obj.Versions) == 0 && len(obj.Version) == 0 {
+				// internal object must have a version to roundtrip all fields
+				obj.Version = "v1"
+			}
 			if len(obj.Versions) == 0 && len(obj.Version) != 0 {
 				obj.Versions = []apiextensions.CustomResourceDefinitionVersion{
 					{
@@ -72,6 +76,23 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if obj.PreserveUnknownFields == nil {
 				obj.PreserveUnknownFields = pointer.BoolPtr(true)
+			}
+
+			// Move per-version schema, subresources, additionalPrinterColumns to the top-level.
+			// This is required by validation in v1beta1, and by round-tripping in v1.
+			if len(obj.Versions) == 1 {
+				if obj.Versions[0].Schema != nil {
+					obj.Validation = obj.Versions[0].Schema
+					obj.Versions[0].Schema = nil
+				}
+				if obj.Versions[0].AdditionalPrinterColumns != nil {
+					obj.AdditionalPrinterColumns = obj.Versions[0].AdditionalPrinterColumns
+					obj.Versions[0].AdditionalPrinterColumns = nil
+				}
+				if obj.Versions[0].Subresources != nil {
+					obj.Subresources = obj.Versions[0].Subresources
+					obj.Versions[0].Subresources = nil
+				}
 			}
 		},
 		func(obj *apiextensions.CustomResourceDefinition, c fuzz.Continue) {

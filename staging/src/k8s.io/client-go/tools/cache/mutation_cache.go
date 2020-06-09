@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +42,7 @@ type MutationCache interface {
 	Mutation(interface{})
 }
 
+// ResourceVersionComparator is able to compare object versions.
 type ResourceVersionComparator interface {
 	CompareResourceVersion(lhs, rhs runtime.Object) int
 }

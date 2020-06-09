@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -32,7 +33,7 @@ type FakeHandler struct {
 	validate, validateCalled bool
 }
 
-func (h *FakeHandler) Admit(a Attributes, o ObjectInterfaces) (err error) {
+func (h *FakeHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) (err error) {
 	h.admitCalled = true
 	if h.admit {
 		return nil
@@ -40,7 +41,7 @@ func (h *FakeHandler) Admit(a Attributes, o ObjectInterfaces) (err error) {
 	return fmt.Errorf("Don't admit")
 }
 
-func (h *FakeHandler) Validate(a Attributes, o ObjectInterfaces) (err error) {
+func (h *FakeHandler) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) (err error) {
 	h.validateCalled = true
 	if h.validate {
 		return nil
@@ -125,7 +126,7 @@ func TestAdmitAndValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
+		err := test.chain.Admit(context.TODO(), NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of admit call: %v", accepted)
@@ -146,7 +147,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
+		err = test.chain.Validate(context.TODO(), NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		accepted = (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of validate call: %v\n", accepted)

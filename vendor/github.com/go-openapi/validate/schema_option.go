@@ -14,20 +14,41 @@
 
 package validate
 
+// SchemaValidatorOptions defines optional rules for schema validation
 type SchemaValidatorOptions struct {
-	DisableObjectArrayTypeCheck bool
+	EnableObjectArrayTypeCheck    bool
+	EnableArrayMustHaveItemsCheck bool
 }
 
+// Option sets optional rules for schema validation
 type Option func(*SchemaValidatorOptions)
 
-func DisableObjectArrayTypeCheck(disable bool) Option {
+// EnableObjectArrayTypeCheck activates the swagger rule: an items must be in type: array
+func EnableObjectArrayTypeCheck(enable bool) Option {
 	return func(svo *SchemaValidatorOptions) {
-		svo.DisableObjectArrayTypeCheck = disable
+		svo.EnableObjectArrayTypeCheck = enable
 	}
 }
 
+// EnableArrayMustHaveItemsCheck activates the swagger rule: an array must have items defined
+func EnableArrayMustHaveItemsCheck(enable bool) Option {
+	return func(svo *SchemaValidatorOptions) {
+		svo.EnableArrayMustHaveItemsCheck = enable
+	}
+}
+
+// SwaggerSchema activates swagger schema validation rules
+func SwaggerSchema(enable bool) Option {
+	return func(svo *SchemaValidatorOptions) {
+		svo.EnableObjectArrayTypeCheck = enable
+		svo.EnableArrayMustHaveItemsCheck = enable
+	}
+}
+
+// Options returns current options
 func (svo SchemaValidatorOptions) Options() []Option {
 	return []Option{
-		DisableObjectArrayTypeCheck(svo.DisableObjectArrayTypeCheck),
+		EnableObjectArrayTypeCheck(svo.EnableObjectArrayTypeCheck),
+		EnableArrayMustHaveItemsCheck(svo.EnableArrayMustHaveItemsCheck),
 	}
 }

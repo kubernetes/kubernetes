@@ -26,8 +26,10 @@ import (
 )
 
 // FooLister helps list Foos.
+// All objects returned here must be treated as read-only.
 type FooLister interface {
 	// List lists all Foos in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.Foo, err error)
 	// Foos returns an object that can list and get Foos.
 	Foos(namespace string) FooNamespaceLister
@@ -58,10 +60,13 @@ func (s *fooLister) Foos(namespace string) FooNamespaceLister {
 }
 
 // FooNamespaceLister helps list and get Foos.
+// All objects returned here must be treated as read-only.
 type FooNamespaceLister interface {
 	// List lists all Foos in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.Foo, err error)
 	// Get retrieves the Foo from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.Foo, error)
 	FooNamespaceListerExpansion
 }

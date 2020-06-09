@@ -21,15 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilnet "k8s.io/utils/net"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -47,6 +50,30 @@ var (
 	// ErrNoAddresses indicates there are no addresses for the hostname
 	ErrNoAddresses = errors.New("No addresses for hostname")
 )
+
+// isValidEndpoint checks that the given host / port pair are valid endpoint
+func isValidEndpoint(host string, port int) bool {
+	return host != "" && port > 0
+}
+
+// BuildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
+// portname. Explode Endpoints.Subsets[*] into this structure.
+func BuildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]string {
+	portsToEndpoints := map[string][]string{}
+	for i := range endpoints.Subsets {
+		ss := &endpoints.Subsets[i]
+		for i := range ss.Ports {
+			port := &ss.Ports[i]
+			for i := range ss.Addresses {
+				addr := &ss.Addresses[i]
+				if isValidEndpoint(addr.IP, int(port.Port)) {
+					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))))
+				}
+			}
+		}
+	}
+	return portsToEndpoints
+}
 
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
@@ -97,23 +124,25 @@ func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) 
 	return nil
 }
 
-// IsLocalIP checks if a given IP address is bound to an interface
-// on the local system
-func IsLocalIP(ip string) (bool, error) {
+// GetLocalAddrs returns a list of all network addresses on the local system
+func GetLocalAddrs() ([]net.IP, error) {
+	var localAddrs []net.IP
+
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
+
+	for _, addr := range addrs {
+		ip, _, err := net.ParseCIDR(addr.String())
 		if err != nil {
-			return false, err
+			return nil, err
 		}
-		if net.ParseIP(ip).Equal(intf) {
-			return true, nil
-		}
+
+		localAddrs = append(localAddrs, ip)
 	}
-	return false, nil
+
+	return localAddrs, nil
 }
 
 // ShouldSkipService checks if a given service should skip proxying
@@ -152,29 +181,35 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			uniqueAddressList.Insert(cidr)
 		}
 	}
+
+	itfs, err := nw.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("error listing all interfaces from host, error: %v", err)
+	}
+
 	// Second round of iteration to parse IPs based on cidr.
 	for _, cidr := range cidrs {
 		if IsZeroCIDR(cidr) {
 			continue
 		}
+
 		_, ipNet, _ := net.ParseCIDR(cidr)
-		itfs, err := nw.Interfaces()
-		if err != nil {
-			return nil, fmt.Errorf("error listing all interfaces from host, error: %v", err)
-		}
 		for _, itf := range itfs {
 			addrs, err := nw.Addrs(&itf)
 			if err != nil {
 				return nil, fmt.Errorf("error getting address from interface %s, error: %v", itf.Name, err)
 			}
+
 			for _, addr := range addrs {
 				if addr == nil {
 					continue
 				}
+
 				ip, _, err := net.ParseCIDR(addr.String())
 				if err != nil {
 					return nil, fmt.Errorf("error parsing CIDR for interface %s, error: %v", itf.Name, err)
 				}
+
 				if ipNet.Contains(ip) {
 					if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
 						uniqueAddressList.Insert(ip.String())
@@ -186,6 +221,11 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			}
 		}
 	}
+
+	if uniqueAddressList.Len() == 0 {
+		return nil, fmt.Errorf("no addresses found for cidrs %v", cidrs)
+	}
+
 	return uniqueAddressList, nil
 }
 
@@ -245,4 +285,29 @@ func AppendPortIfNeeded(addr string, port int32) string {
 		return fmt.Sprintf("%s:%d", addr, port)
 	}
 	return fmt.Sprintf("[%s]:%d", addr, port)
+}
+
+// ShuffleStrings copies strings from the specified slice into a copy in random
+// order. It returns a new slice.
+func ShuffleStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	shuffled := make([]string, len(s))
+	perm := utilrand.Perm(len(s))
+	for i, j := range perm {
+		shuffled[j] = s[i]
+	}
+	return shuffled
+}
+
+// EnsureSysctl sets a kernel sysctl to a given numeric value.
+func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
+	if oldVal, _ := sysctl.GetSysctl(name); oldVal != newVal {
+		if err := sysctl.SetSysctl(name, newVal); err != nil {
+			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
+		}
+		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
+	}
+	return nil
 }

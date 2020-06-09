@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -95,7 +94,7 @@ func (p *loadLoggingPod) Name() string {
 }
 
 func (p *loadLoggingPod) Start(f *framework.Framework) error {
-	e2elog.Logf("Starting load logging pod %s", p.name)
+	framework.Logf("Starting load logging pod %s", p.name)
 	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.name,
@@ -161,7 +160,7 @@ func (p *execLoggingPod) Name() string {
 }
 
 func (p *execLoggingPod) Start(f *framework.Framework) error {
-	e2elog.Logf("Starting repeating logging pod %s", p.name)
+	framework.Logf("Starting repeating logging pod %s", p.name)
 	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.name,

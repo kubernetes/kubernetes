@@ -29,29 +29,30 @@ import (
 	_ "net/http/pprof"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/configz"
+	"k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
-	"k8s.io/kubernetes/pkg/util/configz"
 	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.scheme, o.master)
+	return newProxyServer(o.config, o.CleanupAndExit, o.master)
 }
 
-func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
+func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -67,6 +68,10 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		return &ProxyServer{}, nil
 	}
 
+	if len(config.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
+	}
+
 	client, eventClient, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
@@ -78,7 +83,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		return nil, err
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
+	recorder := eventBroadcaster.NewRecorder(proxyconfigscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -87,14 +92,12 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		Namespace: "",
 	}
 
-	var healthzServer *healthcheck.HealthzServer
-	var healthzUpdater healthcheck.HealthzUpdater
+	var healthzServer healthcheck.ProxierHealthUpdater
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
-		healthzUpdater = healthzServer
+		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 	}
 
-	var proxier proxy.ProxyProvider
+	var proxier proxy.Provider
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
@@ -108,7 +111,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 			hostname,
 			utilnode.GetNodeIP(client, hostname),
 			recorder,
-			healthzUpdater,
+			healthzServer,
 			config.Winkernel,
 		)
 		if err != nil {
@@ -135,18 +138,20 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}
 
 	return &ProxyServer{
-		Client:             client,
-		EventClient:        eventClient,
-		Proxier:            proxier,
-		Broadcaster:        eventBroadcaster,
-		Recorder:           recorder,
-		ProxyMode:          proxyMode,
-		NodeRef:            nodeRef,
-		MetricsBindAddress: config.MetricsBindAddress,
-		EnableProfiling:    config.EnableProfiling,
-		OOMScoreAdj:        config.OOMScoreAdj,
-		ConfigSyncPeriod:   config.ConfigSyncPeriod.Duration,
-		HealthzServer:      healthzServer,
+		Client:              client,
+		EventClient:         eventClient,
+		Proxier:             proxier,
+		Broadcaster:         eventBroadcaster,
+		Recorder:            recorder,
+		ProxyMode:           proxyMode,
+		NodeRef:             nodeRef,
+		MetricsBindAddress:  config.MetricsBindAddress,
+		BindAddressHardFail: config.BindAddressHardFail,
+		EnableProfiling:     config.EnableProfiling,
+		OOMScoreAdj:         config.OOMScoreAdj,
+		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
+		HealthzServer:       healthzServer,
+		UseEndpointSlices:   false,
 	}, nil
 }
 
@@ -164,12 +169,12 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	// Check for Windows Version
 
 	// guaranteed false on error, error only necessary for debugging
-	useWinKerelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
+	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
 	if err != nil {
 		klog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
 		return proxyModeUserspace
 	}
-	if useWinKerelProxy {
+	if useWinKernelProxy {
 		return proxyModeKernelspace
 	}
 	// Fallback.

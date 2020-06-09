@@ -135,8 +135,6 @@ type printer struct {
 	prefix string
 	indent string
 	depth  int
-
-	err error
 }
 
 type edge struct {
@@ -291,7 +289,7 @@ func (p *simpleGraphPrinter) print(g graph.Graph, name string, needsIndent, isSu
 	return nil
 }
 
-func (p *printer) printFrontMatter(name string, needsIndent, isSubgraph, isDirected, isStrict bool) error {
+func (p *printer) printFrontMatter(name string, needsIndent, isSubgraph, isDirected, isStrict bool) {
 	p.buf.WriteString(p.prefix)
 	if needsIndent {
 		for i := 0; i < p.depth; i++ {
@@ -316,7 +314,6 @@ func (p *printer) printFrontMatter(name string, needsIndent, isSubgraph, isDirec
 	}
 
 	p.openBlock(" {")
-	return nil
 }
 
 func (p *printer) writeNode(n graph.Node) {

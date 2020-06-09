@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -27,19 +28,19 @@ import (
 
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-volume-manager")
-	Describe("Volume Manager", func() {
-		Context("On terminatation of pod with memory backed volume", func() {
-			It("should remove the volume from the node [NodeConformance]", func() {
+	ginkgo.Describe("Volume Manager", func() {
+		ginkgo.Context("On terminatation of pod with memory backed volume", func() {
+			ginkgo.It("should remove the volume from the node [NodeConformance]", func() {
 				var (
 					memoryBackedPod *v1.Pod
 					volumeName      string
 				)
-				By("Creating a pod with a memory backed volume that exits success without restart", func() {
+				ginkgo.By("Creating a pod with a memory backed volume that exits success without restart", func() {
 					volumeName = "memory-volume"
 					memoryBackedPod = f.PodClient().Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
@@ -74,7 +75,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
-				By("Verifying the memory backed volume was removed from node", func() {
+				ginkgo.By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
 					var err error
 					for i := 0; i < 10; i++ {
@@ -114,7 +115,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						})
 						err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 						gp := int64(1)
-						f.PodClient().Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
+						f.PodClient().Delete(context.TODO(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 						if err == nil {
 							break
 						}

@@ -17,6 +17,7 @@ limitations under the License.
 package crdconvwebhook
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/spf13/cobra"
@@ -27,6 +28,7 @@ import (
 var (
 	certFile string
 	keyFile  string
+	port     int
 )
 
 // CmdCrdConversionWebhook is used by agnhost Cobra.
@@ -48,6 +50,8 @@ func init() {
 			"after server cert.")
 	CmdCrdConversionWebhook.Flags().StringVar(&keyFile, "tls-private-key-file", "",
 		"File containing the default x509 private key matching --tls-cert-file.")
+	CmdCrdConversionWebhook.Flags().IntVar(&port, "port", 443,
+		"Secure port that the webhook listens on")
 }
 
 // Config contains the server (the webhook) cert and key.
@@ -60,10 +64,14 @@ func main(cmd *cobra.Command, args []string) {
 	config := Config{CertFile: certFile, KeyFile: keyFile}
 
 	http.HandleFunc("/crdconvert", converter.ServeExampleConvert)
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, req *http.Request) { w.Write([]byte("ok")) })
 	clientset := getClient()
 	server := &http.Server{
-		Addr:      ":443",
+		Addr:      fmt.Sprintf(":%d", port),
 		TLSConfig: configTLS(config, clientset),
 	}
-	server.ListenAndServeTLS("", "")
+	err := server.ListenAndServeTLS("", "")
+	if err != nil {
+		panic(err)
+	}
 }

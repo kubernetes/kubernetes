@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,7 +42,7 @@ func TestGetValidatedSources(t *testing.T) {
 	require.Len(t, sources, 3)
 
 	// Unknown source.
-	sources, err = GetValidatedSources([]string{"taco"})
+	_, err = GetValidatedSources([]string{"taco"})
 	require.Error(t, err)
 }
 

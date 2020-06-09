@@ -152,8 +152,8 @@ func main() {
 		script = *onChange
 		log.Printf("No on-start supplied, on-change %v will be applied on start.", script)
 	}
-	for newPeers, peers := sets.NewString(), sets.NewString(); script != ""; time.Sleep(pollPeriod) {
-		newPeers, err = lookup(*svc)
+	for peers := sets.NewString(); script != ""; time.Sleep(pollPeriod) {
+		newPeers, err := lookup(*svc)
 		if err != nil {
 			log.Printf("%v", err)
 			continue

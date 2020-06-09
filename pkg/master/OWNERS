@@ -30,16 +30,13 @@ reviewers:
 - luxas
 - janetkuo
 - justinsb
-- roberthbailey
 - ncdc
-- tallclair
 - mwielgus
 - timothysc
 - soltysh
 - piosz
 - madhusudancs
 - hongchaodeng
-- jszczepkowski
 - enj
 labels:
 - sig/api-machinery

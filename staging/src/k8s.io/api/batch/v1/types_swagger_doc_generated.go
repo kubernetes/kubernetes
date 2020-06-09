@@ -29,9 +29,9 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_Job = map[string]string{
 	"":         "Job represents the configuration of a single job.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "Specification of the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-	"status":   "Current status of a job. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Specification of the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "Current status of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (Job) SwaggerDoc() map[string]string {
@@ -54,7 +54,7 @@ func (JobCondition) SwaggerDoc() map[string]string {
 
 var map_JobList = map[string]string{
 	"":         "JobList is a collection of jobs.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is the list of Jobs.",
 }
 

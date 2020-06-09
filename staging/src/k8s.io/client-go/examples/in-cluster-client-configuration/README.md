@@ -37,7 +37,7 @@ kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccou
 
 Then, run the image in a Pod with a single instance Deployment:
 
-    kubectl run --rm -i demo --image=in-cluster --image-pull-policy=Never
+    kubectl run --rm -i demo --image=in-cluster
 
     There are 4 pods in the cluster
     There are 4 pods in the cluster

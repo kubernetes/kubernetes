@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	// When these values are updated, also update test/e2e/framework/util.go
+	// When these values are updated, also update test/utils/image/manifest.go
 	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
-	defaultPodSandboxImageVersion = "3.1"
+	defaultPodSandboxImageVersion = "3.2"
 )
 
 var (
@@ -51,7 +51,6 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		DockershimRootDirectory:    "/var/lib/dockershim",
 		PodSandboxImage:            defaultPodSandboxImage,
 		ImagePullProgressDeadline:  metav1.Duration{Duration: 1 * time.Minute},
-		ExperimentalDockershim:     false,
 
 		//Alpha feature
 		CNIBinDir:   "/opt/cni/bin",

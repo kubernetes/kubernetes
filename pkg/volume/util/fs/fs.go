@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
-// FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// FsInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
 func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
@@ -68,9 +68,9 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 	}
 	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", path).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", path).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -s -B 1) on path %s with error %v", path, err)
+		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -x -s -B 1) on path %s with error %v", path, err)
 	}
 	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
 	if err != nil {

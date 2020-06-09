@@ -113,6 +113,6 @@ spec:
         operator: Exists
       - operator: Exists
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
 `
 )

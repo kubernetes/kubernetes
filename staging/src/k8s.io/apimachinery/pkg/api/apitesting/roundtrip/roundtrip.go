@@ -26,7 +26,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
@@ -103,6 +103,23 @@ var globalNonRoundTrippableTypes = sets.NewString(
 	"DeleteOptions",
 )
 
+// GlobalNonRoundTrippableTypes returns the kinds that are effectively reserved across all GroupVersions.
+// They don't roundtrip and thus can be excluded in any custom/downstream roundtrip tests
+//
+//  kinds := scheme.AllKnownTypes()
+//  for gvk := range kinds {
+//      if roundtrip.GlobalNonRoundTrippableTypes().Has(gvk.Kind) {
+//          continue
+//      }
+//      t.Run(gvk.Group+"."+gvk.Version+"."+gvk.Kind, func(t *testing.T) {
+//          // roundtrip test
+//      })
+//  }
+//
+func GlobalNonRoundTrippableTypes() sets.String {
+	return sets.NewString(globalNonRoundTrippableTypes.List()...)
+}
+
 // RoundTripTypesWithoutProtobuf applies the round-trip test to all round-trippable Kinds
 // in the scheme.  It will skip all the GroupVersionKinds in the skip list.
 func RoundTripTypesWithoutProtobuf(t *testing.T, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool) {
@@ -142,6 +159,20 @@ func RoundTripExternalTypes(t *testing.T, scheme *runtime.Scheme, codecFactory r
 		}
 		t.Run(gvk.Group+"."+gvk.Version+"."+gvk.Kind, func(t *testing.T) {
 			roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, false)
+		})
+	}
+}
+
+// RoundTripExternalTypesWithoutProtobuf applies the round-trip test to all external round-trippable Kinds
+// in the scheme.  It will skip all the GroupVersionKinds in the nonRoundTripExternalTypes list.
+func RoundTripExternalTypesWithoutProtobuf(t *testing.T, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool) {
+	kinds := scheme.AllKnownTypes()
+	for gvk := range kinds {
+		if gvk.Version == runtime.APIVersionInternal || globalNonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+		t.Run(gvk.Group+"."+gvk.Version+"."+gvk.Kind, func(t *testing.T) {
+			roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, true)
 		})
 	}
 }

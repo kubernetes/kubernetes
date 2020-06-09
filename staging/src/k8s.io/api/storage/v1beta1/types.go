@@ -24,6 +24,9 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.4
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,StorageClass
 
 // StorageClass describes the parameters for a class of storage for
 // which PersistentVolumes can be dynamically provisioned.
@@ -33,7 +36,7 @@ import (
 type StorageClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -75,12 +78,15 @@ type StorageClass struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.4
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,StorageClassList
 
 // StorageClassList is a collection of storage classes.
 type StorageClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -106,6 +112,9 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachment
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -115,7 +124,7 @@ type VolumeAttachment struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -131,12 +140,15 @@ type VolumeAttachment struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachmentList
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -220,6 +232,9 @@ type VolumeError struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIDriver
 
 // CSIDriver captures information about a Container Storage Interface (CSI)
 // volume driver deployed on the cluster.
@@ -239,7 +254,7 @@ type CSIDriver struct {
 	// The driver name must be 63 characters or less, beginning and ending with
 	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
 	// alphanumerics between.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the CSI Driver.
@@ -247,13 +262,16 @@ type CSIDriver struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIDriverList
 
 // CSIDriverList is a collection of CSIDriver objects.
 type CSIDriverList struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -291,14 +309,69 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
+	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volume
+	//                                 defined by a CSIVolumeSource, otherwise "false"
+	//
+	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
+	// required for drivers which support both the "Persistent" and "Ephemeral" VolumeLifecycleMode.
+	// Other drivers can leave pod info disabled and/or ignore this field.
+	// As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when
+	// deployed on such a cluster and the deployment determines which mode that is, for example
+	// via a command line parameter of the driver.
 	// +optional
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
+
+	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+	// The default if the list is empty is "Persistent", which is the usage
+	// defined by the CSI specification and implemented in Kubernetes via the usual
+	// PV/PVC mechanism.
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline
+	// inside the pod spec with CSIVolumeSource and their lifecycle is tied to
+	// the lifecycle of that pod. A driver has to be aware of this
+	// because it is only going to get a NodePublishVolume call for such a volume.
+	// For more information about implementing this mode, see
+	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
+	// A driver can support one or more of these modes and
+	// more modes may be added in the future.
+	// +optional
+	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 }
+
+// VolumeLifecycleMode is an enumeration of possible usage modes for a volume
+// provided by a CSI driver. More modes may be added in the future.
+type VolumeLifecycleMode string
+
+const (
+	// VolumeLifecyclePersistent explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.VolumeLifecycleModes is not
+	// set. Such volumes are managed in Kubernetes via the persistent volume
+	// claim mechanism and have a lifecycle that is independent of the pods which
+	// use them.
+	VolumeLifecyclePersistent VolumeLifecycleMode = "Persistent"
+
+	// VolumeLifecycleEphemeral indicates that the driver can be used for
+	// ephemeral inline volumes. Such volumes are specified inside the pod
+	// spec with a CSIVolumeSource and, as far as Kubernetes is concerned, have
+	// a lifecycle that is tied to the lifecycle of the pod. For example, such
+	// a volume might contain data that gets created specifically for that pod,
+	// like secrets.
+	// But how the volume actually gets created and managed is entirely up to
+	// the driver. It might also use reference counting to share the same volume
+	// instance among different pods if the CSIVolumeSource of those pods is
+	// identical.
+	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
+)
 
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.17
+// +k8s:prerelease-lifecycle-gen:removed=1.22
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSINode
 
+// DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
+// See the release notes for more information.
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as
 // they use the node-driver-registrar sidecar container, the kubelet will
@@ -374,13 +447,17 @@ type VolumeNodeResources struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.17
+// +k8s:prerelease-lifecycle-gen:removed=1.22
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSINode
 
 // CSINodeList is a collection of CSINode objects.
 type CSINodeList struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

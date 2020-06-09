@@ -68,6 +68,7 @@ type Cloud struct {
 	Addresses     []v1.NodeAddress
 	addressesMux  sync.Mutex
 	ExtID         map[types.NodeName]string
+	ExtIDErr      map[types.NodeName]error
 	InstanceTypes map[types.NodeName]string
 	Machines      []types.NodeName
 	NodeResources *v1.NodeResources
@@ -252,9 +253,17 @@ func (f *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 	return f.Addresses, f.Err
 }
 
-// InstanceID returns the cloud provider ID of the node with the specified Name.
+// InstanceID returns the cloud provider ID of the node with the specified Name, unless an entry
+// for the node exists in ExtIDError, in which case it returns the desired error (to facilitate
+// testing of error handling).
 func (f *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
+
+	err, ok := f.ExtIDErr[nodeName]
+	if ok {
+		return "", err
+	}
+
 	return f.ExtID[nodeName], nil
 }
 
@@ -281,6 +290,18 @@ func (f *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-shutdown-by-provider-id")
 	return f.NodeShutdown, f.ErrShutdownByProviderID
+}
+
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (f *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	f.addCall("instance-metadata-by-provider-id")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		Type:          f.InstanceTypes[types.NodeName(providerID)],
+		NodeAddresses: f.Addresses,
+	}, f.Err
 }
 
 // List is a test-spy implementation of Instances.List.

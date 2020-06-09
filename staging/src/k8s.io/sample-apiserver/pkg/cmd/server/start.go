@@ -41,7 +41,7 @@ import (
 	sampleopenapi "k8s.io/sample-apiserver/pkg/generated/openapi"
 )
 
-const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
+const defaultEtcdPathPrefix = "/registry/wardle.example.com"
 
 // WardleServerOptions contains state for master/api server
 type WardleServerOptions struct {
@@ -58,7 +58,6 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion),
-			genericoptions.NewProcessInfo("wardle-apiserver", "wardle"),
 		),
 
 		StdOut: out,

@@ -57,14 +57,22 @@ func (ls Set) Get(label string) string {
 	return ls[label]
 }
 
-// AsSelector converts labels into a selectors.
+// AsSelector converts labels into a selectors. It does not
+// perform any validation, which means the server will reject
+// the request if the Set contains invalid values.
 func (ls Set) AsSelector() Selector {
 	return SelectorFromSet(ls)
 }
 
+// AsValidatedSelector converts labels into a selectors.
+// The Set is validated client-side, which allows to catch errors early.
+func (ls Set) AsValidatedSelector() (Selector, error) {
+	return ValidatedSelectorFromSet(ls)
+}
+
 // AsSelectorPreValidated converts labels into a selector, but
-// assumes that labels are already validated and thus don't
-// preform any validation.
+// assumes that labels are already validated and thus doesn't
+// perform any validation.
 // According to our measurements this is significantly faster
 // in codepaths that matter at high scale.
 func (ls Set) AsSelectorPreValidated() Selector {

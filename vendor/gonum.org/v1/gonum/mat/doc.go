@@ -16,13 +16,16 @@
 //  - Methods and functions for using matrix data (Add, Trace, SymRankOne)
 //  - Types for constructing and using matrix factorizations (QR, LU)
 //  - The complementary types for complex matrices, CMatrix, CSymDense, etc.
+// In the documentation below, we use "matrix" as a short-hand for all of
+// the FooDense types implemented in this package. We use "Matrix" to
+// refer to the Matrix interface.
 //
 // A matrix may be constructed through the corresponding New function. If no
 // backing array is provided the matrix will be initialized to all zeros.
 //  // Allocate a zeroed real matrix of size 3×5
 //  zero := mat.NewDense(3, 5, nil)
 // If a backing data slice is provided, the matrix will have those elements.
-// Matrices are all stored in row-major format.
+// All matrices are all stored in row-major format.
 //  // Generate a 6×6 matrix of random values.
 //  data := make([]float64, 36)
 //  for i := range data {
@@ -34,24 +37,29 @@
 //  tr := mat.Trace(a)
 // and are implemented as methods when the operation modifies the receiver.
 //  zero.Copy(a)
+// Note that the input arguments to most functions and methods are interfaces
+// rather than concrete types `func Trace(Matrix)` rather than
+// `func Trace(*Dense)` allowing flexible use of internal and external
+// Matrix types.
 //
-// Receivers must be the correct size for the matrix operations, otherwise the
-// operation will panic. As a special case for convenience, a zero-value matrix
-// will be modified to have the correct size, allocating data if necessary.
-//  var c mat.Dense // construct a new zero-sized matrix
-//  c.Mul(a, a)     // c is automatically adjusted to be 6×6
+// When a matrix is the destination or receiver for a function or method,
+// the operation will panic if the matrix is not the correct size.
+// An exception is if that destination is empty (see below).
 //
-// Zero-value of a matrix
+// Empty matrix
 //
-// A zero-value matrix is either the Go language definition of a zero-value or
-// is a zero-sized matrix with zero-length stride. Matrix implementations may have
-// a Reset method to revert the receiver into a zero-valued matrix and an IsZero
-// method that returns whether the matrix is zero-valued.
-// So the following will all result in a zero-value matrix.
-//  - var a mat.Dense
-//  - a := NewDense(0, 0, make([]float64, 0, 100))
-//  - a.Reset()
-// A zero-value matrix can not be sliced even if it does have an adequately sized
+// An empty matrix is one that has zero size. Empty matrices are used to allow
+// the destination of a matrix operation to assume the correct size automatically.
+// This operation will re-use the backing data, if available, or will allocate
+// new data if necessary. The IsEmpty method returns whether the given matrix
+// is empty. The zero-value of a matrix is empty, and is useful for easily
+// getting the result of matrix operations.
+//  var c mat.Dense // construct a new zero-value matrix
+//  c.Mul(a, a)     // c is automatically adjusted to be the right size
+// The Reset method can be used to revert a matrix to an empty matrix.
+// Reset should not be used when multiple different matrices share the same backing
+// data slice. This can cause unexpected data modifications after being resized.
+// An empty matrix can not be sliced even if it does have an adequately sized
 // backing data slice, but can be expanded using its Grow method if it exists.
 //
 // The Matrix Interfaces
@@ -60,12 +68,12 @@
 // matrices, The Matrix interface is defined by three functions: Dims, which
 // returns the dimensions of the Matrix, At, which returns the element in the
 // specified location, and T for returning a Transpose (discussed later). All of
-// the concrete types can perform these behaviors and so implement the interface.
+// the matrix types can perform these behaviors and so implement the interface.
 // Methods and functions are designed to use this interface, so in particular the method
 //  func (m *Dense) Mul(a, b Matrix)
 // constructs a *Dense from the result of a multiplication with any Matrix types,
-// not just *Dense. Where more restrictive requirements must be met, there are also the
-// Symmetric and Triangular interfaces. For example, in
+// not just *Dense. Where more restrictive requirements must be met, there are also
+// additional interfaces like Symmetric and Triangular. For example, in
 //  func (s *SymDense) AddSym(a, b Symmetric)
 // the Symmetric interface guarantees a symmetric result.
 //
@@ -77,7 +85,7 @@
 //
 // The T method is used for transposition on real matrices, and H is used for
 // conjugate transposition on complex matrices. For example, c.Mul(a.T(), b) computes
-// c = a^T * b. The mat types implement this method implicitly —
+// c = aᵀ * b. The mat types implement this method implicitly —
 // see the Transpose and Conjugate types for more details. Note that some
 // operations have a transpose as part of their definition, as in *SymDense.SymOuterK.
 //
@@ -126,7 +134,8 @@
 // Invariants
 //
 // Matrix input arguments to functions are never directly modified. If an operation
-// changes Matrix data, the mutated matrix will be the receiver of a function.
+// changes Matrix data, the mutated matrix will be the receiver of a method, or
+// will be the first argument to a method or function.
 //
 // For convenience, a matrix may be used as both a receiver and as an input, e.g.
 //  a.Pow(a, 6)

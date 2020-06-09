@@ -17,8 +17,10 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +31,6 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -37,6 +38,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestCRDShadowGroup(t *testing.T) {
@@ -48,7 +50,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if _, err := kubeclient.CoreV1().Namespaces().Create((&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})); err != nil {
+	if _, err := kubeclient.CoreV1().Namespaces().Create(context.TODO(), (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -58,13 +60,13 @@ func TestCRDShadowGroup(t *testing.T) {
 	}
 
 	t.Logf("Creating a NetworkPolicy")
-	nwPolicy, err := kubeclient.NetworkingV1().NetworkPolicies(testNamespace).Create(&networkingv1.NetworkPolicy{
+	nwPolicy, err := kubeclient.NetworkingV1().NetworkPolicies(testNamespace).Create(context.TODO(), &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: testNamespace},
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Ingress:     []networkingv1.NetworkPolicyIngressRule{},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create NetworkPolicy: %v", err)
 	}
@@ -90,7 +92,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Logf("Checking that we still see the NetworkPolicy")
-	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(nwPolicy.Name, metav1.GetOptions{})
+	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(context.TODO(), nwPolicy.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get NetworkPolocy: %v", err)
 	}
@@ -110,7 +112,7 @@ func TestCRD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if _, err := kubeclient.CoreV1().Namespaces().Create((&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})); err != nil {
+	if _, err := kubeclient.CoreV1().Namespaces().Create(context.TODO(), (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -142,7 +144,7 @@ func TestCRD(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	fooResource := schema.GroupVersionResource{Group: "cr.bar.com", Version: "v1", Resource: "foos"}
-	_, err = dynamicClient.Resource(fooResource).Namespace(testNamespace).List(metav1.ListOptions{})
+	_, err = dynamicClient.Resource(fooResource).Namespace(testNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("Failed to list foos.cr.bar.com instances: %v", err)
 	}
@@ -159,13 +161,14 @@ func TestCRDOpenAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	t.Logf("Trying to create a custom resource without conflict")
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+
+	t.Logf("Trying to create a CustomResourceDefinitions")
+	nonStructuralCRD := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foos.cr.bar.com",
+			Name: "foos.nonstructural.cr.bar.com",
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
+			Group:   "nonstructural.cr.bar.com",
 			Version: "v1",
 			Scope:   apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
@@ -176,76 +179,122 @@ func TestCRDOpenAPI(t *testing.T) {
 				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 					Type: "object",
 					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"foo": {},
+					},
+				},
+			},
+		},
+	}
+	structuralCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foos.structural.cr.bar.com",
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "structural.cr.bar.com",
+			Version: "v1",
+			Scope:   apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: "foos",
+				Kind:   "Foo",
+			},
+			PreserveUnknownFields: utilpointer.BoolPtr(false),
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 						"foo": {Type: "string"},
 					},
 				},
 			},
 		},
 	}
-	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
-	waitForSpec := func(expectedType string) {
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, nonStructuralCRD)
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, structuralCRD)
+
+	getPublishedSchema := func(defName string) (*spec.Schema, error) {
+		bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
+		if err != nil {
+			return nil, err
+		}
+		spec := spec.Swagger{}
+		if err := json.Unmarshal(bs, &spec); err != nil {
+			return nil, err
+		}
+		if spec.SwaggerProps.Paths == nil {
+			return nil, nil
+		}
+		d, ok := spec.SwaggerProps.Definitions[defName]
+		if !ok {
+			return nil, nil
+		}
+		return &d, nil
+	}
+
+	waitForSpec := func(crd *apiextensionsv1beta1.CustomResourceDefinition, expectedType string) {
 		t.Logf(`Waiting for {properties: {"foo": {"type":"%s"}}} to show up in schema`, expectedType)
 		lastMsg := ""
 		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
 			lastMsg = ""
-			bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+			defName := crdDefinitionName(crd)
+			schema, err := getPublishedSchema(defName)
 			if err != nil {
-				return false, err
-			}
-			spec := spec.Swagger{}
-			if err := json.Unmarshal(bs, &spec); err != nil {
-				return false, err
-			}
-			if spec.SwaggerProps.Paths == nil {
-				lastMsg = "spec.SwaggerProps.Paths is nil"
+				lastMsg = err.Error()
 				return false, nil
 			}
-			d, ok := spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"]
-			if !ok {
-				lastMsg = `spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"] not found`
+			if schema == nil {
+				lastMsg = fmt.Sprintf("spec.SwaggerProps.Definitions[%q] not found", defName)
 				return false, nil
 			}
-			p, ok := d.Properties["foo"]
+			p, ok := schema.Properties["foo"]
 			if !ok {
-				lastMsg = `spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"].Properties["foo"] not found`
+				lastMsg = fmt.Sprintf(`spec.SwaggerProps.Definitions[%q].Properties["foo"] not found`, defName)
 				return false, nil
 			}
 			if !p.Type.Contains(expectedType) {
-				lastMsg = fmt.Sprintf(`spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"].Properties["foo"].Type should be %q, but got: %q`, expectedType, p.Type)
+				lastMsg = fmt.Sprintf(`spec.SwaggerProps.Definitions[%q].Properties["foo"].Type should be %q, but got: %q`, defName, expectedType, p.Type)
 				return false, nil
 			}
 			return true, nil
 		}); err != nil {
-			t.Fatalf("Failed to see %s OpenAPI spec in discovery: %v, last message: %s", crd.Name, err, lastMsg)
+			t.Fatalf("Failed to see %s OpenAPI spec in discovery: %v, last message: %s", structuralCRD.Name, err, lastMsg)
 		}
 	}
-	waitForSpec("string")
-	crd, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+
+	t.Logf("Check that structural schema is published")
+	waitForSpec(structuralCRD, "string")
+	structuralCRD, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), structuralCRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prop := crd.Spec.Validation.OpenAPIV3Schema.Properties["foo"]
+	prop := structuralCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"]
 	prop.Type = "boolean"
-	crd.Spec.Validation.OpenAPIV3Schema.Properties["foo"] = prop
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd); err != nil {
+	structuralCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"] = prop
+	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), structuralCRD, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	waitForSpec("boolean")
-}
+	waitForSpec(structuralCRD, "boolean")
 
-type Foo struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-}
-
-func unstructuredFoo(foo *Foo) (*unstructured.Unstructured, error) {
-	bs, err := json.Marshal(foo)
+	t.Logf("Check that non-structural schema is not published")
+	schema, err := getPublishedSchema(crdDefinitionName(nonStructuralCRD))
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	ret := &unstructured.Unstructured{}
-	if err = ret.UnmarshalJSON(bs); err != nil {
-		return nil, err
+	if schema == nil {
+		t.Fatal("expected a non-nil schema")
 	}
-	return ret, nil
+	if foo, ok := schema.Properties["foo"]; ok {
+		t.Fatalf("unexpected published 'foo' property: %#v", foo)
+	}
+}
+
+func crdDefinitionName(crd *apiextensionsv1beta1.CustomResourceDefinition) string {
+	sgmts := strings.Split(crd.Spec.Group, ".")
+	reverse(sgmts)
+	return strings.Join(append(sgmts, crd.Spec.Version, crd.Spec.Names.Kind), ".")
+}
+
+func reverse(s []string) {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
 }

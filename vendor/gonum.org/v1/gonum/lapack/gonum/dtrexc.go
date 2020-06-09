@@ -7,7 +7,7 @@ package gonum
 import "gonum.org/v1/gonum/lapack"
 
 // Dtrexc reorders the real Schur factorization of a n×n real matrix
-//  A = Q*T*Q^T
+//  A = Q*T*Qᵀ
 // so that the diagonal block of T with row index ifst is moved to row ilst.
 //
 // On entry, T must be in Schur canonical form, that is, block upper triangular
@@ -15,7 +15,7 @@ import "gonum.org/v1/gonum/lapack"
 // elements equal and its off-diagonal elements of opposite sign.
 //
 // On return, T will be reordered by an orthogonal similarity transformation Z
-// as Z^T*T*Z, and will be again in Schur canonical form.
+// as Zᵀ*T*Z, and will be again in Schur canonical form.
 //
 // If compq is lapack.UpdateSchur, on return the matrix Q of Schur vectors will be
 // updated by post-multiplying it with Z.

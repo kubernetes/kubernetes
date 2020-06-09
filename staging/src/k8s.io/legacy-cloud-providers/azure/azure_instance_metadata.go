@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -22,6 +24,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
 const (
@@ -50,8 +54,8 @@ type NetworkData struct {
 
 // IPAddress represents IP address information.
 type IPAddress struct {
-	PrivateIP string `json:"privateIPAddress"`
-	PublicIP  string `json:"publicIPAddress"`
+	PrivateIP string `json:"privateIpAddress"`
+	PublicIP  string `json:"publicIpAddress"`
 }
 
 // Subnet represents subnet information.
@@ -62,6 +66,7 @@ type Subnet struct {
 
 // ComputeMetadata represents compute information
 type ComputeMetadata struct {
+	Environment    string `json:"azEnvironment,omitempty"`
 	SKU            string `json:"sku,omitempty"`
 	Name           string `json:"name,omitempty"`
 	Zone           string `json:"zone,omitempty"`
@@ -72,6 +77,7 @@ type ComputeMetadata struct {
 	UpdateDomain   string `json:"platformUpdateDomain,omitempty"`
 	ResourceGroup  string `json:"resourceGroupName,omitempty"`
 	VMScaleSetName string `json:"vmScaleSetName,omitempty"`
+	SubscriptionID string `json:"subscriptionId,omitempty"`
 }
 
 // InstanceMetadata represents instance information.
@@ -83,7 +89,7 @@ type InstanceMetadata struct {
 // InstanceMetadataService knows how to query the Azure instance metadata server.
 type InstanceMetadataService struct {
 	metadataURL string
-	imsCache    *timedCache
+	imsCache    *azcache.TimedCache
 }
 
 // NewInstanceMetadataService creates an instance of the InstanceMetadataService accessor object.
@@ -92,7 +98,7 @@ func NewInstanceMetadataService(metadataURL string) (*InstanceMetadataService, e
 		metadataURL: metadataURL,
 	}
 
-	imsCache, err := newTimedcache(metadataCacheTTL, ims.getInstanceMetadata)
+	imsCache, err := azcache.NewTimedcache(metadataCacheTTL, ims.getInstanceMetadata)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +117,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 
 	q := req.URL.Query()
 	q.Add("format", "json")
-	q.Add("api-version", "2017-12-01")
+	q.Add("api-version", "2019-03-11")
 	req.URL.RawQuery = q.Encode()
 
 	client := &http.Client{}
@@ -121,7 +127,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failure of getting instance metadata with response %q", resp.Status)
 	}
 
@@ -140,8 +146,9 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 }
 
 // GetMetadata gets instance metadata from cache.
-func (ims *InstanceMetadataService) GetMetadata() (*InstanceMetadata, error) {
-	cache, err := ims.imsCache.Get(metadataCacheKey)
+// crt determines if we can get data from stalled cache/need fresh if cache expired.
+func (ims *InstanceMetadataService) GetMetadata(crt azcache.AzureCacheReadType) (*InstanceMetadata, error) {
+	cache, err := ims.imsCache.Get(metadataCacheKey, crt)
 	if err != nil {
 		return nil, err
 	}

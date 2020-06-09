@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -24,10 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec"
 )
 
 type fakeFileInfo struct {
@@ -62,7 +63,6 @@ var (
 	lunStr    = "1"
 	diskPath  = "4:0:0:" + lunStr
 	devName   = "sdd"
-	lun1      = 2
 	lunStr1   = "2"
 	diskPath1 = "3:0:0:" + lunStr1
 	devName1  = "sde"
@@ -125,7 +125,7 @@ func TestIoHandler(t *testing.T) {
 	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 		t.Skipf("TestIoHandler not supported on GOOS=%s", runtime.GOOS)
 	}
-	disk, err := findDiskByLun(lun, &fakeIOHandler{}, mount.NewOsExec())
+	disk, err := findDiskByLun(lun, &fakeIOHandler{}, exec.New())
 	if runtime.GOOS == "windows" {
 		if err != nil {
 			t.Errorf("no data disk found: disk %v err %v", disk, err)
@@ -146,7 +146,7 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 	}{
 		{
 			storageAccountType:  "",
-			expectedAccountType: compute.StandardLRS,
+			expectedAccountType: compute.StandardSSDLRS,
 			expectError:         false,
 		},
 		{

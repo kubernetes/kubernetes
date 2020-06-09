@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Microsoft/hcsshim"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 )
@@ -75,6 +75,9 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 	}
 
 	endpoints, err := hcsshim.HNSListEndpointRequest()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list endpoints: %v", err)
+	}
 	for _, endpoint := range endpoints {
 		equal := false
 		if endpoint.IPAddress != nil {

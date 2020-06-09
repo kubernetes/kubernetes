@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -30,11 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -55,9 +54,12 @@ type Controller struct {
 	EventClient     corev1client.EventsGetter
 	healthClient    rest.Interface
 
-	ServiceClusterIPRegistry rangeallocation.RangeRegistry
+	ServiceClusterIPRegistry          rangeallocation.RangeRegistry
+	ServiceClusterIPRange             net.IPNet
+	SecondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
+	SecondaryServiceClusterIPRange    net.IPNet
+
 	ServiceClusterIPInterval time.Duration
-	ServiceClusterIPRange    net.IPNet
 
 	ServiceNodePortRegistry rangeallocation.RangeRegistry
 	ServiceNodePortInterval time.Duration
@@ -89,10 +91,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		klog.Fatalf("failed to get listener address: %v", err)
 	}
 
-	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic}
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		systemNamespaces = append(systemNamespaces, corev1.NamespaceNodeLease)
-	}
+	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
 
 	return &Controller{
 		ServiceClient:   serviceClient,
@@ -106,8 +105,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SystemNamespaces:         systemNamespaces,
 		SystemNamespacesInterval: 1 * time.Minute,
 
-		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    c.ExtraConfig.ServiceIPRange,
+		ServiceClusterIPRegistry:          legacyRESTStorage.ServiceClusterIPAllocator,
+		ServiceClusterIPRange:             c.ExtraConfig.ServiceIPRange,
+		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
+		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
+
 		ServiceClusterIPInterval: 3 * time.Minute,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
@@ -125,11 +127,13 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 	}
 }
 
+// PostStartHook initiates the core controller loops that must exist for bootstrapping.
 func (c *Controller) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 	c.Start()
 	return nil
 }
 
+// PreShutdownHook triggers the actions needed to shut down the API Server cleanly.
 func (c *Controller) PreShutdownHook() error {
 	c.Stop()
 	return nil
@@ -148,7 +152,7 @@ func (c *Controller) Start() {
 		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
 	}
 
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
+	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.EventClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
@@ -165,6 +169,7 @@ func (c *Controller) Start() {
 	c.runner.Start()
 }
 
+// Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
 func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
@@ -206,7 +211,7 @@ func (c *Controller) RunKubernetesService(ch chan struct{}) {
 	// wait until process is ready
 	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
 		var code int
-		c.healthClient.Get().AbsPath("/healthz").Do().StatusCode(&code)
+		c.healthClient.Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&code)
 		return code == http.StatusOK, nil
 	}, ch)
 
@@ -273,15 +278,15 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 	return endpointPorts
 }
 
-// CreateMasterServiceIfNeeded will create the specified service if it
+// CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
-	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
+	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
 			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
-				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(svc)
+				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
 				return err
 			}
 		}
@@ -303,7 +308,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		},
 	}
 
-	_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Create(svc)
+	_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
 		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}

@@ -29,20 +29,20 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	ports "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	ccmconfigscheme "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme"
 	ccmconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
@@ -106,6 +106,9 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 	s.SecureServing.ServerCert.CertDirectory = ""
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
 	s.SecureServing.BindPort = ports.CloudControllerManagerPort
+
+	s.Generic.LeaderElection.ResourceName = "cloud-controller-manager"
+	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
 
 	return &s, nil
 }
@@ -176,6 +179,8 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	if err != nil {
 		return err
 	}
+	c.Kubeconfig.DisableCompression = true
+	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
 	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
 	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
 	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
@@ -264,6 +269,5 @@ func createRecorder(kubeClient clientset.Interface, userAgent string) record.Eve
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	// TODO: remove dependence on the legacyscheme
-	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
+	return eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: userAgent})
 }

@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"fmt"
-	"time"
 
 	e2eperftype "k8s.io/kubernetes/test/e2e/perftype"
 )
@@ -59,51 +58,6 @@ func (a *APIResponsiveness) Swap(i, j int) {
 }
 func (a *APIResponsiveness) Less(i, j int) bool {
 	return a.APICalls[i].Latency.Perc99 < a.APICalls[j].Latency.Perc99
-}
-
-// Set request latency for a particular quantile in the APICall metric entry (creating one if necessary).
-// 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
-// Only 0.5, 0.9 and 0.99 quantiles are supported.
-func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb, scope string, quantile float64, latency time.Duration) {
-	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb && apicall.Scope == scope {
-			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
-			return
-		}
-	}
-	apicall := setQuantileAPICall(APICall{Resource: resource, Subresource: subresource, Verb: verb, Scope: scope}, quantile, latency)
-	a.APICalls = append(a.APICalls, apicall)
-}
-
-// 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
-// Only 0.5, 0.9 and 0.99 quantiles are supported.
-func setQuantileAPICall(apicall APICall, quantile float64, latency time.Duration) APICall {
-	setQuantile(&apicall.Latency, quantile, latency)
-	return apicall
-}
-
-// Only 0.5, 0.9 and 0.99 quantiles are supported.
-func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration) {
-	switch quantile {
-	case 0.5:
-		metric.Perc50 = latency
-	case 0.9:
-		metric.Perc90 = latency
-	case 0.99:
-		metric.Perc99 = latency
-	}
-}
-
-// Add request count to the APICall metric entry (creating one if necessary).
-func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb, scope string, count int) {
-	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb && apicall.Scope == scope {
-			a.APICalls[i].Count += count
-			return
-		}
-	}
-	apicall := APICall{Resource: resource, Subresource: subresource, Verb: verb, Count: count, Scope: scope}
-	a.APICalls = append(a.APICalls, apicall)
 }
 
 // currentAPICallMetricsVersion is the current apicall performance metrics version. We should

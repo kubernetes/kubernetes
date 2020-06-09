@@ -547,7 +547,6 @@ function compute-kube-apiserver-params {
 	params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
 	params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
 	params+=" --secure-port=443"
-	params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
 	params+=" --target-ram-mb=$((NUM_NODES * 60))"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
@@ -776,4 +775,4 @@ until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
 	fi
 done
 
-echo "Done for the configuration for kubermark master"
+echo "Done for the configuration for kubemark master"

@@ -7,6 +7,8 @@ go_library(
         "data.go",
         "preflight.go",
         "removeetcdmember.go",
+        "unmount.go",
+        "unmount_linux.go",
         "updateclusterstatus.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset",
@@ -25,7 +27,7 @@ go_library(
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

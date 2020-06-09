@@ -17,11 +17,12 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -118,11 +119,11 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.RecommendedOptions.SecureServing.ServerCert.CertDirectory = result.TmpDir
 	s.RecommendedOptions.SecureServing.ExternalAddress = s.RecommendedOptions.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
 
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return result, fmt.Errorf("failed to get current file")
+	pkgPath, err := pkgPath(t)
+	if err != nil {
+		return result, err
 	}
-	s.RecommendedOptions.SecureServing.ServerCert.FixtureDirectory = path.Join(path.Dir(thisFile), "testdata")
+	s.RecommendedOptions.SecureServing.ServerCert.FixtureDirectory = filepath.Join(pkgPath, "testdata")
 
 	if storageConfig != nil {
 		s.RecommendedOptions.Etcd.StorageConfig = *storageConfig
@@ -170,7 +171,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		default:
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
+		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
@@ -215,4 +216,37 @@ func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
 	}
 
 	return ln, tcpAddr.Port, nil
+}
+
+// pkgPath returns the absolute file path to this package's directory. With go
+// test, we can just look at the runtime call stack. However, bazel compiles go
+// binaries with the -trimpath option so the simple approach fails however we
+// can consult environment variables to derive the path.
+//
+// The approach taken here works for both go test and bazel on the assumption
+// that if and only if trimpath is passed, we are running under bazel.
+func pkgPath(t Logger) (string, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("failed to get current file")
+	}
+
+	pkgPath := filepath.Dir(thisFile)
+
+	// If we find bazel env variables, then -trimpath was passed so we need to
+	// construct the path from the environment.
+	if testSrcdir, testWorkspace := os.Getenv("TEST_SRCDIR"), os.Getenv("TEST_WORKSPACE"); testSrcdir != "" && testWorkspace != "" {
+		t.Logf("Detected bazel env varaiables: TEST_SRCDIR=%q TEST_WORKSPACE=%q", testSrcdir, testWorkspace)
+		pkgPath = filepath.Join(testSrcdir, testWorkspace, pkgPath)
+	}
+
+	// If the path is still not absolute, something other than bazel compiled
+	// with -trimpath.
+	if !filepath.IsAbs(pkgPath) {
+		return "", fmt.Errorf("can't construct an absolute path from %q", pkgPath)
+	}
+
+	t.Logf("Resolved testserver package path to: %q", pkgPath)
+
+	return pkgPath, nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"sort"
 	"strconv"
 
@@ -95,7 +96,7 @@ func GetAllReplicaSets(deployment *appsv1.Deployment, c appsclient.AppsV1Interfa
 // RsListFromClient returns an rsListFunc that wraps the given client.
 func rsListFromClient(c appsclient.AppsV1Interface) rsListFunc {
 	return func(namespace string, options metav1.ListOptions) ([]*appsv1.ReplicaSet, error) {
-		rsList, err := c.ReplicaSets(namespace).List(options)
+		rsList, err := c.ReplicaSets(namespace).List(context.TODO(), options)
 		if err != nil {
 			return nil, err
 		}

@@ -25,182 +25,182 @@ import (
 
 func TestUrlsMatch(t *testing.T) {
 	tests := []struct {
-		globUrl       string
-		targetUrl     string
+		globURL       string
+		targetURL     string
 		matchExpected bool
 	}{
 		// match when there is no path component
 		{
-			globUrl:       "*.kubernetes.io",
-			targetUrl:     "prefix.kubernetes.io",
+			globURL:       "*.kubernetes.io",
+			targetURL:     "prefix.kubernetes.io",
 			matchExpected: true,
 		},
 		{
-			globUrl:       "prefix.*.io",
-			targetUrl:     "prefix.kubernetes.io",
+			globURL:       "prefix.*.io",
+			targetURL:     "prefix.kubernetes.io",
 			matchExpected: true,
 		},
 		{
-			globUrl:       "prefix.kubernetes.*",
-			targetUrl:     "prefix.kubernetes.io",
+			globURL:       "prefix.kubernetes.*",
+			targetURL:     "prefix.kubernetes.io",
 			matchExpected: true,
 		},
 		{
-			globUrl:       "*-good.kubernetes.io",
-			targetUrl:     "prefix-good.kubernetes.io",
+			globURL:       "*-good.kubernetes.io",
+			targetURL:     "prefix-good.kubernetes.io",
 			matchExpected: true,
 		},
 		// match with path components
 		{
-			globUrl:       "*.kubernetes.io/blah",
-			targetUrl:     "prefix.kubernetes.io/blah",
+			globURL:       "*.kubernetes.io/blah",
+			targetURL:     "prefix.kubernetes.io/blah",
 			matchExpected: true,
 		},
 		{
-			globUrl:       "prefix.*.io/foo",
-			targetUrl:     "prefix.kubernetes.io/foo/bar",
+			globURL:       "prefix.*.io/foo",
+			targetURL:     "prefix.kubernetes.io/foo/bar",
 			matchExpected: true,
 		},
 		// match with path components and ports
 		{
-			globUrl:       "*.kubernetes.io:1111/blah",
-			targetUrl:     "prefix.kubernetes.io:1111/blah",
+			globURL:       "*.kubernetes.io:1111/blah",
+			targetURL:     "prefix.kubernetes.io:1111/blah",
 			matchExpected: true,
 		},
 		{
-			globUrl:       "prefix.*.io:1111/foo",
-			targetUrl:     "prefix.kubernetes.io:1111/foo/bar",
+			globURL:       "prefix.*.io:1111/foo",
+			targetURL:     "prefix.kubernetes.io:1111/foo/bar",
 			matchExpected: true,
 		},
 		// no match when number of parts mismatch
 		{
-			globUrl:       "*.kubernetes.io",
-			targetUrl:     "kubernetes.io",
+			globURL:       "*.kubernetes.io",
+			targetURL:     "kubernetes.io",
 			matchExpected: false,
 		},
 		{
-			globUrl:       "*.*.kubernetes.io",
-			targetUrl:     "prefix.kubernetes.io",
+			globURL:       "*.*.kubernetes.io",
+			targetURL:     "prefix.kubernetes.io",
 			matchExpected: false,
 		},
 		{
-			globUrl:       "*.*.kubernetes.io",
-			targetUrl:     "kubernetes.io",
+			globURL:       "*.*.kubernetes.io",
+			targetURL:     "kubernetes.io",
 			matchExpected: false,
 		},
 		// no match when some parts mismatch
 		{
-			globUrl:       "kubernetes.io",
-			targetUrl:     "kubernetes.com",
+			globURL:       "kubernetes.io",
+			targetURL:     "kubernetes.com",
 			matchExpected: false,
 		},
 		{
-			globUrl:       "k*.io",
-			targetUrl:     "quay.io",
+			globURL:       "k*.io",
+			targetURL:     "quay.io",
 			matchExpected: false,
 		},
 		// no match when ports mismatch
 		{
-			globUrl:       "*.kubernetes.io:1234/blah",
-			targetUrl:     "prefix.kubernetes.io:1111/blah",
+			globURL:       "*.kubernetes.io:1234/blah",
+			targetURL:     "prefix.kubernetes.io:1111/blah",
 			matchExpected: false,
 		},
 		{
-			globUrl:       "prefix.*.io/foo",
-			targetUrl:     "prefix.kubernetes.io:1111/foo/bar",
+			globURL:       "prefix.*.io/foo",
+			targetURL:     "prefix.kubernetes.io:1111/foo/bar",
 			matchExpected: false,
 		},
 	}
 	for _, test := range tests {
-		matched, _ := urlsMatchStr(test.globUrl, test.targetUrl)
+		matched, _ := urlsMatchStr(test.globURL, test.targetURL)
 		if matched != test.matchExpected {
 			t.Errorf("Expected match result of %s and %s to be %t, but was %t",
-				test.globUrl, test.targetUrl, test.matchExpected, matched)
+				test.globURL, test.targetURL, test.matchExpected, matched)
 		}
 	}
 }
 
 func TestDockerKeyringForGlob(t *testing.T) {
 	tests := []struct {
-		globUrl   string
-		targetUrl string
+		globURL   string
+		targetURL string
 	}{
 		{
-			globUrl:   "https://hello.kubernetes.io",
-			targetUrl: "hello.kubernetes.io",
+			globURL:   "https://hello.kubernetes.io",
+			targetURL: "hello.kubernetes.io",
 		},
 		{
-			globUrl:   "https://*.docker.io",
-			targetUrl: "prefix.docker.io",
+			globURL:   "https://*.docker.io",
+			targetURL: "prefix.docker.io",
 		},
 		{
-			globUrl:   "https://prefix.*.io",
-			targetUrl: "prefix.docker.io",
+			globURL:   "https://prefix.*.io",
+			targetURL: "prefix.docker.io",
 		},
 		{
-			globUrl:   "https://prefix.docker.*",
-			targetUrl: "prefix.docker.io",
+			globURL:   "https://prefix.docker.*",
+			targetURL: "prefix.docker.io",
 		},
 		{
-			globUrl:   "https://*.docker.io/path",
-			targetUrl: "prefix.docker.io/path",
+			globURL:   "https://*.docker.io/path",
+			targetURL: "prefix.docker.io/path",
 		},
 		{
-			globUrl:   "https://prefix.*.io/path",
-			targetUrl: "prefix.docker.io/path/subpath",
+			globURL:   "https://prefix.*.io/path",
+			targetURL: "prefix.docker.io/path/subpath",
 		},
 		{
-			globUrl:   "https://prefix.docker.*/path",
-			targetUrl: "prefix.docker.io/path",
+			globURL:   "https://prefix.docker.*/path",
+			targetURL: "prefix.docker.io/path",
 		},
 		{
-			globUrl:   "https://*.docker.io:8888",
-			targetUrl: "prefix.docker.io:8888",
+			globURL:   "https://*.docker.io:8888",
+			targetURL: "prefix.docker.io:8888",
 		},
 		{
-			globUrl:   "https://prefix.*.io:8888",
-			targetUrl: "prefix.docker.io:8888",
+			globURL:   "https://prefix.*.io:8888",
+			targetURL: "prefix.docker.io:8888",
 		},
 		{
-			globUrl:   "https://prefix.docker.*:8888",
-			targetUrl: "prefix.docker.io:8888",
+			globURL:   "https://prefix.docker.*:8888",
+			targetURL: "prefix.docker.io:8888",
 		},
 		{
-			globUrl:   "https://*.docker.io/path:1111",
-			targetUrl: "prefix.docker.io/path:1111",
+			globURL:   "https://*.docker.io/path:1111",
+			targetURL: "prefix.docker.io/path:1111",
 		},
 		{
-			globUrl:   "https://*.docker.io/v1/",
-			targetUrl: "prefix.docker.io/path:1111",
+			globURL:   "https://*.docker.io/v1/",
+			targetURL: "prefix.docker.io/path:1111",
 		},
 		{
-			globUrl:   "https://*.docker.io/v2/",
-			targetUrl: "prefix.docker.io/path:1111",
+			globURL:   "https://*.docker.io/v2/",
+			targetURL: "prefix.docker.io/path:1111",
 		},
 		{
-			globUrl:   "https://prefix.docker.*/path:1111",
-			targetUrl: "prefix.docker.io/path:1111",
+			globURL:   "https://prefix.docker.*/path:1111",
+			targetURL: "prefix.docker.io/path:1111",
 		},
 		{
-			globUrl:   "prefix.docker.io:1111",
-			targetUrl: "prefix.docker.io:1111/path",
+			globURL:   "prefix.docker.io:1111",
+			targetURL: "prefix.docker.io:1111/path",
 		},
 		{
-			globUrl:   "*.docker.io:1111",
-			targetUrl: "prefix.docker.io:1111/path",
+			globURL:   "*.docker.io:1111",
+			targetURL: "prefix.docker.io:1111/path",
 		},
 	}
 	for i, test := range tests {
 		email := "foo@bar.baz"
 		username := "foo"
-		password := "bar"
+		password := "bar" // Fake value for testing.
 		auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 		sampleDockerConfig := fmt.Sprintf(`{
    "%s": {
      "email": %q,
      "auth": %q
    }
-}`, test.globUrl, email, auth)
+}`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
 		if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
@@ -209,9 +209,9 @@ func TestDockerKeyringForGlob(t *testing.T) {
 			keyring.Add(cfg)
 		}
 
-		creds, ok := keyring.Lookup(test.targetUrl + "/foo/bar")
+		creds, ok := keyring.Lookup(test.targetURL + "/foo/bar")
 		if !ok {
-			t.Errorf("%d: Didn't find expected URL: %s", i, test.targetUrl)
+			t.Errorf("%d: Didn't find expected URL: %s", i, test.targetURL)
 			continue
 		}
 		val := creds[0]
@@ -230,45 +230,45 @@ func TestDockerKeyringForGlob(t *testing.T) {
 
 func TestKeyringMiss(t *testing.T) {
 	tests := []struct {
-		globUrl   string
-		lookupUrl string
+		globURL   string
+		lookupURL string
 	}{
 		{
-			globUrl:   "https://hello.kubernetes.io",
-			lookupUrl: "world.mesos.org/foo/bar",
+			globURL:   "https://hello.kubernetes.io",
+			lookupURL: "world.mesos.org/foo/bar",
 		},
 		{
-			globUrl:   "https://*.docker.com",
-			lookupUrl: "prefix.docker.io",
+			globURL:   "https://*.docker.com",
+			lookupURL: "prefix.docker.io",
 		},
 		{
-			globUrl:   "https://suffix.*.io",
-			lookupUrl: "prefix.docker.io",
+			globURL:   "https://suffix.*.io",
+			lookupURL: "prefix.docker.io",
 		},
 		{
-			globUrl:   "https://prefix.docker.c*",
-			lookupUrl: "prefix.docker.io",
+			globURL:   "https://prefix.docker.c*",
+			lookupURL: "prefix.docker.io",
 		},
 		{
-			globUrl:   "https://prefix.*.io/path:1111",
-			lookupUrl: "prefix.docker.io/path/subpath:1111",
+			globURL:   "https://prefix.*.io/path:1111",
+			lookupURL: "prefix.docker.io/path/subpath:1111",
 		},
 		{
-			globUrl:   "suffix.*.io",
-			lookupUrl: "prefix.docker.io",
+			globURL:   "suffix.*.io",
+			lookupURL: "prefix.docker.io",
 		},
 	}
 	for _, test := range tests {
 		email := "foo@bar.baz"
 		username := "foo"
-		password := "bar"
+		password := "bar" // Fake value for testing.
 		auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 		sampleDockerConfig := fmt.Sprintf(`{
    "%s": {
      "email": %q,
      "auth": %q
    }
-}`, test.globUrl, email, auth)
+}`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
 		if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
@@ -277,9 +277,9 @@ func TestKeyringMiss(t *testing.T) {
 			keyring.Add(cfg)
 		}
 
-		_, ok := keyring.Lookup(test.lookupUrl + "/foo/bar")
+		_, ok := keyring.Lookup(test.lookupURL + "/foo/bar")
 		if ok {
-			t.Errorf("Expected not to find URL %s, but found", test.lookupUrl)
+			t.Errorf("Expected not to find URL %s, but found", test.lookupURL)
 		}
 	}
 
@@ -289,7 +289,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -315,7 +315,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -356,7 +356,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -397,7 +397,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -499,13 +499,13 @@ func TestProvidersDockerKeyring(t *testing.T) {
 func TestDockerKeyringLookup(t *testing.T) {
 	ada := AuthConfig{
 		Username: "ada",
-		Password: "smash",
+		Password: "smash", // Fake value for testing.
 		Email:    "ada@example.com",
 	}
 
 	grace := AuthConfig{
 		Username: "grace",
-		Password: "squash",
+		Password: "squash", // Fake value for testing.
 		Email:    "grace@example.com",
 	}
 
@@ -566,7 +566,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 func TestIssue3797(t *testing.T) {
 	rex := AuthConfig{
 		Username: "rex",
-		Password: "tiny arms",
+		Password: "tiny arms", // Fake value for testing.
 		Email:    "rex@example.com",
 	}
 

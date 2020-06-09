@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -17,12 +19,20 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
+	"strconv"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	networkResourceTenantID       = "networkResourceTenantID"
+	networkResourceSubscriptionID = "networkResourceSubscriptionID"
 )
 
 func TestIsMasterNode(t *testing.T) {
@@ -52,33 +62,44 @@ func TestIsMasterNode(t *testing.T) {
 func TestGetLastSegment(t *testing.T) {
 	tests := []struct {
 		ID        string
+		separator string
 		expected  string
 		expectErr bool
 	}{
 		{
 			ID:        "",
+			separator: "/",
 			expected:  "",
 			expectErr: true,
 		},
 		{
 			ID:        "foo/",
+			separator: "/",
 			expected:  "",
 			expectErr: true,
 		},
 		{
 			ID:        "foo/bar",
+			separator: "/",
 			expected:  "bar",
 			expectErr: false,
 		},
 		{
 			ID:        "foo/bar/baz",
+			separator: "/",
 			expected:  "baz",
+			expectErr: false,
+		},
+		{
+			ID:        "k8s-agentpool-36841236-vmss_1",
+			separator: "_",
+			expected:  "1",
 			expectErr: false,
 		},
 	}
 
 	for _, test := range tests {
-		s, e := getLastSegment(test.ID)
+		s, e := getLastSegment(test.ID, test.separator)
 		if test.expectErr && e == nil {
 			t.Errorf("Expected err, but it was nil")
 			continue
@@ -124,7 +145,9 @@ func TestGenerateStorageAccountName(t *testing.T) {
 }
 
 func TestMapLoadBalancerNameToVMSet(t *testing.T) {
-	az := getTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	az.PrimaryAvailabilitySetName = "primary"
 
 	cases := []struct {
@@ -172,7 +195,9 @@ func TestMapLoadBalancerNameToVMSet(t *testing.T) {
 }
 
 func TestGetAzureLoadBalancerName(t *testing.T) {
-	az := getTestCloud()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
 	az.PrimaryAvailabilitySetName = "primary"
 
 	cases := []struct {
@@ -249,5 +274,240 @@ func TestGetAzureLoadBalancerName(t *testing.T) {
 		}
 		loadbalancerName := az.getAzureLoadBalancerName(c.clusterName, c.vmSet, c.isInternal)
 		assert.Equal(t, c.expected, loadbalancerName, c.description)
+	}
+}
+
+func TestGetLoadBalancingRuleName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+	az.PrimaryAvailabilitySetName = "primary"
+
+	svc := &v1.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Annotations: map[string]string{},
+			UID:         "257b9655-5137-4ad2-b091-ef3f07043ad3",
+		},
+	}
+
+	cases := []struct {
+		description   string
+		subnetName    string
+		isInternal    bool
+		useStandardLB bool
+		protocol      v1.Protocol
+		port          int32
+		expected      string
+	}{
+		{
+			description:   "internal lb should have subnet name on the rule name",
+			subnetName:    "shortsubnet",
+			isInternal:    true,
+			useStandardLB: true,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-shortsubnet-TCP-9000",
+		},
+		{
+			description:   "internal standard lb should have subnet name on the rule name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: true,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
+		},
+		{
+			description:   "internal basic lb should have subnet name on the rule name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: false,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
+		},
+		{
+			description:   "external standard lb should not have subnet name on the rule name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: true,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-TCP-9000",
+		},
+		{
+			description:   "external basic lb should not have subnet name on the rule name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: false,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-TCP-9000",
+		},
+	}
+
+	for _, c := range cases {
+		if c.useStandardLB {
+			az.Config.LoadBalancerSku = loadBalancerSkuStandard
+		} else {
+			az.Config.LoadBalancerSku = loadBalancerSkuBasic
+		}
+		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
+		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
+
+		loadbalancerRuleName := az.getLoadBalancerRuleName(svc, c.protocol, c.port)
+		assert.Equal(t, c.expected, loadbalancerRuleName, c.description)
+	}
+}
+
+func TestGetFrontendIPConfigName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+	az.PrimaryAvailabilitySetName = "primary"
+
+	svc := &v1.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
+				ServiceAnnotationLoadBalancerInternal:       "true",
+			},
+			UID: "257b9655-5137-4ad2-b091-ef3f07043ad3",
+		},
+	}
+
+	cases := []struct {
+		description   string
+		subnetName    string
+		isInternal    bool
+		useStandardLB bool
+		expected      string
+	}{
+		{
+			description:   "internal lb should have subnet name on the frontend ip configuration name",
+			subnetName:    "shortsubnet",
+			isInternal:    true,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad-shortsubnet",
+		},
+		{
+			description:   "internal standard lb should have subnet name on the frontend ip configuration name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
+		},
+		{
+			description:   "internal basic lb should have subnet name on the frontend ip configuration name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: false,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
+		},
+		{
+			description:   "external standard lb should not have subnet name on the frontend ip configuration name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad",
+		},
+		{
+			description:   "external basic lb should not have subnet name on the frontend ip configuration name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: false,
+			expected:      "a257b965551374ad2b091ef3f07043ad",
+		},
+	}
+
+	for _, c := range cases {
+		if c.useStandardLB {
+			az.Config.LoadBalancerSku = loadBalancerSkuStandard
+		} else {
+			az.Config.LoadBalancerSku = loadBalancerSkuBasic
+		}
+		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
+		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
+
+		ipconfigName := az.getFrontendIPConfigName(svc)
+		assert.Equal(t, c.expected, ipconfigName, c.description)
+	}
+}
+
+func TestGetFrontendIPConfigID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	testGetLoadBalancerSubResourceID(t, az, az.getFrontendIPConfigID, frontendIPConfigIDTemplate)
+}
+
+func TestGetBackendPoolID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	testGetLoadBalancerSubResourceID(t, az, az.getBackendPoolID, backendPoolIDTemplate)
+}
+
+func TestGetLoadBalancerProbeID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	testGetLoadBalancerSubResourceID(t, az, az.getLoadBalancerProbeID, loadBalancerProbeIDTemplate)
+}
+
+func testGetLoadBalancerSubResourceID(
+	t *testing.T,
+	az *Cloud,
+	getLoadBalancerSubResourceID func(string, string, string) string,
+	expectedResourceIDTemplate string) {
+	cases := []struct {
+		description                         string
+		loadBalancerName                    string
+		resourceGroupName                   string
+		subResourceName                     string
+		useNetworkResourceInDifferentTenant bool
+		expected                            string
+	}{
+		{
+			description:                         "resource id should contain NetworkResourceSubscriptionID when using network resources in different subscription",
+			loadBalancerName:                    "lbName",
+			resourceGroupName:                   "rgName",
+			subResourceName:                     "subResourceName",
+			useNetworkResourceInDifferentTenant: true,
+		},
+		{
+			description:                         "resource id should contain SubscriptionID when not using network resources in different subscription",
+			loadBalancerName:                    "lbName",
+			resourceGroupName:                   "rgName",
+			subResourceName:                     "subResourceName",
+			useNetworkResourceInDifferentTenant: false,
+		},
+	}
+
+	for _, c := range cases {
+		if c.useNetworkResourceInDifferentTenant {
+			az.NetworkResourceTenantID = networkResourceTenantID
+			az.NetworkResourceSubscriptionID = networkResourceSubscriptionID
+			c.expected = fmt.Sprintf(
+				expectedResourceIDTemplate,
+				az.NetworkResourceSubscriptionID,
+				c.resourceGroupName,
+				c.loadBalancerName,
+				c.subResourceName)
+		} else {
+			az.NetworkResourceTenantID = ""
+			az.NetworkResourceSubscriptionID = ""
+			c.expected = fmt.Sprintf(
+				expectedResourceIDTemplate,
+				az.SubscriptionID,
+				c.resourceGroupName,
+				c.loadBalancerName,
+				c.subResourceName)
+		}
+		subResourceID := getLoadBalancerSubResourceID(c.loadBalancerName, c.resourceGroupName, c.subResourceName)
+		assert.Equal(t, c.expected, subResourceID, c.description)
 	}
 }

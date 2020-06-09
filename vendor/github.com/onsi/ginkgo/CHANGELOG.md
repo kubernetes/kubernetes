@@ -1,3 +1,51 @@
+## 1.11.0
+
+### Features
+- Add syscall for riscv64 architecture [f66e896]
+- teamcity reporter: output location of test failure as well as test definition (#626) [9869142]
+- teamcity reporter: output newline after every service message (#625) [3cfa02d]
+- Add support for go module when running `generate` command (#578) [9c89e3f]
+
+## 1.10.3
+
+### Fixes
+- Set go_import_path in travis.yml to allow internal packages in forks (#607) [3b721db]
+- Add integration test [d90e0dc]
+- Fix coverage files combining [e5dde8c]
+- A new CLI option: -ginkgo.reportFile <file path> (#601) [034fd25]
+
+## 1.10.2
+
+### Fixes
+- speed up table entry generateIt() (#609) [5049dc5]
+- Fix. Write errors to stderr instead of stdout (#610) [7bb3091]
+
+## 1.10.1
+
+### Fixes
+- stack backtrace: fix skipping (#600) [2a4c0bd]
+
+## 1.10.0
+
+### Fixes
+- stack backtrace: fix alignment and skipping [66915d6]
+- fix typo in documentation [8f97b93]
+
+## 1.9.0
+
+### Features
+- Option to print output into report, when tests have passed [0545415]
+
+### Fixes
+- Fixed typos in comments [0ecbc58]
+- gofmt code [a7f8bfb]
+- Simplify code [7454d00]
+- Simplify concatenation, incrementation and function assignment [4825557]
+- Avoid unnecessary conversions [9d9403c]
+- JUnit: include more detailed information about panic [19cca4b]
+- Print help to stdout when the user asks for help [4cb7441]
+
+
 ## 1.8.0
 
 ### New Features

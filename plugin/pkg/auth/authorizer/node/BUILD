@@ -52,6 +52,7 @@ go_library(
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
@@ -61,7 +62,7 @@ go_library(
         "//third_party/forked/gonum/graph:go_default_library",
         "//third_party/forked/gonum/graph/simple:go_default_library",
         "//third_party/forked/gonum/graph/traverse:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

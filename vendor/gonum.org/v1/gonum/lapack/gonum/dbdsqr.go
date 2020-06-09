@@ -15,19 +15,19 @@ import (
 // Dbdsqr performs a singular value decomposition of a real n×n bidiagonal matrix.
 //
 // The SVD of the bidiagonal matrix B is
-//  B = Q * S * P^T
+//  B = Q * S * Pᵀ
 // where S is a diagonal matrix of singular values, Q is an orthogonal matrix of
 // left singular vectors, and P is an orthogonal matrix of right singular vectors.
 //
 // Q and P are only computed if requested. If left singular vectors are requested,
 // this routine returns U * Q instead of Q, and if right singular vectors are
-// requested P^T * VT is returned instead of P^T.
+// requested Pᵀ * VT is returned instead of Pᵀ.
 //
 // Frequently Dbdsqr is used in conjunction with Dgebrd which reduces a general
 // matrix A into bidiagonal form. In this case, the SVD of A is
-//  A = (U * Q) * S * (P^T * VT)
+//  A = (U * Q) * S * (Pᵀ * VT)
 //
-// This routine may also compute Q^T * C.
+// This routine may also compute Qᵀ * C.
 //
 // d and e contain the elements of the bidiagonal matrix b. d must have length at
 // least n, and e must have length at least n-1. Dbdsqr will panic if there is
@@ -35,13 +35,13 @@ import (
 // order.
 //
 // VT is a matrix of size n×ncvt whose elements are stored in vt. The elements
-// of vt are modified to contain P^T * VT on exit. VT is not used if ncvt == 0.
+// of vt are modified to contain Pᵀ * VT on exit. VT is not used if ncvt == 0.
 //
 // U is a matrix of size nru×n whose elements are stored in u. The elements
 // of u are modified to contain U * Q on exit. U is not used if nru == 0.
 //
 // C is a matrix of size n×ncc whose elements are stored in c. The elements
-// of c are modified to contain Q^T * C on exit. C is not used if ncc == 0.
+// of c are modified to contain Qᵀ * C on exit. C is not used if ncc == 0.
 //
 // work contains temporary storage and must have length at least 4*(n-1). Dbdsqr
 // will panic if there is insufficient working memory.

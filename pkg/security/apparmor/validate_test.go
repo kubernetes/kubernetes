@@ -62,13 +62,13 @@ func TestValidateProfile(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{ProfileRuntimeDefault, true},
-		{ProfileNameUnconfined, true},
+		{v1.AppArmorBetaProfileRuntimeDefault, true},
+		{v1.AppArmorBetaProfileNameUnconfined, true},
 		{"baz", false}, // Missing local prefix.
-		{ProfileNamePrefix + "/usr/sbin/ntpd", true},
-		{ProfileNamePrefix + "foo-bar", true},
-		{ProfileNamePrefix + "unloaded", false}, // Not loaded.
-		{ProfileNamePrefix + "", false},
+		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
+		{v1.AppArmorBetaProfileNamePrefix + "unloaded", false}, // Not loaded.
+		{v1.AppArmorBetaProfileNamePrefix + "", false},
 	}
 
 	for _, test := range tests {
@@ -92,8 +92,8 @@ func TestValidateBadHost(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{ProfileRuntimeDefault, false},
-		{ProfileNamePrefix + "docker-default", false},
+		{v1.AppArmorBetaProfileRuntimeDefault, false},
+		{v1.AppArmorBetaProfileNamePrefix + "docker-default", false},
 	}
 
 	for _, test := range tests {
@@ -116,13 +116,13 @@ func TestValidateValidHost(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{ProfileRuntimeDefault, true},
-		{ProfileNamePrefix + "docker-default", true},
-		{ProfileNamePrefix + "foo-container", true},
-		{ProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{v1.AppArmorBetaProfileRuntimeDefault, true},
+		{v1.AppArmorBetaProfileNamePrefix + "docker-default", true},
+		{v1.AppArmorBetaProfileNamePrefix + "foo-container", true},
+		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
 		{"docker-default", false},
-		{ProfileNamePrefix + "foo", false},
-		{ProfileNamePrefix + "", false},
+		{v1.AppArmorBetaProfileNamePrefix + "foo", false},
+		{v1.AppArmorBetaProfileNamePrefix + "", false},
 	}
 
 	for _, test := range tests {
@@ -138,9 +138,9 @@ func TestValidateValidHost(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				ContainerAnnotationKeyPrefix + "init":  ProfileNamePrefix + "foo-container",
-				ContainerAnnotationKeyPrefix + "test1": ProfileRuntimeDefault,
-				ContainerAnnotationKeyPrefix + "test2": ProfileNamePrefix + "docker-default",
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "init":  v1.AppArmorBetaProfileNamePrefix + "foo-container",
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test1": v1.AppArmorBetaProfileRuntimeDefault,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test2": v1.AppArmorBetaProfileNamePrefix + "docker-default",
 			},
 		},
 		Spec: v1.PodSpec{
@@ -176,7 +176,7 @@ func TestParseProfileName(t *testing.T) {
 
 func getPodWithProfile(profile string) *v1.Pod {
 	annotations := map[string]string{
-		ContainerAnnotationKeyPrefix + "test": profile,
+		v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 	}
 	if profile == "" {
 		annotations = map[string]string{

@@ -9,11 +9,14 @@ go_library(
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/util:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -25,6 +28,7 @@ go_test(
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/testing:go_default_library",
+        "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -33,6 +37,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/csi-translation-lib:go_default_library",
     ],
 )
 

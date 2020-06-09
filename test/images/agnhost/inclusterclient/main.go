@@ -17,6 +17,7 @@ limitations under the License.
 package inclusterclient
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"flag"
@@ -30,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var pollInterval int
@@ -48,7 +49,7 @@ This subcommand can also be used to validate token rotation.`,
 
 func init() {
 	CmdInClusterClient.Flags().IntVar(&pollInterval, "poll-interval", 30,
-		"poll interval of call to /healhtz in seconds")
+		"poll interval of call to /healthz in seconds")
 }
 
 func main(cmd *cobra.Command, args []string) {
@@ -72,11 +73,12 @@ func main(cmd *cobra.Command, args []string) {
 
 	c := kubernetes.NewForConfigOrDie(cfg).RESTClient()
 
+	//lint:ignore SA1015 noisy positive, `time.Tick` is used in a main function which is fine
 	t := time.Tick(time.Duration(pollInterval) * time.Second)
 	for {
 		<-t
 		klog.Infof("calling /healthz")
-		b, err := c.Get().AbsPath("/healthz").Do().Raw()
+		b, err := c.Get().AbsPath("/healthz").Do(context.TODO()).Raw()
 		if err != nil {
 			klog.Errorf("status=failed")
 			klog.Errorf("error checking /healthz: %v\n%s\n", err, string(b))

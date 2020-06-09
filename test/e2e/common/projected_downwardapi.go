@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -58,7 +60,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
-	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r—-—————.
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func() {
@@ -74,7 +76,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
-	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r—-—————.
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func() {
@@ -87,30 +89,32 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 	})
 
-	ginkgo.It("should provide podname as non-root with fsgroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := int64(1001)
 		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/podname")
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
-			RunAsUser: &uid,
-			FSGroup:   &gid,
+			FSGroup: &gid,
 		}
+		setPodNonRootUser(pod)
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		})
 	})
 
-	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := int64(1001)
 		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
-			RunAsUser: &uid,
-			FSGroup:   &gid,
+			FSGroup: &gid,
 		}
+		setPodNonRootUser(pod)
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--r-----",
 		})
@@ -163,7 +167,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		ginkgo.By("Creating the pod")
 		podClient.CreateSync(pod)
 
-		pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		gomega.Eventually(func() (string, error) {
@@ -268,9 +272,9 @@ func projectedDownwardAPIVolumePodForModeTest(name, filePath string, itemMode, d
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--file_mode=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -294,9 +298,9 @@ func projectedDownwardAPIVolumePodForUpdateTest(name string, labels, annotations
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=1200", "--file_content_in_loop=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--break_on_expected_content=false", "--retry_time=1200", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",

@@ -17,12 +17,13 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,9 +32,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog/v2"
 )
 
 // RootCACertConfigMapName is name of the configmap which stores certificates
@@ -50,7 +50,7 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root_ca_cert_publisher"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -98,7 +98,7 @@ func (c *Publisher) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting root CA certificate configmap publisher")
 	defer klog.Infof("Shutting down root CA certificate configmap publisher")
 
-	if !controller.WaitForCacheSync("crt configmap", stopCh, c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSync("crt configmap", stopCh, c.cmListerSynced) {
 		return
 	}
 
@@ -178,15 +178,15 @@ func (c *Publisher) syncNamespace(ns string) error {
 
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
-	case apierrs.IsNotFound(err):
-		_, err := c.client.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
+	case apierrors.IsNotFound(err):
+		_, err := c.client.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: RootCACertConfigMapName,
 			},
 			Data: map[string]string{
 				"ca.crt": string(c.rootCA),
 			},
-		})
+		}, metav1.CreateOptions{})
 		return err
 	case err != nil:
 		return err
@@ -202,7 +202,7 @@ func (c *Publisher) syncNamespace(ns string) error {
 
 	cm.Data = data
 
-	_, err = c.client.CoreV1().ConfigMaps(ns).Update(cm)
+	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	return err
 }
 
@@ -211,11 +211,11 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			return nil, fmt.Errorf("Couldn't get object from tombstone %#v", obj)
+			return nil, fmt.Errorf("couldn't get object from tombstone %#v", obj)
 		}
 		cm, ok = tombstone.Obj.(*v1.ConfigMap)
 		if !ok {
-			return nil, fmt.Errorf("Tombstone contained object that is not a ConfigMap %#v", obj)
+			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", obj)
 		}
 	}
 	return cm, nil

@@ -19,10 +19,14 @@ package csidriver
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidCSIDriver(name string) *storage.CSIDriver {
@@ -42,7 +46,7 @@ func getValidCSIDriver(name string) *storage.CSIDriver {
 func TestCSIDriverStrategy(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csidrivers",
 	})
 	if Strategy.NamespaceScoped() {
@@ -72,6 +76,169 @@ func TestCSIDriverStrategy(t *testing.T) {
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}
+}
+
+func TestCSIDriverPrepareForCreate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csidrivers",
+	})
+
+	attachRequired := true
+	podInfoOnMount := true
+	csiDriver := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired: &attachRequired,
+			PodInfoOnMount: &podInfoOnMount,
+			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+				storage.VolumeLifecyclePersistent,
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		withInline bool
+	}{
+		{
+			name:       "inline enabled",
+			withInline: true,
+		},
+		{
+			name:       "inline disabled",
+			withInline: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.withInline)()
+
+			Strategy.PrepareForCreate(ctx, csiDriver)
+			errs := Strategy.Validate(ctx, csiDriver)
+			if len(errs) != 0 {
+				t.Errorf("unexpected validating errors: %v", errs)
+			}
+			if test.withInline {
+				if len(csiDriver.Spec.VolumeLifecycleModes) != 1 {
+					t.Errorf("VolumeLifecycleModes modified: %v", csiDriver.Spec)
+				}
+			} else {
+				if len(csiDriver.Spec.VolumeLifecycleModes) != 0 {
+					t.Errorf("VolumeLifecycleModes not stripped: %v", csiDriver.Spec)
+				}
+			}
+		})
+	}
+}
+
+func TestCSIDriverPrepareForUpdate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csidrivers",
+	})
+
+	attachRequired := true
+	podInfoOnMount := true
+	driverWithoutModes := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired: &attachRequired,
+			PodInfoOnMount: &podInfoOnMount,
+		},
+	}
+	driverWithPersistent := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired: &attachRequired,
+			PodInfoOnMount: &podInfoOnMount,
+			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+				storage.VolumeLifecyclePersistent,
+			},
+		},
+	}
+	driverWithEphemeral := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired: &attachRequired,
+			PodInfoOnMount: &podInfoOnMount,
+			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+				storage.VolumeLifecycleEphemeral,
+			},
+		},
+	}
+	var resultEmpty []storage.VolumeLifecycleMode
+	resultPersistent := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
+	resultEphemeral := []storage.VolumeLifecycleMode{storage.VolumeLifecycleEphemeral}
+
+	tests := []struct {
+		name                      string
+		old, update               *storage.CSIDriver
+		withInline, withoutInline []storage.VolumeLifecycleMode
+	}{
+		{
+			name:          "before: no mode, update: no mode",
+			old:           driverWithoutModes,
+			update:        driverWithoutModes,
+			withInline:    resultEmpty,
+			withoutInline: resultEmpty,
+		},
+		{
+			name:          "before: no mode, update: persistent",
+			old:           driverWithoutModes,
+			update:        driverWithPersistent,
+			withInline:    resultPersistent,
+			withoutInline: resultEmpty,
+		},
+		{
+			name:          "before: persistent, update: ephemeral",
+			old:           driverWithPersistent,
+			update:        driverWithEphemeral,
+			withInline:    resultEphemeral,
+			withoutInline: resultEphemeral,
+		},
+		{
+			name:          "before: persistent, update: no mode",
+			old:           driverWithPersistent,
+			update:        driverWithoutModes,
+			withInline:    resultEmpty,
+			withoutInline: resultEmpty,
+		},
+	}
+
+	runAll := func(t *testing.T, withInline bool) {
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, withInline)()
+
+				csiDriver := test.update.DeepCopy()
+				Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
+				if withInline {
+					require.Equal(t, csiDriver.Spec.VolumeLifecycleModes, test.withInline)
+				} else {
+					require.Equal(t, csiDriver.Spec.VolumeLifecycleModes, test.withoutInline)
+				}
+			})
+		}
+	}
+
+	t.Run("with inline volumes", func(t *testing.T) {
+		runAll(t, true)
+	})
+	t.Run("without inline volumes", func(t *testing.T) {
+		runAll(t, false)
+	})
 }
 
 func TestCSIDriverValidation(t *testing.T) {
@@ -129,6 +296,71 @@ func TestCSIDriverValidation(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"invalid volume mode",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecycleMode("no-such-mode"),
+					},
+				},
+			},
+			true,
+		},
+		{
+			"persistent volume mode",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecyclePersistent,
+					},
+				},
+			},
+			false,
+		},
+		{
+			"ephemeral volume mode",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecycleEphemeral,
+					},
+				},
+			},
+			false,
+		},
+		{
+			"both volume modes",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired: &attachRequired,
+					PodInfoOnMount: &podInfoOnMount,
+					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+						storage.VolumeLifecyclePersistent,
+						storage.VolumeLifecycleEphemeral,
+					},
+				},
+			},
+			false,
+		},
 	}
 
 	for _, test := range tests {
@@ -137,18 +369,18 @@ func TestCSIDriverValidation(t *testing.T) {
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 					APIGroup:   "storage.k8s.io",
-					APIVersion: "v1beta1",
+					APIVersion: "v1",
 					Resource:   "csidrivers",
 				})
 				return Strategy.Validate(ctx, csiDriver)
 			}
 
-			betaErr := testValidation(test.csiDriver, "v1beta1")
-			if len(betaErr) > 0 && !test.expectError {
-				t.Errorf("Validation of v1beta1 object failed: %+v", betaErr)
+			err := testValidation(test.csiDriver, "v1")
+			if len(err) > 0 && !test.expectError {
+				t.Errorf("Validation of v1 object failed: %+v", err)
 			}
-			if len(betaErr) == 0 && test.expectError {
-				t.Errorf("Validation of v1beta1 object unexpectedly succeeded")
+			if len(err) == 0 && test.expectError {
+				t.Errorf("Validation of v1 object unexpectedly succeeded")
 			}
 		})
 	}

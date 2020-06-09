@@ -11,7 +11,7 @@ no need to update `translations/test/...` which is only used for unit tests.
 There is an example [PR here](https://github.com/kubernetes/kubernetes/pull/40645) which adds support for French.
 
 Once you've added a new language, you'll need to register it in
-`pkg/kubectl/util/i18n/i18n.go` by adding it to the `knownTranslations` map.
+`staging/src/k8s.io/kubectl/pkg/util/i18n/i18n.go` by adding it to the `knownTranslations` map.
 
 ## Wrapping strings
 There is a simple script in `translations/extract.py` that performs

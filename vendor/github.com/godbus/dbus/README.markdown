@@ -14,7 +14,7 @@ D-Bus message bus system.
 
 ### Installation
 
-This packages requires Go 1.1. If you installed it and set up your GOPATH, just run:
+This packages requires Go 1.7. If you installed it and set up your GOPATH, just run:
 
 ```
 go get github.com/godbus/dbus

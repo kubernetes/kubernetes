@@ -35,16 +35,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.DeploymentControllerConfiguration)(nil), (*config.DeploymentControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_DeploymentControllerConfiguration_To_config_DeploymentControllerConfiguration(a.(*v1alpha1.DeploymentControllerConfiguration), b.(*config.DeploymentControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.DeploymentControllerConfiguration)(nil), (*v1alpha1.DeploymentControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(a.(*config.DeploymentControllerConfiguration), b.(*v1alpha1.DeploymentControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*v1alpha1.GroupResource), b.(*v1.GroupResource), scope)
 	}); err != nil {

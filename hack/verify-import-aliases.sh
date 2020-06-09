@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script verifies that all the imports have our preferred alias(es). The
+# preferred aliases for imports are listed in `hack/.import-aliases`.
+# Usage: `hack/verify-import-aliases.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

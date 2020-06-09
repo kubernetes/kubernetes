@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -25,14 +27,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"k8s.io/klog"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -87,7 +89,7 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 			klog.V(2).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)
 		} else {
 			klog.V(2).Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, nodeName, err)
-			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, nodeName, err)
+			return "", err
 		}
 	}
 
@@ -171,8 +173,12 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 			return true, nil
 		}
 
-		return false, fmt.Errorf("azureDisk - WaitForAttach failed within timeout node (%s) diskId:(%s) lun:(%v)", nodeName, diskName, lun)
+		// wait until timeout
+		return false, nil
 	})
+	if err == nil && newDevicePath == "" {
+		err = fmt.Errorf("azureDisk - WaitForAttach failed within timeout node (%s) diskId:(%s) lun:(%v)", nodeName, diskName, lun)
+	}
 
 	return newDevicePath, err
 }
@@ -196,8 +202,8 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	return makeGlobalPDPath(a.plugin.host, volumeSource.DataDiskURI, isManagedDisk)
 }
 
-func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.plugin.host.GetMounter(azureDataDiskPluginName)
+func (a *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	mounter := a.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 
 	if err != nil {
@@ -236,7 +242,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	options := []string{}
 	if notMnt {
-		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
+		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, a.plugin.host)
 		mountOptions := util.MountOptionFromSpec(spec, options...)
 		if runtime.GOOS == "windows" {
 			// only parse devicePath on Windows node
@@ -278,8 +284,8 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 }
 
 // UnmountDevice unmounts the volume on the node
-func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := mount.CleanupMountPoint(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()), false)
+func (d *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	err := mount.CleanupMountPoint(deviceMountPath, d.plugin.host.GetMounter(d.plugin.GetPluginName()), false)
 	if err == nil {
 		klog.V(2).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {

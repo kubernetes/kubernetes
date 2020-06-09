@@ -29,7 +29,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 )
 
 const (
@@ -60,8 +60,8 @@ func TestServeWSPortForward(t *testing.T) {
 	podNamespace := "other"
 	podName := "foo"
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)

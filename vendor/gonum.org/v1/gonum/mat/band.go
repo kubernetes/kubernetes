@@ -10,9 +10,11 @@ import (
 
 var (
 	bandDense *BandDense
-	_         Matrix    = bandDense
-	_         Banded    = bandDense
-	_         RawBander = bandDense
+	_         Matrix      = bandDense
+	_         allMatrix   = bandDense
+	_         denseMatrix = bandDense
+	_         Banded      = bandDense
+	_         RawBander   = bandDense
 
 	_ NonZeroDoer    = bandDense
 	_ RowNonZeroDoer = bandDense
@@ -195,6 +197,26 @@ func (b *BandDense) SetRawBand(mat blas64.Band) {
 	b.mat = mat
 }
 
+// IsEmpty returns whether the receiver is empty. Empty matrices can be the
+// receiver for size-restricted operations. The receiver can be zeroed using Reset.
+func (b *BandDense) IsEmpty() bool {
+	return b.mat.Stride == 0
+}
+
+// Reset empties the matrix so that it can be reused as the
+// receiver of a dimensionally restricted operation.
+//
+// Reset should not be used when the matrix shares backing data.
+// See the Reseter interface for more information.
+func (b *BandDense) Reset() {
+	b.mat.Rows = 0
+	b.mat.Cols = 0
+	b.mat.KL = 0
+	b.mat.KU = 0
+	b.mat.Stride = 0
+	b.mat.Data = b.mat.Data[:0:0]
+}
+
 // DiagView returns the diagonal as a matrix backed by the original data.
 func (b *BandDense) DiagView() Diagonal {
 	n := min(b.mat.Rows, b.mat.Cols)
@@ -260,4 +282,18 @@ func (b *BandDense) Zero() {
 		u := min(nCol, m+kL-i)
 		zero(b.mat.Data[i*b.mat.Stride+l : i*b.mat.Stride+u])
 	}
+}
+
+// Trace computes the trace of the matrix.
+func (b *BandDense) Trace() float64 {
+	r, c := b.Dims()
+	if r != c {
+		panic(ErrShape)
+	}
+	rb := b.RawBand()
+	var tr float64
+	for i := 0; i < r; i++ {
+		tr += rb.Data[rb.KL+i*rb.Stride]
+	}
+	return tr
 }

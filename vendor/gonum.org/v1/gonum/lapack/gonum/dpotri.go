@@ -10,7 +10,7 @@ import "gonum.org/v1/gonum/blas"
 // using its Cholesky factorization.
 //
 // On entry, a contains the triangular factor U or L from the Cholesky
-// factorization A = U^T*U or A = L*L^T, as computed by Dpotrf.
+// factorization A = Uᵀ*U or A = L*Lᵀ, as computed by Dpotrf.
 // On return, a contains the upper or lower triangle of the (symmetric)
 // inverse of A, overwriting the input factor U or L.
 func (impl Implementation) Dpotri(uplo blas.Uplo, n int, a []float64, lda int) (ok bool) {
@@ -38,7 +38,7 @@ func (impl Implementation) Dpotri(uplo blas.Uplo, n int, a []float64, lda int) (
 		return false
 	}
 
-	// Form inv(U)*inv(U)^T or inv(L)^T*inv(L).
+	// Form inv(U)*inv(U)ᵀ or inv(L)ᵀ*inv(L).
 	impl.Dlauum(uplo, n, a, lda)
 	return true
 }

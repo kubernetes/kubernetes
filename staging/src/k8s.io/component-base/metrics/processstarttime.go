@@ -17,17 +17,19 @@ limitations under the License.
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/procfs"
-	"k8s.io/klog"
 	"os"
 	"time"
+
+	"github.com/prometheus/procfs"
+
+	"k8s.io/klog/v2"
 )
 
-var processStartTime = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "process_start_time_seconds",
-		Help: "Start time of the process since unix epoch in seconds.",
+var processStartTime = NewGaugeVec(
+	&GaugeOpts{
+		Name:           "process_start_time_seconds",
+		Help:           "Start time of the process since unix epoch in seconds.",
+		StabilityLevel: ALPHA,
 	},
 	[]string{},
 )
@@ -35,14 +37,14 @@ var processStartTime = prometheus.NewGaugeVec(
 // RegisterProcessStartTime registers the process_start_time_seconds to
 // a prometheus registry. This metric needs to be included to ensure counter
 // data fidelity.
-func RegisterProcessStartTime(registerer prometheus.Registerer) error {
+func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
 	start, err := getProcessStart()
 	if err != nil {
 		klog.Errorf("Could not get process start time, %v", err)
 		start = float64(time.Now().Unix())
 	}
 	processStartTime.WithLabelValues().Set(start)
-	return registerer.Register(processStartTime)
+	return registrationFunc(processStartTime)
 }
 
 func getProcessStart() (float64, error) {

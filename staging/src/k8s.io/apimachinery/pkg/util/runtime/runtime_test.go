@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -111,6 +112,24 @@ func TestHandleCrashLog(t *testing.T) {
 	}
 	if match, _ := regexp.MatchString(`runtime\.go:[0-9]+ \+0x`, lines[3]); !match {
 		t.Errorf("mismatch file/line/offset information: %s", lines[3])
+	}
+}
+
+func TestHandleCrashLogSilenceHTTPErrAbortHandler(t *testing.T) {
+	log, err := captureStderr(func() {
+		defer func() {
+			if r := recover(); r != http.ErrAbortHandler {
+				t.Fatalf("expected to recover from http.ErrAbortHandler")
+			}
+		}()
+		defer HandleCrash()
+		panic(http.ErrAbortHandler)
+	})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if len(log) > 0 {
+		t.Fatalf("expected no stderr log, got: %s", log)
 	}
 }
 

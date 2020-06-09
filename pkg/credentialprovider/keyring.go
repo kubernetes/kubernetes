@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -73,6 +73,7 @@ type AuthConfig struct {
 	RegistryToken string `json:"registrytoken,omitempty"`
 }
 
+// Add add some docker config in basic docker keyring
 func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 	if dk.index == nil {
 		dk.index = make([]string, 0)
@@ -159,8 +160,8 @@ func isDefaultRegistryMatch(image string) bool {
 
 // url.Parse require a scheme, but ours don't have schemes.  Adding a
 // scheme to make url.Parse happy, then clear out the resulting scheme.
-func parseSchemelessUrl(schemelessUrl string) (*url.URL, error) {
-	parsed, err := url.Parse("https://" + schemelessUrl)
+func parseSchemelessURL(schemelessURL string) (*url.URL, error) {
+	parsed, err := url.Parse("https://" + schemelessURL)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +171,7 @@ func parseSchemelessUrl(schemelessUrl string) (*url.URL, error) {
 }
 
 // split the host name into parts, as well as the port
-func splitUrl(url *url.URL) (parts []string, port string) {
+func splitURL(url *url.URL) (parts []string, port string) {
 	host, port, err := net.SplitHostPort(url.Host)
 	if err != nil {
 		// could not parse port
@@ -181,43 +182,43 @@ func splitUrl(url *url.URL) (parts []string, port string) {
 
 // overloaded version of urlsMatch, operating on strings instead of URLs.
 func urlsMatchStr(glob string, target string) (bool, error) {
-	globUrl, err := parseSchemelessUrl(glob)
+	globURL, err := parseSchemelessURL(glob)
 	if err != nil {
 		return false, err
 	}
-	targetUrl, err := parseSchemelessUrl(target)
+	targetURL, err := parseSchemelessURL(target)
 	if err != nil {
 		return false, err
 	}
-	return urlsMatch(globUrl, targetUrl)
+	return urlsMatch(globURL, targetURL)
 }
 
 // check whether the given target url matches the glob url, which may have
 // glob wild cards in the host name.
 //
 // Examples:
-//    globUrl=*.docker.io, targetUrl=blah.docker.io => match
-//    globUrl=*.docker.io, targetUrl=not.right.io   => no match
+//    globURL=*.docker.io, targetURL=blah.docker.io => match
+//    globURL=*.docker.io, targetURL=not.right.io   => no match
 //
 // Note that we don't support wildcards in ports and paths yet.
-func urlsMatch(globUrl *url.URL, targetUrl *url.URL) (bool, error) {
-	globUrlParts, globPort := splitUrl(globUrl)
-	targetUrlParts, targetPort := splitUrl(targetUrl)
+func urlsMatch(globURL *url.URL, targetURL *url.URL) (bool, error) {
+	globURLParts, globPort := splitURL(globURL)
+	targetURLParts, targetPort := splitURL(targetURL)
 	if globPort != targetPort {
 		// port doesn't match
 		return false, nil
 	}
-	if len(globUrlParts) != len(targetUrlParts) {
+	if len(globURLParts) != len(targetURLParts) {
 		// host name does not have the same number of parts
 		return false, nil
 	}
-	if !strings.HasPrefix(targetUrl.Path, globUrl.Path) {
+	if !strings.HasPrefix(targetURL.Path, globURL.Path) {
 		// the path of the credential must be a prefix
 		return false, nil
 	}
-	for k, globUrlPart := range globUrlParts {
-		targetUrlPart := targetUrlParts[k]
-		matched, err := filepath.Match(globUrlPart, targetUrlPart)
+	for k, globURLPart := range globURLParts {
+		targetURLPart := targetURLParts[k]
+		matched, err := filepath.Match(globURLPart, targetURLPart)
 		if err != nil {
 			return false, err
 		}
@@ -270,11 +271,14 @@ func (dk *providersDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	return keyring.Lookup(image)
 }
 
+// FakeKeyring a fake config credentials
 type FakeKeyring struct {
 	auth []AuthConfig
 	ok   bool
 }
 
+// Lookup implements the DockerKeyring method for fetching credentials based on image name
+// return fake auth and ok
 func (f *FakeKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	return f.auth, f.ok
 }
@@ -282,6 +286,8 @@ func (f *FakeKeyring) Lookup(image string) ([]AuthConfig, bool) {
 // UnionDockerKeyring delegates to a set of keyrings.
 type UnionDockerKeyring []DockerKeyring
 
+// Lookup implements the DockerKeyring method for fetching credentials based on image name.
+// return each credentials
 func (k UnionDockerKeyring) Lookup(image string) ([]AuthConfig, bool) {
 	authConfigs := []AuthConfig{}
 	for _, subKeyring := range k {

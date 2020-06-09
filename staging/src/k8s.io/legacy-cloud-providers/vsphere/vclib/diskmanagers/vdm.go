@@ -23,7 +23,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
@@ -39,11 +39,17 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 	if diskManager.volumeOptions.SCSIControllerType == "" {
 		diskManager.volumeOptions.SCSIControllerType = vclib.LSILogicControllerType
 	}
-	// Create virtual disk
-	diskFormat := vclib.DiskFormatValidType[diskManager.volumeOptions.DiskFormat]
-	// Create a virtual disk manager
-	vdm := object.NewVirtualDiskManager(datastore.Client())
+
+	// Check for existing VMDK before attempting create. Because a name collision
+	// is unlikely, "VMDK already exists" is likely from a previous attempt to
+	// create this volume.
+	if dsPath := vclib.GetPathFromVMDiskPath(diskManager.diskPath); datastore.Exists(ctx, dsPath) {
+		klog.V(2).Infof("Create: VirtualDisk already exists, returning success. Name=%q", diskManager.diskPath)
+		return diskManager.diskPath, nil
+	}
+
 	// Create specification for new virtual disk
+	diskFormat := vclib.DiskFormatValidType[diskManager.volumeOptions.DiskFormat]
 	vmDiskSpec := &types.FileBackedVirtualDiskSpec{
 		VirtualDiskSpec: types.VirtualDiskSpec{
 			AdapterType: diskManager.volumeOptions.SCSIControllerType,
@@ -51,6 +57,8 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 		},
 		CapacityKb: int64(diskManager.volumeOptions.CapacityKB),
 	}
+
+	vdm := object.NewVirtualDiskManager(datastore.Client())
 	requestTime := time.Now()
 	// Create virtual disk
 	task, err := vdm.CreateVirtualDisk(ctx, diskManager.diskPath, datastore.Datacenter.Datacenter, vmDiskSpec)
@@ -62,6 +70,11 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 	taskInfo, err := task.WaitForResult(ctx, nil)
 	vclib.RecordvSphereMetric(vclib.APICreateVolume, requestTime, err)
 	if err != nil {
+		if isAlreadyExists(diskManager.diskPath, err) {
+			// The disk already exists, log info message and return success
+			klog.V(vclib.LogLevel).Infof("File: %v already exists", diskManager.diskPath)
+			return diskManager.diskPath, nil
+		}
 		klog.Errorf("Failed to complete virtual disk creation: %s. err: %+v", diskManager.diskPath, err)
 		return "", err
 	}

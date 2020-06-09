@@ -47,8 +47,8 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
-	// status informatio is valid only if observedGeneration equals to PDB's object generation.
+	// Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
+	// status information is valid only if observedGeneration equals to PDB's object generation.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
@@ -67,7 +67,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
+	DisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
 
 	// current number of healthy pods
 	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,4,opt,name=currentHealthy"`
@@ -81,6 +81,8 @@ type PodDisruptionBudgetStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.5
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
@@ -97,6 +99,8 @@ type PodDisruptionBudget struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.5
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
@@ -109,6 +113,8 @@ type PodDisruptionBudgetList struct {
 // +genclient
 // +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.5
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
 // This is a subresource of Pod.  A request to cause such an eviction is
@@ -128,13 +134,15 @@ type Eviction struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
 type PodSecurityPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -276,7 +284,7 @@ var AllowAllCapabilities v1.Capability = "*"
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
-var (
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"
@@ -475,12 +483,14 @@ type RuntimeClassStrategyOptions struct {
 const AllowAllRuntimeClassNames = "*"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // PodSecurityPolicyList is a list of PodSecurityPolicy objects.
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sort"
@@ -28,8 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -47,17 +49,19 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 	f := framework.NewDefaultFramework("node-problem-detector")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessSSHKeyPresent()
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-		framework.SkipUnlessProviderIs("gce", "gke")
-		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+		e2eskipper.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 	})
 
 	ginkgo.It("should run without error", func() {
+		e2eskipper.SkipUnlessSSHKeyPresent()
+
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		hosts := []string{}
 		for _, node := range nodes.Items {
 			for _, addr := range node.Status.Addresses {
@@ -92,14 +96,14 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			psCmd := "ps aux | grep [n]ode-problem-detector"
 			result, err = e2essh.SSH(psCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			gomega.Expect(result.Code).To(gomega.BeZero())
+			framework.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 			ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 			journalctlCmd := "sudo journalctl -u node-problem-detector"
 			result, err = e2essh.SSH(journalctlCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			gomega.Expect(result.Code).To(gomega.BeZero())
+			framework.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 			if isStandaloneMode[host] {
@@ -113,7 +117,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			gomega.Expect(result.Code).To(gomega.BeZero())
+			framework.ExpectEqual(result.Code, 0)
 		}
 
 		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
@@ -127,6 +131,14 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			eventListOptions := metav1.ListOptions{FieldSelector: fields.Set{"involvedObject.kind": "Node"}.AsSelector().String()}
 			gomega.Eventually(func() error {
 				return verifyEvents(f, eventListOptions, 1, "AUFSUmountHung", node.Name)
+			}, pollTimeout, pollInterval).Should(gomega.Succeed())
+
+			// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
+			// Since Kubelet may be restarted for a few times after node is booted. We just check the event
+			// is detected, but do not check how many times Kubelet is started.
+			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KubeletStart event on node %q", node.Name))
+			gomega.Eventually(func() error {
+				return verifyEventExists(f, eventListOptions, "KubeletStart", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 		}
 
@@ -177,12 +189,12 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			workingSetStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes.Items[i].Name,
 				workingSetStats[host][0], workingSetStats[host][len(workingSetStats[host])/2], workingSetStats[host][len(workingSetStats[host])-1])
 		}
-		e2elog.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)
+		framework.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)
 	})
 })
 
 func verifyEvents(f *framework.Framework, options metav1.ListOptions, num int, reason, nodeName string) error {
-	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(options)
+	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
@@ -199,8 +211,21 @@ func verifyEvents(f *framework.Framework, options metav1.ListOptions, num int, r
 	return nil
 }
 
+func verifyEventExists(f *framework.Framework, options metav1.ListOptions, reason, nodeName string) error {
+	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(context.TODO(), options)
+	if err != nil {
+		return err
+	}
+	for _, event := range events.Items {
+		if event.Reason == reason && event.Source.Host == nodeName && event.Count > 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("Event %s does not exist: %v", reason, events.Items)
+}
+
 func verifyNodeCondition(f *framework.Framework, condition v1.NodeConditionType, status v1.ConditionStatus, reason, nodeName string) error {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -218,22 +243,22 @@ func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64
 	memCmd := "cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.usage_in_bytes && cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.stat"
 	result, err := e2essh.SSH(memCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	gomega.Expect(result.Code).To(gomega.BeZero())
+	framework.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
 
 	memoryUsage, err := strconv.ParseFloat(lines[0], 64)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 
 	var totalInactiveFile float64
 	for _, line := range lines[1:] {
 		tokens := strings.Split(line, " ")
 		if tokens[0] == "total_rss" {
 			rss, err = strconv.ParseFloat(tokens[1], 64)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 		}
 		if tokens[0] == "total_inactive_file" {
 			totalInactiveFile, err = strconv.ParseFloat(tokens[1], 64)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 		}
 	}
 
@@ -254,11 +279,13 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 	cpuCmd := "cat /sys/fs/cgroup/cpu/system.slice/node-problem-detector.service/cpuacct.usage && cat /proc/uptime | awk '{print $1}'"
 	result, err := e2essh.SSH(cpuCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	gomega.Expect(result.Code).To(gomega.BeZero())
+	framework.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
+	framework.ExpectNoError(err, "Cannot parse float for usage")
 	uptime, err = strconv.ParseFloat(lines[1], 64)
+	framework.ExpectNoError(err, "Cannot parse float for uptime")
 
 	// Convert from nanoseconds to seconds
 	usage *= 1e-9
@@ -266,7 +293,7 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 }
 
 func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, workingSet float64) {
-	summary, err := framework.GetStatsSummary(f.ClientSet, nodeName)
+	summary, err := e2ekubelet.GetStatsSummary(f.ClientSet, nodeName)
 	framework.ExpectNoError(err)
 
 	hasNpdPod := false
@@ -280,6 +307,6 @@ func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, work
 		hasNpdPod = true
 		break
 	}
-	gomega.Expect(hasNpdPod).To(gomega.BeTrue())
+	framework.ExpectEqual(hasNpdPod, true)
 	return
 }

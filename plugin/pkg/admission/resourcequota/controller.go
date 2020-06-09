@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +43,7 @@ import (
 // Evaluator is used to see if quota constraints are satisfied.
 type Evaluator interface {
 	// Evaluate takes an operation and checks to see if quota constraints are satisfied.  It returns an error if they are not.
-	// The default implementation process related operations in chunks when possible.
+	// The default implementation processes related operations in chunks when possible.
 	Evaluate(a admission.Attributes) error
 }
 
@@ -618,7 +618,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	select {
 	case <-waiter.finished:
 	case <-time.After(10 * time.Second):
-		return apierrors.NewInternalError(fmt.Errorf("resource quota evaluates timeout"))
+		return apierrors.NewInternalError(fmt.Errorf("resource quota evaluation timed out"))
 	}
 
 	return waiter.result

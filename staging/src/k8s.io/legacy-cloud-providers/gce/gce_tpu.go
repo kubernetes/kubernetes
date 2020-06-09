@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -25,7 +27,7 @@ import (
 
 	"google.golang.org/api/googleapi"
 	tpuapi "google.golang.org/api/tpu/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -33,7 +35,7 @@ import (
 // newTPUService returns a new tpuService using the client to communicate with
 // the Cloud TPU APIs.
 func newTPUService(client *http.Client) (*tpuService, error) {
-	s, err := tpuapi.New(client)
+	s, err := tpuapi.NewService(context.Background())
 	if err != nil {
 		return nil, err
 	}

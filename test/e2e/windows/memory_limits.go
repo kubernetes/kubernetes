@@ -17,12 +17,8 @@ limitations under the License.
 package windows
 
 import (
-	"crypto/tls"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -31,11 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/client-go/kubernetes/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -48,7 +42,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("Allocatable node memory", func() {
@@ -59,7 +53,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	ginkgo.Context("attempt to deploy past allocatable memory limits", func() {
 		ginkgo.It("should fail deployments of pods once there isn't enough memory", func() {
-			overrideAllocatableMemoryTest(f, 4)
+			overrideAllocatableMemoryTest(f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})
 
@@ -85,10 +79,10 @@ type nodeMemory struct {
 func checkNodeAllocatableTest(f *framework.Framework) {
 
 	nodeMem := getNodeMemory(f)
-	e2elog.Logf("nodeMem says: %+v", nodeMem)
+	framework.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
-	calculatedNodeAlloc := nodeMem.capacity.Copy()
+	calculatedNodeAlloc := nodeMem.capacity.DeepCopy()
 	calculatedNodeAlloc.Sub(nodeMem.systemReserve)
 	calculatedNodeAlloc.Sub(nodeMem.kubeReserve)
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
@@ -121,12 +115,12 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 	f.PodClient().Create(failurePods[0])
 
 	gomega.Eventually(func() bool {
-		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{})
+		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
-				e2elog.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
 				return true
 			}
 		}
@@ -166,7 +160,7 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}
@@ -179,8 +173,8 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 
 // getNodeMemory populates a nodeMemory struct with information from the first
 func getNodeMemory(f *framework.Framework) nodeMemory {
-	selector := labels.Set{"beta.kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)
@@ -195,7 +189,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	kubeletConfig, err := getCurrentKubeletConfig(nodeName)
+	kubeletConfig, err := e2ekubelet.GetCurrentKubeletConfig(nodeName, f.Namespace.Name, true)
 	framework.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
@@ -230,8 +224,8 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 // getTotalAllocatableMemory gets the sum of all agent node's allocatable memory
 func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
-	selector := labels.Set{"beta.kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)
@@ -247,91 +241,4 @@ func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
 	}
 
 	return totalAllocatable
-}
-
-// getCurrentKubeletConfig modified from test/e2e_node/util.go
-func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfiguration, error) {
-
-	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName)
-	kubeCfg, err := decodeConfigz(resp)
-	if err != nil {
-		return nil, err
-	}
-	return kubeCfg, nil
-}
-
-// Causes the test to fail, or returns a status 200 response from the /configz endpoint
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
-	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-	ginkgo.By("Opening proxy to cluster")
-	cmd := framework.KubectlCmd("proxy", "-p", "0")
-	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-	framework.ExpectNoError(err)
-	defer stdout.Close()
-	defer stderr.Close()
-	defer framework.TryKill(cmd)
-	buf := make([]byte, 128)
-	var n int
-	n, err = stdout.Read(buf)
-	framework.ExpectNoError(err)
-	output := string(buf[:n])
-	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-	match := proxyRegexp.FindStringSubmatch(output)
-	framework.ExpectEqual(len(match), 2)
-	port, err := strconv.Atoi(match[1])
-	framework.ExpectNoError(err)
-	ginkgo.By("http requesting node kubelet /configz")
-	endpoint := fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("GET", endpoint, nil)
-	framework.ExpectNoError(err)
-	req.Header.Add("Accept", "application/json")
-
-	var resp *http.Response
-	gomega.Eventually(func() bool {
-		resp, err = client.Do(req)
-		if err != nil {
-			e2elog.Logf("Failed to get /configz, retrying. Error: %v", err)
-			return false
-		}
-		if resp.StatusCode != 200 {
-			e2elog.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
-			return false
-		}
-
-		return true
-	}, timeout, pollInterval).Should(gomega.Equal(true))
-	return resp
-}
-
-// Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
-func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
-	// This hack because /configz reports the following structure:
-	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
-	type configzWrapper struct {
-		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
-	}
-
-	configz := configzWrapper{}
-	kubeCfg := kubeletconfig.KubeletConfiguration{}
-
-	contentsBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(contentsBytes, &configz)
-	if err != nil {
-		return nil, err
-	}
-
-	err = scheme.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return &kubeCfg, nil
 }

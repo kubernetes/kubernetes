@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -36,6 +37,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -69,6 +71,7 @@ import (
 
 var groups = []runtime.SchemeBuilder{
 	admissionv1beta1.SchemeBuilder,
+	admissionv1.SchemeBuilder,
 	admissionregv1beta1.SchemeBuilder,
 	admissionregv1.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
@@ -84,6 +87,7 @@ var groups = []runtime.SchemeBuilder{
 	batchv2alpha1.SchemeBuilder,
 	batchv1beta1.SchemeBuilder,
 	batchv1.SchemeBuilder,
+	certificatesv1.SchemeBuilder,
 	certificatesv1beta1.SchemeBuilder,
 	coordinationv1.SchemeBuilder,
 	coordinationv1beta1.SchemeBuilder,

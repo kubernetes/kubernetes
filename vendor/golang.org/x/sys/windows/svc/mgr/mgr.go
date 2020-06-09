@@ -13,6 +13,7 @@ package mgr
 
 import (
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 
@@ -46,6 +47,36 @@ func ConnectRemote(host string) (*Mgr, error) {
 // Disconnect closes connection to the service control manager m.
 func (m *Mgr) Disconnect() error {
 	return windows.CloseServiceHandle(m.Handle)
+}
+
+type LockStatus struct {
+	IsLocked bool          // Whether the SCM has been locked.
+	Age      time.Duration // For how long the SCM has been locked.
+	Owner    string        // The name of the user who has locked the SCM.
+}
+
+// LockStatus returns whether the service control manager is locked by
+// the system, for how long, and by whom. A locked SCM indicates that
+// most service actions will block until the system unlocks the SCM.
+func (m *Mgr) LockStatus() (*LockStatus, error) {
+	bytesNeeded := uint32(unsafe.Sizeof(windows.QUERY_SERVICE_LOCK_STATUS{}) + 1024)
+	for {
+		bytes := make([]byte, bytesNeeded)
+		lockStatus := (*windows.QUERY_SERVICE_LOCK_STATUS)(unsafe.Pointer(&bytes[0]))
+		err := windows.QueryServiceLockStatus(m.Handle, lockStatus, uint32(len(bytes)), &bytesNeeded)
+		if err == windows.ERROR_INSUFFICIENT_BUFFER && bytesNeeded >= uint32(unsafe.Sizeof(windows.QUERY_SERVICE_LOCK_STATUS{})) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		status := &LockStatus{
+			IsLocked: lockStatus.IsLocked != 0,
+			Age:      time.Duration(lockStatus.LockDuration) * time.Second,
+			Owner:    windows.UTF16ToString((*[(1 << 30) - 1]uint16)(unsafe.Pointer(lockStatus.LockOwner))[:]),
+		}
+		return status, nil
+	}
 }
 
 func toPtr(s string) *uint16 {
@@ -102,9 +133,27 @@ func (m *Mgr) CreateService(name, exepath string, c Config, args ...string) (*Se
 	if err != nil {
 		return nil, err
 	}
+	if c.SidType != windows.SERVICE_SID_TYPE_NONE {
+		err = updateSidType(h, c.SidType)
+		if err != nil {
+			windows.DeleteService(h)
+			windows.CloseHandle(h)
+			return nil, err
+		}
+	}
 	if c.Description != "" {
 		err = updateDescription(h, c.Description)
 		if err != nil {
+			windows.DeleteService(h)
+			windows.CloseHandle(h)
+			return nil, err
+		}
+	}
+	if c.DelayedAutoStart {
+		err = updateStartUp(h, c.DelayedAutoStart)
+		if err != nil {
+			windows.DeleteService(h)
+			windows.CloseHandle(h)
 			return nil, err
 		}
 	}

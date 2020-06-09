@@ -18,6 +18,7 @@ package jsonpath
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -29,13 +30,14 @@ import (
 type JSONPath struct {
 	name       string
 	parser     *Parser
-	stack      [][]reflect.Value // push and pop values in different scopes
-	cur        []reflect.Value   // current scope values
 	beginRange int
 	inRange    int
 	endRange   int
 
+	lastEndNode *Node
+
 	allowMissingKeys bool
+	outputJSON       bool
 }
 
 // New creates a new JSONPath with the given name.
@@ -81,12 +83,12 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 		return nil, fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
 
-	j.cur = []reflect.Value{reflect.ValueOf(data)}
+	cur := []reflect.Value{reflect.ValueOf(data)}
 	nodes := j.parser.Root.Nodes
 	fullResult := [][]reflect.Value{}
 	for i := 0; i < len(nodes); i++ {
 		node := nodes[i]
-		results, err := j.walk(j.cur, node)
+		results, err := j.walk(cur, node)
 		if err != nil {
 			return nil, err
 		}
@@ -94,34 +96,80 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 		// encounter an end node, break the current block
 		if j.endRange > 0 && j.endRange <= j.inRange {
 			j.endRange--
+			j.lastEndNode = &nodes[i]
 			break
 		}
 		// encounter a range node, start a range loop
 		if j.beginRange > 0 {
 			j.beginRange--
 			j.inRange++
-			for k, value := range results {
+			for _, value := range results {
 				j.parser.Root.Nodes = nodes[i+1:]
-				if k == len(results)-1 {
-					j.inRange--
-				}
 				nextResults, err := j.FindResults(value.Interface())
 				if err != nil {
 					return nil, err
 				}
 				fullResult = append(fullResult, nextResults...)
 			}
-			break
+			j.inRange--
+
+			// Fast forward to resume processing after the most recent end node that was encountered
+			for k := i + 1; k < len(nodes); k++ {
+				if &nodes[k] == j.lastEndNode {
+					i = k
+					break
+				}
+			}
+			continue
 		}
 		fullResult = append(fullResult, results)
 	}
 	return fullResult, nil
 }
 
+// EnableJSONOutput changes the PrintResults behavior to return a JSON array of results
+func (j *JSONPath) EnableJSONOutput(v bool) {
+	j.outputJSON = v
+}
+
 // PrintResults writes the results into writer
 func (j *JSONPath) PrintResults(wr io.Writer, results []reflect.Value) error {
+	if j.outputJSON {
+		// convert the []reflect.Value to something that json
+		// will be able to marshal
+		r := make([]interface{}, 0, len(results))
+		for i := range results {
+			r = append(r, results[i].Interface())
+		}
+		results = []reflect.Value{reflect.ValueOf(r)}
+	}
 	for i, r := range results {
-		text, err := j.evalToText(r)
+		var text []byte
+		var err error
+		outputJSON := true
+		kind := r.Kind()
+		if kind == reflect.Interface {
+			kind = r.Elem().Kind()
+		}
+		switch kind {
+		case reflect.Map:
+		case reflect.Array:
+		case reflect.Slice:
+		case reflect.Struct:
+		default:
+			outputJSON = false
+		}
+		switch {
+		case outputJSON || j.outputJSON:
+			if j.outputJSON {
+				text, err = json.MarshalIndent(r.Interface(), "", "    ")
+				text = append(text, '\n')
+			} else {
+				text, err = json.Marshal(r.Interface())
+			}
+		default:
+			text, err = j.evalToText(r)
+		}
 		if err != nil {
 			return err
 		}
@@ -132,7 +180,9 @@ func (j *JSONPath) PrintResults(wr io.Writer, results []reflect.Value) error {
 			return err
 		}
 	}
+
 	return nil
+
 }
 
 // walk visits tree rooted at the given node in DFS order
@@ -212,17 +262,11 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 	results := []reflect.Value{}
 	switch node.Name {
 	case "range":
-		j.stack = append(j.stack, j.cur)
 		j.beginRange++
 		results = input
 	case "end":
-		if j.endRange < j.inRange { // inside a loop, break the current block
+		if j.inRange > 0 {
 			j.endRange++
-			break
-		}
-		// the loop is about to end, pop value and continue the following execution
-		if len(j.stack) > 0 {
-			j.cur, j.stack = j.stack[len(j.stack)-1], j.stack[:len(j.stack)-1]
 		} else {
 			return results, fmt.Errorf("not in range, nothing to end")
 		}

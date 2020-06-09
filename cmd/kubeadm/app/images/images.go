@@ -19,10 +19,13 @@ package images
 import (
 	"fmt"
 
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
+
+const extraHyperKubeNote = ` The "useHyperKubeImage" field will be removed from future kubeadm config versions and possibly ignored in future releases.`
 
 // GetGenericImage generates and returns a platform agnostic image (backed by manifest list)
 func GetGenericImage(prefix, image, tag string) string {
@@ -32,7 +35,8 @@ func GetGenericImage(prefix, image, tag string) string {
 // GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
 // including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
 func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
-	if cfg.UseHyperKubeImage {
+	if cfg.UseHyperKubeImage && image != constants.HyperKube {
+		klog.Warningf(`WARNING: DEPRECATED use of the "hyperkube" image in place of %q.`+extraHyperKubeNote, image)
 		image = constants.HyperKube
 	}
 	repoPrefix := cfg.GetControlPlaneImageRepository()
@@ -69,9 +73,12 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	}
 	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
 	etcdImageTag := constants.DefaultEtcdVersion
-	etcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
+	etcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
 	if err == nil {
 		etcdImageTag = etcdVersion.String()
+	}
+	if warning != nil {
+		klog.Warningln(warning)
 	}
 	// unless an override is specified
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
@@ -80,17 +87,13 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
 }
 
-// GetPauseImage returns the image for the "pause" container
-func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
-	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
-}
-
 // GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node
 func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs := []string{}
 
 	// start with core kubernetes images
 	if cfg.UseHyperKubeImage {
+		klog.Warningln(`WARNING: DEPRECATED use of the "hyperkube" image for the Kubernetes control plane.` + extraHyperKubeNote)
 		imgs = append(imgs, GetKubernetesImage(constants.HyperKube, cfg))
 	} else {
 		imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))

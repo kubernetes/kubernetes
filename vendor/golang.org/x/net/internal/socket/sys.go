@@ -29,5 +29,5 @@ func init() {
 }
 
 func roundup(l int) int {
-	return (l + kernelAlign - 1) & ^(kernelAlign - 1)
+	return (l + kernelAlign - 1) &^ (kernelAlign - 1)
 }

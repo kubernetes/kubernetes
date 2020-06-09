@@ -16,13 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (s *sourceFile) startWatch() {

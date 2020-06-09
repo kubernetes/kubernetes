@@ -17,6 +17,7 @@ limitations under the License.
 package uploadconfig
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -87,12 +88,11 @@ func TestUploadConfiguration(t *testing.T) {
 			}
 			cfg, err := configutil.DefaultedInitConfiguration(initialcfg, clustercfg)
 
-			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
-			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}
-
 			if err != nil {
 				t2.Fatalf("UploadConfiguration() error = %v", err)
 			}
+
+			cfg.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
 
 			status := &kubeadmapi.ClusterStatus{
 				APIEndpoints: map[string]kubeadmapi.APIEndpoint{
@@ -121,7 +121,7 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
@@ -135,8 +135,15 @@ func TestUploadConfiguration(t *testing.T) {
 					t2.Fatalf("unable to decode config from bytes: %v", err)
 				}
 
+				if len(decodedCfg.ComponentConfigs) != 0 {
+					t2.Errorf("unexpected component configs in decodedCfg: %d", len(decodedCfg.ComponentConfigs))
+				}
+
+				// Force initialize with an empty map so that reflect.DeepEqual works
+				decodedCfg.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
+
 				if !reflect.DeepEqual(decodedCfg, &cfg.ClusterConfiguration) {
-					t2.Errorf("the initial and decoded ClusterConfiguration didn't match")
+					t2.Errorf("the initial and decoded ClusterConfiguration didn't match:\n%t\n===\n%t", decodedCfg.ComponentConfigs == nil, cfg.ComponentConfigs == nil)
 				}
 
 				statusData := controlPlaneCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]

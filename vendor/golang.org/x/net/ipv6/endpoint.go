@@ -37,7 +37,7 @@ func (c *Conn) PathMTU() (int, error) {
 	}
 	so, ok := sockOpts[ssoPathMTU]
 	if !ok {
-		return 0, errOpNoSupport
+		return 0, errNotImplemented
 	}
 	_, mtu, err := so.getMTUInfo(c.Conn)
 	if err != nil {

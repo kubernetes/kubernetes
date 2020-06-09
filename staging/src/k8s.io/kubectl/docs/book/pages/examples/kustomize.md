@@ -17,7 +17,7 @@ values that should be copied from this file or that are recommended.
 In practice, fields with no value should simply be  omitted from kustomization.yaml
 to reduce the content visible in configuration reviews.
 
-Example copied from the [kustomize repo](https://github.com/kubernetes-sigs/kustomize/blob/master/docs/kustomization.yaml)
+Example copied from the [kustomize repo](https://github.com/kubernetes-sigs/kustomize/tree/master/examples)
  
  {% sample lang="yaml" %}
 ```yaml
@@ -270,7 +270,7 @@ vars:
 # specified by kustomize's configuration data.
 #
 # The default config data for vars is at
-# https://github.com/kubernetes-sigs/kustomize/blob/master/pkg/transformers/config/defaultconfig/varreference.go
+# https://github.com/kubernetes-sigs/kustomize/blob/v3.3.1/pkg/transformers/config/defaultconfig/varreference.go
 # Long story short, the default targets are all
 # container command args and env value fields.
 #

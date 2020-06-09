@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -40,20 +40,23 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		var count int
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
+			if err != nil {
+				framework.Failf("err creating pod: %v", err)
+			}
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(pod)
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
-				e2elog.Failf("err failing pod: %v", err)
+				framework.Failf("err failing pod: %v", err)
 			}
 
 			count++
 			if count%50 == 0 {
-				e2elog.Logf("count: %v", count)
+				framework.Logf("count: %v", count)
 			}
 		}
 
-		e2elog.Logf("created: %v", count)
+		framework.Logf("created: %v", count)
 
 		// The gc controller polls every 30s and fires off a goroutine per
 		// pod to terminate.
@@ -64,19 +67,19 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 
 		ginkgo.By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
-				e2elog.Logf("Failed to list pod %v", err)
+				framework.Logf("Failed to list pod %v", err)
 				return false, nil
 			}
 			if len(pods.Items) != gcThreshold {
-				e2elog.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
+				framework.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
 				return false, nil
 			}
 			return true, nil
 		})
 		if pollErr != nil {
-			e2elog.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
+			framework.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
 		}
 	})
 })
@@ -97,5 +100,5 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			SchedulerName: "please don't schedule my pods",
 		},
 	}
-	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 }

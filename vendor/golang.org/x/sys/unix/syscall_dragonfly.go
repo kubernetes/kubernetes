@@ -57,6 +57,22 @@ func nametomib(name string) (mib []_C_int, err error) {
 	return buf[0 : n/siz], nil
 }
 
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Fileno), unsafe.Sizeof(Dirent{}.Fileno))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	namlen, ok := direntNamlen(buf)
+	if !ok {
+		return 0, false
+	}
+	return (16 + namlen + 1 + 7) &^ 7, true
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
+}
+
 //sysnb pipe() (r int, w int, err error)
 
 func Pipe(p []int) (err error) {
@@ -269,6 +285,7 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Fstatfs(fd int, stat *Statfs_t) (err error)
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
+//sys	Getdents(fd int, buf []byte) (n int, err error)
 //sys	Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error)
 //sys	Getdtablesize() (size int)
 //sysnb	Getegid() (egid int)

@@ -17,26 +17,30 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
@@ -46,7 +50,7 @@ var (
 	probeFilePath   = probeVolumePath + "/probe-file"
 	fileName        = "test-file"
 	retryDuration   = 20
-	mountImage      = imageutils.GetE2EImage(imageutils.Mounttest)
+	mountImage      = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 type subPathTestSuite struct {
@@ -59,27 +63,37 @@ var _ TestSuite = &subPathTestSuite{}
 func InitSubPathTestSuite() TestSuite {
 	return &subPathTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "subPath",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "subPath",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.NtfsDynamicPV,
 			},
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Mi",
+			},
 		},
 	}
 }
 
-func (s *subPathTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	type local struct {
-		config      *PerTestConfig
-		testCleanup func()
+func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
+		testpatterns.PreprovisionedPV,
+		testpatterns.InlineVolume))
+}
 
-		resource          *genericVolumeTestResource
+func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	type local struct {
+		config        *PerTestConfig
+		driverCleanup func()
+
+		hostExec          utils.HostExec
+		resource          *VolumeResource
 		roVolSource       *v1.VolumeSource
 		pod               *v1.Pod
 		formatPod         *v1.Pod
@@ -104,43 +118,43 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.hostExec = utils.NewHostExec(f)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType
 		switch volType {
 		case testpatterns.InlineVolume:
 			if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.volume)
+				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.Volume)
 			}
 		case testpatterns.PreprovisionedPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: l.resource.pvc.Name,
+					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
 		case testpatterns.DynamicPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: l.resource.pvc.Name,
+					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
 		default:
-			e2elog.Failf("SubPath test doesn't support: %s", volType)
+			framework.Failf("SubPath test doesn't support: %s", volType)
 		}
 
 		subPath := f.Namespace.Name
-		l.pod = SubpathTestPod(f, subPath, l.resource.volType, l.resource.volSource, true)
-		l.pod.Spec.NodeName = l.config.ClientNodeName
-		l.pod.Spec.NodeSelector = l.config.ClientNodeSelector
+		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
+		e2epod.SetNodeSelection(&l.pod.Spec, l.config.ClientNodeSelection)
 
-		l.formatPod = volumeFormatPod(f, l.resource.volSource)
-		l.formatPod.Spec.NodeName = l.config.ClientNodeName
-		l.formatPod.Spec.NodeSelector = l.config.ClientNodeSelector
+		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
+		e2epod.SetNodeSelection(&l.formatPod.Spec, l.config.ClientNodeSelection)
 
 		l.subPathDir = filepath.Join(volumePath, subPath)
 		l.filePathInSubpath = filepath.Join(volumePath, fileName)
@@ -148,25 +162,31 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	}
 
 	cleanup := func() {
+		var errs []error
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
-			err := framework.DeletePodWithWait(f, f.ClientSet, l.pod)
-			framework.ExpectNoError(err, "while deleting pod")
+			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
+			errs = append(errs, err)
 			l.pod = nil
 		}
 
 		if l.resource != nil {
-			l.resource.cleanupResource()
+			errs = append(errs, l.resource.CleanupResource())
 			l.resource = nil
 		}
 
-		if l.testCleanup != nil {
-			l.testCleanup()
-			l.testCleanup = nil
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+
+		if l.hostExec != nil {
+			l.hostExec.Cleanup()
 		}
 
 		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
+
+	driverName := driver.GetDriverInfo().Name
 
 	ginkgo.It("should support non-existent path", func() {
 		init()
@@ -323,19 +343,19 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 
-		testSubpathReconstruction(f, l.pod, false)
+		testSubpathReconstruction(f, l.hostExec, l.pod, false)
 	})
 
 	ginkgo.It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
-		if strings.HasPrefix(l.resource.volType, "hostPath") || strings.HasPrefix(l.resource.volType, "csi-hostpath") {
+		if strings.HasPrefix(driverName, "hostPath") {
 			// TODO: This skip should be removed once #61446 is fixed
-			framework.Skipf("%s volume type does not support reconstruction, skipping", l.resource.volType)
+			e2eskipper.Skipf("Driver %s does not support reconstruction, skipping", driverName)
 		}
 
-		testSubpathReconstruction(f, l.pod, true)
+		testSubpathReconstruction(f, l.hostExec, l.pod, true)
 	})
 
 	ginkgo.It("should support readOnly directory specified in the volumeMount", func() {
@@ -372,7 +392,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", l.resource.volType)
+			e2eskipper.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
 
 		origpod := l.pod.DeepCopy()
@@ -400,7 +420,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", l.resource.volType)
+			e2eskipper.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
 
 		// Format the volume while it's writable
@@ -421,16 +441,16 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		defer cleanup()
 
 		// Change volume container to busybox so we can exec later
-		l.pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
-		l.pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
+		l.pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+		l.pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
 		removeUnusedContainers(l.pod)
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(l.pod)
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), l.pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "while creating pod")
 		defer func() {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-			framework.DeletePodWithWait(f, f.ClientSet, pod)
+			e2epod.DeletePodWithWait(f.ClientSet, pod)
 		}()
 
 		// Wait for pod to be running
@@ -462,7 +482,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 	f.TestContainerOutput("atomic-volume-subpath", pod, 0, []string{contents})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting pod")
 }
 
@@ -496,7 +516,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("init-volume-%s", suffix),
-					Image: volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image: e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -507,11 +527,12 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 							MountPath: probeVolumePath,
 						},
 					},
-					SecurityContext: volume.GenerateSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
 				{
 					Name:  fmt.Sprintf("test-init-subpath-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -523,11 +544,12 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 							MountPath: probeVolumePath,
 						},
 					},
-					SecurityContext: volume.GenerateSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
 				{
 					Name:  fmt.Sprintf("test-init-volume-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -538,13 +560,14 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 							MountPath: probeVolumePath,
 						},
 					},
-					SecurityContext: volume.GenerateSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
 			},
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("test-container-subpath-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -556,11 +579,12 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 							MountPath: probeVolumePath,
 						},
 					},
-					SecurityContext: volume.GenerateSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
 				{
 					Name:  fmt.Sprintf("test-container-volume-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -571,7 +595,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 							MountPath: probeVolumePath,
 						},
 					},
-					SecurityContext: volume.GenerateSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
 			},
 			RestartPolicy:                 v1.RestartPolicyNever,
@@ -588,14 +612,14 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 					},
 				},
 			},
-			SecurityContext: volume.GeneratePodSecurityContext(nil, seLinuxOptions),
+			SecurityContext: e2evolume.GeneratePodSecurityContext(nil, seLinuxOptions),
 		},
 	}
 }
 
 func containerIsUnused(container *v1.Container) bool {
-	// mountImage with nil Args does nothing. Leave everything else
-	return container.Image == mountImage && container.Args == nil
+	// mountImage with nil Args or with just "mounttest" as Args does nothing. Leave everything else
+	return container.Image == mountImage && (container.Args == nil || (len(container.Args) == 1 && container.Args[0] == "mounttest"))
 }
 
 // removeUnusedContainers removes containers from a SubpathTestPod that aren't
@@ -631,8 +655,8 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
-					Command: volume.GenerateScriptCmd("echo nothing"),
+					Image:   e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Command: e2evolume.GenerateScriptCmd("echo nothing"),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -653,11 +677,12 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 }
 
 func setInitCommand(pod *v1.Pod, command string) {
-	pod.Spec.InitContainers[0].Command = volume.GenerateScriptCmd(command)
+	pod.Spec.InitContainers[0].Command = e2evolume.GenerateScriptCmd(command)
 }
 
 func setWriteCommand(file string, container *v1.Container) {
 	container.Args = []string{
+		"mounttest",
 		fmt.Sprintf("--new_file_0644=%v", file),
 		fmt.Sprintf("--file_mode=%v", file),
 	}
@@ -670,6 +695,7 @@ func addSubpathVolumeContainer(container *v1.Container, volumeMount v1.VolumeMou
 
 func addMultipleWrites(container *v1.Container, file1 string, file2 string) {
 	container.Args = []string{
+		"mounttest",
 		fmt.Sprintf("--new_file_0644=%v", file1),
 		fmt.Sprintf("--new_file_0666=%v", file2),
 	}
@@ -686,6 +712,7 @@ func testMultipleReads(f *framework.Framework, pod *v1.Pod, containerIndex int, 
 
 func setReadCommand(file string, container *v1.Container) {
 	container.Args = []string{
+		"mounttest",
 		fmt.Sprintf("--file_content_in_loop=%v", file),
 		fmt.Sprintf("--retry_time=%d", retryDuration),
 	}
@@ -701,7 +728,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 	})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting pod")
 }
 
@@ -712,10 +739,10 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, allowContainerTermi
 func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg string, allowContainerTerminationError bool) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
-		framework.DeletePodWithWait(f, f.ClientSet, pod)
+		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 	ginkgo.By("Checking for subpath error in container status")
 	err = waitForPodSubpathError(f, pod, allowContainerTerminationError)
@@ -739,8 +766,8 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	return wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	waitErr := wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -766,16 +793,20 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		}
 		return false, nil
 	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for pod subpath error to occur: %v", waitErr)
+	}
+	return nil
 }
 
 // Tests that the existing subpath mount is detected when a container restarts
 func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
-	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
-	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
-	pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	// Add liveness probe to subpath container
 	pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
 		Handler: v1.Handler{
@@ -791,33 +822,33 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	// Start pod
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
-		framework.DeletePodWithWait(f, f.ClientSet, pod)
+		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
 	out, err := podContainerExec(pod, 1, fmt.Sprintf("rm %v", probeFilePath))
-	e2elog.Logf("Pod exec output: %v", out)
+	framework.Logf("Pod exec output: %v", out)
 	framework.ExpectNoError(err, "while failing liveness probe")
 
 	// Check that container has restarted
 	ginkgo.By("Waiting for container to restart")
 	restarts := int32(0)
 	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == pod.Spec.Containers[0].Name {
-				e2elog.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
+				framework.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
 				restarts = status.RestartCount
 				if restarts > 0 {
-					e2elog.Logf("Container has restart count: %v", restarts)
+					framework.Logf("Container has restart count: %v", restarts)
 					return true, nil
 				}
 			}
@@ -835,7 +866,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 		writeCmd = fmt.Sprintf("echo test-after > %v", probeFilePath)
 	}
 	out, err = podContainerExec(pod, 1, writeCmd)
-	e2elog.Logf("Pod exec output: %v", out)
+	framework.Logf("Pod exec output: %v", out)
 	framework.ExpectNoError(err, "while rewriting the probe file")
 
 	// Wait for container restarts to stabilize
@@ -843,7 +874,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	stableCount := int(0)
 	stableThreshold := int(time.Minute / framework.Poll)
 	err = wait.PollImmediate(framework.Poll, 2*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -852,13 +883,13 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 				if status.RestartCount == restarts {
 					stableCount++
 					if stableCount > stableThreshold {
-						e2elog.Logf("Container restart has stabilized")
+						framework.Logf("Container restart has stabilized")
 						return true, nil
 					}
 				} else {
 					restarts = status.RestartCount
 					stableCount = 0
-					e2elog.Logf("Container has restart count: %v", restarts)
+					framework.Logf("Container has restart count: %v", restarts)
 				}
 				break
 			}
@@ -868,14 +899,23 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(err, "while waiting for container to stabilize")
 }
 
-func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete bool) {
+func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, pod *v1.Pod, forceDelete bool) {
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
+	// Disruptive test run serially, we can cache all voluem global mount
+	// points and verify after the test that we do not leak any global mount point.
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err, "while listing scheduable nodes")
+	globalMountPointsByNode := make(map[string]sets.String, len(nodeList.Items))
+	for _, node := range nodeList.Items {
+		globalMountPointsByNode[node.Name] = utils.FindVolumeGlobalMountPoints(hostExec, &node)
+	}
+
 	// Change to busybox
-	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
-	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
-	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
-	pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 
 	// If grace period is too short, then there is not enough time for the volume
 	// manager to cleanup the volumes
@@ -884,27 +924,44 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 
 	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
-	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "while getting pod")
 
+	var podNode *v1.Node
+	for i := range nodeList.Items {
+		if nodeList.Items[i].Name == pod.Spec.NodeName {
+			podNode = &nodeList.Items[i]
+		}
+	}
+	framework.ExpectNotEqual(podNode, nil, "pod node should exist in scheduable nodes")
+
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
+
+	if podNode != nil {
+		mountPoints := globalMountPointsByNode[podNode.Name]
+		mountPointsAfter := utils.FindVolumeGlobalMountPoints(hostExec, podNode)
+		s1 := mountPointsAfter.Difference(mountPoints)
+		s2 := mountPoints.Difference(mountPointsAfter)
+		gomega.Expect(s1).To(gomega.BeEmpty(), "global mount points leaked: %v", s1)
+		gomega.Expect(s2).To(gomega.BeEmpty(), "global mount points not found: %v", s2)
+	}
 }
 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod to format volume %s", pod.Name))
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
-	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting volume init pod")
 }
 
@@ -918,5 +975,5 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		shell = "/bin/sh"
 		option = "-c"
 	}
-	return framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+	return framework.RunKubectl(pod.Namespace, "exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }

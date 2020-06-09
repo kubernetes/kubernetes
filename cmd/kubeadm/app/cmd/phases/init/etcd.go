@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -69,6 +69,7 @@ func getEtcdPhaseFlags() []string {
 		options.CertificatesDir,
 		options.CfgPath,
 		options.ImageRepository,
+		options.Kustomize,
 	}
 	return flags
 }
@@ -92,7 +93,7 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
 			}
 			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
-			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), data.KustomizeDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -159,20 +160,20 @@ func TestSplitYAMLDocuments(t *testing.T) {
 	var tests = []struct {
 		name         string
 		fileContents []byte
-		gvkmap       map[schema.GroupVersionKind][]byte
+		gvkmap       kubeadmapi.DocumentMap
 		expectedErr  bool
 	}{
 		{
 			name:         "FooOnly",
 			fileContents: files["foo"],
-			gvkmap: map[schema.GroupVersionKind][]byte{
+			gvkmap: kubeadmapi.DocumentMap{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: files["foo"],
 			},
 		},
 		{
 			name:         "FooBar",
 			fileContents: bytes.Join([][]byte{files["foo"], files["bar"]}, []byte(constants.YAMLDocumentSeparator)),
-			gvkmap: map[schema.GroupVersionKind][]byte{
+			gvkmap: kubeadmapi.DocumentMap{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: files["foo"],
 				{Group: "bar.k8s.io", Version: "v2", Kind: "Bar"}: files["bar"],
 			},

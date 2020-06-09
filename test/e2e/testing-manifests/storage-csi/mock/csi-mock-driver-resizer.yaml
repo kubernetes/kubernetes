@@ -15,14 +15,13 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-resizer
-          image: quay.io/k8scsi/csi-resizer:v0.1.0
+          image: gcr.io/k8s-staging-csi/csi-resizer:v0.4.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
-          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:

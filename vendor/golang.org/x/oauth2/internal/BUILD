@@ -10,7 +10,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/oauth2/internal",
     importpath = "golang.org/x/oauth2/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/golang.org/x/oauth2:__subpackages__"],
     deps = ["//vendor/golang.org/x/net/context/ctxhttp:go_default_library"],
 )
 

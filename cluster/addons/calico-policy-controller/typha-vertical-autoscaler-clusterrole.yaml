@@ -3,12 +3,11 @@ kind: ClusterRole
 metadata:
   name: typha-cpva
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["list"]
-  - apiGroups: ["apps", "extensions"]
+  - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["patch"]

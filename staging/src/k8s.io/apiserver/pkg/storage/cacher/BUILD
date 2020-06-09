@@ -4,6 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cacher.go",
+        "caching_object.go",
+        "metrics.go",
         "time_budget.go",
         "util.go",
         "watch_cache.go",
@@ -19,6 +21,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -27,8 +31,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
@@ -37,6 +42,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cacher_whitebox_test.go",
+        "caching_object_test.go",
         "time_budget_test.go",
         "util_test.go",
         "watch_cache_test.go",

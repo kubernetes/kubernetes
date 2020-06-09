@@ -46,9 +46,9 @@ def import_replace(match, file, line_number):
     Doesn't try to be smart and detect if it's already present, assumes a
     gofmt round wil fix things.
     """
-    sys.stdout.write('{}\n"k8s.io/kubernetes/pkg/util/i18n"\n'.format(match.group(1)))
+    sys.stdout.write('{}\n"k8s.io/kubectl/pkg/util/i18n"\n'.format(match.group(1)))
 
-IMPORT_MATCH = MatchHandler('(.*"k8s.io/kubernetes/pkg/kubectl/cmd/util")', import_replace)
+IMPORT_MATCH = MatchHandler('(.*"k8s.io/kubectl/pkg/cmd/util")', import_replace)
 
 
 def string_flag_replace(match, file, line_number):

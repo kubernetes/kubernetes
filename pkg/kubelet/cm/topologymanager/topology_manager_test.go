@@ -17,60 +17,76 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-func NewTestSocketMask(sockets ...int) socketmask.SocketMask {
-	s, _ := socketmask.NewSocketMask(sockets...)
-	return s
-}
-
-func NewTestSocketMaskFull() socketmask.SocketMask {
-	s, _ := socketmask.NewSocketMask()
-	s.Fill()
+func NewTestBitMask(sockets ...int) bitmask.BitMask {
+	s, _ := bitmask.NewBitMask(sockets...)
 	return s
 }
 
 func TestNewManager(t *testing.T) {
 	tcases := []struct {
-		name       string
-		policyType string
+		description    string
+		policyName     string
+		expectedPolicy string
+		expectedError  error
 	}{
 		{
-			name:       "Policy is set preferred",
-			policyType: "preferred",
+			description:    "Policy is set to best-effort",
+			policyName:     "best-effort",
+			expectedPolicy: "best-effort",
 		},
 		{
-			name:       "Policy is set to strict",
-			policyType: "strict",
+			description:    "Policy is set to restricted",
+			policyName:     "restricted",
+			expectedPolicy: "restricted",
 		},
 		{
-			name:       "Policy is set to unknown",
-			policyType: "unknown",
+			description:   "Policy is set to unknown",
+			policyName:    "unknown",
+			expectedError: fmt.Errorf("unknown policy: \"unknown\""),
 		},
 	}
 
 	for _, tc := range tcases {
-		mngr := NewManager(tc.policyType)
+		mngr, err := NewManager(nil, tc.policyName)
 
-		if _, ok := mngr.(Manager); !ok {
-			t.Errorf("result is not Manager type")
+		if tc.expectedError != nil {
+			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
+				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
+			}
+		} else {
+			rawMgr := mngr.(*manager)
+			if rawMgr.policy.Name() != tc.expectedPolicy {
+				t.Errorf("Unexpected policy name. Have: %q wants %q", rawMgr.policy.Name(), tc.expectedPolicy)
+			}
 		}
 	}
 }
 
 type mockHintProvider struct {
-	th []TopologyHint
+	th map[string][]TopologyHint
+	//TODO: Add this field and add some tests to make sure things error out
+	//appropriately on allocation errors.
+	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod v1.Pod, container v1.Container) []TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
 	return m.th
+}
+
+func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+	//return allocateError
+	return nil
 }
 
 func TestGetAffinity(t *testing.T) {
@@ -96,446 +112,249 @@ func TestGetAffinity(t *testing.T) {
 	}
 }
 
+func TestAccumulateProvidersHints(t *testing.T) {
+	tcases := []struct {
+		name     string
+		hp       []HintProvider
+		expected []map[string][]TopologyHint
+	}{
+		{
+			name:     "TopologyHint not set",
+			hp:       []HintProvider{},
+			expected: nil,
+		},
+		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{},
+			},
+		},
+		{
+			name: "HintProvider returns - nil map[string][]TopologyHint from provider",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": nil,
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource": nil,
+				},
+			},
+		},
+		{
+			name: "2 HintProviders with 1 resource returns hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {TopologyHint{}},
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+				},
+				{
+					"resource2": {TopologyHint{}},
+				},
+			},
+		},
+		{
+			name: "2 HintProviders 1 with 1 resource 1 with nil hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+					},
+				},
+				&mockHintProvider{nil},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+				},
+				nil,
+			},
+		},
+		{
+			name: "2 HintProviders 1 with 1 resource 1 empty hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+				},
+				{},
+			},
+		},
+		{
+			name: "HintProvider with 2 resources returns hints",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {TopologyHint{}},
+						"resource2": {TopologyHint{}},
+					},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource1": {TopologyHint{}},
+					"resource2": {TopologyHint{}},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tcases {
+		mngr := manager{
+			hintProviders: tc.hp,
+		}
+		actual := mngr.accumulateProvidersHints(&v1.Pod{}, &v1.Container{})
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
+		}
+	}
+}
+
+type mockPolicy struct {
+	nonePolicy
+	ph []map[string][]TopologyHint
+}
+
+func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+	p.ph = providersHints
+	return TopologyHint{}, true
+}
+
 func TestCalculateAffinity(t *testing.T) {
 	tcases := []struct {
 		name     string
 		hp       []HintProvider
-		expected TopologyHint
+		expected []map[string][]TopologyHint
 	}{
 		{
-			name: "TopologyHint not set",
-			hp:   []HintProvider{},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+			name:     "No hint providers",
+			hp:       []HintProvider{},
+			expected: ([]map[string][]TopologyHint)(nil),
+		},
+		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{},
+				},
+			},
+			expected: []map[string][]TopologyHint{
+				{},
 			},
 		},
 		{
-			name: "HintProvider returns empty non-nil []TopologyHint",
+			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
-			},
-		},
-
-		{
-			name: "Single TopologyHint with Preferred as true and SocketAffinity as nil",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: nil,
-							Preferred:      true,
-						},
+					map[string][]TopologyHint{
+						"resource": nil,
 					},
 				},
 			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+			expected: []map[string][]TopologyHint{
+				{
+					"resource": nil,
+				},
 			},
 		},
 		{
-			name: "Single TopologyHint with Preferred as false and SocketAffinity as nil",
+			name: "Assorted HintProviders",
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: nil,
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource-1/A": {
+							{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false},
 						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, same mask, both preferred 1/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+						"resource-1/B": {
+							{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
+					map[string][]TopologyHint{
+						"resource-2/A": {
+							{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
 						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, same mask, both preferred 2/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
+						"resource-2/B": {
+							{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+							{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
 						},
 					},
 				},
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
+					map[string][]TopologyHint{
+						"resource-3": nil,
 					},
 				},
 			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
+			expected: []map[string][]TopologyHint{
+				{
+					"resource-1/A": {
+						{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false},
+					},
+					"resource-1/B": {
+						{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
 					},
 				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      true,
-						},
+				{
+					"resource-2/A": {
+						{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
+					},
+					"resource-2/B": {
+						{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+						{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
 					},
 				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
+				{
+					"resource-3": nil,
 				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      true,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, no common mask",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      false,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      false,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      false,
-			},
-		},
-		{
-			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      false,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      false,
-			},
-		},
-		{
-			name: "Two providers, 1 no hints, 1 single hint preferred 1/2",
-			hp: []HintProvider{
-				&mockHintProvider{},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 no hints, 1 single hint preferred 2/2",
-			hp: []HintProvider{
-				&mockHintProvider{},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 with 2 hints, 1 with single hint matching 1/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 with 2 hints, 1 with single hint matching 2/2",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      false,
-			},
-		},
-		{
-			name: "Two providers, both with 2 hints, matching narrower preferred hint from both",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
-			},
-		},
-		{
-			name: "Ensure less narrow preferred hints are chosen over narrower non-preferred hints",
-			hp: []HintProvider{
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
-						},
-					},
-				},
-				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
 			},
 		},
 	}
 
 	for _, tc := range tcases {
 		mngr := manager{}
+		mngr.policy = &mockPolicy{}
 		mngr.hintProviders = tc.hp
-		actual := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
-		if !actual.SocketAffinity.IsEqual(tc.expected.SocketAffinity) {
-			t.Errorf("Expected SocketAffinity in result to be %v, got %v", tc.expected.SocketAffinity, actual.SocketAffinity)
-		}
-		if actual.Preferred != tc.expected.Preferred {
-			t.Errorf("Expected Affinity preference in result to be %v, got %v", tc.expected.Preferred, actual.Preferred)
+		mngr.calculateAffinity(&v1.Pod{}, &v1.Container{})
+		actual := mngr.policy.(*mockPolicy).ph
+		if !reflect.DeepEqual(tc.expected, actual) {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected result to be %v, got %v", tc.expected, actual)
 		}
 	}
 }
@@ -636,6 +455,8 @@ func TestAddHintProvider(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
+	numaNodes := []int{0, 1}
+
 	tcases := []struct {
 		name     string
 		result   lifecycle.PodAdmitResult
@@ -659,19 +480,39 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. Preferred Affinity.",
+			name:     "QOSClass set as BestEffort. single-numa-node Policy. No Hints.",
+			qosClass: v1.PodQOSBestEffort,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as BestEffort. Restricted Policy. No Hints.",
+			qosClass: v1.PodQOSBestEffort,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
 						},
 					},
 				},
@@ -679,23 +520,25 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. More than one Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			policy:   NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
 						},
 					},
 				},
@@ -703,15 +546,25 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Preferred Policy. No Preferred Affinity.",
-			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewPreferredPolicy(),
+			name:     "QOSClass set as Burstable. BestEffort Policy. More than one Preferred Affinity.",
+			qosClass: v1.PodQOSBurstable,
+			policy:   NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
 						},
 					},
 				},
@@ -719,19 +572,17 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Strict Policy. Preferred Affinity.",
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. No Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewStrictPolicy(),
+			policy:   NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
 						},
 					},
 				},
@@ -739,23 +590,21 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Strict Policy. More than one Preferred affinity.",
+			name:     "QOSClass set as Guaranteed. Restricted Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewStrictPolicy(),
+			policy:   NewRestrictedPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(1),
-							Preferred:      true,
-						},
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
 						},
 					},
 				},
@@ -763,15 +612,109 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "QOSClass set as Guaranteed. Strict Policy. No Preferred affinity.",
-			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewStrictPolicy(),
+			name:     "QOSClass set as Burstable. Restricted Policy. Preferred Affinity.",
+			qosClass: v1.PodQOSBurstable,
+			policy:   NewRestrictedPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
-					[]TopologyHint{
-						{
-							SocketAffinity: NewTestSocketMask(0, 1),
-							Preferred:      false,
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Guaranteed. Restricted Policy. More than one Preferred affinity.",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Burstable. Restricted Policy. More than one Preferred affinity.",
+			qosClass: v1.PodQOSBurstable,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Guaranteed. Restricted Policy. No Preferred affinity.",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "QOSClass set as Burstable. Restricted Policy. No Preferred affinity.",
+			qosClass: v1.PodQOSBurstable,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
 						},
 					},
 				},
@@ -780,10 +723,12 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		man := manager{}
-		man.policy = tc.policy
-		man.podTopologyHints = make(map[string]map[string]TopologyHint)
-		man.hintProviders = tc.hp
+		man := manager{
+			policy:           tc.policy,
+			podTopologyHints: make(map[string]map[string]TopologyHint),
+			hintProviders:    tc.hp,
+		}
+
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -792,10 +737,15 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
+			Status: v1.PodStatus{
+				QOSClass: tc.qosClass,
+			},
 		}
-		podAttr := lifecycle.PodAdmitAttributes{}
-		pod.Status.QOSClass = tc.qosClass
-		podAttr.Pod = pod
+
+		podAttr := lifecycle.PodAdmitAttributes{
+			Pod: pod,
+		}
+
 		actual := man.Admit(&podAttr)
 		if actual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, actual.Admit)

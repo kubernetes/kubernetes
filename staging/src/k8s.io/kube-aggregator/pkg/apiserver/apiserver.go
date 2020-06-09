@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -132,6 +134,10 @@ type APIAggregator struct {
 
 	// openAPIAggregationController downloads and merges OpenAPI specs.
 	openAPIAggregationController *openapicontroller.AggregationController
+
+	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
+	// overwrites proxyTransport dialer if not nil
+	egressSelector *egressselector.EgressSelector
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -183,6 +189,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 		openAPIConfig:            openAPIConfig,
+		egressSelector:           c.GenericConfig.EgressSelector,
 	}
 
 	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
@@ -190,9 +197,18 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
+	enabledVersions := sets.NewString()
+	for v := range apiGroupInfo.VersionedResourcesStorageMap {
+		enabledVersions.Insert(v)
+	}
+	if !enabledVersions.Has(v1.SchemeGroupVersion.Version) {
+		return nil, fmt.Errorf("API group/version %s must be enabled", v1.SchemeGroupVersion.String())
+	}
+
 	apisHandler := &apisHandler{
-		codecs: aggregatorscheme.Codecs,
-		lister: s.lister,
+		codecs:         aggregatorscheme.Codecs,
+		lister:         s.lister,
+		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
@@ -207,6 +223,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.ExtraConfig.ProxyClientCert,
 		c.ExtraConfig.ProxyClientKey,
 		s.serviceResolver,
+		c.GenericConfig.EgressSelector,
 	)
 	if err != nil {
 		return nil, err
@@ -218,7 +235,13 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(context.StopCh)
+		handlerSyncedCh := make(chan struct{})
+		go apiserviceRegistrationController.Run(context.StopCh, handlerSyncedCh)
+		select {
+		case <-context.StopCh:
+		case <-handlerSyncedCh:
+		}
+
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
@@ -291,6 +314,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyClientKey:  s.proxyClientKey,
 		proxyTransport:  s.proxyTransport,
 		serviceResolver: s.serviceResolver,
+		egressSelector:  s.egressSelector,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {

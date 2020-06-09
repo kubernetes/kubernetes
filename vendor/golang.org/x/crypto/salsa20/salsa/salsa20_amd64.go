@@ -6,10 +6,9 @@
 
 package salsa
 
-// This function is implemented in salsa2020_amd64.s.
-
 //go:noescape
 
+// salsa2020XORKeyStream is implemented in salsa20_amd64.s.
 func salsa2020XORKeyStream(out, in *byte, n uint64, nonce, key *byte)
 
 // XORKeyStream crypts bytes from in to out using the given key and counters.

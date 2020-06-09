@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -181,6 +183,146 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 					"failed WriteToDisk config write:\n\texpected: %s\n\t  actual: %s",
 					rt.file,
 					newFile,
+				)
+			}
+		})
+	}
+}
+
+func TestGetCurrentAuthInfo(t *testing.T) {
+	var testCases = []struct {
+		name     string
+		config   *clientcmdapi.Config
+		expected bool
+	}{
+		{
+			name:     "nil context",
+			config:   nil,
+			expected: false,
+		},
+		{
+			name:     "no CurrentContext value",
+			config:   &clientcmdapi.Config{},
+			expected: false,
+		},
+		{
+			name:     "no CurrentContext object",
+			config:   &clientcmdapi.Config{CurrentContext: "kubernetes"},
+			expected: false,
+		},
+		{
+			name: "CurrentContext object with bad contents",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"NOTkubernetes": {}},
+			},
+			expected: false,
+		},
+		{
+			name: "no AuthInfo value",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {}},
+			},
+			expected: false,
+		},
+		{
+			name: "no AuthInfo object",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+			},
+			expected: false,
+		},
+		{
+			name: "AuthInfo object with bad contents",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"NOTkubernetes": {}},
+			},
+			expected: false,
+		},
+		{
+			name: "valid AuthInfo",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {}},
+			},
+			expected: true,
+		},
+	}
+	for _, rt := range testCases {
+		t.Run(rt.name, func(t *testing.T) {
+			r := getCurrentAuthInfo(rt.config)
+			if rt.expected != (r != nil) {
+				t.Errorf(
+					"failed TestHasCredentials:\n\texpected: %v\n\t  actual: %v",
+					rt.expected,
+					r,
+				)
+			}
+		})
+	}
+}
+
+func TestHasCredentials(t *testing.T) {
+	var testCases = []struct {
+		name     string
+		config   *clientcmdapi.Config
+		expected bool
+	}{
+		{
+			name:     "no authInfo",
+			config:   nil,
+			expected: false,
+		},
+		{
+			name: "no credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {}},
+			},
+			expected: false,
+		},
+		{
+			name: "token authentication credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {Token: "123"}},
+			},
+			expected: true,
+		},
+		{
+			name: "basic authentication credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {Username: "A", Password: "B"}},
+			},
+			expected: true,
+		},
+		{
+			name: "X509 authentication credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {ClientKey: "A", ClientCertificate: "B"}},
+			},
+			expected: true,
+		},
+	}
+	for _, rt := range testCases {
+		t.Run(rt.name, func(t *testing.T) {
+			r := HasAuthenticationCredentials(rt.config)
+			if rt.expected != r {
+				t.Errorf(
+					"failed TestHasCredentials:\n\texpected: %v\n\t  actual: %v",
+					rt.expected,
+					r,
 				)
 			}
 		})

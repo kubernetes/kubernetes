@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), (*config.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(a.(*v1alpha1.PersistentVolumeBinderControllerConfiguration), b.(*config.PersistentVolumeBinderControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.PersistentVolumeBinderControllerConfiguration)(nil), (*v1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(a.(*config.PersistentVolumeBinderControllerConfiguration), b.(*v1alpha1.PersistentVolumeBinderControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.PersistentVolumeRecyclerConfiguration)(nil), (*config.PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(a.(*v1alpha1.PersistentVolumeRecyclerConfiguration), b.(*config.PersistentVolumeRecyclerConfiguration), scope)
 	}); err != nil {

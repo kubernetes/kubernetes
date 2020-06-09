@@ -15,7 +15,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/generated",
     deps = [
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -23,7 +23,9 @@ go_library(
 go_bindata(
     name = "bindata",
     srcs = [
+        "//test/conformance/testdata:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
+        "//test/e2e_node/testing-manifests:all-srcs",
         "//test/fixtures:all-srcs",
         "//test/images:all-srcs",
     ],

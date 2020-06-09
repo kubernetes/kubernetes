@@ -23,17 +23,18 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/klog/v2"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 type sioVolume struct {
@@ -53,6 +54,10 @@ type sioVolume struct {
 
 	volume.MetricsNil
 }
+
+const (
+	minimumVolumeSizeGiB = 8
+)
 
 // *******************
 // volume.Volume Impl
@@ -156,7 +161,7 @@ func (v *sioVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	if !v.readOnly && mounterArgs.FsGroup != nil {
 		klog.V(4).Info(log("applying  value FSGroup ownership"))
-		volume.SetVolumeOwnership(v, mounterArgs.FsGroup)
+		volume.SetVolumeOwnership(v, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	}
 
 	klog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
@@ -271,21 +276,17 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 
 	// setup volume attrributes
 	genName := v.generateName("k8svol", 11)
-	eightGig := int64(8 * volumehelpers.GiB)
 
 	capacity := v.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 
-	volSizeBytes := capacity.Value()
-	volSizeGB := int64(volumehelpers.RoundUpToGiB(capacity))
-
-	if volSizeBytes == 0 {
-		return nil, fmt.Errorf("invalid volume size of 0 specified")
+	volSizeGiB, err := volumehelpers.RoundUpToGiB(capacity)
+	if err != nil {
+		return nil, err
 	}
 
-	if volSizeBytes < eightGig {
-		eightGiBCapacity := resource.NewQuantity(eightGig, resource.BinarySI)
-		volSizeGB = int64(volumehelpers.RoundUpToGiB(*eightGiBCapacity))
-		klog.V(4).Info(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGB))
+	if volSizeGiB < minimumVolumeSizeGiB {
+		volSizeGiB = minimumVolumeSizeGiB
+		klog.V(4).Info(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGiB))
 
 	}
 
@@ -297,7 +298,7 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 
 	// create volume
 	volName := genName
-	vol, err := v.sioMgr.CreateVolume(volName, volSizeGB)
+	vol, err := v.sioMgr.CreateVolume(volName, volSizeGiB)
 	if err != nil {
 		klog.Error(log("provision failed while creating volume: %v", err))
 		return nil, err
@@ -332,7 +333,7 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 			AccessModes:                   v.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(
-					fmt.Sprintf("%dGi", volSizeGB),
+					fmt.Sprintf("%dGi", volSizeGiB),
 				),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{

@@ -48,6 +48,14 @@ func TestRuntimeClassConversion(t *testing.T) {
 						core.ResourceCPU: resource.MustParse(cpuOverhead),
 					},
 				},
+				Scheduling: &node.Scheduling{
+					NodeSelector: map[string]string{"extra-soft": "true"},
+					Tolerations: []core.Toleration{{
+						Key:      "stinky",
+						Operator: core.TolerationOpExists,
+						Effect:   core.TaintEffectNoSchedule,
+					}},
+				},
 			},
 			external: &v1alpha1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -57,6 +65,14 @@ func TestRuntimeClassConversion(t *testing.T) {
 						PodFixed: corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse(cpuOverhead),
 						},
+					},
+					Scheduling: &v1alpha1.Scheduling{
+						NodeSelector: map[string]string{"extra-soft": "true"},
+						Tolerations: []corev1.Toleration{{
+							Key:      "stinky",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}},
 					},
 				},
 			},
@@ -72,6 +88,20 @@ func TestRuntimeClassConversion(t *testing.T) {
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,
 					Overhead:       &v1alpha1.Overhead{},
+				},
+			},
+		},
+		"empty-scheduling": {
+			internal: &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Handler:    handler,
+				Scheduling: &node.Scheduling{},
+			},
+			external: &v1alpha1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1alpha1.RuntimeClassSpec{
+					RuntimeHandler: handler,
+					Scheduling:     &v1alpha1.Scheduling{},
 				},
 			},
 		},

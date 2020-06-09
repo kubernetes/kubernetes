@@ -18,6 +18,7 @@ package certificate
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -58,6 +59,68 @@ XSCcosCktbkXvpYrS30CIQDPDxgqlwDEJQ0uKuHkZI38/SPWWqfUmkecwlbpXABK
 iQIgZX08DA8VfvcA5/Xj1Zjdey9FVY6POLXen6RPiabE97UCICp6eUW7ht+2jjar
 e35EltCRCjoejRHTuN9TC0uCoVipAiAXaJIx/Q47vGwiw6Y8KXsNU6y54gTbOSxX
 54LzHNk/+Q==
+-----END RSA PRIVATE KEY-----`)
+var storeTwoCertsData = newCertificateData(`-----BEGIN CERTIFICATE-----
+MIIDfTCCAyegAwIBAgIUFBl4gUoqZDP/wUJDn37/VJ9upD0wDQYJKoZIhvcNAQEF
+BQAwfjELMAkGA1UEBhMCR0IxDzANBgNVBAgMBkxvbmRvbjEPMA0GA1UEBwwGTG9u
+ZG9uMRgwFgYDVQQKDA9HbG9iYWwgU2VjdXJpdHkxFjAUBgNVBAsMDUlUIERlcGFy
+dG1lbnQxGzAZBgNVBAMMEnRlc3QtY2VydGlmaWNhdGUtMDAeFw0yMDAzMDIxOTM3
+MDBaFw0yMTAzMDIxOTM3MDBaMIGIMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2Fs
+aWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzEdMBsGA1UEChMURXhhbXBs
+ZSBDb21wYW55LCBMTEMxEzARBgNVBAsTCk9wZXJhdGlvbnMxGDAWBgNVBAMTD3d3
+dy5leGFtcGxlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMiR
+DNpmwTICFr+P16fKDVjbNCzSjWq+MTu8vAfS6GrLpBTUEe+6zVqxUza/fZenxo8O
+ucV2JTUv5J4nkT/vG6Qm/mToVJ4vQzLQ5jR2w7v/7cf3oWCwTAKUafgo6/Ga95gn
+lQB3+Fd8sy96zfFr/7wDSMPPueR5kSFax+cEd30wwv5O7tWj0ro1mrxLssBlwPaR
+ZlzkkvxBYTzWCqKZsWktQlXciqlFSos0ua7uvwqKN5CTxfC/xoyMxx9kfZm7BzPN
+ZDqYMFw2HiWdEiLzI4jj+Gh0D5t47tnvlpUMihcX9x0jP6/+hnfcQ8GAP2jR/BXY
+5YZRRY70LiCXPevlRAECAwEAAaOBqTCBpjAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0l
+BBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYE
+FOoiE+kh7gGDpyx0KZuCc1lrlTRKMB8GA1UdIwQYMBaAFNtosvGlpDUsb9JwcRcX
+q37L52VTMCcGA1UdEQQgMB6CC2V4YW1wbGUuY29tgg93d3cuZXhhbXBsZS5jb20w
+DQYJKoZIhvcNAQEFBQADQQAw6mxQONAD2sivfzIf1eDFd6LU7aE+MnkdlEQjjPCi
+tlUITFIuO3XavISupP6V9wE0b1wTF1pTlVWArf/0YQXs
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIICRzCCAfGgAwIBAgIJALMb7ecMIk3MMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
+BAYTAkdCMQ8wDQYDVQQIDAZMb25kb24xDzANBgNVBAcMBkxvbmRvbjEYMBYGA1UE
+CgwPR2xvYmFsIFNlY3VyaXR5MRYwFAYDVQQLDA1JVCBEZXBhcnRtZW50MRswGQYD
+VQQDDBJ0ZXN0LWNlcnRpZmljYXRlLTAwIBcNMTcwNDI2MjMyNjUyWhgPMjExNzA0
+MDIyMzI2NTJaMH4xCzAJBgNVBAYTAkdCMQ8wDQYDVQQIDAZMb25kb24xDzANBgNV
+BAcMBkxvbmRvbjEYMBYGA1UECgwPR2xvYmFsIFNlY3VyaXR5MRYwFAYDVQQLDA1J
+VCBEZXBhcnRtZW50MRswGQYDVQQDDBJ0ZXN0LWNlcnRpZmljYXRlLTAwXDANBgkq
+hkiG9w0BAQEFAANLADBIAkEAtBMa7NWpv3BVlKTCPGO/LEsguKqWHBtKzweMY2CV
+tAL1rQm913huhxF9w+ai76KQ3MHK5IVnLJjYYA5MzP2H5QIDAQABo1AwTjAdBgNV
+HQ4EFgQU22iy8aWkNSxv0nBxFxerfsvnZVMwHwYDVR0jBBgwFoAU22iy8aWkNSxv
+0nBxFxerfsvnZVMwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAANBAEOefGbV
+NcHxklaW06w6OBYJPwpIhCVozC1qdxGX1dg8VkEKzjOzjgqVD30m59OFmSlBmHsl
+nkVA6wyOSDYBf3o=
+-----END CERTIFICATE-----`, `-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAyJEM2mbBMgIWv4/Xp8oNWNs0LNKNar4xO7y8B9LoasukFNQR
+77rNWrFTNr99l6fGjw65xXYlNS/knieRP+8bpCb+ZOhUni9DMtDmNHbDu//tx/eh
+YLBMApRp+Cjr8Zr3mCeVAHf4V3yzL3rN8Wv/vANIw8+55HmRIVrH5wR3fTDC/k7u
+1aPSujWavEuywGXA9pFmXOSS/EFhPNYKopmxaS1CVdyKqUVKizS5ru6/Coo3kJPF
+8L/GjIzHH2R9mbsHM81kOpgwXDYeJZ0SIvMjiOP4aHQPm3ju2e+WlQyKFxf3HSM/
+r/6Gd9xDwYA/aNH8FdjlhlFFjvQuIJc96+VEAQIDAQABAoIBAQCc6R3tH8a1oPy7
+EYXeNy0J/zRqfK82e2V5HsbcOByssHTF9sOxkatm8KPxiQ5wv0mQUiz0VuH1Imrx
+cHMqWZ5+ZiNQPpM0zjT8ZII1OVUYl7knYIxYYJSW0BW3mAw/EMXzu8POgg1AJMbq
+tmC4J44DQW6EAtej75ejSKpsCgqRXVoi3iEk9eMLHUFIHqkzl/aKEc7k/P+eKo2h
+PHsDoKZdmOmZA3OKzw61xAqJICYyplRHatQcEiWJgnLer+9qvUGc4k8eqAYeDGm7
+T78XcUvsXOug2GClVWGZu1quFhf7MxjzFfOjz4q9HwPex7X6nQL0IX2hzMECkaMC
+iUMZGGEhAoGBAOLY1KSNOjvt54MkKznI8stHkx8V73c0Nxbz5Rj8gM0Gwk1FWVas
+jgoAbKPQ2UL/RglLX1JZvztKvNuWSEeZGqggDvhzB38leiEH+OY7DZ7a0c5sWwdF
+CpcT1mJb91ww5xEC09WO8Oq3i5olVBBivOl5EjwKHOQn2TUh2OSLhqf/AoGBAOJX
+mxqdTEUwFU9ecsAOK9labjI7mA5so0vIq8eq1Q670NFszChfSMKJAqQ90N1LEu9z
+L0f6CBXYCn7sMmOlF4CKE+u2/ieJfD1OkKq7RwEd3pi4X3xtAlcPK8F/QprmQWo0
+wi33BDBb4zYkuQB6Q5RYIV2di7k+HBpoQPottBP/AoGAIB4xJUc1qoyJjeDOGfVg
+ovV0WB9j8026Sw6nLj16Aw1k70nVV1dBGRtsRllomXrJMMGyMleworV3PePuQezk
+gE9hrz2iHxdwTkLxs69Cw24Z7I8c6E+XK0LMxMpeoHfwD1GGKqN9as4n/uAwIc3J
+D4lr0oJgCtG1iDdNnTZAD4MCgYAkOpWPCwJ8SJgAnkOLzjjij4D39WX/WRBCPxqP
+2R5FP3bLLrj29Vl2GewcUfCumyeqwCsfQDwvEueLLU9bd79tSayqnB3OQklqnrq1
+OUjCOv+4Pjq6ddBcEweT70S/+n8Z+tvh85nuC6cwsWwTUX6jrf+ZNnB49CIXb/yG
+ju42DQKBgAPtbB/ON3+GtnSTHBSY6HwZvGJrBDicrXmr1U9zuA8yYxv8qaRXZkpn
+2cpLLvO2MJutwXMYf+T3x1ZCFMkE56pOswSTGrCQWRl3hOiJayLHQyAOYHPnYeZB
+78iRJPUZ0biEQUZQ62GBxWkcB0qkxa9m759h/TvLwvV0RrO5Uzd0
 -----END RSA PRIVATE KEY-----`)
 var expiredStoreCertData = newCertificateData(`-----BEGIN CERTIFICATE-----
 MIIBFzCBwgIJALhygXnxXmN1MA0GCSqGSIb3DQEBCwUAMBMxETAPBgNVBAMMCGhv
@@ -163,12 +226,17 @@ func TestNewManagerNoRotation(t *testing.T) {
 	}
 }
 
-type gaugeMock struct {
+type metricMock struct {
 	calls     int
 	lastValue float64
 }
 
-func (g *gaugeMock) Set(v float64) {
+func (g *metricMock) Set(v float64) {
+	g.calls++
+	g.lastValue = v
+}
+
+func (g *metricMock) Observe(v float64) {
 	g.calls++
 	g.lastValue = v
 }
@@ -195,7 +263,6 @@ func TestSetRotationDeadline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := gaugeMock{}
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
@@ -203,9 +270,9 @@ func TestSetRotationDeadline(t *testing.T) {
 						NotAfter:  tc.notAfter,
 					},
 				},
-				getTemplate:           func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-				usages:                []certificates.KeyUsage{},
-				certificateExpiration: &g,
+				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+				usages:      []certificates.KeyUsage{},
+				now:         func() time.Time { return now },
 			}
 			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
@@ -218,12 +285,6 @@ func TestSetRotationDeadline(t *testing.T) {
 					tc.notAfter,
 					deadline,
 					lowerBound)
-			}
-			if g.calls != 1 {
-				t.Errorf("%d metrics were recorded, wanted %d", g.calls, 1)
-			}
-			if g.lastValue != float64(tc.notAfter.Unix()) {
-				t.Errorf("%f value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
 			}
 		})
 	}
@@ -383,6 +444,7 @@ func TestCertSatisfiesTemplate(t *testing.T) {
 			m := manager{
 				cert:        tlsCert,
 				getTemplate: func() *x509.CertificateRequest { return tc.template },
+				now:         time.Now,
 			}
 
 			result := m.certSatisfiesTemplate()
@@ -407,6 +469,7 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
 			return fakeClient{failureType: createError}, nil
 		},
+		now: func() time.Time { return now },
 	}
 
 	if success, err := m.rotateCerts(); success {
@@ -430,6 +493,7 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
 			return fakeClient{failureType: watchError}, nil
 		},
+		now: func() time.Time { return now },
 	}
 
 	defer func(t time.Duration) { certificateWaitTimeout = t }(certificateWaitTimeout)
@@ -945,6 +1009,40 @@ func TestServerHealth(t *testing.T) {
 	}
 }
 
+func TestRotationLogsDuration(t *testing.T) {
+	h := metricMock{}
+	now := time.Now()
+	certIss := now.Add(-2 * time.Hour)
+	m := manager{
+		cert: &tls.Certificate{
+			Leaf: &x509.Certificate{
+				NotBefore: certIss,
+				NotAfter:  now.Add(-1 * time.Hour),
+			},
+		},
+		certStore:   &fakeStore{cert: expiredStoreCertData.certificate},
+		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+			return &fakeClient{
+				certificatePEM: apiServerCertData.certificatePEM,
+			}, nil
+		},
+		certificateRotation: &h,
+		now:                 func() time.Time { return now },
+	}
+	ok, err := m.rotateCerts()
+	if err != nil || !ok {
+		t.Errorf("failed to rotate certs: %v", err)
+	}
+	if h.calls != 1 {
+		t.Errorf("rotation metric was not called")
+	}
+	if h.lastValue != now.Sub(certIss).Seconds() {
+		t.Errorf("rotation metric did not record the right value got: %f; want %f", h.lastValue, now.Sub(certIss).Seconds())
+	}
+
+}
+
 type fakeClientFailureType int
 
 const (
@@ -961,7 +1059,7 @@ type fakeClient struct {
 	err            error
 }
 
-func (c fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+func (c fakeClient) List(_ context.Context, opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
 	if c.failureType == watchError {
 		if c.err != nil {
 			return nil, c.err
@@ -976,7 +1074,7 @@ func (c fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningR
 	return &csrReply, nil
 }
 
-func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+func (c fakeClient) Create(context.Context, *certificates.CertificateSigningRequest, v1.CreateOptions) (*certificates.CertificateSigningRequest, error) {
 	if c.failureType == createError {
 		if c.err != nil {
 			return nil, c.err
@@ -988,7 +1086,7 @@ func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificat
 	return &csrReply, nil
 }
 
-func (c fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c fakeClient) Watch(_ context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	if c.failureType == watchError {
 		if c.err != nil {
 			return nil, c.err

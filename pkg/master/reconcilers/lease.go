@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +37,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
@@ -64,13 +63,19 @@ var _ Leases = &storageLeases{}
 // ListLeases retrieves a list of the current master IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
 	ipInfoList := &corev1.EndpointsList{}
-	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, "0", storage.Everything, ipInfoList); err != nil {
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+	}
+	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
 		return nil, err
 	}
 
-	ipList := make([]string, len(ipInfoList.Items))
-	for i, ip := range ipInfoList.Items {
-		ipList[i] = ip.Subsets[0].Addresses[0].IP
+	ipList := make([]string, 0, len(ipInfoList.Items))
+	for _, ip := range ipInfoList.Items {
+		if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 && len(ip.Subsets[0].Addresses[0].IP) > 0 {
+			ipList = append(ipList, ip.Subsets[0].Addresses[0].IP)
+		}
 	}
 
 	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
@@ -120,16 +125,16 @@ func NewLeases(storage storage.Interface, baseKey string, leaseTime time.Duratio
 }
 
 type leaseEndpointReconciler struct {
-	endpointClient        corev1client.EndpointsGetter
+	epAdapter             EndpointsAdapter
 	masterLeases          Leases
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
-func NewLeaseEndpointReconciler(endpointClient corev1client.EndpointsGetter, masterLeases Leases) EndpointReconciler {
+func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases) EndpointReconciler {
 	return &leaseEndpointReconciler{
-		endpointClient:        endpointClient,
+		epAdapter:             epAdapter,
 		masterLeases:          masterLeases,
 		stopReconcilingCalled: false,
 	}
@@ -161,7 +166,7 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 }
 
 func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-	e, err := r.endpointClient.Endpoints(corev1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions{})
 	shouldCreate := false
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -193,7 +198,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
 	if formatCorrect && ipCorrect && portsCorrect {
-		return nil
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
 
 	if !formatCorrect {
@@ -222,11 +227,11 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 
 	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
 	if shouldCreate {
-		if _, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
+		if _, err = r.epAdapter.Create(corev1.NamespaceDefault, e); errors.IsAlreadyExists(err) {
 			err = nil
 		}
 	} else {
-		_, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Update(e)
+		_, err = r.epAdapter.Update(corev1.NamespaceDefault, e)
 	}
 	return err
 }

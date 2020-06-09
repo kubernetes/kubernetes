@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/api/events/v1beta1"
 	"k8s.io/client-go/tools/record/util"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type recorderImpl struct {
@@ -68,7 +68,7 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 	t := metav1.Time{Time: recorder.clock.Now()}
 	namespace := refRegarding.Namespace
 	if namespace == "" {
-		namespace = metav1.NamespaceSystem
+		namespace = metav1.NamespaceDefault
 	}
 	return &v1beta1.Event{
 		ObjectMeta: metav1.ObjectMeta{

@@ -1,17 +1,27 @@
 language: go
 go:
-  - 1.9.x
-  - tip
+  - "1.12.x"
+  - "1.13.x"
 
 go_import_path: github.com/containerd/console
 
+env:
+  - GO111MODULE=on
+
 install:
-  - go get -d
-  - GOOS=windows go get -d
-  - GOOS=solaris go get -d
+  - pushd ..; go get -u github.com/vbatts/git-validation; popd
+  - pushd ..; go get -u github.com/kunalkushwaha/ltag; popd
+
+before_script:
+  - pushd ..; git clone https://github.com/containerd/project; popd
 
 script:
+  - DCO_VERBOSITY=-q ../project/script/validate/dco
+  - ../project/script/validate/fileheader ../project/
+  - travis_wait ../project/script/validate/vendor
   - go test -race
-  - GOOS=windows go test
+  - GOOS=openbsd go build
+  - GOOS=openbsd go test -c
   - GOOS=solaris go build
   - GOOS=solaris go test -c
+  - GOOS=windows go test

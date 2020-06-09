@@ -25,7 +25,7 @@ import (
 	"runtime"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // StacktracePred returns true if a stacktrace should be logged for this status.
@@ -156,11 +156,19 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	if klog.V(3) {
+	if klog.V(3).Enabled() {
 		if !rl.hijacked {
-			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.UserAgent(), rl.req.RemoteAddr))
+			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v resp=%v UserAgent=%q srcIP=%q: %v%v",
+				rl.req.Method, rl.req.RequestURI,
+				latency, rl.status,
+				rl.req.UserAgent(), rl.req.RemoteAddr,
+				rl.statusStack, rl.addedInfo,
+			))
 		} else {
-			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.UserAgent(), rl.req.RemoteAddr))
+			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v UserAgent=%q srcIP=%q: hijacked",
+				rl.req.Method, rl.req.RequestURI,
+				latency, rl.req.UserAgent(), rl.req.RemoteAddr,
+			))
 		}
 	}
 }
@@ -186,7 +194,7 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 func (rl *respLogger) Flush() {
 	if flusher, ok := rl.w.(http.Flusher); ok {
 		flusher.Flush()
-	} else if klog.V(2) {
+	} else if klog.V(2).Enabled() {
 		klog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
 	}
 }

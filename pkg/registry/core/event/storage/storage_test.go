@@ -38,7 +38,11 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "events",
 	}
-	return NewREST(restOptions, testTTL), server
+	rest, err := NewREST(restOptions, testTTL)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return rest, server
 }
 
 func validNewEvent(namespace string) *api.Event {
