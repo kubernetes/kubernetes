@@ -355,7 +355,7 @@ replace (
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/morikuni/aec => github.com/morikuni/aec v1.0.0
-	github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618
+	github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
 	github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls => github.com/mvdan/xurls v1.1.0
 	github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223
