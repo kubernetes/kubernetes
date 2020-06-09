@@ -63,20 +63,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-type fakePodPreemptor struct{}
-
-func (fp fakePodPreemptor) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
-	return pod, nil
-}
-
-func (fp fakePodPreemptor) deletePod(pod *v1.Pod) error {
-	return nil
-}
-
-func (fp fakePodPreemptor) removeNominatedNodeName(pod *v1.Pod) error {
-	return nil
-}
-
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -134,8 +120,8 @@ func (es mockScheduler) Extenders() []framework.Extender {
 	return nil
 }
 
-func (es mockScheduler) Preempt(ctx context.Context, profile *profile.Profile, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (string, []*v1.Pod, []*v1.Pod, error) {
-	return "", nil, nil, nil
+func (es mockScheduler) Preempt(ctx context.Context, profile *profile.Profile, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) (string, error) {
+	return "", nil
 }
 
 func TestSchedulerCreation(t *testing.T) {
@@ -816,9 +802,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Error: func(p *framework.QueuedPodInfo, err error) {
 			errChan <- err
 		},
-		Profiles:     profiles,
-		client:       client,
-		podPreemptor: fakePodPreemptor{},
+		Profiles: profiles,
+		client:   client,
 	}
 
 	return sched, bindingChan, errChan
@@ -1181,61 +1166,6 @@ func TestSchedulerBinding(t *testing.T) {
 				}
 			}
 
-		})
-	}
-}
-
-func TestRemoveNominatedNodeName(t *testing.T) {
-	tests := []struct {
-		name                     string
-		currentNominatedNodeName string
-		newNominatedNodeName     string
-		expectedPatchRequests    int
-		expectedPatchData        string
-	}{
-		{
-			name:                     "Should make patch request to clear node name",
-			currentNominatedNodeName: "node1",
-			expectedPatchRequests:    1,
-			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
-		},
-		{
-			name:                     "Should not make patch request if nominated node is already cleared",
-			currentNominatedNodeName: "",
-			expectedPatchRequests:    0,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actualPatchRequests := 0
-			var actualPatchData string
-			cs := &clientsetfake.Clientset{}
-			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				actualPatchRequests++
-				patch := action.(clienttesting.PatchAction)
-				actualPatchData = string(patch.GetPatch())
-				// For this test, we don't care about the result of the patched pod, just that we got the expected
-				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
-				return true, &v1.Pod{}, nil
-			})
-
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
-			}
-
-			preemptor := &podPreemptorImpl{Client: cs}
-			if err := preemptor.removeNominatedNodeName(pod); err != nil {
-				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
-			}
-
-			if actualPatchRequests != test.expectedPatchRequests {
-				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
-			}
-
-			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
-				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
-			}
 		})
 	}
 }
