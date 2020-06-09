@@ -219,7 +219,7 @@ github.com/docker/docker/pkg/jsonmessage
 github.com/docker/docker/pkg/stdcopy
 github.com/docker/docker/pkg/term
 github.com/docker/docker/pkg/term/windows
-# github.com/docker/go-connections v0.4.0 => github.com/docker/go-connections v0.3.0
+# github.com/docker/go-connections v0.4.0 => github.com/docker/go-connections v0.4.0
 github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
