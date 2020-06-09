@@ -196,16 +196,18 @@ func DeleteDeploymentForeground(client clientset.Interface, namespace, name stri
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
-	if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(role); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create RBAC role")
-		}
+	return wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role, metav1.CreateOptions{}); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return false, errors.Wrap(err, "unable to create RBAC role")
+			}
 
-		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(role); err != nil {
-			return errors.Wrap(err, "unable to update RBAC role")
+			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
+				return false, errors.Wrap(err, "unable to update RBAC role")
+			}
 		}
-	}
-	return nil
+		return true, nil
+	})
 }
 
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
