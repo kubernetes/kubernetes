@@ -226,14 +226,15 @@ func isTimedOut(pod *v1.Pod) bool {
 	if !isTerminating(pod) {
 		return false
 	}
-	rc := clock.RealClock{}
-	now := rc.Now()
-	deletionTime := pod.DeletionTimestamp.Time
-	gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
-	if now.After(deletionTime.Add(gracePeriod)) {
-		return true
+	if pod.DeletionGracePeriodSeconds != nil {
+		rc := clock.RealClock{}
+		now := rc.Now()
+		deletionTime := pod.DeletionTimestamp.Time
+		gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
+		if now.After(deletionTime.Add(gracePeriod)) {
+			return true
+		}
 	}
-
 	return false
 }
 
