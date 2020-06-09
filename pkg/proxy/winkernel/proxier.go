@@ -290,6 +290,24 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 	return info
 }
 
+func (network hnsNetworkInfo) findRemoteSubnetProviderAddress(ip string) string {
+	var providerAddress string
+	for _, rs := range network.remoteSubnets {
+		_, ipNet, err := net.ParseCIDR(rs.destinationPrefix)
+		if err != nil {
+			klog.Fatalf("%v", err)
+		}
+		if ipNet.Contains(net.ParseIP(ip)) {
+			providerAddress = rs.providerAddress
+		}
+		if ip == rs.providerAddress {
+			providerAddress = rs.providerAddress
+		}
+	}
+
+	return providerAddress
+}
+
 type endpointsChange struct {
 	previous proxyEndpointsMap
 	current  proxyEndpointsMap
@@ -1169,24 +1187,12 @@ func (proxier *Proxier) syncProxyRules() {
 						return
 					}
 					proxier.network = *updatedNetwork
-					var providerAddress string
-					for _, rs := range proxier.network.remoteSubnets {
-						_, ipNet, err := net.ParseCIDR(rs.destinationPrefix)
-						if err != nil {
-							klog.Fatalf("%v", err)
-						}
-						if ipNet.Contains(net.ParseIP(ep.ip)) {
-							providerAddress = rs.providerAddress
-						}
-						if ep.ip == rs.providerAddress {
-							providerAddress = rs.providerAddress
-							containsNodeIP = true
-						}
-					}
+
+					providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.ip)
+
 					if len(providerAddress) == 0 {
 						klog.Infof("Could not find provider address for %s. Assuming it is a public IP", ep.ip)
 						providerAddress = proxier.nodeIP.String()
-						containsPublicIP = true
 					}
 
 					hnsEndpoint := &endpointsInfo{
@@ -1214,6 +1220,17 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 				}
+			}
+
+			if proxier.network.networkType == "Overlay" {
+				providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.ip)
+
+				isNodeIP := (ep.ip == providerAddress)
+				isPublicIP := (len(providerAddress) == 0)
+				klog.Infof("Endpoint %s on overlay network %s is classified as NodeIp: %v, Public Ip: %v", ep.ip, hnsNetworkName, isNodeIP, isPublicIP)
+
+				containsNodeIP = containsNodeIP || isNodeIP
+				containsPublicIP = containsPublicIP || isPublicIP
 			}
 
 			// Save the hnsId for reference
