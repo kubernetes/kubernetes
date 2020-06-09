@@ -64,11 +64,13 @@ func DescribeSvc(ns string) {
 // newAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
 // that behave the same, no matter the underlying OS.
 func newAgnhostPod(name string, args ...string) *v1.Pod {
+	zero := int64(0)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &zero,
 			Containers: []v1.Container{
 				{
 					Name:  "agnhost",
