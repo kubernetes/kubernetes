@@ -434,10 +434,11 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 	filtered := make([]*v1.Node, numNodesToFind)
 
 	if !prof.HasFilterPlugins() {
+		length := len(allNodes)
 		for i := range filtered {
-			filtered[i] = allNodes[i].Node()
+			filtered[i] = allNodes[(g.nextStartNodeIndex+i)%length].Node()
 		}
-		g.nextStartNodeIndex = (g.nextStartNodeIndex + len(filtered)) % len(allNodes)
+		g.nextStartNodeIndex = (g.nextStartNodeIndex + len(filtered)) % length
 		return filtered, nil
 	}
 
