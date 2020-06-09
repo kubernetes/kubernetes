@@ -1335,22 +1335,26 @@ retriesLoop:
 		// NOTE the test may need access to the events to see what's going on, such as a change in status
 		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
-		// watchEventsLoop:
+		ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
+
 		totalValidWatchEvents := 0
-		actualWatchEventsHasDelete := false
-		for watchEventIndex := range expectedWatchEvents {
+		foundEventIndexes := map[int]*int{}
+
+		for watchEventIndex, expectedWatchEvent := range expectedWatchEvents {
 			foundExpectedWatchEvent := false
-			ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
-			for actualWatchEventIndex := range actualWatchEvents {
-				if actualWatchEvents[watchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
-					foundExpectedWatchEvent = true
+		actualWatchEventsLoop:
+			for actualWatchEventIndex, actualWatchEvent := range actualWatchEvents {
+				if foundEventIndexes[actualWatchEventIndex] != nil {
+					continue actualWatchEventsLoop
 				}
-				if actualWatchEvents[actualWatchEventIndex].Type == watch.Deleted && actualWatchEventsHasDelete != true {
-					actualWatchEventsHasDelete = true
+				if actualWatchEvent.Type == expectedWatchEvent.Type {
+					foundExpectedWatchEvent = true
+					foundEventIndexes[actualWatchEventIndex] = &watchEventIndex
+					break actualWatchEventsLoop
 				}
 			}
 			if foundExpectedWatchEvent == false {
-				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvents[watchEventIndex].Type))
+				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvent.Type))
 			}
 			totalValidWatchEvents++
 		}
