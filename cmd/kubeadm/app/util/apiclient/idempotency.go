@@ -197,12 +197,12 @@ func DeleteDeploymentForeground(client clientset.Interface, namespace, name stri
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 	return wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
-		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role, metav1.CreateOptions{}); err != nil {
+		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(role); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return false, errors.Wrap(err, "unable to create RBAC role")
 			}
 
-			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
+			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(role); err != nil {
 				return false, errors.Wrap(err, "unable to update RBAC role")
 			}
 		}
@@ -212,16 +212,18 @@ func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
-	if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(roleBinding); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create RBAC rolebinding")
-		}
+	return wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(roleBinding); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return false, errors.Wrap(err, "unable to create RBAC rolebinding")
+			}
 
-		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(roleBinding); err != nil {
-			return errors.Wrap(err, "unable to update RBAC rolebinding")
+			if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(roleBinding); err != nil {
+				return false, errors.Wrap(err, "unable to update RBAC rolebinding")
+			}
 		}
-	}
-	return nil
+		return true, nil
+	})
 }
 
 // CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
