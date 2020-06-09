@@ -48,6 +48,8 @@ const (
 	clusterSubnetMaxDiff = 16
 	// halfIPv6Len is the half of the IPv6 length
 	halfIPv6Len = net.IPv6len / 2
+	// siteLocalRange is ipv6 site-local range which is deprecated.
+	siteLocalRange = "FEC0::/10"
 )
 
 var (
@@ -59,6 +61,10 @@ var (
 	// big compared to the CIDR mask size.
 	ErrCIDRSetSubNetTooBig = errors.New(
 		"New CIDR set failed; the node CIDR size is too big")
+	// ErrCIDRSetSubNetContainIpv6SiteLocalAddrs when the subnet is in site local range.
+	// contains addresses that belong to FEC0::/10
+	ErrCIDRSetSubNetContainIpv6SiteLocalAddrs = errors.New(
+		"New CIDR set failed; the node CIDR size contains ipv6 site-local addresses that belong to FEC0::/10")
 )
 
 // NewCIDRSet creates a new CidrSet.
@@ -70,6 +76,11 @@ func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*CidrSet, error) {
 	if (clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize > clusterSubnetMaxDiff) {
 		return nil, ErrCIDRSetSubNetTooBig
 	}
+	_, siteLocalNet, _ := net.ParseCIDR(siteLocalRange)
+	if siteLocalNet.Contains(clusterCIDR.IP) || clusterCIDR.Contains(siteLocalNet.IP) {
+		return nil, ErrCIDRSetSubNetContainIpv6SiteLocalAddrs
+	}
+
 	maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
 	return &CidrSet{
 		clusterCIDR:     clusterCIDR,
