@@ -53,6 +53,7 @@ type respLogger struct {
 	statusStack    string
 	addedInfo      string
 	startTime      time.Time
+	isTerminating  bool
 
 	captureErrorOutput bool
 
@@ -76,13 +77,17 @@ func DefaultStacktracePred(status int) bool {
 }
 
 // WithLogging wraps the handler with logging.
-func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
+func WithLogging(handler http.Handler, pred StacktracePred, isTerminatingFn func() bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		if old := respLoggerFromContext(req); old != nil {
 			panic("multiple WithLogging calls!")
 		}
-		rl := newLogged(req, w).StacktraceWhen(pred)
+		isTerminating := false
+		if isTerminatingFn != nil {
+			isTerminating = isTerminatingFn()
+		}
+		rl := newLogged(req, w).StacktraceWhen(pred).IsTerminating(isTerminating)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
 
 		defer rl.Log()
@@ -135,6 +140,12 @@ func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
 	return rl
 }
 
+// IsTerminating informs the logger that the server is terminating.
+func (rl *respLogger) IsTerminating(is bool) *respLogger {
+	rl.isTerminating = is
+	return rl
+}
+
 // StatusIsNot returns a StacktracePred which will cause stacktraces to be logged
 // for any status *not* in the given list.
 func StatusIsNot(statuses ...int) StacktracePred {
@@ -156,7 +167,7 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	if klog.V(3) {
+	if bool(klog.V(3)) || (rl.isTerminating && bool(klog.V(1))) {
 		if !rl.hijacked {
 			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v resp=%v UserAgent=%q srcIP=%q: %v%v",
 				rl.req.Method, rl.req.RequestURI,
