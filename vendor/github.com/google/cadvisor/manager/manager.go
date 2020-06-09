@@ -148,11 +148,18 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	}
 
 	// Detect the container we are running on.
-	selfContainer, err := cgroups.GetOwnCgroupPath("cpu")
-	if err != nil {
-		return nil, err
+	selfContainer := "/"
+	var err error
+	// Avoid using GetOwnCgroupPath on cgroup v2 as it is not supported by libcontainer
+	if cgroups.IsCgroup2UnifiedMode() {
+		klog.Warningf("Cannot detect current cgroup on cgroup v2")
+	} else {
+		selfContainer, err := cgroups.GetOwnCgroupPath("cpu")
+		if err != nil {
+			return nil, err
+		}
+		klog.V(2).Infof("cAdvisor running in container: %q", selfContainer)
 	}
-	klog.V(2).Infof("cAdvisor running in container: %q", selfContainer)
 
 	context := fs.Context{}
 
@@ -190,7 +197,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 		containerWatchers:                     []watcher.ContainerWatcher{},
 		eventsChannel:                         eventsChannel,
 		collectorHTTPClient:                   collectorHTTPClient,
-		nvidiaManager:                         accelerators.NewNvidiaManager(),
+		nvidiaManager:                         accelerators.NewNvidiaManager(includedMetricsSet),
 		rawContainerCgroupPathPrefixWhiteList: rawContainerCgroupPathPrefixWhiteList,
 	}
 
@@ -545,6 +552,9 @@ func (m *manager) getSubcontainers(containerName string) map[string]*containerDa
 	// Get all the unique subcontainers of the specified container
 	matchedName := path.Join(containerName, "/")
 	for i := range m.containers {
+		if m.containers[i] == nil {
+			continue
+		}
 		name := m.containers[i].info.Name
 		if name == containerName || strings.HasPrefix(name, matchedName) {
 			containersMap[m.containers[i].info.Name] = m.containers[i]
@@ -650,6 +660,7 @@ func (m *manager) containerDataSliceToContainerInfoSlice(containers []*container
 		cinfo, err := m.containerDataToContainerInfo(containers[i], query)
 		if err != nil {
 			// Skip containers with errors, we try to degrade gracefully.
+			klog.V(4).Infof("convert container data to container info failed with error %s", err.Error())
 			continue
 		}
 		output = append(output, cinfo)

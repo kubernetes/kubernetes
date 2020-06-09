@@ -120,7 +120,8 @@ type DeprecatedContainerStats struct {
 	HasMemory bool           `json:"has_memory"`
 	Memory    v1.MemoryStats `json:"memory,omitempty"`
 	// Hugepage statistics
-	HasHugetlb bool `json:"has_hugetlb"`
+	HasHugetlb bool                       `json:"has_hugetlb"`
+	Hugetlb    map[string]v1.HugetlbStats `json:"hugetlb,omitempty"`
 	// Network statistics
 	HasNetwork bool         `json:"has_network"`
 	Network    NetworkStats `json:"network,omitempty"`
@@ -136,6 +137,8 @@ type DeprecatedContainerStats struct {
 	// Custom Metrics
 	HasCustomMetrics bool                      `json:"has_custom_metrics"`
 	CustomMetrics    map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
+	// Perf events counters
+	PerfStats []v1.PerfStat `json:"perf_stats,omitempty"`
 	// Referenced memory
 	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
 }
@@ -275,6 +278,7 @@ type ProcessInfo struct {
 	CgroupPath    string  `json:"cgroup_path"`
 	Cmd           string  `json:"cmd"`
 	FdCount       int     `json:"fd_count"`
+	Psr           int     `json:"psr"`
 }
 
 type TcpStat struct {
