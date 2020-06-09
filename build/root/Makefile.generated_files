@@ -501,6 +501,7 @@ API_RULE_CHECK_FAILURE_MESSAGE = "ERROR: \n\t $(1) API rule check failed. Report
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
 
 KUBE_KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
+AGGREGATOR_KNOWN_VIOLATION_FILENAME := api/api-rules/aggregator_violation_exceptions.list
 APIEXTENSIONS_KNOWN_VIOLATION_FILENAME := api/api-rules/apiextensions_violation_exceptions.list
 CODEGEN_KNOWN_VIOLATION_FILENAME := api/api-rules/codegen_violation_exceptions.list
 SAMPLEAPISERVER_KNOWN_VIOLATION_FILENAME := api/api-rules/sample_apiserver_violation_exceptions.list
@@ -508,16 +509,18 @@ SAMPLEAPISERVER_KNOWN_VIOLATION_FILENAME := api/api-rules/sample_apiserver_viola
 APIMACHINERY_DEFAULT_TAG_FILES := vendor/k8s.io/apimachinery/pkg/apis/meta/v1/% vendor/k8s.io/apimachinery/pkg/runtime/% vendor/k8s.io/apimachinery/pkg/version/%
 
 KUBE_OPENAPI_TAG_FILES :=            $(filter-out vendor/k8s.io/code-generator/% vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
+AGGREGATOR_OPENAPI_TAG_FILES :=      $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/kube-aggregator/%, $(ALL_K8S_TAG_FILES))
 APIEXTENSIONS_OPENAPI_TAG_FILES :=   $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/apiextensions/% vendor/k8s.io/api/autoscaling/v1/%, $(ALL_K8S_TAG_FILES))
 CODEGEN_OPENAPI_TAG_FILES :=         $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/code-generator/%, $(ALL_K8S_TAG_FILES))
 SAMPLEAPISERVER_OPENAPI_TAG_FILES := $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) vendor/k8s.io/sample-apiserver/%, $(ALL_K8S_TAG_FILES))
 
 KUBE_OPENAPI_OUTPUT_PKG := pkg/generated/openapi
+AGGREGATOR_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/kube-aggregator/pkg/generated/openapi
 APIEXTENSIONS_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi
 CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/_examples/apiserver/openapi
 SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/generated/openapi
 
-OPENAPI_TARGETS := KUBE APIEXTENSIONS CODEGEN SAMPLEAPISERVER
+OPENAPI_TARGETS := KUBE AGGREGATOR APIEXTENSIONS CODEGEN SAMPLEAPISERVER
 
 # Find all the directories that request openapi generation.
 define OPENAPI_DIR_DEF
@@ -587,7 +590,7 @@ $(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_TARGETS_DEF)))
 
 # This rule is the user-friendly entrypoint for openapi generation.
 .PHONY: gen_openapi
-gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(APIEXTENSIONS_OPENAPI_OUTFILE) $(CODEGEN_OPENAPI_OUTFILE) $(SAMPLEAPISERVER_OPENAPI_OUTFILE)
+gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(AGGREGATOR_OPENAPI_OUTFILE) $(APIEXTENSIONS_OPENAPI_OUTFILE) $(CODEGEN_OPENAPI_OUTFILE) $(SAMPLEAPISERVER_OPENAPI_OUTFILE)
 
 # How to build the generator tool.  The deps for this are defined in
 # the $(GO_PKGDEPS_FILE), above.
