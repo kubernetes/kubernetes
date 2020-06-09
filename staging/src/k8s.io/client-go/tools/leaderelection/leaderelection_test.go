@@ -917,3 +917,180 @@ func TestTryAcquireOrRenewEndpointsLeases(t *testing.T) {
 func TestTryAcquireOrRenewConfigMapsLeases(t *testing.T) {
 	testTryAcquireOrRenewMultiLock(t, "configmapsleases")
 }
+func TestTryToReleaseEndpointsLeases(t *testing.T) {
+	testTryReleaseMultiLock(t, "endpointsleases")
+}
+func TestTryReleaseConfigMapsLeases(t *testing.T) {
+	testTryReleaseMultiLock(t, "configmapsleases")
+}
+func testTryReleaseMultiLock(t *testing.T, objectType string) {
+	future := time.Now().Add(1000 * time.Hour)
+	primaryType, secondaryType := multiLockType(t, objectType)
+	tests := []struct {
+		name              string
+		observedRecord    rl.LeaderElectionRecord
+		observedRawRecord []byte
+		observedTime      time.Time
+		reactors          []Reactor
+		releaseReactors   []Reactor
+
+		expectSuccess    bool
+		transitionLeader bool
+		doRelease        bool
+		outHolder        string
+	}{
+		{
+			name: "acquire and lease from no object",
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: primaryType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
+				{
+					verb:       "create",
+					objectType: primaryType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+				{
+					verb:       "create",
+					objectType: secondaryType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "baz"},
+			observedRawRecord: GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "baz"}),
+			observedTime:      future,
+
+			expectSuccess: true,
+			outHolder:     "baz",
+		},
+	}
+
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			// OnNewLeader is called async so we have to wait for it.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			var reportedLeader string
+			var lock rl.Interface
+
+			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: &record.FakeRecorder{},
+			}
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, reactor.objectType, reactor.reaction)
+			}
+
+			switch objectType {
+			case rl.EndpointsLeasesResourceLock:
+				lock = &rl.MultiLock{
+					Primary: &rl.EndpointsLock{
+						EndpointsMeta: objectMeta,
+						LockConfig:    resourceLockConfig,
+						Client:        c.CoreV1(),
+					},
+					Secondary: &rl.LeaseLock{
+						LeaseMeta:  objectMeta,
+						LockConfig: resourceLockConfig,
+						Client:     c.CoordinationV1(),
+					},
+				}
+			case rl.ConfigMapsLeasesResourceLock:
+				lock = &rl.MultiLock{
+					Primary: &rl.ConfigMapLock{
+						ConfigMapMeta: objectMeta,
+						LockConfig:    resourceLockConfig,
+						Client:        c.CoreV1(),
+					},
+					Secondary: &rl.LeaseLock{
+						LeaseMeta:  objectMeta,
+						LockConfig: resourceLockConfig,
+						Client:     c.CoordinationV1(),
+					},
+				}
+			}
+
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 10 * time.Second,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader: func(l string) {
+						defer wg.Done()
+						reportedLeader = l
+					},
+				},
+			}
+			le := &LeaderElector{
+				config:            lec,
+				observedRecord:    test.observedRecord,
+				observedRawRecord: test.observedRawRecord,
+				observedTime:      test.observedTime,
+				clock:             clock.RealClock{},
+			}
+			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+			}
+
+			le.observedRecord.AcquireTime = metav1.Time{}
+			le.observedRecord.RenewTime = metav1.Time{}
+			if le.observedRecord.HolderIdentity != test.outHolder {
+				t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", test.outHolder, le.observedRecord.HolderIdentity)
+			}
+			if len(test.reactors) != len(c.Actions()) {
+				t.Errorf("wrong number of api interactions")
+			}
+			if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+				t.Errorf("leader should have transitioned but did not")
+			}
+			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+				t.Errorf("leader should not have transitioned but did")
+			}
+
+			le.maybeReportTransition()
+			wg.Wait()
+			if reportedLeader != test.outHolder {
+				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
+			}
+
+			//try to release
+			c.AddReactor("update", primaryType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+				object := action.(fakeclient.UpdateAction).GetObject()
+				var annotation string
+				switch object.(type) {
+				case *corev1.Endpoints:
+					annotation = object.(*corev1.Endpoints).Annotations[rl.LeaderElectionRecordAnnotationKey]
+				case *corev1.ConfigMap:
+					annotation = object.(*corev1.ConfigMap).Annotations[rl.LeaderElectionRecordAnnotationKey]
+				}
+				var ler rl.LeaderElectionRecord
+				err := json.Unmarshal([]byte(annotation), &ler)
+				if err != nil {
+					return true, nil, errors.NewInternalError(err)
+				}
+				// From https://github.com/kubernetes/kubernetes/blob/0e2220b4462130ae8a22ed657e8979f7844e22c1/pkg/apis/coordination/validation/validation.go#L40
+				// leaseDurationSeconds cannot be <=0
+				if ler.LeaseDurationSeconds <= 0 {
+					return true, nil, errors.NewBadRequest("leaseDurationSeconds cannot be <=0 ")
+				}
+				return true, object, nil
+			})
+			c.AddReactor("get", secondaryType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+				return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+			})
+			if !le.release() {
+				t.Errorf("could not release the lock")
+			}
+		})
+	}
+}
