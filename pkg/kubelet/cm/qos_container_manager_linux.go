@@ -176,6 +176,9 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			continue
 		}
 		req, _ := resource.PodRequestsAndLimits(pod)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling) {
+			req = resource.PodResourceAllocations(pod)
+		}
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
 		}
@@ -210,6 +213,9 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 			continue
 		}
 		req, _ := resource.PodRequestsAndLimits(pod)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling) {
+			req = resource.PodResourceAllocations(pod)
+		}
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
 		}

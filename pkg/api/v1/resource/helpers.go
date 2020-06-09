@@ -86,30 +86,58 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	return
 }
 
-// GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
-func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
-	requestQuantity := resource.Quantity{}
+// PodResourceAllocations returns a dictionary of resources allocated to the containers of pod.
+func PodResourceAllocations(pod *v1.Pod) (allocations v1.ResourceList) {
+	allocations = v1.ResourceList{}
+	for _, container := range pod.Spec.Containers {
+		addResourceList(allocations, container.ResourcesAllocated)
+	}
+	// init containers define the minimum of any resource
+	for _, container := range pod.Spec.InitContainers {
+		maxResourceList(allocations, container.Resources.Requests)
+	}
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		addResourceList(allocations, pod.Spec.Overhead)
+	}
+	return
+}
 
+func getFormattedResourceQuantity(resourceName v1.ResourceName) resource.Quantity {
+	resourceQuantity := resource.Quantity{}
 	switch resourceName {
 	case v1.ResourceCPU:
-		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
+		resourceQuantity = resource.Quantity{Format: resource.DecimalSI}
 	case v1.ResourceMemory, v1.ResourceStorage, v1.ResourceEphemeralStorage:
-		requestQuantity = resource.Quantity{Format: resource.BinarySI}
+		resourceQuantity = resource.Quantity{Format: resource.BinarySI}
 	default:
-		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
+		resourceQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
+	return resourceQuantity
+}
 
+func addPodOverheadQuantity(pod *v1.Pod, resourceName v1.ResourceName, resourceQuantity resource.Quantity) resource.Quantity {
+	// if PodOverhead feature is supported, add overhead for running a pod
+	// to the total requests if the resource total is non-zero
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !resourceQuantity.IsZero() {
+			resourceQuantity.Add(podOverhead)
+		}
+	}
+	return resourceQuantity
+}
+
+// GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
+func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+	requestQuantity := getFormattedResourceQuantity(resourceName)
 	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk
 		return requestQuantity
 	}
-
 	for _, container := range pod.Spec.Containers {
 		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
 			requestQuantity.Add(rQuantity)
 		}
 	}
-
 	for _, container := range pod.Spec.InitContainers {
 		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
 			if requestQuantity.Cmp(rQuantity) < 0 {
@@ -117,16 +145,31 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 			}
 		}
 	}
+	requestQuantity = addPodOverheadQuantity(pod, resourceName, requestQuantity)
+	return requestQuantity
+}
 
-	// if PodOverhead feature is supported, add overhead for running a pod
-	// to the total requests if the resource total is non-zero
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
-		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !requestQuantity.IsZero() {
-			requestQuantity.Add(podOverhead)
+// GetResourceAllocationQuantity finds and returns the resourcesAllocated quantity for a specific resource.
+func GetResourceAllocationQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+	allocQuantity := getFormattedResourceQuantity(resourceName)
+	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk
+		return allocQuantity
+	}
+	for _, container := range pod.Spec.Containers {
+		if rQuantity, ok := container.ResourcesAllocated[resourceName]; ok {
+			allocQuantity.Add(rQuantity)
 		}
 	}
-
-	return requestQuantity
+	for _, container := range pod.Spec.InitContainers {
+		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
+			if allocQuantity.Cmp(rQuantity) < 0 {
+				allocQuantity = rQuantity.DeepCopy()
+			}
+		}
+	}
+	allocQuantity = addPodOverheadQuantity(pod, resourceName, allocQuantity)
+	return allocQuantity
 }
 
 // GetResourceRequest finds and returns the request value for a specific resource.
@@ -142,6 +185,18 @@ func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	}
 
 	return requestQuantity.Value()
+}
+
+// GetResourceAllocation finds and returns resource allocation for a specific resource.
+func GetResourceAllocation(pod *v1.Pod, resource v1.ResourceName) int64 {
+	if resource == v1.ResourcePods {
+		return 1
+	}
+	allocQuantity := GetResourceAllocationQuantity(pod, resource)
+	if resource == v1.ResourceCPU {
+		return allocQuantity.MilliValue()
+	}
+	return allocQuantity.Value()
 }
 
 // ExtractResourceValueByContainerName extracts the value of a resource
@@ -192,6 +247,12 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
 	case "requests.ephemeral-storage":
 		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
+	case "resourcesAllocated.cpu":
+		return convertResourceCPUToString(container.ResourcesAllocated.Cpu(), divisor)
+	case "resourcesAllocated.memory":
+		return convertResourceMemoryToString(container.ResourcesAllocated.Memory(), divisor)
+	case "resourcesAllocated.ephemeral-storage":
+		return convertResourceEphemeralStorageToString(container.ResourcesAllocated.StorageEphemeral(), divisor)
 	}
 
 	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)

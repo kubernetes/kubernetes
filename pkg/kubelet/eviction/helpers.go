@@ -25,9 +25,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/pod"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -544,10 +546,16 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 
 		p1Memory := memoryUsage(p1Stats.Memory)
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p1ExceedsRequests := p1Memory.Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1
-		p2ExceedsRequests := p2Memory.Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1
+		var p1Exceeds, p2Exceeds bool
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			p1Exceeds = p1Memory.Cmp(v1resource.GetResourceAllocationQuantity(p1, v1.ResourceMemory)) == 1
+			p2Exceeds = p2Memory.Cmp(v1resource.GetResourceAllocationQuantity(p2, v1.ResourceMemory)) == 1
+		} else {
+			p1Exceeds = p1Memory.Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1
+			p2Exceeds = p2Memory.Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1
+		}
 		// prioritize evicting the pod which exceeds its requests
-		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
+		return cmpBool(p1Exceeds, p2Exceeds)
 	}
 }
 
@@ -562,12 +570,21 @@ func memory(stats statsFunc) cmpFunc {
 		}
 
 		// adjust p1, p2 usage relative to the request (if any)
+		var p1Request, p2Request resource.Quantity
 		p1Memory := memoryUsage(p1Stats.Memory)
-		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			p1Request = v1resource.GetResourceAllocationQuantity(p1, v1.ResourceMemory)
+		} else {
+			p1Request = v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
+		}
 		p1Memory.Sub(p1Request)
 
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			p2Request = v1resource.GetResourceAllocationQuantity(p2, v1.ResourceMemory)
+		} else {
+			p2Request = v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
+		}
 		p2Memory.Sub(p2Request)
 
 		// prioritize evicting the pod which has the larger consumption of memory
@@ -1043,7 +1060,12 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	for _, containerStats := range podStats.Containers {
 		for _, container := range pod.Spec.Containers {
 			if container.Name == containerStats.Name {
-				requests := container.Resources.Requests[resourceToReclaim]
+				var requests resource.Quantity
+				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+					requests = container.ResourcesAllocated[resourceToReclaim]
+				} else {
+					requests = container.Resources.Requests[resourceToReclaim]
+				}
 				var usage *resource.Quantity
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:

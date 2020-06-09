@@ -549,8 +549,14 @@ func (n *NodeInfo) resetSlicesIfEmpty() {
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
-		resPtr.Add(c.Resources.Requests)
-		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
+		var non0CPUReq, non0MemReq int64
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			resPtr.Add(c.ResourcesAllocated)
+			non0CPUReq, non0MemReq = schedutil.GetNonzeroRequests(&c.ResourcesAllocated)
+		} else {
+			resPtr.Add(c.Resources.Requests)
+			non0CPUReq, non0MemReq = schedutil.GetNonzeroRequests(&c.Resources.Requests)
+		}
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.

@@ -254,6 +254,30 @@ func TestExtractResourceValue(t *testing.T) {
 
 			expectedValue: "104857600",
 		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "resourcesAllocated.cpu",
+			},
+			cName:         "foo",
+			pod:           getPod("foo", podResources{cpuAllocated: "7"}),
+			expectedValue: "7",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "resourcesAllocated.memory",
+			},
+			cName:         "foo",
+			pod:           getPod("foo", podResources{memoryAllocated: "1400Mi"}),
+			expectedValue: "1468006400",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "resourcesAllocated.ephemeral-storage",
+			},
+			cName:         "foo",
+			pod:           getPod("foo", podResources{ephemeralStorageAllocated: "2Gi"}),
+			expectedValue: "2147483648",
+		},
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
@@ -337,8 +361,103 @@ func TestPodRequestsAndLimits(t *testing.T) {
 	}
 }
 
+func TestGetResourceAllocation(t *testing.T) {
+	cases := []struct {
+		pod           *v1.Pod
+		cName         string
+		resourceName  v1.ResourceName
+		expectedValue int64
+	}{
+		{
+			pod:           getPod("foo", podResources{cpuAllocated: "9"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 9000,
+		},
+		{
+			pod:           getPod("foo", podResources{memoryAllocated: "90Mi"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 94371840,
+		},
+		{
+			cName:         "just-overhead for cpu",
+			pod:           getPod("foo", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 0,
+		},
+		{
+			cName:         "just-overhead for memory",
+			pod:           getPod("foo", podResources{memoryOverhead: "5"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 0,
+		},
+		{
+			cName:         "cpu overhead and req",
+			pod:           getPod("foo", podResources{cpuAllocated: "2", cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 7000,
+		},
+		{
+			cName:         "mem overhead and req",
+			pod:           getPod("foo", podResources{cpuAllocated: "2", memoryAllocated: "1024", cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 1029,
+		},
+	}
+	as := assert.New(t)
+	for idx, tc := range cases {
+		actual := GetResourceAllocation(tc.pod, tc.resourceName)
+		as.Equal(actual, tc.expectedValue, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+	}
+}
+
+func TestPodResourceAllocations(t *testing.T) {
+	cases := []struct {
+		pod                *v1.Pod
+		cName              string
+		expectedAllocation v1.ResourceList
+	}{
+		{
+			cName: "just-allocation-no-overhead",
+			pod:   getPod("foo", podResources{cpuAllocated: "9"}),
+			expectedAllocation: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU): resource.MustParse("9"),
+			},
+		},
+		{
+			cName: "just-overhead",
+			pod:   getPod("foo", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedAllocation: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+			},
+		},
+		{
+			cName: "allocation-and-overhead",
+			pod:   getPod("foo", podResources{cpuAllocated: "1", memoryAllocated: "10", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedAllocation: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+		},
+		{
+			cName: "some-req-some-allocation-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", cpuAllocated: "2", memoryRequest: "10", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedAllocation: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("7"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+		},
+	}
+	for idx, tc := range cases {
+		resAllocation := PodResourceAllocations(tc.pod)
+		if !equality.Semantic.DeepEqual(tc.expectedAllocation, resAllocation) {
+			t.Errorf("test case failure[%d]: %v, allocated:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedAllocation, resAllocation)
+		}
+	}
+}
+
 type podResources struct {
-	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
+	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead, cpuAllocated, memoryAllocated, ephemeralStorageAllocated string
 }
 
 func getPod(cname string, resources podResources) *v1.Pod {
@@ -346,6 +465,7 @@ func getPod(cname string, resources podResources) *v1.Pod {
 		Limits:   make(v1.ResourceList),
 		Requests: make(v1.ResourceList),
 	}
+	alloc := make(v1.ResourceList)
 
 	overhead := make(v1.ResourceList)
 
@@ -367,13 +487,23 @@ func getPod(cname string, resources podResources) *v1.Pod {
 	if resources.memoryOverhead != "" {
 		overhead[v1.ResourceMemory] = resource.MustParse(resources.memoryOverhead)
 	}
+	if resources.cpuAllocated != "" {
+		alloc[v1.ResourceCPU] = resource.MustParse(resources.cpuAllocated)
+	}
+	if resources.memoryAllocated != "" {
+		alloc[v1.ResourceMemory] = resource.MustParse(resources.memoryAllocated)
+	}
+	if resources.ephemeralStorageAllocated != "" {
+		alloc[v1.ResourceEphemeralStorage] = resource.MustParse(resources.ephemeralStorageAllocated)
+	}
 
 	return &v1.Pod{
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:      cname,
-					Resources: r,
+					Name:               cname,
+					Resources:          r,
+					ResourcesAllocated: alloc,
 				},
 			},
 			InitContainers: []v1.Container{

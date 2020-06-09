@@ -45,6 +45,9 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	// set linux container resources
 	var cpuShares int64
 	cpuRequest := container.Resources.Requests.Cpu()
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling) {
+		cpuRequest = container.ResourcesAllocated.Cpu()
+	}
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
 	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
