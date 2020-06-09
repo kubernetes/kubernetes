@@ -200,7 +200,7 @@ replace (
 	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 	github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
-	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20191113100448-d9fb101ca1fb
+	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
 	github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0

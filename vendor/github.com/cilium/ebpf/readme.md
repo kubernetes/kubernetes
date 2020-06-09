@@ -13,6 +13,11 @@ The library is maintained by [Cloudflare](https://www.cloudflare.com) and [Ciliu
 The package is production ready, but **the API is explicitly unstable
 right now**. Expect to update your code if you want to follow along.
 
+## Requirements
+
+* A version of Go that is [supported by upstream](https://golang.org/doc/devel/release.html#policy)
+* Linux 4.9, 4.19 or 5.4 (versions in-between should work, but are not tested)
+
 ## Useful resources
 
 * [Cilium eBPF documentation](https://cilium.readthedocs.io/en/latest/bpf/#bpf-guide) (recommended)

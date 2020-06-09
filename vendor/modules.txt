@@ -132,10 +132,11 @@ github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
 # github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b => github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b
 github.com/checkpoint-restore/go-criu/rpc
-# github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574 => github.com/cilium/ebpf v0.0.0-20191113100448-d9fb101ca1fb
+# github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574 => github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
+github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
 # github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 github.com/clusterhq/flocker-go

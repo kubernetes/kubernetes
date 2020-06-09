@@ -83,8 +83,8 @@ github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWR
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e h1:fY5BOSpyZCqRo5OhCuC+XN+r/bBCmeuuJtjz+bCNIf8=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
-github.com/cilium/ebpf v0.0.0-20191113100448-d9fb101ca1fb h1:bQ0NJ9dAB8vsw7ffajBDX/7Wr64BdLWeJkYY36UkeRY=
-github.com/cilium/ebpf v0.0.0-20191113100448-d9fb101ca1fb/go.mod h1:MA5e5Lr8slmEg9bt0VpxxWqJlO4iwu3FBdHUzV7wQVg=
+github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574 h1:G4qUgaciePbY+xCMxxseQhAet478x7qDMdYj3yJgsps=
+github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574/go.mod h1:XT+cAw5wfvsodedcijoh1l9cf7v1x9FlFB/3VmF/O8s=
 github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 h1:eIHD9GNM3Hp7kcRW5mvcz7WTR3ETeoYYKwpgA04kaXE=
 github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313/go.mod h1:P1wt9Z3DP8O6W3rvwCt0REIlshg1InHImaLW0t3ObY0=
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa h1:OaNxuTZr7kxeODyLWsRMC+OD03aFUH+mW6r2d+MWa5Y=

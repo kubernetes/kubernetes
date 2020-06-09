@@ -22,11 +22,23 @@ func _() {
 	_ = x[LPMTrie-11]
 	_ = x[ArrayOfMaps-12]
 	_ = x[HashOfMaps-13]
+	_ = x[DevMap-14]
+	_ = x[SockMap-15]
+	_ = x[CPUMap-16]
+	_ = x[XSKMap-17]
+	_ = x[SockHash-18]
+	_ = x[CGroupStorage-19]
+	_ = x[ReusePortSockArray-20]
+	_ = x[PerCPUCGroupStorage-21]
+	_ = x[Queue-22]
+	_ = x[Stack-23]
+	_ = x[SkStorage-24]
+	_ = x[DevMapHash-25]
 }
 
-const _MapType_name = "UnspecifiedMapHashArrayProgramArrayPerfEventArrayPerCPUHashPerCPUArrayStackTraceCGroupArrayLRUHashLRUCPUHashLPMTrieArrayOfMapsHashOfMaps"
+const _MapType_name = "UnspecifiedMapHashArrayProgramArrayPerfEventArrayPerCPUHashPerCPUArrayStackTraceCGroupArrayLRUHashLRUCPUHashLPMTrieArrayOfMapsHashOfMapsDevMapSockMapCPUMapXSKMapSockHashCGroupStorageReusePortSockArrayPerCPUCGroupStorageQueueStackSkStorageDevMapHash"
 
-var _MapType_index = [...]uint8{0, 14, 18, 23, 35, 49, 59, 70, 80, 91, 98, 108, 115, 126, 136}
+var _MapType_index = [...]uint8{0, 14, 18, 23, 35, 49, 59, 70, 80, 91, 98, 108, 115, 126, 136, 142, 149, 155, 161, 169, 182, 200, 219, 224, 229, 238, 248}
 
 func (i MapType) String() string {
 	if i >= MapType(len(_MapType_index)-1) {
@@ -64,11 +76,12 @@ func _() {
 	_ = x[CGroupSysctl-23]
 	_ = x[RawTracepointWritable-24]
 	_ = x[CGroupSockopt-25]
+	_ = x[Tracing-26]
 }
 
-const _ProgramType_name = "UnspecifiedProgramSocketFilterKprobeSchedCLSSchedACTTracePointXDPPerfEventCGroupSKBCGroupSockLWTInLWTOutLWTXmitSockOpsSkSKBCGroupDeviceSkMsgRawTracepointCGroupSockAddrLWTSeg6LocalLircMode2SkReuseportFlowDissectorCGroupSysctlRawTracepointWritableCGroupSockopt"
+const _ProgramType_name = "UnspecifiedProgramSocketFilterKprobeSchedCLSSchedACTTracePointXDPPerfEventCGroupSKBCGroupSockLWTInLWTOutLWTXmitSockOpsSkSKBCGroupDeviceSkMsgRawTracepointCGroupSockAddrLWTSeg6LocalLircMode2SkReuseportFlowDissectorCGroupSysctlRawTracepointWritableCGroupSockoptTracing"
 
-var _ProgramType_index = [...]uint16{0, 18, 30, 36, 44, 52, 62, 65, 74, 83, 93, 98, 104, 111, 118, 123, 135, 140, 153, 167, 179, 188, 199, 212, 224, 245, 258}
+var _ProgramType_index = [...]uint16{0, 18, 30, 36, 44, 52, 62, 65, 74, 83, 93, 98, 104, 111, 118, 123, 135, 140, 153, 167, 179, 188, 199, 212, 224, 245, 258, 265}
 
 func (i ProgramType) String() string {
 	if i >= ProgramType(len(_ProgramType_index)-1) {
