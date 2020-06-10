@@ -209,7 +209,7 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 				return false, nil
 			}
 		},
-	)).To(gomega.Succeed(), "wait for pod %q to success", name)
+	)).To(gomega.Succeed(), "wait for pod %q to succeed", name)
 }
 
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
