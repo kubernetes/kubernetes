@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1017,93 +1016,6 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	}
 	// And the nominated node name of the medium priority pod is cleared.
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		pod, err := cs.CoreV1().Pods(medPriPod.Namespace).Get(context.TODO(), medPriPod.Name, metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("Error getting the medium priority pod info: %v", err)
-		}
-		if len(pod.Status.NominatedNodeName) == 0 {
-			return true, nil
-		}
-		return false, err
-	}); err != nil {
-		t.Errorf("The nominated node name of the medium priority pod was not cleared: %v", err)
-	}
-}
-
-func TestNominatedNodeCleanUpUponNodeDeletion(t *testing.T) {
-	// Initialize scheduler.
-	testCtx := initTest(t, "preemption")
-	defer testutils.CleanupTest(t, testCtx)
-
-	cs := testCtx.ClientSet
-	defer cleanupPodsInNamespace(cs, t, testCtx.NS.Name)
-
-	// Create a node with some resources and a label.
-	nodeRes := &v1.ResourceList{
-		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
-	}
-	nodeNames := []string{"node1", "node2"}
-	for _, nodeName := range nodeNames {
-		_, err := createNode(testCtx.ClientSet, nodeName, nodeRes)
-		if err != nil {
-			t.Fatalf("Error creating nodes: %v", err)
-		}
-	}
-
-	// Fill the cluster with one high-priority and one low-priority Pod.
-	highPriPod, err := createPausePod(cs, mkPriorityPodWithGrace(testCtx, "high-pod", highPriority, 60))
-	if err != nil {
-		t.Fatalf("Error creating high-priority pod: %v", err)
-	}
-	// Make sure the pod is scheduled.
-	if err := testutils.WaitForPodToSchedule(cs, highPriPod); err != nil {
-		t.Fatalf("Pod %v/%v didn't get scheduled: %v", highPriPod.Namespace, highPriPod.Name, err)
-	}
-
-	lowPriPod, err := createPausePod(cs, mkPriorityPodWithGrace(testCtx, "low-pod", lowPriority, 60))
-	if err != nil {
-		t.Fatalf("Error creating low-priority pod: %v", err)
-	}
-	// Make sure the pod is scheduled.
-	if err := testutils.WaitForPodToSchedule(cs, lowPriPod); err != nil {
-		t.Fatalf("Pod %v/%v didn't get scheduled: %v", lowPriPod.Namespace, lowPriPod.Name, err)
-	}
-
-	// Create a medium-priority Pod.
-	medPriPod, err := createPausePod(cs, mkPriorityPodWithGrace(testCtx, "med-pod", mediumPriority, 60))
-	if err != nil {
-		t.Fatalf("Error creating med-priority pod: %v", err)
-	}
-	// Check its nominatedNodeName field is set properly.
-	if err := waitForNominatedNodeName(cs, medPriPod); err != nil {
-		t.Fatalf("NominatedNodeName was not set for pod %v/%v: %v", medPriPod.Namespace, medPriPod.Name, err)
-	}
-
-	// Get the live version of low and med pods.
-	lowPriPod, _ = getPod(cs, lowPriPod.Name, lowPriPod.Namespace)
-	medPriPod, _ = getPod(cs, medPriPod.Name, medPriPod.Namespace)
-
-	want, got := lowPriPod.Spec.NodeName, medPriPod.Status.NominatedNodeName
-	if want != got {
-		t.Fatalf("Expect med-priority's nominatedNodeName to be %v, but got %v.", want, got)
-	}
-
-	// Delete the node where med-priority pod is nominated to.
-	cs.CoreV1().Nodes().Delete(context.TODO(), got, metav1.DeleteOptions{})
-	if err := wait.Poll(200*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := cs.CoreV1().Nodes().Get(context.TODO(), got, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}); err != nil {
-		t.Fatalf("Node %v cannot be deleted: %v.", got, err)
-	}
-
-	// Finally verify if med-priority pod's nominatedNodeName gets cleared.
-	if err := wait.Poll(200*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		pod, err := cs.CoreV1().Pods(medPriPod.Namespace).Get(context.TODO(), medPriPod.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("Error getting the medium priority pod info: %v", err)
