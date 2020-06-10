@@ -26,10 +26,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
+	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 )
@@ -96,9 +97,9 @@ func runPlan(flags *planFlags, args []string) error {
 	return nil
 }
 
-// newComponentUpgradePlan helper creates outputapiv1alpha1.ComponentUpgradePlan object
-func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapiv1alpha1.ComponentUpgradePlan {
-	return outputapiv1alpha1.ComponentUpgradePlan{
+// newComponentUpgradePlan helper creates outputapi.ComponentUpgradePlan object
+func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapi.ComponentUpgradePlan {
+	return outputapi.ComponentUpgradePlan{
 		Name:           name,
 		CurrentVersion: currentVersion,
 		NewVersion:     newVersion,
@@ -107,7 +108,7 @@ func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapiv
 
 // TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
 // https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
-func appendDNSComponent(components []outputapiv1alpha1.ComponentUpgradePlan, up *upgrade.Upgrade, DNSType kubeadmapi.DNSAddOnType, name string) []outputapiv1alpha1.ComponentUpgradePlan {
+func appendDNSComponent(components []outputapi.ComponentUpgradePlan, up *upgrade.Upgrade, DNSType kubeadmapi.DNSAddOnType, name string) []outputapi.ComponentUpgradePlan {
 	beforeVersion, afterVersion := "", ""
 	if up.Before.DNSType == DNSType {
 		beforeVersion = up.Before.DNSVersion
@@ -123,7 +124,7 @@ func appendDNSComponent(components []outputapiv1alpha1.ComponentUpgradePlan, up 
 }
 
 // genUpgradePlan generates output-friendly upgrade plan out of upgrade.Upgrade structure
-func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha1.UpgradePlan, string, error) {
+func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.UpgradePlan, string, error) {
 	newK8sVersion, err := version.ParseSemantic(up.After.KubeVersion)
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "Unable to parse normalized version %q as a semantic version", up.After.KubeVersion)
@@ -138,7 +139,7 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha
 		}
 	}
 
-	components := []outputapiv1alpha1.ComponentUpgradePlan{}
+	components := []outputapi.ComponentUpgradePlan{}
 
 	if up.CanUpgradeKubelets() {
 		// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
@@ -161,11 +162,11 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha
 		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
 	}
 
-	return &outputapiv1alpha1.UpgradePlan{Components: components}, unstableVersionFlag, nil
+	return &outputapi.UpgradePlan{Components: components}, unstableVersionFlag, nil
 }
 
 // printUpgradePlan prints a UX-friendly overview of what versions are available to upgrade to
-func printUpgradePlan(up *upgrade.Upgrade, plan *outputapiv1alpha1.UpgradePlan, unstableVersionFlag string, isExternalEtcd bool, w io.Writer) {
+func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstableVersionFlag string, isExternalEtcd bool, w io.Writer) {
 	// The tab writer writes to the "real" writer w
 	tabw := tabwriter.NewWriter(w, 10, 4, 3, ' ', 0)
 
