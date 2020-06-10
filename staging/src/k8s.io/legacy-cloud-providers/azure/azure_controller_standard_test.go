@@ -44,19 +44,36 @@ func TestStandardAttachDisk(t *testing.T) {
 	defer ctrl.Finish()
 
 	testCases := []struct {
-		desc        string
-		nodeName    types.NodeName
-		expectedErr bool
+		desc          string
+		nodeName      types.NodeName
+		isManagedDisk bool
+		isAttachFail  bool
+		expectedErr   bool
 	}{
 		{
-			desc:        "an error shall be returned if there's no corresponding vms",
-			nodeName:    "vm2",
-			expectedErr: true,
+			desc:          "an error shall be returned if there's no corresponding vms",
+			nodeName:      "vm2",
+			isManagedDisk: true,
+			expectedErr:   true,
 		},
 		{
-			desc:        "no error shall be returned if everything's good",
-			nodeName:    "vm1",
-			expectedErr: false,
+			desc:          "no error shall be returned if everything's good",
+			nodeName:      "vm1",
+			isManagedDisk: true,
+			expectedErr:   false,
+		},
+		{
+			desc:          "no error shall be returned if everything's good with non managed disk",
+			nodeName:      "vm1",
+			isManagedDisk: false,
+			expectedErr:   false,
+		},
+		{
+			desc:          "an error shall be returned if update attach disk failed",
+			nodeName:      "vm1",
+			isManagedDisk: true,
+			isAttachFail:  true,
+			expectedErr:   true,
 		},
 	}
 
@@ -66,12 +83,28 @@ func TestStandardAttachDisk(t *testing.T) {
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		for _, vm := range expectedVMs {
+			vm.StorageProfile = &compute.StorageProfile{
+				OsDisk: &compute.OSDisk{
+					Name: to.StringPtr("osdisk1"),
+					ManagedDisk: &compute.ManagedDiskParameters{
+						ID: to.StringPtr("ManagedID"),
+						DiskEncryptionSet: &compute.DiskEncryptionSetParameters{
+							ID: to.StringPtr("DiskEncryptionSetID"),
+						},
+					},
+				},
+				DataDisks: &[]compute.DataDisk{},
+			}
 			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
 		}
 		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
-		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		if test.isAttachFail {
+			mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(&retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		} else {
+			mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		}
 
-		err := vmSet.AttachDisk(true, "",
+		err := vmSet.AttachDisk(test.isManagedDisk, "",
 			"uri", test.nodeName, 0, compute.CachingTypesReadOnly, "", false)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, err: %v", i, test.desc, err)
 	}
@@ -85,6 +118,7 @@ func TestStandardDetachDisk(t *testing.T) {
 		desc          string
 		nodeName      types.NodeName
 		diskName      string
+		isDetachFail  bool
 		expectedError bool
 	}{
 		{
@@ -104,6 +138,12 @@ func TestStandardDetachDisk(t *testing.T) {
 			diskName:      "disk1",
 			expectedError: false,
 		},
+		{
+			desc:          "an error shall be returned if detach disk failed",
+			nodeName:      "vm1",
+			isDetachFail:  true,
+			expectedError: true,
+		},
 	}
 
 	for i, test := range testCases {
@@ -115,7 +155,11 @@ func TestStandardDetachDisk(t *testing.T) {
 			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
 		}
 		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
-		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		if test.isDetachFail {
+			mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(&retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		} else {
+			mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		}
 
 		err := vmSet.DetachDisk(test.diskName, "", test.nodeName)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
@@ -129,6 +173,7 @@ func TestGetDataDisks(t *testing.T) {
 	var testCases = []struct {
 		desc              string
 		nodeName          types.NodeName
+		isDataDiskNull    bool
 		expectedDataDisks []compute.DataDisk
 		expectedError     bool
 		crt               azcache.AzureCacheReadType
@@ -164,6 +209,14 @@ func TestGetDataDisks(t *testing.T) {
 			expectedError: false,
 			crt:           azcache.CacheReadTypeUnsafe,
 		},
+		{
+			desc:              "nil shall be returned if DataDisk is null",
+			nodeName:          "vm1",
+			isDataDiskNull:    true,
+			expectedDataDisks: nil,
+			expectedError:     false,
+			crt:               azcache.CacheReadTypeDefault,
+		},
 	}
 	for i, test := range testCases {
 		testCloud := GetTestCloud(ctrl)
@@ -171,6 +224,9 @@ func TestGetDataDisks(t *testing.T) {
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		for _, vm := range expectedVMs {
+			if test.isDataDiskNull {
+				vm.StorageProfile = &compute.StorageProfile{}
+			}
 			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
 		}
 		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Not("vm1"), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
