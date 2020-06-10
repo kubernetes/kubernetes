@@ -1315,6 +1315,10 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 //   expectedWatchEvents array of events which are expected to occur
 //   scenario            the test itself
 //   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+// this tooling relies on the test to return the events as they occur
+// the entire scenario must be run to ensure that the desired watch events arrive in order (allowing for interweaving of watch events)
+//   if an expected watch event is missing we elect to clean up and run the entire scenario again
+// we try the scenario three times to allow the sequencing to fail a couple of times
 func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
 	listWatcher := &cache.ListWatch{
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
@@ -1322,7 +1326,6 @@ func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resou
 		},
 	}
 
-	// NOTE value of 3 retries seems to make sense
 	retries := 3
 retriesLoop:
 	for try := 1; try <= retries; try++ {
