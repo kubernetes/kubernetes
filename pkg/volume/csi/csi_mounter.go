@@ -66,6 +66,7 @@ type csiMountMgr struct {
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
+	fsGroupPolicy       storage.FSGroupPolicy
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
@@ -277,17 +278,30 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 	}
 
-	// apply volume ownership
-	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
-	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
-	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
-	err = c.applyFSGroup(fsType, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
-	if err != nil {
-		// At this point mount operation is successful:
-		//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
-		//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
-		//      cleaned up.
-		return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
+	fsGroupFeatureGateEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy)
+	// If the feature gate isn't enabled, then adjust the CSIDriver to use the ReadWriteOnceWithFSTypeFSGroupPolicy
+	// policy. This keeps the default behavior.
+	if !fsGroupFeatureGateEnabled {
+		c.fsGroupPolicy = storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	}
+
+	// If the the FSGroupPolicy isn't NoneFSGroupPolicy, then we should attempt to modify
+	// the fsGroup. At this point the feature gate is enabled, so we should proceed,
+	// or it's disabled, at which point we should evaluate the fstype and pv.AccessMode
+	// and update the fsGroup appropriately.
+	if c.fsGroupPolicy != storage.NoneFSGroupPolicy {
+
+		// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
+		// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
+		// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
+		err = c.applyFSGroup(fsType, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		if err != nil {
+			// At this point mount operation is successful:
+			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
+			//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
+			//      cleaned up.
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
+		}
 	}
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
@@ -377,25 +391,30 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 // 1) if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 // 2) if fstype is provided and pv.AccessMode == ReadWriteOnly and !c.spec.ReadOnly then apply fsgroup
 func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
-	if fsGroup != nil {
-		if fsType == "" {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
-			return nil
-		}
+	if c.fsGroupPolicy == storage.FileFSGroupPolicy || fsGroup != nil {
 
-		accessModes := c.spec.PersistentVolume.Spec.AccessModes
-		if c.spec.PersistentVolume.Spec.AccessModes == nil {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-			return nil
-		}
-		if !hasReadWriteOnce(accessModes) {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-			return nil
-		}
+		// If the FSGroupPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy perform additional checks
+		// to determine if we should proceed with modifying the fsGroup.
+		if c.fsGroupPolicy == storage.ReadWriteOnceWithFSTypeFSGroupPolicy {
+			if fsType == "" {
+				klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
+				return nil
+			}
 
-		if c.readOnly {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
-			return nil
+			accessModes := c.spec.PersistentVolume.Spec.AccessModes
+			if c.spec.PersistentVolume.Spec.AccessModes == nil {
+				klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+				return nil
+			}
+			if !hasReadWriteOnce(accessModes) {
+				klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+				return nil
+			}
+
+			if c.readOnly {
+				klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
+				return nil
+			}
 		}
 
 		err := volume.SetVolumeOwnership(c, fsGroup, fsGroupChangePolicy)
@@ -403,7 +422,9 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64, fsGroupChangeP
 			return err
 		}
 
-		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+		if fsGroup != nil {
+			klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+		}
 	}
 
 	return nil
