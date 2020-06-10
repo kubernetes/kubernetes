@@ -138,6 +138,14 @@ message CSIDriverSpec {
   //
   // +optional
   optional bool storageCapacity = 4;
+
+  // Defines if the underlying volume supports changing ownership and
+  // permission of the volume before being mounted.
+  // Refer to the specific FSGroupPolicy values for additional details.
+  // This field is alpha-level, and is only honored by servers
+  // that enable the CSIVolumeFSGroupPolicy feature gate.
+  // +optional
+  optional string fsGroupPolicy = 5;
 }
 
 // CSINode holds information about all CSI drivers installed on a node.

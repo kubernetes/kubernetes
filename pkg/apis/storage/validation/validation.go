@@ -452,6 +452,8 @@ func validateStorageCapacity(storageCapacity *bool, fldPath *field.Path) field.E
 	if storageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
+
+	return allErrs
 }
 
 var supportedFSGroupPolicy = sets.NewString(string(storage.ReadWriteOnceWithFSTypeFSGroupPolicy), string(storage.FileFSGroupPolicy), string(storage.NoneFSGroupPolicy))
