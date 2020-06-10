@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+// CertificateController is used for initializing different certificate controllers.
 type CertificateController struct {
 	// name is an identifier for this particular controller instance.
 	name string
@@ -53,6 +54,7 @@ type CertificateController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewCertificateController creates new certificate controller.
 func NewCertificateController(
 	name string,
 	kubeClient clientset.Interface,
@@ -199,7 +201,7 @@ func (cc *CertificateController) syncFunc(key string) error {
 // it's spammy and usually user error. Instead we will log these errors at a
 // higher log level. We still need to throw these errors to signal that the
 // sync should be retried.
-func IgnorableError(s string, args ...interface{}) ignorableError {
+func IgnorableError(s string, args ...interface{}) error {
 	return ignorableError(fmt.Sprintf(s, args...))
 }
 

@@ -28,7 +28,8 @@ func IsCertificateRequestApproved(csr *certificates.CertificateSigningRequest) b
 	return approved && !denied
 }
 
-// HasCondition returns true if the csr contains a condition of the specified type with a status that is set to True or is empty
+// HasTrueCondition returns true if the csr contains a condition of the specified type
+// with a status that is set to True or is empty.
 func HasTrueCondition(csr *certificates.CertificateSigningRequest, conditionType certificates.RequestConditionType) bool {
 	for _, c := range csr.Status.Conditions {
 		if c.Type == conditionType && (len(c.Status) == 0 || c.Status == v1.ConditionTrue) {
@@ -38,6 +39,7 @@ func HasTrueCondition(csr *certificates.CertificateSigningRequest, conditionType
 	return false
 }
 
+// GetCertApprovalCondition gets the certificates approval condition.
 func GetCertApprovalCondition(status *certificates.CertificateSigningRequestStatus) (approved bool, denied bool) {
 	for _, c := range status.Conditions {
 		if c.Type == certificates.CertificateApproved {
