@@ -192,7 +192,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 	)
 }
 
-func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet clientset.Interface, force bool, modify func(csr runtime.Object) (runtime.Object, bool, error)) error {
+func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet clientset.Interface, force bool, modify func(csr runtime.Object, force bool) (runtime.Object, bool, error)) error {
 	var found int
 	r := builder.
 		Unstructured().
@@ -230,7 +230,7 @@ func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builde
 				return err
 			}
 
-			modifiedCSR, hasCondition, err := modify(csr)
+			modifiedCSR, hasCondition, err := modify(csr, force)
 			if err != nil {
 				return err
 			}
@@ -265,17 +265,20 @@ func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builde
 	return err
 }
 
-func addConditionIfNeeded(mustNotHaveConditionType, conditionType, reason, message string) func(runtime.Object) (runtime.Object, bool, error) {
-	return func(csr runtime.Object) (runtime.Object, bool, error) {
+func addConditionIfNeeded(mustNotHaveConditionType, conditionType, reason, message string) func(runtime.Object, bool) (runtime.Object, bool, error) {
+	return func(csr runtime.Object, force bool) (runtime.Object, bool, error) {
 		switch csr := csr.(type) {
 		case *certificatesv1.CertificateSigningRequest:
 			var alreadyHasCondition bool
-			for _, c := range csr.Status.Conditions {
-				if string(c.Type) == mustNotHaveConditionType {
-					return nil, false, fmt.Errorf("certificate signing request %q is already %s", csr.Name, c.Type)
+			for i, condition := range csr.Status.Conditions {
+				if string(condition.Type) == mustNotHaveConditionType {
+					return nil, false, fmt.Errorf("certificate signing request %q is already %s", csr.Name, condition.Type)
 				}
-				if string(c.Type) == conditionType {
+				if string(condition.Type) == conditionType {
 					alreadyHasCondition = true
+					if force {
+						csr.Status.Conditions[i].LastUpdateTime = metav1.Now()
+					}
 				}
 			}
 			if alreadyHasCondition {
@@ -292,12 +295,15 @@ func addConditionIfNeeded(mustNotHaveConditionType, conditionType, reason, messa
 
 		case *certificatesv1beta1.CertificateSigningRequest:
 			var alreadyHasCondition bool
-			for _, c := range csr.Status.Conditions {
-				if string(c.Type) == mustNotHaveConditionType {
-					return nil, false, fmt.Errorf("certificate signing request %q is already %s", csr.Name, c.Type)
+			for i, condition := range csr.Status.Conditions {
+				if string(condition.Type) == mustNotHaveConditionType {
+					return nil, false, fmt.Errorf("certificate signing request %q is already %s", csr.Name, condition.Type)
 				}
-				if string(c.Type) == conditionType {
+				if string(condition.Type) == conditionType {
 					alreadyHasCondition = true
+					if force {
+						csr.Status.Conditions[i].LastUpdateTime = metav1.Now()
+					}
 				}
 			}
 			if alreadyHasCondition {
