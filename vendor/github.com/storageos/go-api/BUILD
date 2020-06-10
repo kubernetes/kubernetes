@@ -4,7 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
+        "cluster.go",
         "health.go",
+        "licence.go",
         "logger.go",
         "login.go",
         "namespace.go",

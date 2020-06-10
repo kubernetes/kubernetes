@@ -96,11 +96,6 @@ go_library(
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:illumos": [
-            "//pkg/kubelet/cadvisor:go_default_library",
-            "//staging/src/k8s.io/client-go/tools/record:go_default_library",
-            "//vendor/k8s.io/utils/mount:go_default_library",
-        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/kubelet/cadvisor:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
