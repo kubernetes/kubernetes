@@ -28,13 +28,13 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -947,42 +947,52 @@ var _ = SIGDescribe("Ingress API", func() {
 		Testname: Ingress API
 		Description:
 		The networking.k8s.io API group MUST exist in the /apis discovery document.
-		The networking.k8s.io/v1beta1 API group/version MUST exist in the /apis/networking.k8s.io discovery document.
-		The ingresses resources MUST exist in the /apis/networking.k8s.io/v1beta1 discovery document.
+		The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io discovery document.
+		The ingresses resources MUST exist in the /apis/networking.k8s.io/v1 discovery document.
 		The ingresses resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 		The ingresses/status resource must support update and patch
-
 	*/
 
-	ginkgo.It("should support creating Ingress API operations", func() {
+	framework.ConformanceIt("should support creating Ingress API operations", func() {
 		// Setup
 		ns := f.Namespace.Name
-		ingVersion := "v1beta1"
-		ingClient := f.ClientSet.NetworkingV1beta1().Ingresses(ns)
+		ingVersion := "v1"
+		ingClient := f.ClientSet.NetworkingV1().Ingresses(ns)
 
-		prefixPathType := networkingv1beta1.PathTypePrefix
+		prefixPathType := networkingv1.PathTypePrefix
+		serviceBackend := &networkingv1.IngressServiceBackend{
+			Name: "default-backend",
+			Port: networkingv1.ServiceBackendPort{
+				Name:   "",
+				Number: 8080,
+			},
+		}
+		defaultBackend := networkingv1.IngressBackend{
+			Service: serviceBackend,
+		}
 
-		ingTemplate := &networkingv1beta1.Ingress{
+		ingTemplate := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-ing",
 				Labels: map[string]string{
 					"special-label": f.UniqueName,
 				}},
-			Spec: networkingv1beta1.IngressSpec{
-				Backend: &networkingv1beta1.IngressBackend{
-					ServiceName: "default-backend",
-					ServicePort: intstr.FromInt(8080),
-				},
-				Rules: []networkingv1beta1.IngressRule{
+			Spec: networkingv1.IngressSpec{
+				DefaultBackend: &defaultBackend,
+				Rules: []networkingv1.IngressRule{
 					{
 						Host: "foo.bar.com",
-						IngressRuleValue: networkingv1beta1.IngressRuleValue{
-							HTTP: &networkingv1beta1.HTTPIngressRuleValue{
-								Paths: []networkingv1beta1.HTTPIngressPath{{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{{
 									Path:     "/",
 									PathType: &prefixPathType,
-									Backend: networkingv1beta1.IngressBackend{
-										ServiceName: "test-backend",
-										ServicePort: intstr.FromInt(8080),
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: "test-backend",
+											Port: networkingv1.ServiceBackendPort{
+												Number: 8080,
+											},
+										},
 									},
 								}},
 							},
@@ -990,7 +1000,7 @@ var _ = SIGDescribe("Ingress API", func() {
 					},
 				},
 			},
-			Status: networkingv1beta1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
+			Status: networkingv1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
 		}
 		// Discovery
 		ginkgo.By("getting /apis")
@@ -1028,7 +1038,7 @@ var _ = SIGDescribe("Ingress API", func() {
 
 		ginkgo.By("getting /apis/networking.k8s.io" + ingVersion)
 		{
-			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1beta1.SchemeGroupVersion.String())
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
 			framework.ExpectNoError(err)
 			foundIngress := false
 			for _, resource := range resources.APIResources {
@@ -1065,7 +1075,7 @@ var _ = SIGDescribe("Ingress API", func() {
 		framework.ExpectNoError(err)
 
 		// Test cluster-wide list and watch
-		clusterIngClient := f.ClientSet.NetworkingV1beta1().Ingresses("")
+		clusterIngClient := f.ClientSet.NetworkingV1().Ingresses("")
 		ginkgo.By("cluster-wide listing")
 		clusterIngs, err := clusterIngClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
@@ -1094,7 +1104,7 @@ var _ = SIGDescribe("Ingress API", func() {
 			case evt, ok := <-ingWatch.ResultChan():
 				framework.ExpectEqual(ok, true, "watch channel should not close")
 				framework.ExpectEqual(evt.Type, watch.Modified)
-				watchedIngress, isIngress := evt.Object.(*networkingv1beta1.Ingress)
+				watchedIngress, isIngress := evt.Object.(*networkingv1.Ingress)
 				framework.ExpectEqual(isIngress, true, fmt.Sprintf("expected Ingress, got %T", evt.Object))
 				if watchedIngress.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")

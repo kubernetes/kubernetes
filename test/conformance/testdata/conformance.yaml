@@ -1561,6 +1561,27 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
+- testname: Ingress API
+  codename: '[sig-network] Ingress API should support creating Ingress API operations
+    [Conformance]'
+  description: ' The networking.k8s.io API group MUST exist in the /apis discovery
+    document. The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. The ingresses resources MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. The ingresses resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection. The ingresses/status resource must
+    support update and patch'
+  release: v1.19
+  file: test/e2e/network/ingress.go
+- testname: IngressClass API
+  codename: '[sig-network] IngressClass API  should support creating IngressClass
+    API operations [Conformance]'
+  description: ' - The networking.k8s.io API group MUST exist in the /apis discovery
+    document. - The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. - The ingressclasses resource MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. - The ingressclass resource must support create, get, list,
+    watch, update, patch, delete, and deletecollection.'
+  release: v1.19
+  file: test/e2e/network/ingressclass.go
 - testname: Networking, intra pod http
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
     communication: http [NodeConformance] [Conformance]'
