@@ -19,7 +19,6 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -59,14 +58,27 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 // the cluster and mutator callback will be called on it, then an Update of the mutated ConfigMap will be performed. This function is resilient
 // to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
 // taking place)
+// CreateOrMutateConfigMap tries to create the ConfigMap provided as cm. If the resource exists already, the latest version will be fetched from
+// the cluster and mutator callback will be called on it, then an Update of the mutated ConfigMap will be performed. This function is resilient
+// to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
+// taking place)
 func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutator ConfigMapMutator) error {
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create ConfigMap")
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
+			lastError = err
+			if apierrors.IsAlreadyExists(err) {
+				lastError = MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
+				return lastError == nil, nil
+			}
+			return false, nil
 		}
-		return MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
+		return true, nil
+	})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // MutateConfigMap takes a ConfigMap Object Meta (namespace and name), retrieves the resource from the server and tries to mutate it
@@ -74,22 +86,24 @@ func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutat
 // to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
 // taking place).
 func MutateConfigMap(client clientset.Interface, meta metav1.ObjectMeta, mutator ConfigMapMutator) error {
-	return clientsetretry.RetryOnConflict(wait.Backoff{
-		Steps:    20,
-		Duration: 500 * time.Millisecond,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() error {
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
 		configMap, err := client.CoreV1().ConfigMaps(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
 		if err != nil {
-			return err
+			lastError = err
+			return false, nil
 		}
 		if err = mutator(configMap); err != nil {
-			return errors.Wrap(err, "unable to mutate ConfigMap")
+			lastError = errors.Wrap(err, "unable to mutate ConfigMap")
+			return false, nil
 		}
-		_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(configMap)
-		return err
+		_, lastError = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(configMap)
+		return lastError == nil, nil
 	})
+	if err == nil {
+		return nil
+	}
+	return lastError
 }
 
 // CreateOrRetainConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
@@ -196,34 +210,48 @@ func DeleteDeploymentForeground(client clientset.Interface, namespace, name stri
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
-	return wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
 		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(role); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
-				return false, errors.Wrap(err, "unable to create RBAC role")
+				lastError = errors.Wrap(err, "unable to create RBAC role")
+				return false, nil
 			}
 
 			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(role); err != nil {
-				return false, errors.Wrap(err, "unable to update RBAC role")
+				lastError = errors.Wrap(err, "unable to update RBAC role")
+				return false, nil
 			}
 		}
 		return true, nil
 	})
+	if err == nil {
+		return nil
+	}
+	return lastError
 }
 
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
-	return wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
 		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(roleBinding); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
-				return false, errors.Wrap(err, "unable to create RBAC rolebinding")
+				lastError = errors.Wrap(err, "unable to create RBAC rolebinding")
+				return false, nil
 			}
 
 			if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(roleBinding); err != nil {
-				return false, errors.Wrap(err, "unable to update RBAC rolebinding")
+				lastError = errors.Wrap(err, "unable to update RBAC rolebinding")
+				return false, nil
 			}
 		}
 		return true, nil
 	})
+	if err == nil {
+		return nil
+	}
+	return lastError
 }
 
 // CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
