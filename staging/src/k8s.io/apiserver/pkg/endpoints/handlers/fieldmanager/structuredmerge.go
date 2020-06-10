@@ -18,14 +18,12 @@ package fieldmanager
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v3/merge"
@@ -41,7 +39,6 @@ type structuredMergeManager struct {
 }
 
 var _ Manager = &structuredMergeManager{}
-var atMostEverySecond = internal.NewAtMostEvery(time.Second)
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
@@ -98,19 +95,11 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	}
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
-		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		atMostEverySecond.Do(func() {
-			klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
-		})
-		return newObj, managed, nil
+		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		atMostEverySecond.Do(func() {
-			klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
-		})
-		return newObj, managed, nil
+		return nil, nil, fmt.Errorf("failed to convert live object (%v) to smd typed: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
