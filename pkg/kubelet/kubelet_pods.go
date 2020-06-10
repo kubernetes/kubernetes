@@ -518,7 +518,8 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 			return m, fmt.Errorf("failed to list services when setting up env vars")
 		}
 
-		for _, service := range services {
+		for i := range services {
+			service := services[i]
 			// ignore services where ClusterIP is "None" or empty
 			if !v1helper.IsServiceIPSet(service) {
 				continue
