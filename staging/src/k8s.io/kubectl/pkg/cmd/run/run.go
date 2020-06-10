@@ -120,6 +120,7 @@ type RunOptions struct {
 	Interactive    bool
 	LeaveStdinOpen bool
 	Port           string
+	Privileged     bool
 	Quiet          bool
 	Schedule       string
 	TTY            bool
@@ -202,6 +203,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
 	cmd.Flags().MarkDeprecated("schedule", "has no effect and will be removed in the future.")
+	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 }
 
