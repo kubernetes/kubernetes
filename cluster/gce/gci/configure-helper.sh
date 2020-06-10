@@ -2519,7 +2519,7 @@ function start-kube-addons {
   fi
 
   # Set up manifests of other addons.
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
     if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
       # Replace with custom GKE kube proxy.
       cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
@@ -3027,7 +3027,7 @@ function main() {
   else
     create-node-pki
     create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
@@ -3072,7 +3072,7 @@ function main() {
     start-lb-controller
     update-legacy-addon-node-labels &
   else
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
       start-kube-proxy
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
