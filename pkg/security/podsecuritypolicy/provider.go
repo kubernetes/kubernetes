@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -259,7 +260,7 @@ func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
 				continue
 			}
 
-			if !allowsAllVolumeTypes && !allowedVolumes.Has(string(fsType)) {
+			if !allowsAllVolumeTypes && !allowsVolumeType(allowedVolumes, fsType, v) {
 				allErrs = append(allErrs, field.Invalid(
 					field.NewPath("spec", "volumes").Index(i), string(fsType),
 					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
@@ -448,4 +449,16 @@ func validateRuntimeClassName(actual *string, validNames []string) field.ErrorLi
 		}
 	}
 	return field.ErrorList{field.Invalid(field.NewPath("spec", "runtimeClassName"), *actual, "")}
+}
+
+func allowsVolumeType(allowedVolumes sets.String, fsType policy.FSType, volume api.Volume) bool {
+	if allowedVolumes.Has(string(fsType)) {
+		return true
+	}
+
+	// if secret volume is allowed, all the projected volume sources that projected service account token volumes expose are allowed, regardless of psp.
+	if allowedVolumes.Has(string(policy.Secret)) && fsType == policy.Projected && psputil.IsOnlyServiceAccountTokenSources(volume.VolumeSource.Projected) {
+		return true
+	}
+	return false
 }
