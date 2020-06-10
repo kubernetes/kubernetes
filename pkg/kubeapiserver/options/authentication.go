@@ -24,17 +24,23 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 type BuiltInAuthenticationOptions struct {
@@ -391,37 +397,54 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 	return ret, nil
 }
 
-func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
+// ApplyTo requires already applied OpenAPIConfig and EgressSelector if present.
+func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, openAPIConfig *openapicommon.Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory) error {
 	if o == nil {
 		return nil
 	}
 
-	if o.ClientCert != nil {
-		clientCertificateCAContentProvider, err := o.ClientCert.GetClientCAContentProvider()
-		if err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
-		}
-		if err = c.Authentication.ApplyClientCert(clientCertificateCAContentProvider, c.SecureServing); err != nil {
+	if openAPIConfig == nil {
+		return errors.New("uninitialized OpenAPIConfig")
+	}
+
+	authenticatorConfig, err := o.ToAuthenticationConfig()
+	if err != nil {
+		return err
+	}
+
+	if authenticatorConfig.ClientCAContentProvider != nil {
+		if err = authInfo.ApplyClientCert(authenticatorConfig.ClientCAContentProvider, secureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
-	if o.RequestHeader != nil {
-		requestHeaderConfig, err := o.RequestHeader.ToAuthenticationRequestHeaderConfig()
-		if err != nil {
-			return fmt.Errorf("unable to create request header authentication config: %v", err)
-		}
-		if requestHeaderConfig != nil {
-			if err = c.Authentication.ApplyClientCert(requestHeaderConfig.CAContentProvider, c.SecureServing); err != nil {
-				return fmt.Errorf("unable to load client CA file: %v", err)
-			}
+	if authenticatorConfig.RequestHeaderConfig != nil && authenticatorConfig.RequestHeaderConfig.CAContentProvider != nil {
+		if err = authInfo.ApplyClientCert(authenticatorConfig.RequestHeaderConfig.CAContentProvider, secureServing); err != nil {
+			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 
-	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+	authInfo.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
 
-	c.Authentication.APIAudiences = o.APIAudiences
+	authInfo.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
-		c.Authentication.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+	}
+
+	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+			versionedInformer.Core().V1().Pods().Lister(),
+		)
+	}
+	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+		versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
+	)
+
+	authInfo.Authenticator, openAPIConfig.SecurityDefinitions, err = authenticatorConfig.New()
+	if err != nil {
+		return err
 	}
 
 	return nil
