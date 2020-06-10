@@ -163,14 +163,18 @@ func NewStore(lg *zap.Logger, b backend.Backend, le lease.Lessor, ig ConsistentI
 
 func (s *store) compactBarrier(ctx context.Context, ch chan struct{}) {
 	if ctx == nil || ctx.Err() != nil {
-		s.mu.Lock()
 		select {
 		case <-s.stopc:
 		default:
+			// fix deadlock in mvcc,for more information, please refer to pr 11817.
+			// s.stopc is only updated in restore operation, which is called by apply
+			// snapshot call, compaction and apply snapshot requests are serialized by
+			// raft, and do not happen at the same time.
+			s.mu.Lock()
 			f := func(ctx context.Context) { s.compactBarrier(ctx, ch) }
 			s.fifoSched.Schedule(f)
+			s.mu.Unlock()
 		}
-		s.mu.Unlock()
 		return
 	}
 	close(ch)
