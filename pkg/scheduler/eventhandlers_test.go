@@ -103,6 +103,51 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "with changes on Finalizers",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-0",
+					Finalizers: []string{"a", "b"},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "pod-0",
+						Finalizers: []string{"c", "d"},
+					},
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "with changes on Conditions",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-0",
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{Type: "foo"},
+					},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-0",
+					},
+				}
+			},
+			expected: true,
+		},
 	}
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
