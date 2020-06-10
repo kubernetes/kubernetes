@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -1005,6 +1006,68 @@ func TestParseWarningHeaders(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ParseWarningHeaders() got %#v, want %#v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestIsProbableEOF(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "with no error",
+			expected: false,
+		},
+		{
+			name:     "with EOF error",
+			err:      io.EOF,
+			expected: true,
+		},
+		{
+			name:     "with unexpected EOF error",
+			err:      io.ErrUnexpectedEOF,
+			expected: true,
+		},
+		{
+			name:     "with broken connection error",
+			err:      fmt.Errorf("http: can't write HTTP request on broken connection"),
+			expected: true,
+		},
+		{
+			name:     "with server sent GOAWAY error",
+			err:      fmt.Errorf("error foo - http2: server sent GOAWAY and closed the connection - error bar"),
+			expected: true,
+		},
+		{
+			name:     "with connection reset by peer error",
+			err:      fmt.Errorf("error foo - connection reset by peer - error bar"),
+			expected: true,
+		},
+		{
+			name:     "with use of closed network connection error",
+			err:      fmt.Errorf("error foo - Use of closed network connection - error bar"),
+			expected: true,
+		},
+		{
+			name: "with url error",
+			err: &url.Error{
+				Err: io.ErrUnexpectedEOF,
+			},
+			expected: true,
+		},
+		{
+			name:     "with unrecognized error",
+			err:      fmt.Errorf("error foo"),
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := IsProbableEOF(test.err)
+			assert.Equal(t, test.expected, actual)
 		})
 	}
 }

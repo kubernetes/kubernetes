@@ -83,6 +83,8 @@ func IsProbableEOF(err error) bool {
 	switch {
 	case err == io.EOF:
 		return true
+	case err == io.ErrUnexpectedEOF:
+		return true
 	case msg == "http: can't write HTTP request on broken connection":
 		return true
 	case strings.Contains(msg, "http2: server sent GOAWAY and closed the connection"):
