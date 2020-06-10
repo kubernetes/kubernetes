@@ -1314,14 +1314,6 @@
     resource must support get, update, patch.'
   release: v1.19
   file: test/e2e/auth/certificates.go
-- testname: CertificateSigningRequest API Client Certificate
-  codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
-    building a client with a CSR [Conformance]'
-  description: ' The certificatesigningrequests resource must accept a request for
-    a certificate signed by kubernetes.io/kube-apiserver-client. The issued certificate
-    must be valid as a client certificate used to authenticate to the kube-apiserver.'
-  release: v1.19
-  file: test/e2e/auth/certificates.go
 - testname: Service account tokens auto mount optionally
   codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]'
   description: Ensure that Service Account keys are mounted into the Pod only when
