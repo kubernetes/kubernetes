@@ -40,8 +40,8 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 	}
 }
 
-// AllocatedResources field can not be set by an user and is designed to track maximum
-// capacity user has requested.
+// SetAllocatedResources ensures that AllocatedResources field can only increase and tracks
+// maximum user requested capacity.
 func SetAllocatedResources(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
 		userResources := pvcSpec.Resources

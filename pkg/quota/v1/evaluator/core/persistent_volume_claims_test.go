@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
@@ -77,6 +78,19 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 		StorageClassName: &classGold,
 	})
 
+	validPVCWithAllocatedResources := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("5G"),
+			},
+		},
+		AllocatedResources: &core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+	})
+
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
 		pvc   *api.PersistentVolumeClaim
@@ -86,6 +100,14 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			pvc: validClaim,
 			usage: corev1.ResourceList{
 				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+		},
+		"pvc-usage-higher-allocated-resource": {
+			pvc: validPVCWithAllocatedResources,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:        resource.MustParse("10G"),
 				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
