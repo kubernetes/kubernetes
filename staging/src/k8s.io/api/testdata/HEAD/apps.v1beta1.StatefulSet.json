@@ -1458,9 +1458,17 @@
               "ƫ雮蛱ñYȴ": "307"
             }
           },
+          "allocatedResources": {
+            "limits": {
+              "弊þ­奿ÆŁĪŀc=Ƨz鈡煰敹x": "659"
+            },
+            "requests": {
+              "Ȭő+aò¼箰ð祛?扄鰀G抉": "968"
+            }
+          },
           "volumeName": "455",
           "storageClassName": "456",
-          "volumeMode": "",
+          "volumeMode": "燺Ǫ^撌â羃ȄÑNQ梯誠?忹ț",
           "dataSource": {
             "apiGroup": "457",
             "kind": "458",
@@ -1468,19 +1476,19 @@
           }
         },
         "status": {
-          "phase": "k餫Ŷö靌瀞鈝Ń¥厀",
+          "phase": "罪Ɛǥ",
           "accessModes": [
-            "8Ì所Í绝鲸Ȭő+aò¼箰ð祛"
+            "/ɼ菈"
           ],
           "capacity": {
-            "扄鰀G抉ȪĠʩ崯ɋ+Ő\u003câʑ鱰ȡĴr": "847"
+            "": "145"
           },
           "conditions": [
             {
-              "type": "ț慑",
-              "status": "\u003e",
-              "lastProbeTime": "2875-08-19T11:51:12Z",
-              "lastTransitionTime": "2877-07-20T22:14:42Z",
+              "type": "ɹr",
+              "status": "×鄞閆N钮Ǒ繒瞁ȷ滣ƆƾȊ(X",
+              "lastProbeTime": "2484-03-31T22:08:53Z",
+              "lastTransitionTime": "2401-11-16T03:57:37Z",
               "reason": "460",
               "message": "461"
             }
@@ -1489,29 +1497,29 @@
       }
     ],
     "serviceName": "462",
-    "podManagementPolicy": "Ă/ɼ菈ɁQ))e×鄞閆N钮Ǒ繒",
+    "podManagementPolicy": "Ǥ",
     "updateStrategy": {
-      "type": "F徵{ɦ!f親ʚ",
+      "type": "澙凋",
       "rollingUpdate": {
-        "partition": 1771606623
+        "partition": 467598356
       }
     },
-    "revisionHistoryLimit": 977191736
+    "revisionHistoryLimit": -904085165
   },
   "status": {
-    "observedGeneration": -6053519636978590122,
-    "replicas": -949944616,
-    "readyReplicas": -676713715,
-    "currentReplicas": -904085165,
-    "updatedReplicas": -1670812209,
+    "observedGeneration": -7176083794112885548,
+    "replicas": 678500473,
+    "readyReplicas": 1116426833,
+    "currentReplicas": -958674547,
+    "updatedReplicas": -1049635740,
     "currentRevision": "463",
     "updateRevision": "464",
-    "collisionCount": 678500473,
+    "collisionCount": 1686888334,
     "conditions": [
       {
-        "type": "¹旛坷硂鋡浤ɖ緖焿熣$ɒ割婻漛Ǒ",
-        "status": "ǖʣ国ȏ禫eÒ",
-        "lastTransitionTime": "2095-11-13T08:32:34Z",
+        "type": "砍蛗癨",
+        "status": "焿熣$ɒ割婻漛Ǒ",
+        "lastTransitionTime": "2749-04-27T04:39:52Z",
         "reason": "465",
         "message": "466"
       }

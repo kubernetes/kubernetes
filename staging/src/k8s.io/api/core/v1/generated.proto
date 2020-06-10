@@ -2630,7 +2630,10 @@ message PersistentVolumeClaimSpec {
   optional ResourceRequirements resources = 2;
 
   // AllocatedResources represents the resources that was requested to satisfy user
-  // request.
+  // request. This field is not meant to be set by the user but is used for tracking
+  // volume quota.
+  // This field is alpha-level and is only honored by servers that enable the RecoverVolumeExpansionFailure feature.
+  //
   // +optional
   optional ResourceRequirements allocatedResources = 8;
 

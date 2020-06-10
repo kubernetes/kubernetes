@@ -30,9 +30,9 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  podManagementPolicy: Ă/ɼ菈ɁQ))e×鄞閆N钮Ǒ繒
+  podManagementPolicy: Ǥ
   replicas: 896585016
-  revisionHistoryLimit: 977191736
+  revisionHistoryLimit: -904085165
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -956,8 +956,8 @@ spec:
           volumePath: "101"
   updateStrategy:
     rollingUpdate:
-      partition: 1771606623
-    type: F徵{ɦ!f親ʚ
+      partition: 467598356
+    type: 澙凋
   volumeClaimTemplates:
   - metadata:
       annotations:
@@ -991,6 +991,11 @@ spec:
     spec:
       accessModes:
       - ',躻[鶆f盧詳痍4''N擻搧'
+      allocatedResources:
+        limits:
+          弊þ­奿ÆŁĪŀc=Ƨz鈡煰敹x: "659"
+        requests:
+          Ȭő+aò¼箰ð祛?扄鰀G抉: "968"
       dataSource:
         apiGroup: "457"
         kind: "458"
@@ -1007,33 +1012,33 @@ spec:
         matchLabels:
           46-q-q0o90--g-09--d5ez1----a.w----11rqy3eo79p-f4r1--7p--053--suu--9f82k8-2-d--n-5/Y-.2__a_dWU_V-_Q_Ap._2_xao: 1K--g__..2bidF.-0-...WE.-_tdt_-Z0_TM_p6lM.Y-nd_.b_g
       storageClassName: "456"
-      volumeMode: ""
+      volumeMode: 燺Ǫ^撌â羃ȄÑNQ梯誠?忹ț
       volumeName: "455"
     status:
       accessModes:
-      - 8Ì所Í绝鲸Ȭő+aò¼箰ð祛
+      - /ɼ菈
       capacity:
-        扄鰀G抉ȪĠʩ崯ɋ+Ő<âʑ鱰ȡĴr: "847"
+        "": "145"
       conditions:
-      - lastProbeTime: "2875-08-19T11:51:12Z"
-        lastTransitionTime: "2877-07-20T22:14:42Z"
+      - lastProbeTime: "2484-03-31T22:08:53Z"
+        lastTransitionTime: "2401-11-16T03:57:37Z"
         message: "461"
         reason: "460"
-        status: '>'
-        type: ț慑
-      phase: k餫Ŷö靌瀞鈝Ń¥厀
+        status: ×鄞閆N钮Ǒ繒瞁ȷ滣ƆƾȊ(X
+        type: ɹr
+      phase: 罪Ɛǥ
 status:
-  collisionCount: 678500473
+  collisionCount: 1686888334
   conditions:
-  - lastTransitionTime: "2095-11-13T08:32:34Z"
+  - lastTransitionTime: "2749-04-27T04:39:52Z"
     message: "466"
     reason: "465"
-    status: ǖʣ国ȏ禫eÒ
-    type: ¹旛坷硂鋡浤ɖ緖焿熣$ɒ割婻漛Ǒ
-  currentReplicas: -904085165
+    status: 焿熣$ɒ割婻漛Ǒ
+    type: 砍蛗癨
+  currentReplicas: -958674547
   currentRevision: "463"
-  observedGeneration: -6053519636978590122
-  readyReplicas: -676713715
-  replicas: -949944616
+  observedGeneration: -7176083794112885548
+  readyReplicas: 1116426833
+  replicas: 678500473
   updateRevision: "464"
-  updatedReplicas: -1670812209
+  updatedReplicas: -1049635740

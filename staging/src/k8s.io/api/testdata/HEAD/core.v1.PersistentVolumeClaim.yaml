@@ -32,6 +32,11 @@ metadata:
 spec:
   accessModes:
   - '@Hr鯹)晿'
+  allocatedResources:
+    limits:
+      '|¶鎚¡ Ɠ(嘒ėf倐ȓ': "85"
+    requests:
+      ķ蟒苾h^樅: "39"
   dataSource:
     apiGroup: "27"
     kind: "28"
@@ -48,18 +53,18 @@ spec:
     matchLabels:
       h0-6pJ: Hn7y-74.-0MUORQQ.N2.1L
   storageClassName: "26"
-  volumeMode: 娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^
+  volumeMode: ɸ=ǤÆ碛,1
   volumeName: "25"
 status:
   accessModes:
-  - ĭÐl恕ɍȇ廄裭4懙
+  - '"ŵw^Ü郀叚Fi皬择,Q'
   capacity:
-    嵒ƫS捕ɷD¡轫n: "583"
+    ȸ{+: "914"
   conditions:
-  - lastProbeTime: "2588-10-04T08:20:38Z"
-    lastTransitionTime: "2095-10-31T02:52:44Z"
+  - lastProbeTime: "2484-09-08T04:15:23Z"
+    lastTransitionTime: "2539-07-26T12:51:22Z"
     message: "31"
     reason: "30"
-    status: ƣKʘńw:5塋
-    type: Ü郀
-  phase: 燴壩卄蓨MĮ?
+    status: a縳讋ɮ衺勽Ƙq/Ź u衲<¿燥ǖ_è
+    type: "y"
+  phase: Ɯ/C龷ȪÆl殛瓷雼浢Ü礽绅{
