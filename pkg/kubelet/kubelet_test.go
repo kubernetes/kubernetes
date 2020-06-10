@@ -1955,6 +1955,13 @@ func TestSyncPodKillPod(t *testing.T) {
 	checkPodStatus(t, kl, pod, v1.PodFailed)
 }
 
+func TestPreInitRuntimeService(t *testing.T) {
+	err := PreInitRuntimeService(nil, nil, nil, "", "", "", "", "")
+	if err == nil {
+		t.Fatal("PreInitRuntimeService should fail when not configured with a container runtime")
+	}
+}
+
 func waitForVolumeUnmount(
 	volumeManager kubeletvolume.VolumeManager,
 	pod *v1.Pod) error {
