@@ -200,8 +200,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 				pair := topologyPair{key: c.TopologyKey, value: tpVal}
 				cnt = *s.TopologyPairToPodCounts[pair]
 			}
-			cnt = adjustForMaxSkew(cnt, int64(c.MaxSkew))
-			score += float64(cnt) * s.TopologyNormalizingWeight[i]
+			score += scoreForCount(cnt, c.MaxSkew, s.TopologyNormalizingWeight[i])
 		}
 	}
 	return int64(score), nil
@@ -287,13 +286,10 @@ func topologyNormalizingWeight(size int) float64 {
 	return math.Log(float64(size + 2))
 }
 
-// adjustForMaxSkew adjusts the number of matching pods in a topology domain
-// using the constraint's maxSkew.
-// Topology domains with less than maxSkew number of pods are considered to have
-// the same priority.
-func adjustForMaxSkew(cnt, maxSkew int64) int64 {
-	if cnt < maxSkew {
-		return maxSkew - 1
-	}
-	return cnt
+// scoreForCount calculates the score based on number of matching pods in a
+// topology domain, the constraint's maxSkew and the topology weight.
+// `maxSkew-1` is added to the score so that differences between topology
+// domains get watered down, controlling the tolerance of the score to skews.
+func scoreForCount(cnt int64, maxSkew int32, tpWeight float64) float64 {
+	return float64(cnt)*tpWeight + float64(maxSkew-1)
 }
