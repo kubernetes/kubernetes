@@ -290,8 +290,7 @@ func (s *server) kill() error {
 	const timeout = 10 * time.Second
 	for _, signal := range []string{"-TERM", "-KILL"} {
 		klog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
+		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		cmd := exec.CommandContext(ctx, "kill", signal, strconv.Itoa(pid))
 		_, err := cmd.Output()
 
