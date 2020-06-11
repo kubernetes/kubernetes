@@ -97,7 +97,7 @@ export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 # Default container runtime
-export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
+export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 
 # Set default values with override
 if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
