@@ -79,6 +79,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TokenStr,
 			options.CertificateKey,
 			options.Kustomize,
+			options.Patches,
 		}
 	case "download-certs":
 		flags = []string{
@@ -124,6 +125,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.CfgPath,
 			options.ControlPlane,
 			options.Kustomize,
+			options.Patches,
 		}
 	default:
 		flags = []string{}
@@ -190,6 +192,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 		err := controlplane.CreateStaticPodFiles(
 			kubeadmconstants.GetStaticPodDirectory(),
 			data.KustomizeDir(),
+			data.PatchesDir(),
 			&cfg.ClusterConfiguration,
 			&cfg.LocalAPIEndpoint,
 			component,

@@ -46,4 +46,5 @@ type InitData interface {
 	Client() (clientset.Interface, error)
 	Tokens() []string
 	KustomizeDir() string
+	PatchesDir() string
 }

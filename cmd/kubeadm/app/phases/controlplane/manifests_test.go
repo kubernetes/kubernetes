@@ -125,7 +125,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 			// Execute createStaticPodFunction
 			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			err := CreateStaticPodFiles(manifestPath, "", "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
 			if err != nil {
 				t.Errorf("Error executing createStaticPodFunction: %v", err)
 				return
@@ -174,7 +174,7 @@ func TestCreateStaticPodFilesKustomize(t *testing.T) {
 
 	// Execute createStaticPodFunction with kustomizations
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateStaticPodFiles(manifestPath, kustomizePath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
+	err = CreateStaticPodFiles(manifestPath, kustomizePath, "", cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return

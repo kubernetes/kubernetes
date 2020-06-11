@@ -130,6 +130,7 @@ type joinOptions struct {
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
 	joinControlPlane      *kubeadmapiv1beta2.JoinControlPlane
 	kustomizeDir          string
+	patchesDir            string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -145,6 +146,7 @@ type joinData struct {
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
 	kustomizeDir          string
+	patchesDir            string
 }
 
 // NewCmdJoin returns "kubeadm join" command.
@@ -286,6 +288,7 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 		"Create a new control plane instance on this node",
 	)
 	options.AddKustomizePodsFlag(flagSet, &joinOptions.kustomizeDir)
+	options.AddPatchesFlag(flagSet, &joinOptions.patchesDir)
 }
 
 // newJoinOptions returns a struct ready for being used for creating cmd join flags.
@@ -441,6 +444,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
 		kustomizeDir:          opt.kustomizeDir,
+		patchesDir:            opt.patchesDir,
 	}, nil
 }
 
@@ -509,6 +513,11 @@ func (j *joinData) OutputWriter() io.Writer {
 // KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
 func (j *joinData) KustomizeDir() string {
 	return j.kustomizeDir
+}
+
+// PatchesDir returns the folder where patches for components are stored
+func (j *joinData) PatchesDir() string {
+	return j.patchesDir
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery

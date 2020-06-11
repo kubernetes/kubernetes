@@ -96,7 +96,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	for _, test := range tests {
 		// Execute createStaticPodFunction
 		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", "", test.cfg, &kubeadmapi.APIEndpoint{})
+		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", "", "", test.cfg, &kubeadmapi.APIEndpoint{})
 
 		if !test.expectedError {
 			if err != nil {
@@ -149,7 +149,7 @@ func TestCreateLocalEtcdStaticPodManifestFileKustomize(t *testing.T) {
 
 	// Execute createStaticPodFunction with kustomizations
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, kustomizePath, "", cfg, &kubeadmapi.APIEndpoint{})
+	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, kustomizePath, "", "", cfg, &kubeadmapi.APIEndpoint{})
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return
