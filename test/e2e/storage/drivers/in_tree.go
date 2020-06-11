@@ -397,7 +397,7 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume te
 
 	volSource := v1.VolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
-			TargetPortal: "127.0.0.1:3260",
+			TargetPortal: iv.serverIP + ":3260",
 			IQN:          iv.iqn,
 			Lun:          0,
 			ReadOnly:     readOnly,
@@ -415,7 +415,7 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 
 	pvSource := v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
-			TargetPortal: "127.0.0.1:3260",
+			TargetPortal: iv.serverIP + ":3260",
 			IQN:          iv.iqn,
 			Lun:          0,
 			ReadOnly:     readOnly,
@@ -460,16 +460,17 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config e2evolume.
 		Prefix:      "iscsi",
 		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
 		ServerArgs:  []string{iqn},
-		ServerVolumes: map[string]string{
-			// iSCSI container needs to insert modules from the host
-			"/lib/modules": "/lib/modules",
-			// iSCSI container needs to configure kernel
-			"/sys/kernel": "/sys/kernel",
-			// iSCSI source "block devices" must be available on the host
-			"/srv/iscsi": "/srv/iscsi",
-		},
+		/*		ServerVolumes: map[string]string{
+					// iSCSI container needs to insert modules from the host
+					"/lib/modules": "/lib/modules",
+					// iSCSI container needs to configure kernel
+					"/sys/kernel": "/sys/kernel",
+					// iSCSI source "block devices" must be available on the host
+					"/srv/iscsi": "/srv/iscsi",
+				},
+		*/
 		ServerReadyMessage: "iscsi target started",
-		ServerHostNetwork:  true,
+		//ServerHostNetwork:  true,
 	}
 	pod, ip = e2evolume.CreateStorageServer(cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
