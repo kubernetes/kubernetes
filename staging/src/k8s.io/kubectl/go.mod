@@ -32,7 +32,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
-	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
+	golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -51,6 +51,7 @@ require (
 replace (
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	google.golang.org/protobuf => google.golang.org/protobuf v1.23.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

@@ -25,9 +25,11 @@ require (
 	github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.3
+	github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b // indirect
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/codegangsta/negroni v1.0.0 // indirect
 	github.com/container-storage-interface/spec v1.2.0
+	github.com/containerd/console v1.0.0 // indirect
 	github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration v1.0.8
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -38,7 +40,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
-	github.com/docker/go-connections v0.3.0
+	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
@@ -72,14 +74,14 @@ require (
 	github.com/miekg/dns v1.1.4
 	github.com/moby/ipvs v1.0.1
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
-	github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618
+	github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest v1.0.0-rc1
-	github.com/opencontainers/runc v1.0.0-rc10
-	github.com/opencontainers/selinux v1.3.3
+	github.com/opencontainers/runc v1.0.0-rc90.0.20200602184820-0853956d235d
+	github.com/opencontainers/selinux v1.5.2
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.6.0
@@ -95,6 +97,7 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 	github.com/stretchr/testify v1.4.0
+	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/thecodeteam/goscaleio v0.1.0
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/vishvananda/netlink v1.1.0
@@ -103,13 +106,13 @@ require (
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
-	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
+	golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4
 	gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/api v0.15.1
-	google.golang.org/grpc v1.26.0
+	google.golang.org/grpc v1.27.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.8
@@ -217,6 +220,7 @@ replace (
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
+	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.10
 	github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
@@ -266,6 +270,7 @@ replace (
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 	github.com/godbus/dbus => github.com/godbus/dbus v0.0.0-20190422162347-ade71ed3457e
+	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
