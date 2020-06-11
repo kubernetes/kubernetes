@@ -52,7 +52,7 @@ import (
 // Job/Pod to the queue after the TTL is expected to expire; if the TTL has expired, the
 // worker will send requests to the API server to delete the Jobs/Pods accordingly.
 // This is implemented outside of Job controller for separation of concerns, and
-// because it will be extended to handle other finishable resource types.
+// because it will be extended to handle other finish-able resource types.
 type Controller struct {
 	client   clientset.Interface
 	recorder record.EventRecorder
@@ -70,8 +70,11 @@ type Controller struct {
 	// Added as a member to the struct to allow injection for testing.
 	pListerSynced cache.InformerSynced
 
-	// Jobs/Pods that the controller will check its TTL and attempt to delete when the TTL expires.
-	queue workqueue.RateLimitingInterface
+	// Pods that the controller will check its TTL and attempt to delete when the TTL expires.
+	podQueue workqueue.RateLimitingInterface
+
+	// Jobs that the controller will check its TTL and attempt to delete when the TTL expires.
+	jobQueue workqueue.RateLimitingInterface
 
 	// The clock for tracking time
 	clock clock.Clock
@@ -90,7 +93,8 @@ func New(jobInformer batchinformers.JobInformer, podInformer coreinformers.PodIn
 	tc := &Controller{
 		client:   client,
 		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
+		jobQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
+		podQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_pods_to_delete"),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -114,20 +118,22 @@ func New(jobInformer batchinformers.JobInformer, podInformer coreinformers.PodIn
 	return tc
 }
 
-// Run starts the workers to clean up Jobs.
+// Run starts the workers to clean up Jobs and Pods.
 func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	defer tc.queue.ShutDown()
+	defer tc.jobQueue.ShutDown()
+	defer tc.podQueue.ShutDown()
 
 	klog.Infof("Starting TTL after finished controller")
 	defer klog.Infof("Shutting down TTL after finished controller")
 
-	if !cache.WaitForNamedCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSync("TTL after finished", stopCh, tc.jListerSynced, tc.pListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(tc.worker, time.Second, stopCh)
+		go wait.Until(tc.jobWorker, time.Second, stopCh)
+		go wait.Until(tc.podWorker, time.Second, stopCh)
 	}
 
 	<-stopCh
@@ -175,7 +181,7 @@ func (tc *Controller) enqueue(obj interface{}) {
 			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", resource, err))
 			return
 		}
-		tc.queue.Add(key)
+		tc.jobQueue.Add(key)
 	case *v1.Pod:
 		klog.V(4).Infof("Add pod %s/%s to cleanup", resource.Namespace, resource.Name)
 		key, err := controller.KeyFunc(resource)
@@ -183,7 +189,7 @@ func (tc *Controller) enqueue(obj interface{}) {
 			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", resource, err))
 			return
 		}
-		tc.queue.Add(key)
+		tc.podQueue.Add(key)
 	}
 
 }
@@ -196,43 +202,66 @@ func (tc *Controller) enqueueAfter(obj interface{}, after time.Duration) {
 			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", resource, err))
 			return
 		}
-		tc.queue.AddAfter(key, after)
+		tc.jobQueue.AddAfter(key, after)
 	case *v1.Pod:
 		key, err := controller.KeyFunc(resource)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", resource, err))
 			return
 		}
-		tc.queue.AddAfter(key, after)
+		tc.podQueue.AddAfter(key, after)
 	}
 }
 
-func (tc *Controller) worker() {
-	for tc.processNextWorkItem() {
+type QueueType int
+
+const (
+	JobQueue QueueType = iota
+	PodQueue)
+
+func (tc *Controller) getQueue(queueType QueueType) workqueue.RateLimitingInterface {
+	switch queueType {
+	case JobQueue:
+		return tc.jobQueue
+	case PodQueue:
+		return tc.podQueue
+	default:
+		return nil
 	}
 }
 
-func (tc *Controller) processNextWorkItem() bool {
-	key, quit := tc.queue.Get()
+func (tc *Controller) jobWorker() {
+	for tc.processNextWorkItem(JobQueue) {
+	}
+}
+
+func (tc *Controller) podWorker() {
+	for tc.processNextWorkItem(PodQueue) {
+	}
+}
+
+func (tc *Controller) processNextWorkItem(queueType QueueType) bool {
+	var theQueue = tc.getQueue(queueType)
+	key, quit := theQueue.Get()
 	if quit {
 		return false
 	}
-	defer tc.queue.Done(key)
+	defer theQueue.Done(key)
 
 	err := tc.processResource(key.(string))
-	tc.handleErr(err, key)
+	tc.handleErr(err, key, queueType)
 
 	return true
 }
 
-func (tc *Controller) handleErr(err error, key interface{}) {
+func (tc *Controller) handleErr(err error, key interface{}, queueType QueueType) {
 	if err == nil {
-		tc.queue.Forget(key)
+		tc.getQueue(queueType).Forget(key)
 		return
 	}
 
 	utilruntime.HandleError(fmt.Errorf("error cleaning up Job/Pod %v, will retry: %v", key, err))
-	tc.queue.AddRateLimited(key)
+	tc.getQueue(queueType).AddRateLimited(key)
 }
 
 // processResource will check the Resource's [job / pod] state and TTL and
