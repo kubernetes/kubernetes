@@ -18,6 +18,7 @@ FROM $BASEIMAGE
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 RUN yum install -y scsi-target-utils && yum clean all
+RUN yum install -y net-tools iscsi-initiator-utils && yum clean all
 ADD run_iscsi_target.sh /usr/local/bin/
 ADD block.tar.gz /
 

@@ -25,23 +25,31 @@ function start()
 {
     # Create new IQN (iSCSI Qualified Name)
     cat <<EOF > /etc/tgt/conf.d/kubernetes.conf
-default-driver iscsi
-
 <target $IQN>
+        lun 1
+        write-cache off
         backing-store /block
 </target>
 EOF
     # Using -f (foreground) to print logs to stdout/stderr
-    tgtd -d1 -f &
+    tgtd -f &
+    sleep 1
+
+    # from tgtd.service
+    /usr/sbin/tgtadm --op update --mode sys --name State -v offline
+    /usr/sbin/tgt-admin -e -c /etc/tgt/tgtd.conf
+    /usr/sbin/tgtadm --op update --mode sys --name State -v ready
     echo "iscsi target started"
 }
 
 function stop()
 {
     echo "stopping iscsi target"
+    # from tgtd.service
     tgtadm --op update --mode sys --name State -v offline
     tgt-admin --update ALL -c /dev/null
     tgtadm --op delete --mode system
+
     sleep 1
     killall tgtd
     exit 0

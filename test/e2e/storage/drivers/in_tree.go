@@ -356,11 +356,17 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &iSCSIDriver{}
 var _ testsuites.InlineVolumeTestDriver = &iSCSIDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &iSCSIDriver{}
 
+func GetISCSIDriverInitializer(index string) func() testsuites.TestDriver {
+	return func() testsuites.TestDriver {
+		return InitISCSIDriver(index)
+	}
+}
+
 // InitISCSIDriver returns iSCSIDriver that implements TestDriver interface
-func InitISCSIDriver() testsuites.TestDriver {
+func InitISCSIDriver(index string) testsuites.TestDriver {
 	return &iSCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:             "iscsi",
+			Name:             "iscsi" + index,
 			InTreePluginName: "kubernetes.io/iscsi",
 			FeatureTag:       "[Feature:Volumes]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
@@ -399,7 +405,7 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume te
 		ISCSI: &v1.ISCSIVolumeSource{
 			TargetPortal: iv.serverIP + ":3260",
 			IQN:          iv.iqn,
-			Lun:          0,
+			Lun:          1,
 			ReadOnly:     readOnly,
 		},
 	}
@@ -417,7 +423,7 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
 			TargetPortal: iv.serverIP + ":3260",
 			IQN:          iv.iqn,
-			Lun:          0,
+			Lun:          1,
 			ReadOnly:     readOnly,
 		},
 	}
@@ -456,19 +462,11 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config e2evolume.
 	// Generate cluster-wide unique IQN
 	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
 	config = e2evolume.TestConfig{
-		Namespace:   namespace,
-		Prefix:      "iscsi",
-		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
-		ServerArgs:  []string{iqn},
-		/*		ServerVolumes: map[string]string{
-					// iSCSI container needs to insert modules from the host
-					"/lib/modules": "/lib/modules",
-					// iSCSI container needs to configure kernel
-					"/sys/kernel": "/sys/kernel",
-					// iSCSI source "block devices" must be available on the host
-					"/srv/iscsi": "/srv/iscsi",
-				},
-		*/
+		Namespace:          namespace,
+		Prefix:             "iscsi",
+		ServerImage:        imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
+		ServerArgs:         []string{iqn},
+		ServerPorts:        []int{3260},
 		ServerReadyMessage: "iscsi target started",
 		//ServerHostNetwork:  true,
 	}

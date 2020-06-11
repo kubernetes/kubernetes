@@ -41,6 +41,7 @@ type RegistryList struct {
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 	K8sCSI                  string `yaml:"k8sCSI"`
+	JSafrane                string `yaml:"jsafrane"`
 }
 
 // Config holds an images registry, name, and version
@@ -82,6 +83,7 @@ func initReg() RegistryList {
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		K8sCSI:                  "gcr.io/k8s-staging-csi",
+		JSafrane:                "quay.io/jsafrane",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -105,6 +107,7 @@ var (
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
 	dockerGluster           = registry.DockerGluster
 	e2eRegistry             = registry.E2eRegistry
+	e2eJSafrane             = registry.JSafrane
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
@@ -238,7 +241,7 @@ func initImageConfigs() map[int]Config {
 	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[VolumeNFSServer] = Config{e2eRegistry, "volume/nfs", "1.0"}
-	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "2.0"}
+	configs[VolumeISCSIServer] = Config{e2eJSafrane, "iscsi-test", "3.0"}
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
 	return configs
