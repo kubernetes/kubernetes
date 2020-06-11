@@ -965,7 +965,7 @@ EOF
     # If GKE exec auth for webhooks has been requested, then
     # ValidatingAdmissionWebhook should use it.  Otherwise, run with the default
     # config.
-    if [[ "${ADMISSION_CONTROL:-}" == *"ValidatingAdmissionWebhook"* && -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
+    if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
       1>&2 echo "ValidatingAdmissionWebhook requested, and WEBHOOK_GKE_EXEC_AUTH specified.  Configuring ValidatingAdmissionWebhook to use gke-exec-auth-plugin."
 
       # Append config for ValidatingAdmissionWebhook to the shared admission
