@@ -475,7 +475,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		CountMetricPollPeriod:   time.Minute,
 	}
 	if enableWatchCache {
-		restOptionsGetter.Decorator = genericregistry.StorageWithCacher(100)
+		restOptionsGetter.Decorator = genericregistry.StorageWithCacher()
 	}
 
 	handler, err := NewCustomResourceDefinitionHandler(
