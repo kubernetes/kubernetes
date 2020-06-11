@@ -350,6 +350,23 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		}
 	}()
 
+	if class == nil {
+		// StorageClass is nil, so the default one will be used
+		scName, err := e2epv.GetDefaultStorageClassName(client)
+		framework.ExpectNoError(err)
+		defaultSC, err := client.StorageV1().StorageClasses().Get(context.TODO(), scName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		// If late binding is configured, create and delete a pod to provision the volume
+		if *defaultSC.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+			ginkgo.By("creating a pod referring to the claim")
+			var pod *v1.Pod
+			pod, err := e2epod.CreatePod(t.Client, claim.Namespace, nil /* nodeSelector */, []*v1.PersistentVolumeClaim{claim}, true /* isPrivileged */, "" /* command */)
+			// Delete pod now, otherwise PV can't be deleted below
+			framework.ExpectNoError(err)
+			e2epod.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
+		}
+	}
+
 	// Run the checker
 	if t.PvCheck != nil {
 		t.PvCheck(claim)
