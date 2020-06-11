@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -62,19 +63,20 @@ var (
 
 type csiMountMgr struct {
 	csiClientGetter
-	k8s                 kubernetes.Interface
-	plugin              *csiPlugin
-	driverName          csiDriverName
-	volumeLifecycleMode storage.VolumeLifecycleMode
-	volumeID            string
-	specVolumeID        string
-	readOnly            bool
-	supportsSELinux     bool
-	spec                *volume.Spec
-	pod                 *api.Pod
-	podUID              types.UID
-	publishContext      map[string]string
-	kubeVolHost         volume.KubeletVolumeHost
+	k8s                          kubernetes.Interface
+	plugin                       *csiPlugin
+	driverName                   csiDriverName
+	volumeLifecycleMode          storage.VolumeLifecycleMode
+	volumeID                     string
+	specVolumeID                 string
+	readOnly                     bool
+	supportsSELinux              bool
+	supportsSELinuxRelabelPolicy bool
+	spec                         *volume.Spec
+	pod                          *api.Pod
+	podUID                       types.UID
+	publishContext               map[string]string
+	kubeVolHost                  volume.KubeletVolumeHost
 	volume.MetricsProvider
 }
 
@@ -141,13 +143,14 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	accessMode := api.ReadWriteOnce
 
 	var (
-		fsType             string
-		volAttribs         map[string]string
-		nodePublishSecrets map[string]string
-		publishContext     map[string]string
-		mountOptions       []string
-		deviceMountPath    string
-		secretRef          *api.SecretReference
+		fsType                 string
+		volAttribs             map[string]string
+		nodePublishSecrets     map[string]string
+		publishContext         map[string]string
+		mountOptions           []string
+		deviceMountPath        string
+		secretRef              *api.SecretReference
+		expectMountWithContext bool
 	)
 
 	switch {
@@ -169,6 +172,13 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			ns := c.pod.Namespace
 			secretRef = &api.SecretReference{Name: secretName, Namespace: ns}
 		}
+
+		if c.supportsSELinuxRelabelPolicy && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+			mountOptions, expectMountWithContext, err = util.AddSELinuxMountOptions(mountOptions, mounterArgs.SELinuxOptions, mounterArgs.SELinuxRelabelPolicy)
+			if err != nil {
+				return errors.New(log("mounter.SetUpAt failed to compose SELinux mount options: %v", err))
+			}
+		}
 	case pvSrc != nil:
 		if c.volumeLifecycleMode != storage.VolumeLifecyclePersistent {
 			return fmt.Errorf("unexpected driver mode: %s", c.volumeLifecycleMode)
@@ -188,6 +198,12 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		}
 
 		mountOptions = c.spec.PersistentVolume.Spec.MountOptions
+		if c.supportsSELinuxRelabelPolicy && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+			mountOptions, expectMountWithContext, err = util.AddSELinuxMountOptions(mountOptions, mounterArgs.SELinuxOptions, mounterArgs.SELinuxRelabelPolicy)
+			if err != nil {
+				return errors.New(log("mounter.SetUpAt failed to compose SELinux mount options: %v", err))
+			}
+		}
 
 		// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 		stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
@@ -277,6 +293,14 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) && expectMountWithContext {
+		if err = util.CheckSELinuxContext(dir, mounterArgs.SELinuxOptions, mounterArgs.SELinuxRelabelPolicy); err != nil {
+			// Despite "-o context=" mount option, the driver did not mount the volume with the right context.
+			// In other words, CSI driver erroneously advertises that it supports SELinuxRelabelPolicy.
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("CSI driver failure: volume has invalid SELinux label after applying '-o context=<pod context>' mount option"))
+		}
+	}
+
 	// apply volume ownership
 	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
@@ -335,9 +359,10 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        c.readOnly,
-		Managed:         !c.readOnly,
-		SupportsSELinux: c.supportsSELinux,
+		ReadOnly:                     c.readOnly,
+		Managed:                      !c.readOnly,
+		SupportsSELinux:              c.supportsSELinux,
+		SupportsSELinuxRelabelPolicy: c.supportsSELinuxRelabelPolicy,
 	}
 }
 

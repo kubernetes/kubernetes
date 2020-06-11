@@ -400,7 +400,7 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, mounterArgs volume.Mou
 		options = append(options, "ro")
 	}
 	mountOptions := util.JoinMountOptions(options, b.mountOptions)
-	mountOptions, err = util.AddSELinuxMountOptions(mountOptions, mounterArgs.SELinuxOptions, mounterArgs.SELinuxRelabelPolicy)
+	mountOptions, _, err = util.AddSELinuxMountOptions(mountOptions, mounterArgs.SELinuxOptions, mounterArgs.SELinuxRelabelPolicy)
 	if err != nil {
 		return err
 	}

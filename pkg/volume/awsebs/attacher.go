@@ -242,7 +242,7 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 	if notMnt {
 		diskMounter := volumeutil.NewSafeFormatAndMountFromHost(awsElasticBlockStorePluginName, attacher.host)
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
-		mountOptions, err = util.AddSELinuxMountOptions(mountOptions, opts.SELinuxOptions, opts.SELinuxRelabelPolicy)
+		mountOptions, _, err = util.AddSELinuxMountOptions(mountOptions, opts.SELinuxOptions, opts.SELinuxRelabelPolicy)
 		if err != nil {
 			return err
 		}

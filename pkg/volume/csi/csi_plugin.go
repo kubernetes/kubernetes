@@ -390,18 +390,24 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New(log("cast from VolumeHost to KubeletVolumeHost failed"))
 	}
 
+	supportsSELinuxRelabelPolicy, err := p.supportsSELinuxRelabelPolicy(driverName)
+	if err != nil {
+		return nil, errors.New(log("unable to determine SELinuxMountSupported value"))
+	}
+
 	mounter := &csiMountMgr{
-		plugin:              p,
-		k8s:                 k8s,
-		spec:                spec,
-		pod:                 pod,
-		podUID:              pod.UID,
-		driverName:          csiDriverName(driverName),
-		volumeLifecycleMode: volumeLifecycleMode,
-		volumeID:            volumeHandle,
-		specVolumeID:        spec.Name(),
-		readOnly:            readOnly,
-		kubeVolHost:         kvh,
+		plugin:                       p,
+		k8s:                          k8s,
+		spec:                         spec,
+		pod:                          pod,
+		podUID:                       pod.UID,
+		driverName:                   csiDriverName(driverName),
+		volumeLifecycleMode:          volumeLifecycleMode,
+		volumeID:                     volumeHandle,
+		specVolumeID:                 spec.Name(),
+		readOnly:                     readOnly,
+		kubeVolHost:                  kvh,
+		supportsSELinuxRelabelPolicy: supportsSELinuxRelabelPolicy,
 	}
 	mounter.csiClientGetter.driverName = csiDriverName(driverName)
 
@@ -954,4 +960,31 @@ func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName
 	}
 
 	return nil
+}
+
+// supportsSELinuxRelabelPolicy determines if the CSI driver supports
+// SELinuxRelabelPolicy.
+func (p *csiPlugin) supportsSELinuxRelabelPolicy(driver string) (bool, error) {
+	kletHost, ok := p.host.(volume.KubeletVolumeHost)
+	if ok {
+		if err := kletHost.WaitForCacheSync(); err != nil {
+			return false, err
+		}
+	}
+
+	if p.csiDriverLister == nil {
+		return false, errors.New("CSIDriver lister does not exist")
+	}
+	csiDriver, err := p.csiDriverLister.Get(driver)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// No CSiDriver exists -> SELinuxRelabelPolicy is not supported (default).
+			return false, nil
+		}
+		return false, err
+	}
+	if csiDriver.Spec.SELinuxMountSupported != nil && *csiDriver.Spec.SELinuxMountSupported == true {
+		return true, nil
+	}
+	return false, nil
 }

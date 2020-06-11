@@ -707,22 +707,61 @@ func IsMultiAttachAllowed(volumeSpec *volume.Spec) bool {
 }
 
 // AddSELinuxMountOptions adds SELinux mount options to given list
-func AddSELinuxMountOptions(opts []string, selinuxOptions *v1.SELinuxOptions, policy *v1.PodSELinuxRelabelPolicy) ([]string, error) {
+func AddSELinuxMountOptions(opts []string, selinuxOptions *v1.SELinuxOptions, policy *v1.PodSELinuxRelabelPolicy) ([]string, bool, error) {
 	if !selinux.SELinuxEnabled() {
-		return opts, nil
+		return opts, false, nil
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
-		return opts, nil
+		return opts, false, nil
 	}
 	if policy == nil || *policy == v1.SELinuxRelabelAlwaysRelabel {
-		return opts, nil
+		return opts, false, nil
+	}
+
+	if selinuxOptions == nil {
+		return opts, false, nil
 	}
 
 	label, err := selinux.GetSELinuxLabelString(selinuxOptions.User, selinuxOptions.Role, selinuxOptions.Type, selinuxOptions.Level)
 	if err != nil {
-		return opts, err
+		return opts, false, err
 	}
 	opt := fmt.Sprintf("context=%s", label)
-	return JoinMountOptions([]string{opt}, opts), nil
+	return JoinMountOptions([]string{opt}, opts), true, nil
+}
+
+func CheckSELinuxContext(path string, expectedOptions *v1.SELinuxOptions, policy *v1.PodSELinuxRelabelPolicy) error {
+	if !selinux.SELinuxEnabled() {
+		return nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+		return nil
+	}
+
+	if expectedOptions == nil {
+		return nil
+	}
+
+	if policy == nil || *policy == v1.SELinuxRelabelAlwaysRelabel {
+		return nil
+	}
+
+	expectedLabel, err := selinux.GetSELinuxLabelString(expectedOptions.User, expectedOptions.Role, expectedOptions.Type, expectedOptions.Level)
+	if err != nil {
+		return err
+	}
+
+	sr := selinux.NewSELinuxRunner()
+	label, err := sr.Getfilecon(path)
+	if err != nil {
+		return err
+	}
+
+	if label != expectedLabel {
+		klog.V(2).Infof("error mounting volume %s with SELinuxRelabelPolicy: expected label %s, got %s", path, expectedLabel, label)
+		return fmt.Errorf("CSI driver failed to apply SELinux label via mount option")
+	}
+	return nil
 }

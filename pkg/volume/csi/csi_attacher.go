@@ -35,8 +35,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -345,8 +348,23 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	var mountOptions []string
+	var expectMountWithContext bool
+
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.MountOptions != nil {
 		mountOptions = spec.PersistentVolume.Spec.MountOptions
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+		supportsRelabel, err := c.plugin.supportsSELinuxRelabelPolicy(csiSource.Driver)
+		if err != nil {
+			return errors.New(log("attacher.MountDevice failed to get SELinuxMountSupported for the driver: %v", err))
+		}
+		if supportsRelabel {
+			mountOptions, expectMountWithContext, err = util.AddSELinuxMountOptions(mountOptions, opts.SELinuxOptions, opts.SELinuxRelabelPolicy)
+			if err != nil {
+				return errors.New(log("attacher.MountDevice failed to compose SELinux mount options: %v", err))
+			}
+		}
 	}
 
 	fsType := csiSource.FSType
@@ -362,6 +380,14 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	if err != nil {
 		return err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) && expectMountWithContext {
+		if err = util.CheckSELinuxContext(deviceMountPath, opts.SELinuxOptions, opts.SELinuxRelabelPolicy); err != nil {
+			// Despite "-o context=" mount option, the driver did not mount the volume with the right context.
+			// In other words, CSI driver erroneously advertises that it supports SELinuxRelabelPolicy.
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("CSI driver failure: volume has invalid SELinux label after applying '-o context=<pod context>' mount option"))
+		}
 	}
 
 	klog.V(4).Infof(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
