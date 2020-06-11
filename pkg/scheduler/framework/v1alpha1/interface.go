@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -511,6 +512,9 @@ type FrameworkHandle interface {
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
+
+	// EventRecorder returns an event recorder.
+	EventRecorder() events.EventRecorder
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
