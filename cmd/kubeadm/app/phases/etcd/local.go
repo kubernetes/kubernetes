@@ -19,6 +19,7 @@ package etcd
 import (
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +63,15 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir, kustomizeDir, patchesDir 
 			return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", kubeadmconstants.Etcd)
 		}
 		spec = *kustomizedSpec
+	}
+
+	// if patchesDir is defined, patch the static Pod manifest
+	if patchesDir != "" {
+		patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
+		if err != nil {
+			return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", kubeadmconstants.Etcd)
+		}
+		spec = *patchedSpec
 	}
 
 	// writes etcd StaticPod to disk
@@ -172,6 +182,15 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 			return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", kubeadmconstants.Etcd)
 		}
 		spec = *kustomizedSpec
+	}
+
+	// if patchesDir is defined, patch the static Pod manifest
+	if patchesDir != "" {
+		patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
+		if err != nil {
+			return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", kubeadmconstants.Etcd)
+		}
+		spec = *patchedSpec
 	}
 
 	// writes etcd StaticPod to disk

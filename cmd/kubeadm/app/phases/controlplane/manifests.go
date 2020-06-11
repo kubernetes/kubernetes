@@ -19,6 +19,7 @@ package controlplane
 import (
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -115,6 +116,15 @@ func CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kub
 				return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", componentName)
 			}
 			spec = *kustomizedSpec
+		}
+
+		// if patchesDir is defined, patch the static Pod manifest
+		if patchesDir != "" {
+			patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
+			if err != nil {
+				return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", componentName)
+			}
+			spec = *patchedSpec
 		}
 
 		// writes the StaticPodSpec to disk
