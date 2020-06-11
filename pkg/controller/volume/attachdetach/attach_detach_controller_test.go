@@ -159,6 +159,28 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	var podsNum, extraPodsNum, nodesNum, i int
 
+	// Create the controller
+	adcObj, err := NewAttachDetachController(
+		fakeKubeClient,
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Storage().V1().CSINodes(),
+		informerFactory.Storage().V1().CSIDrivers(),
+		nil, /* cloud */
+		plugins,
+		prober,
+		false,
+		1*time.Second,
+		DefaultTimerConfig)
+
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
+	}
+
+	adc := adcObj.(*attachDetachController)
+
 	stopCh := make(chan struct{})
 
 	pods, err := fakeKubeClient.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
@@ -239,28 +261,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		csiNodesList, err = informerFactory.Storage().V1().CSINodes().Lister().List(labels.Everything())
 		i++
 	}
-
-	// Create the controller
-	adcObj, err := NewAttachDetachController(
-		fakeKubeClient,
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Storage().V1().CSINodes(),
-		informerFactory.Storage().V1().CSIDrivers(),
-		nil, /* cloud */
-		plugins,
-		prober,
-		false,
-		1*time.Second,
-		DefaultTimerConfig)
-
-	if err != nil {
-		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
-	}
-
-	adc := adcObj.(*attachDetachController)
 
 	// Populate ASW
 	err = adc.populateActualStateOfWorld()
