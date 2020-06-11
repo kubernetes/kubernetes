@@ -1027,7 +1027,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 				client,
 				ProbeVolumePlugins(),
 				"fakeNode",
-				factory.Storage().V1().CSIDrivers().Lister(),
+				factory.Storage().V1beta1().CSIDrivers().Lister(),
 				factory.Storage().V1().VolumeAttachments().Lister(),
 			)
 
@@ -1148,7 +1148,7 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 					Spec: v1.NodeSpec{},
 				},
 			)
-			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, tmpDir, client, ProbeVolumePlugins(), "fakeNode", nil, nil)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(tmpDir, client, ProbeVolumePlugins(), "fakeNode", nil, nil)
 			plugMgr := host.GetPluginMgr()
 
 			plug, err := plugMgr.FindDeviceMountablePluginBySpec(test.spec)

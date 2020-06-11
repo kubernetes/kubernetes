@@ -111,7 +111,7 @@ func NewAttachDetachController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	csiNodeInformer storageinformersv1.CSINodeInformer,
-	csiDriverInformer storageinformersv1.CSIDriverInformer,
+	csiDriverInformer storageinformers.CSIDriverInformer,
 	volumeAttachmentInformer storageinformersv1.VolumeAttachmentInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
