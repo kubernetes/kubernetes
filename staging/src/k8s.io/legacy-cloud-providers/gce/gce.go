@@ -163,6 +163,8 @@ type Cloud struct {
 
 	// Keep a reference of this around so we can inject a new cloud.RateLimiter implementation.
 	s *cloud.Service
+
+	metricsCollector loadbalancerMetricsCollector
 }
 
 // ConfigGlobal is the in memory representation of the gce.conf config data
@@ -518,6 +520,7 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		operationPollRateLimiter: operationPollRateLimiter,
 		AlphaFeatureGate:         config.AlphaFeatureGate,
 		nodeZones:                map[string]sets.String{},
+		metricsCollector:         newLoadBalancerMetrics(),
 	}
 
 	gce.manager = &gceServiceManager{gce}
@@ -643,6 +646,7 @@ func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
 
 	go g.watchClusterID(stop)
+	go g.metricsCollector.Run(stop)
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
