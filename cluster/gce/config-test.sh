@@ -101,7 +101,7 @@ export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
 
 # Set default values with override
 if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
-  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/docker.sock}
+  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
   export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-docker}
   export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 elif [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
