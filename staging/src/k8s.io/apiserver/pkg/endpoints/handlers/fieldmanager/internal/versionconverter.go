@@ -97,5 +97,7 @@ func (v *versionConverter) Convert(object *typed.TypedValue, version fieldpath.A
 
 // IsMissingVersionError
 func (v *versionConverter) IsMissingVersionError(err error) bool {
-	return runtime.IsNotRegisteredError(err) || isNoCorrespondingTypeError(err)
+	return runtime.IsNotRegisteredError(err) ||
+		runtime.IsInvalidGroupVersion(err) ||
+		isNoCorrespondingTypeError(err)
 }

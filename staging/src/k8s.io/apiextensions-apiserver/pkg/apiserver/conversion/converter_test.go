@@ -152,6 +152,16 @@ func TestConversion(t *testing.T) {
 			},
 			ExpectedFailure: "invalid group/version: example.com/v3",
 		},
+		{
+			Name:          "empty_object",
+			ValidVersions: []string{"example.com/v1", "example.com/v2"},
+			ClusterScoped: false,
+			ToVersion:     "example.com/v2",
+			SourceObject: &unstructured.Unstructured{
+				Object: map[string]interface{}{},
+			},
+			ExpectedFailure: "no kind is registered for the type *unstructured.Unstructured in scheme \"[example.com/v2]\"",
+		},
 	}
 
 	CRConverterFactory, err := NewCRConverterFactory(nil, func(resolver webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver { return nil })

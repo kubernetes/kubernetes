@@ -18,7 +18,9 @@ package conversion
 
 import (
 	"fmt"
+	"reflect"
 
+	"github.com/pkg/errors"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -162,24 +164,32 @@ func (c *crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVe
 	fromGVK := in.GetObjectKind().GroupVersionKind()
 	toGVK, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{fromGVK})
 	if !ok {
-		// TODO: should this be a typed error?
-		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", fromGVK.String(), target)
+		return nil, runtime.NewNotRegisteredErrForType(target.Identifier(), reflect.TypeOf(in))
 	}
 	if !c.validVersions[toGVK.GroupVersion()] {
-		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", toGVK.GroupVersion().String())
+		return nil, errors.Wrap(
+			runtime.NewInvalidGroupVersionError(toGVK.GroupVersion()),
+			"request to convert CR to group/version",
+		)
 	}
 	// Note that even if the request is for a list, the GV of the request UnstructuredList is what
 	// is expected to convert to. As mentioned in the function's document, it is not expected to
 	// get a v1.List.
 	if !c.validVersions[fromGVK.GroupVersion()] {
-		return nil, fmt.Errorf("request to convert CR from an invalid group/version: %s", fromGVK.GroupVersion().String())
+		return nil, errors.Wrap(
+			runtime.NewInvalidGroupVersionError(fromGVK.GroupVersion()),
+			"request to convert CR from group/version",
+		)
 	}
 	// Check list item's apiVersion
 	if list, ok := in.(*unstructured.UnstructuredList); ok {
 		for i := range list.Items {
 			expectedGV := list.Items[i].GroupVersionKind().GroupVersion()
 			if !c.validVersions[expectedGV] {
-				return nil, fmt.Errorf("request to convert CR list failed, list index %d has invalid group/version: %s", i, expectedGV.String())
+				return nil, errors.Wrapf(
+					runtime.NewInvalidGroupVersionError(expectedGV),
+					"request to convert CR list failed at index %d", i,
+				)
 			}
 		}
 	}

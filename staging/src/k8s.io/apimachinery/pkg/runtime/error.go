@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -147,5 +148,27 @@ func IsStrictDecodingError(err error) bool {
 		return false
 	}
 	_, ok := err.(*strictDecodingError)
+	return ok
+}
+
+type invalidGroupVersionError struct {
+	gv schema.GroupVersion
+}
+
+func NewInvalidGroupVersionError(gv schema.GroupVersion) error {
+	return &invalidGroupVersionError{gv}
+}
+
+func (k *invalidGroupVersionError) Error() string {
+	return fmt.Sprintf("invalid group/version: %s", k.gv)
+}
+
+// IsInvalidGroupVersion returns true if the error indicates that the provided object
+// is an invalidGroupVersion error.
+func IsInvalidGroupVersion(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := errors.Cause(err).(*invalidGroupVersionError)
 	return ok
 }
