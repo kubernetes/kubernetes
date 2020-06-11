@@ -1945,8 +1945,8 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		return err
 	}
 
-	// curEndpoints represents IPVS destinations listed from current system.
-	curEndpoints := sets.NewString()
+	// curEndpointWeights represents IPVS destinations with weight listed from current system.
+	curEndpointWeights := make(map[string]int)
 	// newEndpoints represents Endpoints watched from API Server.
 	newEndpoints := sets.NewString()
 
@@ -1956,7 +1956,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		return err
 	}
 	for _, des := range curDests {
-		curEndpoints.Insert(des.String())
+		curEndpointWeights[des.String()] = des.Weight
 	}
 
 	endpoints := proxier.endpointsMap[svcPortName]
@@ -1996,10 +1996,16 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			Weight:  1,
 		}
 
-		if curEndpoints.Has(ep) {
+		if weight, ok := curEndpointWeights[ep]; ok {
 			// check if newEndpoint is in gracefulDelete list, if true, delete this ep immediately
 			uniqueRS := GetUniqueRSName(vs, newDest)
 			if !proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
+				if weight != newDest.Weight {
+					err := proxier.ipvs.UpdateRealServer(appliedVirtualServer, newDest)
+					if err != nil {
+						klog.Errorf("Failed to update destination: %v, error: %v", newDest, err)
+					}
+				}
 				continue
 			}
 			klog.V(5).Infof("new ep %q is in graceful delete list", uniqueRS)
@@ -2016,7 +2022,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 	}
 	// Delete old endpoints
-	for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
+	for _, ep := range sets.StringKeySet(curEndpointWeights).Difference(newEndpoints).UnsortedList() {
 		// if curEndpoint is in gracefulDelete, skip
 		uniqueRS := vs.String() + "/" + ep
 		if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
