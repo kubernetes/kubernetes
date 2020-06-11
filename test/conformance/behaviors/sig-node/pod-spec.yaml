@@ -42,8 +42,8 @@ behaviors:
   description: When hostIPC is set to false, the Pod MUST NOT use the host's inter-process
     communication namespace.
 - id: pod/spec/label/create
-  decription: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful.
+  description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful.
 - id: pod/spec/label/patch
-  decription: A patch request must be able to update the pod to change the value of an existing Label. Query for the Pod with the new value for the label MUST be successful.
+  description: A patch request must be able to update the pod to change the value of an existing Label. Query for the Pod with the new value for the label MUST be successful.
 - id: pod/spec/container/resources
   description: Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
