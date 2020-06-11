@@ -290,7 +290,7 @@ func Test_NodesDeleted(t *testing.T) {
 				nodeMonitorPeriod: 1 * time.Second,
 			}
 
-			eventBroadcaster.StartStructuredLogging(0)
+			eventBroadcaster.StartLogging(t.Logf)
 			cloudNodeLifecycleController.MonitorNodes()
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
