@@ -209,21 +209,17 @@ func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 
 // Release releases the given CIDR range.
 func (s *CidrSet) Release(cidr *net.IPNet) error {
-	begin, end, err := s.getBeginingAndEndIndices(cidr)
-	if err != nil {
-		return err
-	}
-	s.Lock()
-	defer s.Unlock()
-	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 0)
-	}
-	return nil
+	return s.markCIDRRangeBits(cidr, 0)
 }
 
 // Occupy marks the given CIDR range as used. Occupy does not check if the CIDR
 // range was previously used.
 func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
+	return s.markCIDRRangeBits(cidr, 1)
+}
+
+// markCIDRRangeBits marks the given CIDR range bits to indicate whether it is used or not
+func (s *CidrSet) markCIDRRangeBits(cidr *net.IPNet, bit uint) error {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
 	if err != nil {
 		return err
@@ -232,7 +228,7 @@ func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 1)
+		s.used.SetBit(&s.used, i, bit)
 	}
 
 	return nil
