@@ -52,11 +52,11 @@ var (
 	# Create a deployment named my-dep that runs the nginx image with 3 replicas.
 	kubectl create deployment my-dep --image=nginx --replicas=3
 
-	# Create a deployment named my-dep that runs the busybox image and expose port 5701.
+	# Create a deployment named my-dep that runs the busybox image and exposes port 5701.
 	kubectl create deployment my-dep --image=busybox --port=5701`))
 )
 
-// CreateDeploymentOptions is returned by NewCmdCreateDeployment
+// CreateDeploymentOptions is created by NewCmdCreateDeployment
 type CreateDeploymentOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
@@ -72,9 +72,9 @@ type CreateDeploymentOptions struct {
 	FieldManager     string
 	CreateAnnotation bool
 
-	Client         appsv1client.AppsV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	Client           appsv1client.AppsV1Interface
+	DryRunStrategy   cmdutil.DryRunStrategy
+	DryRunVerifier   *resource.DryRunVerifier
 
 	genericclioptions.IOStreams
 }
