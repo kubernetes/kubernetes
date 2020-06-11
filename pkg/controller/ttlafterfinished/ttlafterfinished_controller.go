@@ -277,7 +277,7 @@ func (tc *Controller) processPod(pod *v1.Pod, namespace, name string) error {
 	// Before deleting the Pod, do a final sanity check.
 	// If TTL is modified before we do this check, we cannot be sure if the TTL truly expires.
 	// The latest Pod may have a different UID, but it's fine because the checks will be run again.
-	fresh, err := tc.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+	fresh, err := tc.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -297,7 +297,7 @@ func (tc *Controller) processPod(pod *v1.Pod, namespace, name string) error {
 		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}
 	klog.V(4).Infof("Cleaning up Pod %s/%s", namespace, name)
-	return tc.client.CoreV1().Pods(fresh.Namespace).Delete(fresh.Name, options)
+	return tc.client.CoreV1().Pods(fresh.Namespace).Delete(context.TODO(), fresh.Name, *options)
 }
 
 func (tc *Controller) processJob(job *batch.Job, namespace, name string) error {
