@@ -194,13 +194,13 @@ Usage:
 Starts a HTTP server on the given `--http-port` (default: 80), serving various endpoints representing a
 guestbook app. The endpoints and their purpose are:
 
-- `/register`: A guestbook slave will subscribe to a master, to its given `--slaveof` endpoint. The master
-  will then push any updates it receives to its registered slaves through the `--backend-port` (default: 6379).
+- `/register`: A guestbook replica will subscribe to a master, to its given `--replicaof` endpoint. The master
+  will then push any updates it receives to its registered replicas through the `--backend-port` (default: 6379).
 - `/get`: Returns `{"data": value}`, where the `value` is the stored value for the given `key` if non-empty,
   or the entire store.
-- `/set`: Will set the given key-value pair in its own store and propagate it to its slaves, if any.
+- `/set`: Will set the given key-value pair in its own store and propagate it to its replicas, if any.
   Will return `{"data": "Updated"}` to the caller on success.
-- `/guestbook`: Will proxy the request to `agnhost-master` if the given `cmd` is `set`, or `agnhost-slave`
+- `/guestbook`: Will proxy the request to `agnhost-master` if the given `cmd` is `set`, or `agnhost-replica`
   if the given `cmd` is `get`.
 
 Usage:
