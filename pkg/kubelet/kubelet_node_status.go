@@ -45,6 +45,37 @@ import (
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+const (
+	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
+	nodeStatusUpdateRetry = 5
+)
+
+// fastStatusUpdateOnce starts a loop that checks the internal node indexer cache for when a CIDR
+// is applied  and tries to update pod CIDR immediately. After pod CIDR is updated it fires off
+// a runtime update and a node status update. Function returns after one successful node status update.
+// Function is executed only during Kubelet start which improves latency to ready node by updating
+// pod CIDR, runtime status and node statuses ASAP.
+func (kl *Kubelet) fastStatusUpdateOnce() {
+	for {
+		time.Sleep(100 * time.Millisecond)
+		node, err := kl.GetNode()
+		if err != nil {
+			klog.Errorf(err.Error())
+			continue
+		}
+		if len(node.Spec.PodCIDRs) != 0 {
+			podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
+			if _, err := kl.updatePodCIDR(podCIDRs); err != nil {
+				klog.Errorf("Pod CIDR update to %v failed %v", podCIDRs, err)
+				continue
+			}
+			kl.updateRuntimeUp()
+			kl.syncNodeStatus()
+			return
+		}
+	}
+}
+
 // registerWithAPIServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
@@ -703,4 +734,18 @@ func nodeConditionsHaveChanged(originalConditions []v1.NodeCondition, conditions
 		}
 	}
 	return false
+}
+
+// providerRequiresNetworkingConfiguration returns whether the cloud provider
+// requires special networking configuration.
+func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
+	// TODO: We should have a mechanism to say whether native cloud provider
+	// is used or whether we are using overlay networking. We should return
+	// true for cloud providers if they implement Routes() interface and
+	// we are not using overlay networking.
+	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
+		return false
+	}
+	_, supported := kl.cloud.Routes()
+	return supported
 }

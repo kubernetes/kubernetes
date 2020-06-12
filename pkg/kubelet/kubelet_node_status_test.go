@@ -60,6 +60,9 @@ import (
 )
 
 const (
+	minImgSize int64 = 23 * 1024 * 1024
+	maxImgSize int64 = 1000 * 1024 * 1024
+
 	maxImageTagsForTest = 20
 )
 

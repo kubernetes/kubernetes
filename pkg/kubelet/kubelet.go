@@ -26,7 +26,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -125,9 +124,6 @@ import (
 const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
-
-	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
-	nodeStatusUpdateRetry = 5
 
 	// ContainerLogsDir is the location of container logs.
 	ContainerLogsDir = "/var/log/containers"
@@ -2181,32 +2177,6 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			removeAll = eviction.PodIsEvicted(syncedPod.Status) || (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses))
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
-	}
-}
-
-// fastStatusUpdateOnce starts a loop that checks the internal node indexer cache for when a CIDR
-// is applied  and tries to update pod CIDR immediately. After pod CIDR is updated it fires off
-// a runtime update and a node status update. Function returns after one successful node status update.
-// Function is executed only during Kubelet start which improves latency to ready node by updating
-// pod CIDR, runtime status and node statuses ASAP.
-func (kl *Kubelet) fastStatusUpdateOnce() {
-	for {
-		time.Sleep(100 * time.Millisecond)
-		node, err := kl.GetNode()
-		if err != nil {
-			klog.Errorf(err.Error())
-			continue
-		}
-		if len(node.Spec.PodCIDRs) != 0 {
-			podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
-			if _, err := kl.updatePodCIDR(podCIDRs); err != nil {
-				klog.Errorf("Pod CIDR update to %v failed %v", podCIDRs, err)
-				continue
-			}
-			kl.updateRuntimeUp()
-			kl.syncNodeStatus()
-			return
-		}
 	}
 }
 

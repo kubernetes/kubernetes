@@ -40,20 +40,6 @@ const (
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
-// providerRequiresNetworkingConfiguration returns whether the cloud provider
-// requires special networking configuration.
-func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
-	// TODO: We should have a mechanism to say whether native cloud provider
-	// is used or whether we are using overlay networking. We should return
-	// true for cloud providers if they implement Routes() interface and
-	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
-		return false
-	}
-	_, supported := kl.cloud.Routes()
-	return supported
-}
-
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR. Return true if pod CIDR is actually changed.
 func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
