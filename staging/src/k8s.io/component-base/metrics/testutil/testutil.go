@@ -30,6 +30,14 @@ import (
 // pedantic Registry. It then does the same as GatherAndCompare, gathering the
 // metrics from the pedantic Registry.
 func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...string) error {
+	lintProblems, err := testutil.CollectAndLint(c, metricNames...)
+	if err != nil {
+		return err
+	}
+	if err := getLintError(lintProblems); err != nil {
+		return err
+	}
+
 	return testutil.CollectAndCompare(c, expected, metricNames...)
 }
 
@@ -38,6 +46,14 @@ func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...s
 // exposition format. If any metricNames are provided, only metrics with those
 // names are compared.
 func GatherAndCompare(g metrics.Gatherer, expected io.Reader, metricNames ...string) error {
+	lintProblems, err := testutil.GatherAndLint(g, metricNames...)
+	if err != nil {
+		return err
+	}
+	if err := getLintError(lintProblems); err != nil {
+		return err
+	}
+
 	return testutil.GatherAndCompare(g, expected, metricNames...)
 }
 

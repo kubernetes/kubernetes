@@ -59,3 +59,46 @@ func TestLinter(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeProblems(t *testing.T) {
+	problemOne := Problem{
+		Metric: "metric_one",
+		Text:   "problem one",
+	}
+	problemTwo := Problem{
+		Metric: "metric_two",
+		Text:   "problem two",
+	}
+
+	var tests = []struct {
+		name     string
+		problems []Problem
+		expected string
+	}{
+		{
+			name:     "no problem",
+			problems: nil,
+			expected: "",
+		},
+		{
+			name:     "one problem",
+			problems: []Problem{problemOne},
+			expected: "metric_one:problem one",
+		},
+		{
+			name:     "more than one problem",
+			problems: []Problem{problemOne, problemTwo},
+			expected: "metric_one:problem one,metric_two:problem two",
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			got := mergeProblems(tc.problems)
+			if tc.expected != got {
+				t.Errorf("expected: %s, but got: %s", tc.expected, got)
+			}
+		})
+	}
+}
