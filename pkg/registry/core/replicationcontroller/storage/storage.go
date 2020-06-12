@@ -48,6 +48,7 @@ type ControllerStorage struct {
 	Scale      *ScaleREST
 }
 
+// NewStorage returns a RESTStorage object that will work against replication controllers.
 func NewStorage(optsGetter generic.RESTOptionsGetter) (ControllerStorage, error) {
 	controllerREST, statusREST, err := NewREST(optsGetter)
 	if err != nil {
@@ -61,6 +62,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (ControllerStorage, error)
 	}, nil
 }
 
+// REST implements a RESTStorage for replication controllers.
 type REST struct {
 	*genericregistry.Store
 }
@@ -111,6 +113,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new ReplicationController object.
 func (r *StatusREST) New() runtime.Object {
 	return &api.ReplicationController{}
 }
@@ -127,6 +130,7 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// ScaleREST implements a scale for replication controllers.
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -135,6 +139,7 @@ type ScaleREST struct {
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
+// GroupVersionKind returns GroupVersionKind for ReplicationController Scale object.
 func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	switch containingGV {
 	case extensionsv1beta1.SchemeGroupVersion:
@@ -149,6 +154,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
+// Get retrieves object from Scale storage.
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
@@ -158,6 +164,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scaleFromRC(rc), nil
 }
 
+// Update alters scale subset of ReplicationController object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, _, err := r.store.Update(
 		ctx,
