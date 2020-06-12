@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/pkg/errors"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -167,29 +166,20 @@ func (c *crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVe
 		return nil, runtime.NewNotRegisteredErrForType(target.Identifier(), reflect.TypeOf(in))
 	}
 	if !c.validVersions[toGVK.GroupVersion()] {
-		return nil, errors.Wrap(
-			runtime.NewInvalidGroupVersionError(toGVK.GroupVersion()),
-			"request to convert CR to group/version",
-		)
+		return nil, runtime.NewNotRegisteredErrForKind(target.Identifier(), toGVK)
 	}
 	// Note that even if the request is for a list, the GV of the request UnstructuredList is what
 	// is expected to convert to. As mentioned in the function's document, it is not expected to
 	// get a v1.List.
 	if !c.validVersions[fromGVK.GroupVersion()] {
-		return nil, errors.Wrap(
-			runtime.NewInvalidGroupVersionError(fromGVK.GroupVersion()),
-			"request to convert CR from group/version",
-		)
+		return nil, runtime.NewNotRegisteredErrForKind(target.Identifier(), fromGVK)
 	}
 	// Check list item's apiVersion
 	if list, ok := in.(*unstructured.UnstructuredList); ok {
 		for i := range list.Items {
 			expectedGV := list.Items[i].GroupVersionKind().GroupVersion()
 			if !c.validVersions[expectedGV] {
-				return nil, errors.Wrapf(
-					runtime.NewInvalidGroupVersionError(expectedGV),
-					"request to convert CR list failed at index %d", i,
-				)
+				return nil, runtime.NewNotRegisteredErrForKind(target.Identifier(), list.Items[i].GroupVersionKind())
 			}
 		}
 	}

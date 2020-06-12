@@ -70,7 +70,7 @@ func TestConversion(t *testing.T) {
 					"other":      "data",
 				},
 			},
-			ExpectedFailure: "invalid group/version: example.com/v3",
+			ExpectedFailure: "no version \"example.com/v3\" has been registered in scheme \"[example.com/v3]\"",
 		},
 		{
 			Name:          "simple_list_conversion",
@@ -150,7 +150,7 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			ExpectedFailure: "invalid group/version: example.com/v3",
+			ExpectedFailure: "no kind \"foo\" is registered for version \"example.com/v3\" in scheme \"[example.com/v2]\"",
 		},
 		{
 			Name:          "empty_object",
