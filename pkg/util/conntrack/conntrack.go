@@ -42,11 +42,57 @@ func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
 	return parameters
 }
 
+// Clearer is an interface to delete conntrack entries
+type Clearer interface {
+	// Exists returns true if conntrack binary is installed.
+	Exists() bool
+	// ClearEntriesForIP delete conntrack entries by the destination IP and protocol
+	ClearEntriesForIP(ip string, protocol v1.Protocol) error
+	// ClearEntriesForPort delete conntrack entries by the destination Port and protocol
+	ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error
+	// ClearEntriesForNAT delete conntrack entries by the NAT source and destination IP and protocol
+	ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error
+	// ClearEntriesForPortNAT delete conntrack entries by the NAT destination IP and Port and protocol
+	ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error
+}
+
+type conntrack struct {
+	execer exec.Interface
+}
+
+var _ Clearer = conntrack{}
+
+// NewClearer will create a new Conntrack Clearer
+func NewClearer(exec exec.Interface) Clearer {
+	return &conntrack{
+		execer: exec,
+	}
+}
+
+// Exec executes the conntrack tool using the given parameters
+func (ct conntrack) exec(parameters ...string) error {
+	conntrackPath, err := ct.execer.LookPath("conntrack")
+	if err != nil {
+		return fmt.Errorf("error looking for path of conntrack: %v", err)
+	}
+	output, err := ct.execer.Command(conntrackPath, parameters...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("conntrack command returned: %q, error message: %s", string(output), err)
+	}
+	return nil
+}
+
+// Exists returns true if conntrack binary is installed.
+func (ct conntrack) Exists() bool {
+	_, err := ct.execer.LookPath("conntrack")
+	return err == nil
+}
+
 // ClearEntriesForIP uses the conntrack tool to delete the conntrack entries
 // for the UDP connections specified by the given service IP
-func ClearEntriesForIP(execer exec.Interface, ip string, protocol v1.Protocol) error {
+func (ct conntrack) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(utilnet.IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
-	err := Exec(execer, parameters...)
+	err := ct.exec(parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
@@ -56,37 +102,18 @@ func ClearEntriesForIP(execer exec.Interface, ip string, protocol v1.Protocol) e
 	return nil
 }
 
-// Exec executes the conntrack tool using the given parameters
-func Exec(execer exec.Interface, parameters ...string) error {
-	conntrackPath, err := execer.LookPath("conntrack")
-	if err != nil {
-		return fmt.Errorf("error looking for path of conntrack: %v", err)
-	}
-	output, err := execer.Command(conntrackPath, parameters...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("conntrack command returned: %q, error message: %s", string(output), err)
-	}
-	return nil
-}
-
-// Exists returns true if conntrack binary is installed.
-func Exists(execer exec.Interface) bool {
-	_, err := execer.LookPath("conntrack")
-	return err == nil
-}
-
 // ClearEntriesForPort uses the conntrack tool to delete the conntrack entries
 // for connections specified by the port.
 // When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
 // The solution is clearing the conntrack. Known issues:
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
-func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
+func (ct conntrack) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
 	}
 	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
-	err := Exec(execer, parameters...)
+	err := ct.exec(parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
 	}
@@ -95,10 +122,10 @@ func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol 
 
 // ClearEntriesForNAT uses the conntrack tool to delete the conntrack entries
 // for connections specified by the {origin, dest} IP pair.
-func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.Protocol) error {
+func (ct conntrack) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(utilnet.IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
 		"-p", protoStr(protocol))
-	err := Exec(execer, parameters...)
+	err := ct.exec(parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
@@ -112,12 +139,12 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 // for connections specified by the {dest IP, port} pair.
 // Known issue:
 // https://github.com/kubernetes/kubernetes/issues/59368
-func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protocol v1.Protocol) error {
+func (ct conntrack) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("Wrong port number. The port number must be greater then zero")
 	}
 	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
-	err := Exec(execer, parameters...)
+	err := ct.exec(parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		return fmt.Errorf("error deleting conntrack entries for %s port: %d, error: %v", protoStr(protocol), port, err)
 	}

@@ -61,8 +61,12 @@ func TestExecConntrackTool(t *testing.T) {
 
 	expectErr := []bool{false, false, true}
 
+	ct := conntrack{
+		execer: &fexec,
+	}
+
 	for i := range testCases {
-		err := Exec(&fexec, testCases[i]...)
+		err := ct.exec(testCases[i]...)
 
 		if expectErr[i] {
 			if err == nil {
@@ -104,6 +108,8 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 
+	ct := NewClearer(&fexec)
+
 	testCases := []struct {
 		name string
 		ip   string
@@ -116,7 +122,7 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 
 	svcCount := 0
 	for _, tc := range testCases {
-		if err := ClearEntriesForIP(&fexec, tc.ip, v1.ProtocolUDP); err != nil {
+		if err := ct.ClearEntriesForIP(tc.ip, v1.ProtocolUDP); err != nil {
 			t.Errorf("%s test case:, Unexpected error: %v", tc.name, err)
 		}
 		expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", tc.ip) + familyParamStr(utilnet.IsIPv6String(tc.ip))
@@ -150,6 +156,8 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 
+	ct := NewClearer(&fexec)
+
 	testCases := []struct {
 		name   string
 		port   int
@@ -161,7 +169,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 	}
 	svcCount := 0
 	for _, tc := range testCases {
-		err := ClearEntriesForPort(&fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
+		err := ct.ClearEntriesForPort(tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: Unexpected error: %v", tc.name, err)
 		}
@@ -203,6 +211,8 @@ func TestDeleteConnections(t *testing.T) {
 		},
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
+
+	ct := NewClearer(&fexec)
 
 	testCases := []struct {
 		name   string
@@ -249,7 +259,7 @@ func TestDeleteConnections(t *testing.T) {
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearEntriesForNAT(&fexec, tc.origin, tc.dest, tc.proto)
+		err := ct.ClearEntriesForNAT(tc.origin, tc.dest, tc.proto)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}
@@ -279,6 +289,8 @@ func TestClearConntrackForPortNAT(t *testing.T) {
 		},
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
+	ct := NewClearer(&fexec)
+
 	testCases := []struct {
 		name  string
 		port  int
@@ -300,7 +312,7 @@ func TestClearConntrackForPortNAT(t *testing.T) {
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearEntriesForPortNAT(&fexec, tc.dest, tc.port, tc.proto)
+		err := ct.ClearEntriesForPortNAT(tc.dest, tc.port, tc.proto)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}
