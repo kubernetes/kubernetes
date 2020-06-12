@@ -17,7 +17,9 @@ limitations under the License.
 package testutil
 
 import (
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
 )
@@ -28,14 +30,26 @@ import (
 // We setup this list for allow and not fail on the current violations.
 // Generally speaking, you need to fix the problem for a new metric rather than add it into the list.
 var exceptionMetrics = []string{
+	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/egressselector
+	"apiserver_egress_dialer_dial_failure_count", // counter metrics should have "_total" suffix
+
+	// k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset
+	"apiserver_flowcontrol_current_inqueue_requests",   // label names should be written in 'snake_case' not 'camelCase',
+	"apiserver_flowcontrol_current_executing_requests", // label names should be written in 'snake_case' not 'camelCase'
+	"apiserver_flowcontrol_rejected_requests_total",    // label names should be written in 'snake_case' not 'camelCase'
+
+	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/healthz
+	"apiserver_request_total", // label names should be written in 'snake_case' not 'camelCase'
+
+	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/filters
+	"authenticated_user_requests", // counter metrics should have "_total" suffix
+	"authentication_attempts",     // counter metrics should have "_total" suffix
+
 	// kube-apiserver
 	"aggregator_openapi_v2_regeneration_count",
 	"apiserver_admission_step_admission_duration_seconds_summary",
 	"apiserver_current_inflight_requests",
 	"apiserver_longrunning_gauge",
-	"apiserver_request_total",
-	"authenticated_user_requests",
-	"authentication_attempts",
 	"get_token_count",
 	"get_token_fail_count",
 	"ssh_tunnel_open_count",
@@ -49,13 +63,21 @@ var exceptionMetrics = []string{
 	"get_token_fail_count",
 	"node_collector_evictions_number",
 
-	// kubelet-resource-v1alpha1
-	"container_cpu_usage_seconds_total",
-	"node_cpu_usage_seconds_total",
+	// k8s.io/kubernetes/pkg/kubelet/server/stats
+	"container_cpu_usage_seconds_total", // non-counter metrics should not have "_total" suffix
+	"node_cpu_usage_seconds_total",      // non-counter metrics should not have "_total" suffix
+
+	// k8s.io/kubernetes/pkg/kubelet/pleg
+	"kubelet_running_container_count", // non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_running_pod_count",       // non-histogram and non-summary metrics should not have "_count" suffix
 }
 
 // A Problem is an issue detected by a Linter.
 type Problem promlint.Problem
+
+func (p *Problem) String() string {
+	return fmt.Sprintf("%s:%s", p.Metric, p.Text)
+}
 
 // A Linter is a Prometheus metrics linter.  It identifies issues with metric
 // names, types, and metadata, and reports them to the caller.
@@ -100,4 +122,43 @@ func NewPromLinter(r io.Reader) *Linter {
 	return &Linter{
 		promLinter: promlint.New(r),
 	}
+}
+
+func mergeProblems(problems []Problem) string {
+	var problemsMsg []string
+
+	for index := range problems {
+		problemsMsg = append(problemsMsg, problems[index].String())
+	}
+
+	return strings.Join(problemsMsg, ",")
+}
+
+// shouldIgnore returns true if metric in the exception list, otherwise returns false.
+func shouldIgnore(metricName string) bool {
+	for i := range exceptionMetrics {
+		if metricName == exceptionMetrics[i] {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getLintError will ignore the metrics in exception list and converts lint problem to error.
+func getLintError(problems []promlint.Problem) error {
+	var filteredProblems []Problem
+	for _, problem := range problems {
+		if shouldIgnore(problem.Metric) {
+			continue
+		}
+
+		filteredProblems = append(filteredProblems, Problem(problem))
+	}
+
+	if len(filteredProblems) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("lint error: %s", mergeProblems(filteredProblems))
 }
