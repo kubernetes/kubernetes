@@ -3961,6 +3961,7 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 	})
 
 	ginkgo.It("should create a Pod with SCTP HostPort", func() {
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		ginkgo.By("checking whether kubenet is used")
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
