@@ -51,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -198,15 +197,15 @@ type Proxier struct {
 	syncPeriod           time.Duration
 
 	// These are effectively const and do not need the mutex to be held.
-	iptables       utiliptables.Interface
-	masqueradeAll  bool
-	masqueradeMark string
-	exec           utilexec.Interface
-	localDetector  proxyutiliptables.LocalTrafficDetector
-	hostname       string
-	nodeIP         net.IP
-	portMapper     utilproxy.PortOpener
-	recorder       record.EventRecorder
+	iptables         utiliptables.Interface
+	masqueradeAll    bool
+	masqueradeMark   string
+	conntrackClearer conntrack.Clearer
+	localDetector    proxyutiliptables.LocalTrafficDetector
+	hostname         string
+	nodeIP           net.IP
+	portMapper       utilproxy.PortOpener
+	recorder         record.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -255,8 +254,8 @@ var _ proxy.Provider = &Proxier{}
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
 func NewProxier(ipt utiliptables.Interface,
+	ct conntrack.Clearer,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -305,7 +304,7 @@ func NewProxier(ipt utiliptables.Interface,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
-		exec:                     exec,
+		conntrackClearer:         ct,
 		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
@@ -348,8 +347,8 @@ func NewProxier(ipt utiliptables.Interface,
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
 	ipt [2]utiliptables.Interface,
+	ct conntrack.Clearer,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -363,15 +362,15 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, false)
-	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
+	ipv4Proxier, err := NewProxier(ipt[0], ct, sysctl,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
 		nodeIP[0], recorder, healthzServer, nodePortAddresses4)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
+	ipv6Proxier, err := NewProxier(ipt[1], ct, sysctl,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
 		nodeIP[1], recorder, healthzServer, nodePortAddresses6)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -753,21 +752,21 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			svcProto := svcInfo.Protocol()
 			var err error
 			if nodePort != 0 {
-				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
+				err = proxier.conntrackClearer.ClearEntriesForPortNAT(endpointIP, nodePort, svcProto)
 			} else {
-				err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
+				err = proxier.conntrackClearer.ClearEntriesForNAT(svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			}
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
+				err := proxier.conntrackClearer.ClearEntriesForNAT(extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
+				err := proxier.conntrackClearer.ClearEntriesForNAT(lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}
@@ -1258,7 +1257,7 @@ func (proxier *Proxier) syncProxyRules() {
 						// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
 						// This only affects UDP connections, which are not common.
 						// See issue: https://github.com/kubernetes/kubernetes/issues/49881
-						err := conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
+						err := proxier.conntrackClearer.ClearEntriesForPort(lp.Port, isIPv6, v1.ProtocolUDP)
 						if err != nil {
 							klog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.Port, err)
 						}
@@ -1610,7 +1609,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
 	for _, svcIP := range staleServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+		if err := proxier.conntrackClearer.ClearEntriesForIP(svcIP, v1.ProtocolUDP); err != nil {
 			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}

@@ -44,10 +44,9 @@ import (
 	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
+	conntracktest "k8s.io/kubernetes/pkg/util/conntrack/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -232,33 +231,12 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		},
 	}
 
-	// Create a fake executor for the conntrack utility. This should only be
-	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
-	fcmd := fakeexec.FakeCmd{}
-	fexec := fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
-	}
-	execFunc := func(cmd string, args ...string) exec.Cmd {
-		return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
-	}
-	for _, tc := range testCases {
-		if conntrack.IsClearConntrackNeeded(tc.protocol) {
-			var cmdOutput string
-			var simErr error
-			if tc.simulatedErr == "" {
-				cmdOutput = "1 flow entries have been deleted"
-			} else {
-				simErr = fmt.Errorf(tc.simulatedErr)
-			}
-			cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, simErr }
-			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
-			fexec.CommandScript = append(fexec.CommandScript, execFunc)
-		}
-	}
-
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt, false)
-	fp.exec = &fexec
+	// Create a fake conntrack clearer. This should only be
+	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
+	ct := conntracktest.NewFakeClearer()
+	fp.conntrackClearer = ct
 
 	for _, tc := range testCases {
 		makeServiceMap(fp,
@@ -278,7 +256,6 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 	// Run the test cases
 	for _, tc := range testCases {
-		priorExecs := fexec.CommandCalls
 		priorGlogErrs := klog.Stats.Error.Lines()
 
 		svc := proxy.ServicePortName{
@@ -293,33 +270,19 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			},
 		}
 
-		fp.deleteEndpointConnections(input)
-
-		// For UDP and SCTP connections, check the executed conntrack command
-		var expExecs int
+		// For UDP and SCTP connections, add the flow to the FakeConntrackClearer
 		if conntrack.IsClearConntrackNeeded(tc.protocol) {
-			isIPv6 := func(ip string) bool {
-				netIP := net.ParseIP(ip)
-				return netIP.To4() == nil
-			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
-			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p %s", tc.svcIP, endpointIP, strings.ToLower(string((tc.protocol))))
-			if isIPv6(endpointIP) {
-				expectCommand += " -f ipv6"
+			ct.Proto = tc.protocol
+			ct.OrigDstIP = tc.svcIP
+			ct.OrigDstPort = int(tc.svcPort)
+			ct.NatDstIP = endpointIP
+			if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
+				klog.Errorf(tc.simulatedErr)
 			}
-			actualCommand := strings.Join(fcmd.CombinedOutputLog[fexec.CommandCalls-1], " ")
-			if actualCommand != expectCommand {
-				t.Errorf("%s: Expected command: %s, but executed %s", tc.description, expectCommand, actualCommand)
-			}
-			expExecs = 1
 		}
 
-		// Check the number of times conntrack was executed
-		execs := fexec.CommandCalls - priorExecs
-		if execs != expExecs {
-			t.Errorf("%s: Expected conntrack to be executed %d times, but got %d", tc.description, expExecs, execs)
-		}
-
+		fp.deleteEndpointConnections(input)
 		// Check the number of new glog errors
 		var expGlogErrs int64
 		if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
@@ -351,7 +314,6 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 	// invocation into a Run() method.
 	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", ipt)
 	p := &Proxier{
-		exec:                     &fakeexec.FakeExec{},
 		serviceMap:               make(proxy.ServiceMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
