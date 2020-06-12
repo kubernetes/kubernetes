@@ -95,6 +95,8 @@ export KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 
 # Default container runtime
 export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
+# Default container runtime for windows
+export WINDOWS_CONTAINER_RUNTIME=${KUBE_WINDOWS_CONTAINER_RUNTIME:-docker}
 
 # Set default values with override
 if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
