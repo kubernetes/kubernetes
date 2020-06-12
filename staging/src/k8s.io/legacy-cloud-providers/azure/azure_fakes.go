@@ -89,7 +89,7 @@ func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 	az.nsgCache, _ = az.newNSGCache()
 	az.rtCache, _ = az.newRouteTableCache()
 
-	common := &controllerCommon{cloud: az}
+	common := &controllerCommon{cloud: az, resourceGroup: "rg", location: "westus"}
 	az.controllerCommon = common
 	az.ManagedDiskController = &ManagedDiskController{common: common}
 
