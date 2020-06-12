@@ -51,24 +51,26 @@ type HostPortManager interface {
 }
 
 type hostportManager struct {
-	hostPortMap    map[hostport]closeable
-	execer         exec.Interface
-	conntrackFound bool
-	iptables       utiliptables.Interface
-	portOpener     hostportOpener
-	mu             sync.Mutex
+	hostPortMap      map[hostport]closeable
+	conntrackClearer conntrack.Clearer
+	iptables         utiliptables.Interface
+	portOpener       hostportOpener
+	mu               sync.Mutex
 }
 
 func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
-	h := &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
-		execer:      exec.New(),
-		iptables:    iptables,
-		portOpener:  openLocalPort,
+	execer := exec.New()
+	ct := conntrack.NewClearer(execer)
+
+	if !ct.Exists() {
+		klog.Warningf("The conntrack binary is not installed, this can cause failures in network connection cleanup.")
 	}
-	h.conntrackFound = conntrack.Exists(h.execer)
-	if !h.conntrackFound {
-		klog.Warningf("The binary conntrack is not installed, this can cause failures in network connection cleanup.")
+
+	h := &hostportManager{
+		hostPortMap:      make(map[hostport]closeable),
+		conntrackClearer: ct,
+		iptables:         iptables,
+		portOpener:       openLocalPort,
 	}
 	return h
 }
@@ -181,10 +183,10 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	// the IP tables rule, it can be the case that the packets received by the node after iptables rule removal will
 	// create a new conntrack entry without any DNAT. That will result in blackhole of the traffic even after correct
 	// iptables rules have been added back.
-	if hm.execer != nil && hm.conntrackFound {
+	if hm.conntrackClearer.Exists() {
 		klog.Infof("Starting to delete udp conntrack entries: %v, isIPv6 - %v", conntrackPortsToRemove, isIPv6)
 		for _, port := range conntrackPortsToRemove {
-			err = conntrack.ClearEntriesForPort(hm.execer, port, isIPv6, v1.ProtocolUDP)
+			err = hm.conntrackClearer.ClearEntriesForPort(port, isIPv6, v1.ProtocolUDP)
 			if err != nil {
 				klog.Errorf("Failed to clear udp conntrack for port %d, error: %v", port, err)
 			}

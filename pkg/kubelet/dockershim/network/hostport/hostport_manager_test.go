@@ -26,8 +26,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	conntracktest "k8s.io/kubernetes/pkg/util/conntrack/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	"k8s.io/utils/exec"
 )
 
 func TestOpenCloseHostports(t *testing.T) {
@@ -100,10 +100,10 @@ func TestOpenCloseHostports(t *testing.T) {
 	iptables := NewFakeIPTables()
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
-		iptables:    iptables,
-		portOpener:  portOpener.openFakeSocket,
-		execer:      exec.New(),
+		hostPortMap:      make(map[hostport]closeable),
+		conntrackClearer: conntracktest.NewFakeClearer(),
+		iptables:         iptables,
+		portOpener:       portOpener.openFakeSocket,
 	}
 
 	for _, tc := range openPortCases {
@@ -183,10 +183,10 @@ func TestHostportManager(t *testing.T) {
 	iptables := NewFakeIPTables()
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
-		iptables:    iptables,
-		portOpener:  portOpener.openFakeSocket,
-		execer:      exec.New(),
+		hostPortMap:      make(map[hostport]closeable),
+		conntrackClearer: conntracktest.NewFakeClearer(),
+		iptables:         iptables,
+		portOpener:       portOpener.openFakeSocket,
 	}
 
 	testCases := []struct {
@@ -392,10 +392,10 @@ func TestHostportManagerIPv6(t *testing.T) {
 	iptables.protocol = utiliptables.ProtocolIPv6
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
-		iptables:    iptables,
-		portOpener:  portOpener.openFakeSocket,
-		execer:      exec.New(),
+		hostPortMap:      make(map[hostport]closeable),
+		conntrackClearer: conntracktest.NewFakeClearer(),
+		iptables:         iptables,
+		portOpener:       portOpener.openFakeSocket,
 	}
 
 	testCases := []struct {
