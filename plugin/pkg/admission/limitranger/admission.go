@@ -35,10 +35,12 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -459,11 +461,13 @@ func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) b
 		return false
 	}
 
-	// Since containers and initContainers cannot currently be added, removed, or updated, it is unnecessary
-	// to mutate and validate limitrange on pod updates. Trying to mutate containers or initContainers on a pod
-	// update request will always fail pod validation because those fields are immutable once the object is created.
-	if a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
-		return false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// Since containers and initContainers cannot currently be added, removed, or updated, it is unnecessary
+		// to mutate and validate limitrange on pod updates. Trying to mutate containers or initContainers on a pod
+		// update request will always fail pod validation because those fields are immutable once the object is created.
+		if a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
+			return false
+		}
 	}
 
 	return a.GetKind().GroupKind() == api.Kind("Pod") || a.GetKind().GroupKind() == api.Kind("PersistentVolumeClaim")
