@@ -223,18 +223,18 @@ type Proxier struct {
 	// Values are CIDR's to exclude when cleaning up IPVS rules.
 	excludeCIDRs []*net.IPNet
 	// Set to true to set sysctls arp_ignore and arp_announce
-	strictARP      bool
-	iptables       utiliptables.Interface
-	ipvs           utilipvs.Interface
-	ipset          utilipset.Interface
-	exec           utilexec.Interface
-	masqueradeAll  bool
-	masqueradeMark string
-	localDetector  proxyutiliptables.LocalTrafficDetector
-	hostname       string
-	nodeIP         net.IP
-	portMapper     utilproxy.PortOpener
-	recorder       record.EventRecorder
+	strictARP        bool
+	iptables         utiliptables.Interface
+	ipvs             utilipvs.Interface
+	ipset            utilipset.Interface
+	conntrackClearer conntrack.Clearer
+	masqueradeAll    bool
+	masqueradeMark   string
+	localDetector    proxyutiliptables.LocalTrafficDetector
+	hostname         string
+	nodeIP           net.IP
+	portMapper       utilproxy.PortOpener
+	recorder         record.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -324,10 +324,10 @@ func parseExcludedCIDRs(excludeCIDRs []string) []*net.IPNet {
 // Once a proxier is created, it will keep iptables and ipvs rules up to date in the background and
 // will not terminate if a particular iptables or ipvs call fails.
 func NewProxier(ipt utiliptables.Interface,
+	ct conntrack.Clearer,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
@@ -450,7 +450,7 @@ func NewProxier(ipt utiliptables.Interface,
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
-		exec:                  exec,
+		conntrackClearer:      ct,
 		localDetector:         localDetector,
 		hostname:              hostname,
 		nodeIP:                nodeIP,
@@ -489,10 +489,10 @@ func NewProxier(ipt utiliptables.Interface,
 // NewDualStackProxier returns a new Proxier for dual-stack operation
 func NewDualStackProxier(
 	ipt [2]utiliptables.Interface,
+	ct conntrack.Clearer,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
@@ -517,8 +517,8 @@ func NewDualStackProxier(
 	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, false)
 
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
+	ipv4Proxier, err := NewProxier(ipt[0], ct, ipvs, safeIpset, sysctl,
+		syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
 		recorder, healthzServer, scheduler, nodePortAddresses4, kernelHandler)
@@ -526,8 +526,8 @@ func NewDualStackProxier(
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ipt[1], ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
+	ipv6Proxier, err := NewProxier(ipt[1], ct, ipvs, safeIpset, sysctl,
+		syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
 		nil, nil, scheduler, nodePortAddresses6, kernelHandler)
@@ -1435,7 +1435,7 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					if lp.Protocol == "udp" {
-						conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
+						proxier.conntrackClearer.ClearEntriesForPort(lp.Port, isIPv6, v1.ProtocolUDP)
 					}
 					replacementPortsMap[lp] = socket
 				} // We're holding the port, so it's OK to install ipvs rules.
@@ -1632,7 +1632,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
 	for _, svcIP := range staleServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+		if err := proxier.conntrackClearer.ClearEntriesForIP(svcIP, v1.ProtocolUDP); err != nil {
 			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}
@@ -1901,18 +1901,18 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
 			svcProto := svcInfo.Protocol()
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
+			err := proxier.conntrackClearer.ClearEntriesForNAT(svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
+				err := proxier.conntrackClearer.ClearEntriesForNAT(extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
+				err := proxier.conntrackClearer.ClearEntriesForNAT(lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}

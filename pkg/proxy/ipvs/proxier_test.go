@@ -43,14 +43,14 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
+	conntracktest "k8s.io/kubernetes/pkg/util/conntrack/testing"
+
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	ipsettest "k8s.io/kubernetes/pkg/util/ipset/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	ipvstest "k8s.io/kubernetes/pkg/util/ipvs/testing"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -101,26 +101,14 @@ func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 }
 
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet, endpointSlicesEnabled bool) *Proxier {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return []byte("dummy device have been created"), nil, nil },
-			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
-		},
-	}
-	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
-	}
+
 	// initialize ipsetList with all sets we needed
 	ipsetList := make(map[string]*IPSet)
 	for _, is := range ipsetInfo {
 		ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, false, is.comment)
 	}
 	p := &Proxier{
-		exec:                  fexec,
+		conntrackClearer:      conntracktest.NewFakeClearer(),
 		serviceMap:            make(proxy.ServiceMap),
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
