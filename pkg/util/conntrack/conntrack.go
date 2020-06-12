@@ -64,9 +64,30 @@ func getProtocolNumber(proto v1.Protocol) uint8 {
 	return 0
 }
 
-// ClearEntriesForIP uses the conntrack tool to delete the conntrack entries
-// for the UDP connections specified by the given service IP
-func ClearEntriesForIP(ip string, protocol v1.Protocol) error {
+// Clearer is an interface to delete conntrack entries
+type Clearer interface {
+	// ClearEntriesForIP delete conntrack entries by the destination IP and protocol
+	ClearEntriesForIP(ip string, protocol v1.Protocol) error
+	// ClearEntriesForPort delete conntrack entries by the destination Port and protocol
+	ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error
+	// ClearEntriesForNAT delete conntrack entries by the NAT source and destination IP and protocol
+	ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error
+	// ClearEntriesForPortNAT delete conntrack entries by the NAT destination IP and Port and protocol
+	ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error
+}
+
+type conntrack struct{}
+
+var _ Clearer = conntrack{}
+
+// NewClearer will create a new Conntrack Clearer
+func NewClearer() Clearer {
+	return &conntrack{}
+}
+
+// ClearEntriesForIP delete the conntrack entries for the connections
+// specified by the given service IP and protocol
+func (conntrack) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
 	filter := &conntrackFilter{}
 	filter.addIP(conntrackOrigDstIP, net.ParseIP(ip))
 	filter.addProtocol(getProtocolNumber(protocol))
@@ -90,7 +111,7 @@ func ClearEntriesForIP(ip string, protocol v1.Protocol) error {
 // The solution is clearing the conntrack. Known issues:
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
-func ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
+func (conntrack) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
 	}
@@ -112,7 +133,7 @@ func ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
 
 // ClearEntriesForNAT uses the conntrack tool to delete the conntrack entries
 // for connections specified by the {origin, dest} IP pair.
-func ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
+func (conntrack) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
 	filter := &conntrackFilter{}
 	filter.addIP(netlink.ConntrackOrigDstIP, net.ParseIP(origin))
 	filter.addIP(netlink.ConntrackReplyDstIP, net.ParseIP(dest))
@@ -136,7 +157,7 @@ func ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
 // for connections specified by the {dest IP, port} pair.
 // Known issue:
 // https://github.com/kubernetes/kubernetes/issues/59368
-func ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
+func (conntrack) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("Wrong port number. The port number must be greater then zero")
 	}

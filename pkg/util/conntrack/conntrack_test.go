@@ -27,6 +27,8 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+var ct conntrack
+
 func createUDPConnection(t *testing.T, srcIP, srcPort, dstIP, dstPort string) {
 	laddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(srcIP, srcPort))
 	if err != nil {
@@ -92,7 +94,7 @@ func TestClearEntriesForIP(t *testing.T) {
 			t.Errorf("Found %d flows, expected 1 flow for %v", found, tc)
 		}
 
-		if err := ClearEntriesForIP(tc.dstIP, v1.ProtocolUDP); err != nil {
+		if err := ct.ClearEntriesForIP(tc.dstIP, v1.ProtocolUDP); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -164,7 +166,7 @@ func TestClearEntriesForPort(t *testing.T) {
 		}
 
 		isIPv6 := utilnet.IsIPv6String(tc.dstIP)
-		if err := ClearEntriesForPort(tc.dstPort, isIPv6, v1.ProtocolUDP); err != nil {
+		if err := ct.ClearEntriesForPort(tc.dstPort, isIPv6, v1.ProtocolUDP); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -236,7 +238,7 @@ func TestClearEntriesForNAT(t *testing.T) {
 		}
 
 		// swap source and destination IP as in NAT we look in the reverse flow
-		if err := ClearEntriesForNAT(tc.dstIP, tc.srcIP, v1.ProtocolUDP); err != nil {
+		if err := ct.ClearEntriesForNAT(tc.dstIP, tc.srcIP, v1.ProtocolUDP); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -307,7 +309,7 @@ func TestClearConntrackForPortNAT(t *testing.T) {
 		}
 
 		// swap source and destination IP as in NAT we look in the reverse flow
-		if err := ClearEntriesForPortNAT(tc.srcIP, 5000, v1.ProtocolUDP); err != nil {
+		if err := ct.ClearEntriesForPortNAT(tc.srcIP, 5000, v1.ProtocolUDP); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
