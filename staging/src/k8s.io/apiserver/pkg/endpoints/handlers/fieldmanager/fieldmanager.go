@@ -34,6 +34,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+var atMostEverySecond = internal.NewAtMostEvery(time.Second)
+
 // FieldManager updates the managed fields and merge applied
 // configurations.
 type FieldManager struct {
@@ -108,7 +110,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	if err != nil || len(managed.Fields) == 0 {
 		managed, err = internal.DecodeObjectManagedFields(liveObj)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
+			managed = internal.NewEmptyManaged()
 		}
 	}
 	// if managed field is still empty, skip updating managed fields altogether
@@ -170,6 +172,25 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	}
 
 	return newObj, nil
+}
+
+// UpdateNoErrors is the same as Update, but it will not return
+// errors. If an error happens, the object is returned with
+// managedFields cleared.
+func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager string) runtime.Object {
+	obj, err := f.Update(liveObj, newObj, manager)
+	if err != nil {
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to update managedFields for %v: %v",
+				newObj.GetObjectKind().GroupVersionKind(),
+				err)
+		})
+		// Explicitly remove managedFields on failure, so that
+		// we can't have garbage in it.
+		internal.RemoveObjectManagedFields(newObj)
+		return newObj
+	}
+	return obj
 }
 
 // Apply is used when server-side apply is called, as it merges the
