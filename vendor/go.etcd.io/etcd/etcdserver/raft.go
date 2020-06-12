@@ -231,12 +231,26 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					r.transport.Send(r.processMessages(rd.Messages))
 				}
 
+				// Must save the snapshot file and WAL snapshot entry before saving any other entries or hardstate to
+				// ensure that recovery after a snapshot restore is possible.
+				if !raft.IsEmptySnap(rd.Snapshot) {
+					// gofail: var raftBeforeSaveSnap struct{}
+					if err := r.storage.SaveSnap(rd.Snapshot); err != nil {
+						if r.lg != nil {
+							r.lg.Fatal("failed to save Raft snapshot", zap.Error(err))
+						} else {
+							plog.Fatalf("failed to save Raft snapshot %v", err)
+						}
+					}
+					// gofail: var raftAfterSaveSnap struct{}
+				}
+
 				// gofail: var raftBeforeSave struct{}
 				if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
 					if r.lg != nil {
 						r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
 					} else {
-						plog.Fatalf("raft save state and entries error: %v", err)
+						plog.Fatalf("failed to save state and entries error: %v", err)
 					}
 				}
 				if !raft.IsEmptyHardState(rd.HardState) {
@@ -245,18 +259,22 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 				// gofail: var raftAfterSave struct{}
 
 				if !raft.IsEmptySnap(rd.Snapshot) {
-					// gofail: var raftBeforeSaveSnap struct{}
-					if err := r.storage.SaveSnap(rd.Snapshot); err != nil {
+					// Force WAL to fsync its hard state before Release() releases
+					// old data from the WAL. Otherwise could get an error like:
+					// panic: tocommit(107) is out of range [lastIndex(84)]. Was the raft log corrupted, truncated, or lost?
+					// See https://github.com/etcd-io/etcd/issues/10219 for more details.
+					if err := r.storage.Sync(); err != nil {
 						if r.lg != nil {
-							r.lg.Fatal("failed to save Raft snapshot", zap.Error(err))
+							r.lg.Fatal("failed to sync Raft snapshot", zap.Error(err))
 						} else {
-							plog.Fatalf("raft save snapshot error: %v", err)
+							plog.Fatalf("failed to sync Raft snapshot %v", err)
 						}
 					}
+
 					// etcdserver now claim the snapshot has been persisted onto the disk
 					notifyc <- struct{}{}
 
-					// gofail: var raftAfterSaveSnap struct{}
+					// gofail: var raftBeforeApplySnap struct{}
 					r.raftStorage.ApplySnapshot(rd.Snapshot)
 					if r.lg != nil {
 						r.lg.Info("applied incoming Raft snapshot", zap.Uint64("snapshot-index", rd.Snapshot.Metadata.Index))
@@ -264,6 +282,15 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 						plog.Infof("raft applied incoming snapshot at index %d", rd.Snapshot.Metadata.Index)
 					}
 					// gofail: var raftAfterApplySnap struct{}
+
+					if err := r.storage.Release(rd.Snapshot); err != nil {
+						if r.lg != nil {
+							r.lg.Fatal("failed to release Raft wal", zap.Error(err))
+						} else {
+							plog.Fatalf("failed to release Raft wal %v", err)
+						}
+					}
+					// gofail: var raftAfterWALRelease struct{}
 				}
 
 				r.raftStorage.Append(rd.Entries)

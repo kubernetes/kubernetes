@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "jwt.go",
+        "metrics.go",
         "nop.go",
         "options.go",
         "range_perm_cache.go",
@@ -17,6 +18,7 @@ go_library(
     deps = [
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/go.etcd.io/etcd/auth/authpb:go_default_library",
         "//vendor/go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/go.etcd.io/etcd/etcdserver/etcdserverpb:go_default_library",

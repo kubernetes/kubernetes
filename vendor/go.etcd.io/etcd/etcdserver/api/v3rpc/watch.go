@@ -259,9 +259,10 @@ func (sws *serverWatchStream) recvLoop() error {
 
 				select {
 				case sws.ctrlStream <- wr:
+					continue
 				case <-sws.closec:
+					return nil
 				}
-				return nil
 			}
 
 			filters := FiltersFromRequest(creq)
