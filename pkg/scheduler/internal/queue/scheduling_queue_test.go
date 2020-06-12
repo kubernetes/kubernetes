@@ -710,35 +710,22 @@ func TestUnschedulablePodsMap(t *testing.T) {
 }
 
 func TestSchedulingQueue_Close(t *testing.T) {
-	tests := []struct {
-		name        string
-		q           SchedulingQueue
-		expectedErr error
-	}{
-		{
-			name:        "PriorityQueue close",
-			q:           NewPriorityQueue(newDefaultQueueSort()),
-			expectedErr: fmt.Errorf(queueClosed),
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				pod, err := test.q.Pop()
-				if err.Error() != test.expectedErr.Error() {
-					t.Errorf("Expected err %q from Pop() if queue is closed, but got %q", test.expectedErr.Error(), err.Error())
-				}
-				if pod != nil {
-					t.Errorf("Expected pod nil from Pop() if queue is closed, but got: %v", pod)
-				}
-			}()
-			test.q.Close()
-			wg.Wait()
-		})
-	}
+	q := NewPriorityQueue(newDefaultQueueSort())
+	wantErr := fmt.Errorf(queueClosed)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pod, err := q.Pop()
+		if err.Error() != wantErr.Error() {
+			t.Errorf("Expected err %q from Pop() if queue is closed, but got %q", wantErr.Error(), err.Error())
+		}
+		if pod != nil {
+			t.Errorf("Expected pod nil from Pop() if queue is closed, but got: %v", pod)
+		}
+	}()
+	q.Close()
+	wg.Wait()
 }
 
 // TestRecentlyTriedPodsGoBack tests that pods which are recently tried and are
