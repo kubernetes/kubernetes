@@ -540,17 +540,6 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	kubelet.onRepeatedHeartbeatFailure = func() {
 		atomic.AddInt64(&failureCallbacks, 1)
 	}
-	kubelet.containerManager = &localCM{
-		ContainerManager: cm.NewStubContainerManager(),
-		allocatableReservation: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100e6, resource.BinarySI),
-		},
-		capacity: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(20e9, resource.BinarySI),
-		},
-	}
 
 	// should return an error, but not hang
 	assert.Error(t, kubelet.updateNodeStatus())
@@ -1073,10 +1062,8 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 
 			kubelet := testKubelet.kubelet
 			kubelet.kubeClient = nil // ensure only the heartbeat client is used
-			kubelet.containerManager = &localCM{ContainerManager: cm.NewStubContainerManager()}
 			kubelet.lastStatusReportTime = kubelet.clock.Now()
 			kubelet.nodeStatusReportFrequency = time.Hour
-			kubelet.machineInfo = &cadvisorapi.MachineInfo{}
 
 			// override test volumeManager
 			fakeVolumeManager := kubeletvolume.NewFakeVolumeManager(tc.existingVolumes)
@@ -1142,15 +1129,6 @@ func TestRegisterWithApiServer(t *testing.T) {
 	})
 
 	addNotImplatedReaction(kubeClient)
-
-	machineInfo := &cadvisorapi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	kubelet.machineInfo = machineInfo
 
 	done := make(chan struct{})
 	go func() {
@@ -1393,9 +1371,6 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 }
 
 func TestUpdateDefaultLabels(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
-
 	cases := []struct {
 		name         string
 		initialNode  *v1.Node
@@ -1688,24 +1663,19 @@ func TestUpdateDefaultLabels(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-
-		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
+		needsUpdate := updateDefaultLabels(tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
 	}
 }
 
 func TestReconcileHugePageResource(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
 	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
 	hugePageResourceName1Gi := v1.ResourceName("hugepages-1Gi")
 
 	cases := []struct {
 		name         string
-		testKubelet  *TestKubelet
 		initialNode  *v1.Node
 		existingNode *v1.Node
 		expectedNode *v1.Node
@@ -1713,7 +1683,6 @@ func TestReconcileHugePageResource(t *testing.T) {
 	}{
 		{
 			name:        "no update needed when all huge page resources are similar",
-			testKubelet: testKubelet,
 			needsUpdate: false,
 			initialNode: &v1.Node{
 				Status: v1.NodeStatus{
@@ -1771,7 +1740,6 @@ func TestReconcileHugePageResource(t *testing.T) {
 			},
 		}, {
 			name:        "update needed when new huge page resources is supported",
-			testKubelet: testKubelet,
 			needsUpdate: true,
 			initialNode: &v1.Node{
 				Status: v1.NodeStatus{
@@ -1827,7 +1795,6 @@ func TestReconcileHugePageResource(t *testing.T) {
 			},
 		}, {
 			name:        "update needed when huge page resource quantity has changed",
-			testKubelet: testKubelet,
 			needsUpdate: true,
 			initialNode: &v1.Node{
 				Status: v1.NodeStatus{
@@ -1879,7 +1846,6 @@ func TestReconcileHugePageResource(t *testing.T) {
 			},
 		}, {
 			name:        "update needed when a huge page resources is no longer supported",
-			testKubelet: testKubelet,
 			needsUpdate: true,
 			initialNode: &v1.Node{
 				Status: v1.NodeStatus{
@@ -1936,10 +1902,7 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(T *testing.T) {
-			defer testKubelet.Cleanup()
-			kubelet := testKubelet.kubelet
-
-			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
+			needsUpdate := reconcileHugePageResource(tc.initialNode, tc.existingNode)
 			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 		})
@@ -1947,23 +1910,18 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 }
 func TestReconcileExtendedResource(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
-	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	containerManager := cm.NewStubContainerManagerWithExtendedResource(true)
 	extendedResourceName1 := v1.ResourceName("test.com/resource1")
 	extendedResourceName2 := v1.ResourceName("test.com/resource2")
 
 	cases := []struct {
 		name         string
-		testKubelet  *TestKubelet
 		existingNode *v1.Node
 		expectedNode *v1.Node
 		needsUpdate  bool
 	}{
 		{
-			name:        "no update needed without extended resource",
-			testKubelet: testKubelet,
+			name: "no update needed without extended resource",
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -1995,8 +1953,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 			needsUpdate: false,
 		},
 		{
-			name:        "extended resource capacity is not zeroed due to presence of checkpoint file",
-			testKubelet: testKubelet,
+			name: "extended resource capacity is not zeroed due to presence of checkpoint file",
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -2028,8 +1985,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 			needsUpdate: false,
 		},
 		{
-			name:        "extended resource capacity is zeroed",
-			testKubelet: testKubeletNoReset,
+			name: "extended resource capacity is zeroed",
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -2071,11 +2027,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		initialNode := &v1.Node{}
-
-		needsUpdate := kubelet.reconcileExtendedResource(initialNode, tc.existingNode)
+		needsUpdate := reconcileExtendedResource(containerManager, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
 	}
@@ -2178,15 +2130,6 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-
-	machineInfo := &cadvisorapi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	kubelet.machineInfo = machineInfo
 
 	var gotNode runtime.Object
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {

@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -145,10 +146,10 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	// Edge case: the node was previously registered; reconcile
 	// the value of the controller-managed attach-detach
 	// annotation.
-	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
-	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
-	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
+	requiresUpdate := reconcileCMADAnnotationWithExistingNode(node, existingNode)
+	requiresUpdate = updateDefaultLabels(node, existingNode) || requiresUpdate
+	requiresUpdate = reconcileExtendedResource(kl.containerManager, existingNode) || requiresUpdate
+	requiresUpdate = reconcileHugePageResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 			klog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
@@ -160,7 +161,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 }
 
 // reconcileHugePageResource will update huge page capacity for each page size and remove huge page sizes no longer supported
-func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node) bool {
+func reconcileHugePageResource(initialNode, existingNode *v1.Node) bool {
 	requiresUpdate := false
 	supportedHugePageResources := sets.String{}
 
@@ -207,10 +208,10 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 }
 
 // Zeros out extended resource capacity during reconciliation.
-func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
+func reconcileExtendedResource(cm cm.ContainerManager, node *v1.Node) bool {
 	requiresUpdate := false
 	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
-	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
+	if cm.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
 			if v1helper.IsExtendedResourceName(k) {
 				klog.Infof("Zero out resource %s capacity in existing node.", k)
@@ -224,7 +225,7 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 }
 
 // updateDefaultLabels will set the default labels on the node
-func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
+func updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		v1.LabelHostname,
 		v1.LabelZoneFailureDomainStable,
@@ -264,7 +265,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 // reconcileCMADAnnotationWithExistingNode reconciles the controller-managed
 // attach-detach annotation on a new node and the existing node, returning
 // whether the existing node must be updated.
-func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v1.Node) bool {
+func reconcileCMADAnnotationWithExistingNode(node, existingNode *v1.Node) bool {
 	var (
 		existingCMAAnnotation    = existingNode.Annotations[volutil.ControllerManagedAttachAnnotation]
 		newCMAAnnotation, newSet = node.Annotations[volutil.ControllerManagedAttachAnnotation]
@@ -351,7 +352,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		node.Spec.Taints = nodeTaints
 	}
 	// Initially, set NodeNetworkUnavailable to true.
-	if kl.providerRequiresNetworkingConfiguration() {
+	if providerRequiresNetworkingConfiguration(kl.cloud) {
 		node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
 			Type:               v1.NodeNetworkUnavailable,
 			Status:             v1.ConditionTrue,
@@ -738,14 +739,14 @@ func nodeConditionsHaveChanged(originalConditions []v1.NodeCondition, conditions
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
-func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
+func providerRequiresNetworkingConfiguration(cloud cloudprovider.Interface) bool {
 	// TODO: We should have a mechanism to say whether native cloud provider
 	// is used or whether we are using overlay networking. We should return
 	// true for cloud providers if they implement Routes() interface and
 	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
+	if cloud == nil || cloud.ProviderName() != "gce" {
 		return false
 	}
-	_, supported := kl.cloud.Routes()
+	_, supported := cloud.Routes()
 	return supported
 }
