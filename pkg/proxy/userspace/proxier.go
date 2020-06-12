@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	"k8s.io/kubernetes/pkg/util/iptables"
-	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )
 
@@ -116,22 +115,22 @@ type Proxier struct {
 	// TODO(imroc): implement node handler for userspace proxier.
 	config.NoopNodeHandler
 
-	loadBalancer    LoadBalancer
-	mu              sync.Mutex // protects serviceMap
-	serviceMap      map[proxy.ServicePortName]*ServiceInfo
-	syncPeriod      time.Duration
-	minSyncPeriod   time.Duration
-	udpIdleTimeout  time.Duration
-	portMapMutex    sync.Mutex
-	portMap         map[portMapKey]*portMapValue
-	numProxyLoops   int32 // use atomic ops to access this; mostly for testing
-	listenIP        net.IP
-	iptables        iptables.Interface
-	hostIP          net.IP
-	localAddrs      netutils.IPSet
-	proxyPorts      PortAllocator
-	makeProxySocket ProxySocketFunc
-	exec            utilexec.Interface
+	loadBalancer     LoadBalancer
+	mu               sync.Mutex // protects serviceMap
+	serviceMap       map[proxy.ServicePortName]*ServiceInfo
+	syncPeriod       time.Duration
+	minSyncPeriod    time.Duration
+	udpIdleTimeout   time.Duration
+	portMapMutex     sync.Mutex
+	portMap          map[portMapKey]*portMapValue
+	numProxyLoops    int32 // use atomic ops to access this; mostly for testing
+	listenIP         net.IP
+	iptables         iptables.Interface
+	hostIP           net.IP
+	localAddrs       netutils.IPSet
+	proxyPorts       PortAllocator
+	makeProxySocket  ProxySocketFunc
+	conntrackClearer conntrack.Clearer
 	// endpointsSynced and servicesSynced are set to 1 when the corresponding
 	// objects are synced after startup. This is used to avoid updating iptables
 	// with some partial data after kube-proxy restart.
@@ -183,15 +182,15 @@ var (
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string) (*Proxier, error) {
-	return NewCustomProxier(loadBalancer, listenIP, iptables, exec, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, nodePortAddresses, newProxySocket)
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, ct conntrack.Clearer, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string) (*Proxier, error) {
+	return NewCustomProxier(loadBalancer, listenIP, iptables, ct, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, nodePortAddresses, newProxySocket)
 }
 
 // NewCustomProxier functions similarly to NewProxier, returning a new Proxier
 // for the given LoadBalancer and address.  The new proxier is constructed using
 // the ProxySocket constructor provided, however, instead of constructing the
 // default ProxySockets.
-func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, ct conntrack.Clearer, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -215,10 +214,10 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 	proxyPorts := newPortAllocator(pr)
 
 	klog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, exec, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout, makeProxySocket)
+	return createProxier(loadBalancer, listenIP, iptables, ct, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout, makeProxySocket)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, ct conntrack.Clearer, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(utilnet.PortRange{})
@@ -233,20 +232,20 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		return nil, fmt.Errorf("failed to flush iptables: %v", err)
 	}
 	proxier := &Proxier{
-		loadBalancer:    loadBalancer,
-		serviceMap:      make(map[proxy.ServicePortName]*ServiceInfo),
-		serviceChanges:  make(map[types.NamespacedName]*serviceChange),
-		portMap:         make(map[portMapKey]*portMapValue),
-		syncPeriod:      syncPeriod,
-		minSyncPeriod:   minSyncPeriod,
-		udpIdleTimeout:  udpIdleTimeout,
-		listenIP:        listenIP,
-		iptables:        iptables,
-		hostIP:          hostIP,
-		proxyPorts:      proxyPorts,
-		makeProxySocket: makeProxySocket,
-		exec:            exec,
-		stopChan:        make(chan struct{}),
+		loadBalancer:     loadBalancer,
+		serviceMap:       make(map[proxy.ServicePortName]*ServiceInfo),
+		serviceChanges:   make(map[types.NamespacedName]*serviceChange),
+		portMap:          make(map[portMapKey]*portMapValue),
+		syncPeriod:       syncPeriod,
+		minSyncPeriod:    minSyncPeriod,
+		udpIdleTimeout:   udpIdleTimeout,
+		listenIP:         listenIP,
+		iptables:         iptables,
+		hostIP:           hostIP,
+		proxyPorts:       proxyPorts,
+		makeProxySocket:  makeProxySocket,
+		conntrackClearer: ct,
+		stopChan:         make(chan struct{}),
 	}
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, numBurstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("userspace-proxy-sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, numBurstSyncs)
@@ -581,7 +580,7 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPorts sets.S
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
 	for _, svcIP := range staleUDPServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+		if err := proxier.conntrackClearer.ClearEntriesForIP(svcIP, v1.ProtocolUDP); err != nil {
 			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}
