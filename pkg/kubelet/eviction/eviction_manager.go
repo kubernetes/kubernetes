@@ -507,20 +507,11 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 		return false
 	}
 
+	// pod stats api summarizes ephemeral storage usage (container, emptyDir, host[etc-hosts, logs])
 	podEphemeralStorageTotalUsage := &resource.Quantity{}
-	var fsStatsSet []fsStatsType
-	if *m.dedicatedImageFs {
-		fsStatsSet = []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}
-	} else {
-		fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
+	if podStats.EphemeralStorage != nil {
+		podEphemeralStorageTotalUsage = resource.NewQuantity(int64(*podStats.EphemeralStorage.UsedBytes), resource.BinarySI)
 	}
-	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet, m.etcHostsPath(pod.UID))
-	if err != nil {
-		klog.Errorf("eviction manager: error getting pod disk usage %v", err)
-		return false
-	}
-
-	podEphemeralStorageTotalUsage.Add(podEphemeralUsage[v1.ResourceEphemeralStorage])
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
