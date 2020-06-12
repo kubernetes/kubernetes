@@ -407,6 +407,12 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profil
 		return nil, nil, s.AsError()
 	}
 
+	// handle prefilter plugins return UnschedulableAndUnresolvable status,
+	// and quickly reject unschedulable pods
+	if s.Code() == framework.UnschedulableAndUnresolvable {
+		return nil, nil, s.AsError()
+	}
+
 	filteredNodesStatuses := make(framework.NodeToStatusMap)
 	filtered, err := g.findNodesThatPassFilters(ctx, prof, state, pod, filteredNodesStatuses)
 	if err != nil {
