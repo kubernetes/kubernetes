@@ -1106,7 +1106,49 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				return nil
 			},
 		},
-		// TODO(#91111): Add more test cases.
+		{
+			name: "pod with pod-affinity gets added",
+			init: func(cs kubernetes.Interface, _ string) error {
+				node, err := createNode(cs, "node-1", nil)
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+				if err := utils.AddLabelsToNode(cs, node.Name, map[string]string{"region": "test"}); err != nil {
+					return fmt.Errorf("cannot add labels to node: %v", err)
+				}
+				return nil
+			},
+			pod: &pausePodConfig{
+				Name: "pod-1",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"pod-with-affinity": "true",
+									},
+								},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				podConfig := &pausePodConfig{
+					Name:      "pod-with-affinity",
+					Namespace: ns,
+					Labels: map[string]string{
+						"pod-with-affinity": "true",
+					},
+				}
+				if _, err := createPausePod(cs, initPausePod(podConfig)); err != nil {
+					return fmt.Errorf("cannot create pod: %v", err)
+				}
+				return nil
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
