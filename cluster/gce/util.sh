@@ -897,11 +897,11 @@ function construct-windows-kubelet-flags {
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
 
-  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
+  if [[ "${WINDOWS_CONTAINER_RUNTIME:-}" != "docker" ]]; then
     flags+=" --container-runtime=remote"
-    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
-      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
-      flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+    if [[ "${WINDOWS_CONTAINER_RUNTIME}" == "containerd" ]]; then
+      WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+      flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
     fi
   fi
 
@@ -1550,6 +1550,8 @@ CNI_DIR: $(yaml-quote ${WINDOWS_CNI_DIR})
 CNI_CONFIG_DIR: $(yaml-quote ${WINDOWS_CNI_CONFIG_DIR})
 WINDOWS_CNI_STORAGE_PATH: $(yaml-quote ${WINDOWS_CNI_STORAGE_PATH})
 WINDOWS_CNI_VERSION: $(yaml-quote ${WINDOWS_CNI_VERSION})
+WINDOWS_CONTAINER_RUNTIME: $(yaml-quote ${WINDOWS_CONTAINER_RUNTIME})
+WINDOWS_CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote ${WINDOWS_CONTAINER_RUNTIME_ENDPOINT})
 MANIFESTS_DIR: $(yaml-quote ${WINDOWS_MANIFESTS_DIR})
 PKI_DIR: $(yaml-quote ${WINDOWS_PKI_DIR})
 CA_FILE_PATH: $(yaml-quote ${WINDOWS_CA_FILE})

@@ -241,6 +241,14 @@ function Set_CurrentShellEnvironmentVar {
 # Sets environment variables used by Kubernetes binaries and by other functions
 # in this module. Depends on numerous ${kube_env} keys.
 function Set-EnvironmentVars {
+  if ($kube_env.ContainsKey('WINDOWS_CONTAINER_RUNTIME')) {
+      $container_runtime = ${kube_env}['WINDOWS_CONTAINER_RUNTIME']
+      $container_runtime_endpoint = ${kube_env}['WINDOWS_CONTAINER_RUNTIME_ENDPOINT']
+  } else {
+      Log-Output "ERROR: WINDOWS_CONTAINER_RUNTIME not set in kube-env, falling back in CONTAINER_RUNTIME"
+      $container_runtime = ${kube_env}['CONTAINER_RUNTIME']
+      $container_runtime_endpoint = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
+  }
   # Turning the kube-env values into environment variables is not required but
   # it makes debugging this script easier, and it also makes the syntax a lot
   # easier (${env:K8S_DIR} can be expanded within a string but
@@ -268,8 +276,8 @@ function Set-EnvironmentVars {
     "KUBELET_CERT_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.crt'
     "KUBELET_KEY_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.key'
 
-    "CONTAINER_RUNTIME" = ${kube_env}['CONTAINER_RUNTIME']
-    "CONTAINER_RUNTIME_ENDPOINT" = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
+    "CONTAINER_RUNTIME" = $container_runtime
+    "CONTAINER_RUNTIME_ENDPOINT" = $container_runtime_endpoint
 
     'LICENSE_DIR' = 'C:\Program Files\Google\Compute Engine\THIRD_PARTY_NOTICES'
   }
