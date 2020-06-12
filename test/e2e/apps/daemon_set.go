@@ -151,6 +151,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
 	  Behaviors:
 	  - apps/daemonset/create
+	  - apps/daemonset/deleted-pod
 	*/
 	framework.ConformanceIt("should run and stop simple daemon", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
@@ -180,6 +181,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  selectors.
 	  Behaviors:
 	  - apps/daemonset/create-node-selector
+	  - apps/daemonset/add-pods
+	  - apps/daemonset/remove-pods
 	*/
 	framework.ConformanceIt("should run and stop complex daemon", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
@@ -280,7 +283,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Testname: DaemonSet-FailedPodCreation
 		Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 		Behaviors:
-		- apps/daemonset/revive-pod
+		- apps/daemonset/failed-pod
 	*/
 	framework.ConformanceIt("should retry creating failed daemon pods", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
@@ -362,6 +365,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
 	  Behaviors:
 	  - apps/daemonset/update-pod
+	  - apps/daemonset/create-controller-revision
 	*/
 	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
