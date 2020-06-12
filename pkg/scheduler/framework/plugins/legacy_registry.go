@@ -269,6 +269,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 		})
 	registry.registerPredicateConfigProducer(CheckVolumeBindingPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, volumebinding.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumebinding.Name, nil)
 			plugins.Reserve = appendToPluginSet(plugins.Reserve, volumebinding.Name, nil)
 			plugins.PreBind = appendToPluginSet(plugins.PreBind, volumebinding.Name, nil)
