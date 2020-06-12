@@ -93,8 +93,8 @@ func New(jobInformer batchinformers.JobInformer, podInformer coreinformers.PodIn
 	tc := &Controller{
 		client:   client,
 		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
-		jobQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
-		podQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_pods_to_delete"),
+		jobQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
+		podQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_pods_to_delete"),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -213,17 +213,18 @@ func (tc *Controller) enqueueAfter(obj interface{}, after time.Duration) {
 	}
 }
 
-type QueueType int
+type queueType int
 
 const (
-	JobQueue QueueType = iota
-	PodQueue)
+	jobQueue queueType = iota
+	podQueue
+)
 
-func (tc *Controller) getQueue(queueType QueueType) workqueue.RateLimitingInterface {
+func (tc *Controller) getQueue(queueType queueType) workqueue.RateLimitingInterface {
 	switch queueType {
-	case JobQueue:
+	case jobQueue:
 		return tc.jobQueue
-	case PodQueue:
+	case podQueue:
 		return tc.podQueue
 	default:
 		return nil
@@ -231,16 +232,16 @@ func (tc *Controller) getQueue(queueType QueueType) workqueue.RateLimitingInterf
 }
 
 func (tc *Controller) jobWorker() {
-	for tc.processNextWorkItem(JobQueue) {
+	for tc.processNextWorkItem(jobQueue) {
 	}
 }
 
 func (tc *Controller) podWorker() {
-	for tc.processNextWorkItem(PodQueue) {
+	for tc.processNextWorkItem(podQueue) {
 	}
 }
 
-func (tc *Controller) processNextWorkItem(queueType QueueType) bool {
+func (tc *Controller) processNextWorkItem(queueType queueType) bool {
 	var theQueue = tc.getQueue(queueType)
 	key, quit := theQueue.Get()
 	if quit {
@@ -254,7 +255,7 @@ func (tc *Controller) processNextWorkItem(queueType QueueType) bool {
 	return true
 }
 
-func (tc *Controller) handleErr(err error, key interface{}, queueType QueueType) {
+func (tc *Controller) handleErr(err error, key interface{}, queueType queueType) {
 	if err == nil {
 		tc.getQueue(queueType).Forget(key)
 		return
