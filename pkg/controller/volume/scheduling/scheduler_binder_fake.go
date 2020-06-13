@@ -58,6 +58,9 @@ func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string)
 	return b.config.AllBound, b.config.AssumeErr
 }
 
+// RevertAssumedPodVolumes implements SchedulerVolumeBinder.RevertAssumedPodVolumes
+func (b *FakeVolumeBinder) RevertAssumedPodVolumes(assumedPod *v1.Pod, nodeName string) {}
+
 // BindPodVolumes implements SchedulerVolumeBinder.BindPodVolumes.
 func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
 	b.BindCalled = true

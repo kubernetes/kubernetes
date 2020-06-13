@@ -124,6 +124,9 @@ type SchedulerVolumeBinder interface {
 	// This function is called serially.
 	AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (allFullyBound bool, err error)
 
+	// RevertAssumedPodVolumes will revert assumed PV and PVC cache.
+	RevertAssumedPodVolumes(assumedPod *v1.Pod, nodeName string)
+
 	// BindPodVolumes will:
 	// 1. Initiate the volume binding by making the API call to prebind the PV
 	// to its matching PVC.
@@ -379,6 +382,12 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings, newProvisionedPVCs)
 
 	return
+}
+
+// RevertAssumedPodVolumes will revert assumed PV and PVC cache.
+func (b *volumeBinder) RevertAssumedPodVolumes(assumedPod *v1.Pod, nodeName string) {
+	b.revertAssumedPVs(b.podBindingCache.GetBindings(assumedPod, nodeName))
+	b.revertAssumedPVCs(b.podBindingCache.GetProvisionedPVCs(assumedPod, nodeName))
 }
 
 // BindPodVolumes gets the cached bindings and PVCs to provision in podBindingCache,

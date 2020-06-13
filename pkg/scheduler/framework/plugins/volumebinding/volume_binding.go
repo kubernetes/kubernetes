@@ -205,9 +205,10 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 	return nil
 }
 
-// Unreserve clears pod binding state.
-// TODO(#90962) Revert assumed PV/PVC cache
+// Unreserve clears assumed PV and PVC cache and pod binding state.
+// It's idempotent, and does nothing if no cache or binding state found for the given pod.
 func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
+	pl.Binder.RevertAssumedPodVolumes(pod, nodeName)
 	pl.Binder.DeletePodBindings(pod)
 	return
 }
