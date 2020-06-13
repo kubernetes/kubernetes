@@ -56,6 +56,7 @@ import (
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -112,6 +113,7 @@ func newProxyServer(
 	}
 
 	var iptInterface utiliptables.Interface
+	var ctClearer conntrack.Clearer
 	var ipvsInterface utilipvs.Interface
 	var kernelHandler ipvs.KernelHandler
 	var ipsetInterface utilipset.Interface
@@ -120,6 +122,7 @@ func newProxyServer(
 	execer := exec.New()
 
 	iptInterface = utiliptables.New(execer, protocol)
+	ctClearer = conntrack.NewClearer(execer)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
 	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
@@ -134,7 +137,6 @@ func newProxyServer(
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
 		return &ProxyServer{
-			execer:         execer,
 			IptInterface:   iptInterface,
 			IpvsInterface:  ipvsInterface,
 			IpsetInterface: ipsetInterface,
@@ -213,8 +215,8 @@ func newProxyServer(
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
 				ipt,
+				ctClearer,
 				utilsysctl.New(),
-				execer,
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
@@ -236,8 +238,8 @@ func newProxyServer(
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
 				iptInterface,
+				ctClearer,
 				utilsysctl.New(),
-				execer,
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
@@ -282,10 +284,10 @@ func newProxyServer(
 
 			proxier, err = ipvs.NewDualStackProxier(
 				ipt,
+				ctClearer,
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.IPVS.SyncPeriod.Duration,
 				config.IPVS.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -313,10 +315,10 @@ func newProxyServer(
 
 			proxier, err = ipvs.NewProxier(
 				iptInterface,
+				ctClearer,
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.IPVS.SyncPeriod.Duration,
 				config.IPVS.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -348,7 +350,7 @@ func newProxyServer(
 			userspace.NewLoadBalancerRR(),
 			net.ParseIP(config.BindAddress),
 			iptInterface,
-			execer,
+			ctClearer,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -366,7 +368,6 @@ func newProxyServer(
 		IptInterface:           iptInterface,
 		IpvsInterface:          ipvsInterface,
 		IpsetInterface:         ipsetInterface,
-		execer:                 execer,
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
 		Recorder:               recorder,

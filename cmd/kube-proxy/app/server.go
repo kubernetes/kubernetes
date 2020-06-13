@@ -83,7 +83,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -527,7 +526,6 @@ type ProxyServer struct {
 	IptInterface           utiliptables.Interface
 	IpvsInterface          utilipvs.Interface
 	IpsetInterface         utilipset.Interface
-	execer                 exec.Interface
 	Proxier                proxy.Provider
 	Broadcaster            record.EventBroadcaster
 	Recorder               record.EventRecorder
