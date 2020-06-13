@@ -149,16 +149,36 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		return err
 	}
 
-	// notifies the other members of the etcd cluster about the joining member
 	etcdPeerAddress := etcdutil.GetPeerURL(endpoint)
 
-	klog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
-	initialCluster, err := etcdClient.AddMember(nodeName, etcdPeerAddress)
+	klog.V(1).Infoln("[etcd] Getting the list of existing members")
+	initialCluster, err := etcdClient.ListMembers()
 	if err != nil {
 		return err
 	}
-	fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
-	klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
+
+	// only add the new member if it doesn't already exists
+	var exists bool
+	klog.V(1).Infof("[etcd] Checking if the etcd member already exists: %s", etcdPeerAddress)
+	for _, member := range initialCluster {
+		if member.PeerURL == etcdPeerAddress {
+			exists = true
+			break
+		}
+	}
+
+	if exists {
+		klog.V(1).Infof("[etcd] Etcd member already exists: %s", endpoint)
+	} else {
+		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
+		initialCluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
+		klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
+	}
 
 	fmt.Printf("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
 
