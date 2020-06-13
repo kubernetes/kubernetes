@@ -69,7 +69,6 @@ go_library(
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],

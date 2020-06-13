@@ -40,7 +40,6 @@ go_library(
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],
 )
 
