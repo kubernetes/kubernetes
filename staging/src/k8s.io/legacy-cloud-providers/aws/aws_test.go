@@ -1971,3 +1971,23 @@ func newMockedFakeAWSServices(id string) *FakeAWSServices {
 	s.elb = &MockedFakeELB{FakeELB: s.elb.(*FakeELB)}
 	return s
 }
+
+func TestAzToRegion(t *testing.T) {
+	testCases := []struct {
+		az     string
+		region string
+	}{
+		{"us-west-2a", "us-west-2"},
+		{"us-west-2-lax-1a", "us-west-2"},
+		{"ap-northeast-2a", "ap-northeast-2"},
+		{"us-gov-east-1a", "us-gov-east-1"},
+		{"us-iso-east-1a", "us-iso-east-1"},
+		{"us-isob-east-1a", "us-isob-east-1"},
+	}
+
+	for _, testCase := range testCases {
+		result, err := azToRegion(testCase.az)
+		assert.NoError(t, err)
+		assert.Equal(t, testCase.region, result)
+	}
+}
