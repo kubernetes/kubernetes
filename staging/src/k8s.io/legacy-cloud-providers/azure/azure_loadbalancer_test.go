@@ -1848,9 +1848,9 @@ func TestReconcileSecurityGroup(t *testing.T) {
 							SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
 								Protocol:                 network.SecurityRuleProtocol("Tcp"),
 								SourcePortRange:          to.StringPtr("*"),
-								DestinationPortRange:     to.StringPtr("10080"),
+								DestinationPortRange:     to.StringPtr("80"),
 								SourceAddressPrefix:      to.StringPtr("Internet"),
-								DestinationAddressPrefix: to.StringPtr("*"),
+								DestinationAddressPrefix: to.StringPtr("fd00::eef0"),
 								Access:                   network.SecurityRuleAccess("Allow"),
 								Priority:                 to.Int32Ptr(500),
 								Direction:                network.SecurityRuleDirection("Inbound"),
