@@ -112,6 +112,9 @@ type ContainerManager interface {
 
 	// GetTopologyPodAdmitHandler returns an instance of the TopologyManager for Pod Admission
 	GetTopologyPodAdmitHandler() topologymanager.Manager
+
+	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
+	UpdateAllocatedDevices()
 }
 
 type NodeConfig struct {

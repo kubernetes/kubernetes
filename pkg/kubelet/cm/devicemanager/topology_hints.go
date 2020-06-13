@@ -28,6 +28,10 @@ import (
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
 func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+	// Garbage collect any stranded device resources before providing TopologyHints
+	m.UpdateAllocatedDevices()
+
+	// Loop through all device resources and generate TopologyHints for them..
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 
 	for resourceObj, requestedObj := range container.Resources.Limits {
@@ -67,7 +71,7 @@ func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
 
 func (m *ManagerImpl) getAvailableDevices(resource string) sets.String {
 	// Gets Devices in use.
-	m.updateAllocatedDevices(m.activePods())
+	m.UpdateAllocatedDevices()
 	// Strip all devices in use from the list of healthy ones.
 	return m.healthyDevices[resource].Difference(m.allocatedDevices[resource])
 }
