@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -66,66 +65,6 @@ var (
 	errPrioritize = fmt.Errorf("priority map encounters an error")
 )
 
-const ErrReasonFake = "Nodes failed the fake predicate"
-
-type trueFilterPlugin struct{}
-
-// Name returns name of the plugin.
-func (pl *trueFilterPlugin) Name() string {
-	return "TrueFilter"
-}
-
-// Filter invoked at the filter extension point.
-func (pl *trueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	return nil
-}
-
-// NewTrueFilterPlugin initializes a trueFilterPlugin and returns it.
-func NewTrueFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	return &trueFilterPlugin{}, nil
-}
-
-type falseFilterPlugin struct{}
-
-// Name returns name of the plugin.
-func (pl *falseFilterPlugin) Name() string {
-	return "FalseFilter"
-}
-
-// Filter invoked at the filter extension point.
-func (pl *falseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
-}
-
-// NewFalseFilterPlugin initializes a falseFilterPlugin and returns it.
-func NewFalseFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	return &falseFilterPlugin{}, nil
-}
-
-type matchFilterPlugin struct{}
-
-// Name returns name of the plugin.
-func (pl *matchFilterPlugin) Name() string {
-	return "MatchFilter"
-}
-
-// Filter invoked at the filter extension point.
-func (pl *matchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
-	if pod.Name == node.Name {
-		return nil
-	}
-	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
-}
-
-// NewMatchFilterPlugin initializes a matchFilterPlugin and returns it.
-func NewMatchFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	return &matchFilterPlugin{}, nil
-}
-
 type noPodsFilterPlugin struct{}
 
 // Name returns name of the plugin.
@@ -138,44 +77,12 @@ func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState,
 	if len(nodeInfo.Pods) == 0 {
 		return nil
 	}
-	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
+	return framework.NewStatus(framework.Unschedulable, st.ErrReasonFake)
 }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
 func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &noPodsFilterPlugin{}, nil
-}
-
-// fakeFilterPlugin is a test filter plugin to record how many times its Filter() function have
-// been called, and it returns different 'Code' depending on its internal 'failedNodeReturnCodeMap'.
-type fakeFilterPlugin struct {
-	numFilterCalled         int32
-	failedNodeReturnCodeMap map[string]framework.Code
-}
-
-// Name returns name of the plugin.
-func (pl *fakeFilterPlugin) Name() string {
-	return "FakeFilter"
-}
-
-// Filter invoked at the filter extension point.
-func (pl *fakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	atomic.AddInt32(&pl.numFilterCalled, 1)
-
-	if returnCode, ok := pl.failedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
-		return framework.NewStatus(returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
-	}
-
-	return nil
-}
-
-// NewFakeFilterPlugin initializes a fakeFilterPlugin and returns it.
-func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) framework.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-		return &fakeFilterPlugin{
-			failedNodeReturnCodeMap: failedNodeReturnCodeMap,
-		}, nil
-	}
 }
 
 type numericMapPlugin struct{}
@@ -386,7 +293,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("FalseFilter", NewFalseFilterPlugin),
+				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -396,15 +303,15 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"machine1": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
-					"machine2": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
+					"machine1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+					"machine2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
 				},
 			},
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:         []string{"machine1", "machine2"},
@@ -417,7 +324,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Fits on a machine where the pod ID matches the machine name
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
+				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:         []string{"machine1", "machine2"},
@@ -429,7 +336,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -442,7 +349,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
+				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -455,7 +362,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -469,8 +376,8 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-				st.RegisterFilterPlugin("FalseFilter", NewFalseFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -481,9 +388,9 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 3,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"3": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
-					"2": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
-					"1": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
+					"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+					"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+					"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
 				},
 			},
 		},
@@ -491,7 +398,7 @@ func TestGenericScheduler(t *testing.T) {
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("NoPodsFilter", NewNoPodsFilterPlugin),
-				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
+				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -513,8 +420,8 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"1": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
-					"2": framework.NewStatus(framework.Unschedulable, ErrReasonFake),
+					"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+					"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
 				},
 			},
 		},
@@ -522,7 +429,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -549,7 +456,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with non existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -574,7 +481,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with deleting PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -599,7 +506,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterScorePlugin("FalseMap", newFalseMapPlugin(), 1),
 				st.RegisterScorePlugin("TrueMap", newTrueMapPlugin(), 2),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -727,7 +634,7 @@ func TestGenericScheduler(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin(
 					"FakeFilter",
-					NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
+					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
 				),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -749,7 +656,7 @@ func TestGenericScheduler(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin(
 					"FakeFilter",
-					NewFakeFilterPlugin(map[string]framework.Code{"3": framework.UnschedulableAndUnresolvable}),
+					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.UnschedulableAndUnresolvable}),
 				),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -771,7 +678,7 @@ func TestGenericScheduler(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin(
 					"FakeFilter",
-					NewFakeFilterPlugin(map[string]framework.Code{"1": framework.Unschedulable}),
+					st.NewFakeFilterPlugin(map[string]framework.Code{"1": framework.Unschedulable}),
 				),
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -864,8 +771,8 @@ func TestFindFitAllError(t *testing.T) {
 	scheduler := makeScheduler(nodes)
 	prof, err := makeProfile(
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-		st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
+		st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+		st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	)
 	if err != nil {
@@ -889,7 +796,7 @@ func TestFindFitAllError(t *testing.T) {
 				t.Errorf("failed to find node %v in %v", node.Name, nodeToStatusMap)
 			}
 			reasons := status.Reasons()
-			if len(reasons) != 1 || reasons[0] != ErrReasonFake {
+			if len(reasons) != 1 || reasons[0] != st.ErrReasonFake {
 				t.Errorf("unexpected failure reasons: %v", reasons)
 			}
 		})
@@ -901,8 +808,8 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(nodes)
 	prof, err := makeProfile(
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-		st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
+		st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+		st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	)
 	if err != nil {
@@ -930,7 +837,7 @@ func TestFindFitSomeError(t *testing.T) {
 				t.Errorf("failed to find node %v in %v", node.Name, nodeToStatusMap)
 			}
 			reasons := status.Reasons()
-			if len(reasons) != 1 || reasons[0] != ErrReasonFake {
+			if len(reasons) != 1 || reasons[0] != st.ErrReasonFake {
 				t.Errorf("unexpected failures: %v", reasons)
 			}
 		})
@@ -958,7 +865,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 	for _, test := range tests {
 		nodes := makeNodeList([]string{"1"})
 
-		plugin := fakeFilterPlugin{}
+		plugin := st.FakeFilterPlugin{}
 		registerFakeFilterFunc := st.RegisterFilterPlugin(
 			"FakeFilter",
 			func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
@@ -986,8 +893,8 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if test.expectedCount != plugin.numFilterCalled {
-			t.Errorf("predicate was called %d times, expected is %d", plugin.numFilterCalled, test.expectedCount)
+		if test.expectedCount != plugin.NumFilterCalled {
+			t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
 		}
 	}
 }
@@ -1286,7 +1193,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "a pod that does not fit on any machine",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("FalseFilter", NewFalseFilterPlugin),
+				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1301,7 +1208,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "a pod that fits with no preemption",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1316,7 +1223,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			name: "a pod that fits on one machine with no preemption",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
+				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1592,8 +1499,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			}
 
 			// For each test, prepend a FakeFilterPlugin.
-			fakePlugin := fakeFilterPlugin{}
-			fakePlugin.failedNodeReturnCodeMap = filterFailedNodeReturnCodeMap
+			fakePlugin := st.FakeFilterPlugin{}
+			fakePlugin.FailedNodeReturnCodeMap = filterFailedNodeReturnCodeMap
 			registerFakeFilterFunc := st.RegisterFilterPlugin(
 				"FakeFilter",
 				func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
@@ -1637,8 +1544,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				t.Error(err)
 			}
 
-			if test.expectedNumFilterCalled != fakePlugin.numFilterCalled {
-				t.Errorf("expected fakePlugin.numFilterCalled is %d, but got %d", test.expectedNumFilterCalled, fakePlugin.numFilterCalled)
+			if test.expectedNumFilterCalled != fakePlugin.NumFilterCalled {
+				t.Errorf("expected fakePlugin.numFilterCalled is %d, but got %d", test.expectedNumFilterCalled, fakePlugin.NumFilterCalled)
 			}
 
 			if err := checkPreemptionVictims(test.expected, nodeToPods); err != nil {
@@ -2063,7 +1970,7 @@ func TestPreempt(t *testing.T) {
 		name                  string
 		pod                   *v1.Pod
 		pods                  []*v1.Pod
-		extenders             []*FakeExtender
+		extenders             []*st.FakeExtender
 		failedNodeToStatusMap framework.NodeToStatusMap
 		nodeNames             []string
 		registerPlugins       []st.RegisterPluginFunc
@@ -2210,12 +2117,12 @@ func TestPreempt(t *testing.T) {
 
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			extenders: []*FakeExtender{
+			extenders: []*st.FakeExtender{
 				{
-					predicates: []fitPredicate{truePredicateExtender},
+					Predicates: []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					predicates: []fitPredicate{machine1PredicateExtender},
+					Predicates: []st.FitPredicate{st.Machine1PredicateExtender},
 				},
 			},
 			registerPlugins: []st.RegisterPluginFunc{
@@ -2239,9 +2146,9 @@ func TestPreempt(t *testing.T) {
 
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			extenders: []*FakeExtender{
+			extenders: []*st.FakeExtender{
 				{
-					predicates: []fitPredicate{falsePredicateExtender},
+					Predicates: []st.FitPredicate{st.FalsePredicateExtender},
 				},
 			},
 			registerPlugins: []st.RegisterPluginFunc{
@@ -2265,13 +2172,13 @@ func TestPreempt(t *testing.T) {
 
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			extenders: []*FakeExtender{
+			extenders: []*st.FakeExtender{
 				{
-					predicates: []fitPredicate{errorPredicateExtender},
-					ignorable:  true,
+					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
+					Ignorable:  true,
 				},
 				{
-					predicates: []fitPredicate{machine1PredicateExtender},
+					Predicates: []st.FitPredicate{st.Machine1PredicateExtender},
 				},
 			},
 			registerPlugins: []st.RegisterPluginFunc{
@@ -2295,13 +2202,13 @@ func TestPreempt(t *testing.T) {
 
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			extenders: []*FakeExtender{
+			extenders: []*st.FakeExtender{
 				{
-					predicates:   []fitPredicate{machine1PredicateExtender},
-					unInterested: true,
+					Predicates:   []st.FitPredicate{st.Machine1PredicateExtender},
+					UnInterested: true,
 				},
 				{
-					predicates: []fitPredicate{truePredicateExtender},
+					Predicates: []st.FitPredicate{st.TruePredicateExtender},
 				},
 			},
 			registerPlugins: []st.RegisterPluginFunc{
@@ -2394,7 +2301,7 @@ func TestPreempt(t *testing.T) {
 			var extenders []framework.Extender
 			for _, extender := range test.extenders {
 				// Set nodeInfoMap as extenders cached node information.
-				extender.cachedNodeNameToInfo = cachedNodeInfoMap
+				extender.CachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
 
@@ -2540,7 +2447,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	g := makeScheduler(nodes)
 	prof, err := makeProfile(
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+		st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	)
 	if err != nil {
