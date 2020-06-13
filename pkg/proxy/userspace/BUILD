@@ -35,7 +35,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -85,6 +84,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/proxy:go_default_library",
+        "//pkg/util/conntrack/testing:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
@@ -93,8 +93,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],
 )
 

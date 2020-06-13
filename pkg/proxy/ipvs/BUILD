@@ -23,6 +23,7 @@ go_test(
         "//pkg/proxy/util/iptables:go_default_library",
         "//pkg/proxy/util/testing:go_default_library",
         "//pkg/util/async:go_default_library",
+        "//pkg/util/conntrack/testing:go_default_library",
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/ipset/testing:go_default_library",
         "//pkg/util/iptables:go_default_library",
@@ -38,8 +39,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/k8s.io/utils/exec/testing:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
