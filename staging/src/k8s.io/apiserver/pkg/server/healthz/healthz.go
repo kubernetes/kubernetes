@@ -131,6 +131,8 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 			/* subresource = */ path,
 			/* scope = */ "",
 			/* component = */ "",
+			/* deprecated */ false,
+			/* removedRelease */ "",
 			handleRootHealthz(checks...)))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
