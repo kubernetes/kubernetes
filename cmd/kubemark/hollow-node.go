@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	goflag "flag"
 	"fmt"
 	"math/rand"
@@ -47,9 +46,9 @@ import (
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/pkg/master/ports"
+	conntracktest "k8s.io/kubernetes/pkg/util/conntrack/testing"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
-	fakeexec "k8s.io/utils/exec/testing"
 )
 
 type hollowNodeConfig struct {
@@ -235,10 +234,8 @@ func run(config *hollowNodeConfig) {
 			klog.Fatalf("Failed to create API Server client: %v", err)
 		}
 		iptInterface := fakeiptables.NewFake()
+		ctClearer := conntracktest.NewFakeClearer()
 		sysctl := fakesysctl.NewFake()
-		execer := &fakeexec.FakeExec{
-			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
-		}
 		eventBroadcaster := record.NewBroadcaster()
 		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
@@ -247,8 +244,8 @@ func run(config *hollowNodeConfig) {
 			client,
 			client.CoreV1(),
 			iptInterface,
+			ctClearer,
 			sysctl,
-			execer,
 			eventBroadcaster,
 			recorder,
 			config.UseRealProxier,

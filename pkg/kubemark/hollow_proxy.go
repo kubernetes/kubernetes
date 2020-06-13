@@ -31,10 +31,10 @@ import (
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilexec "k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -67,8 +67,8 @@ func NewHollowProxyOrDie(
 	client clientset.Interface,
 	eventClient v1core.EventsGetter,
 	iptInterface utiliptables.Interface,
+	ctClearer conntrack.Clearer,
 	sysctl utilsysctl.Interface,
-	execer utilexec.Interface,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
 	useRealProxier bool,
@@ -89,8 +89,8 @@ func NewHollowProxyOrDie(
 		//var err error
 		proxier, err = iptables.NewProxier(
 			iptInterface,
+			ctClearer,
 			sysctl,
-			execer,
 			proxierSyncPeriod,
 			proxierMinSyncPeriod,
 			false,
