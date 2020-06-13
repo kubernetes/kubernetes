@@ -120,7 +120,6 @@ func newProxyServer(
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
 		return &ProxyServer{
-			execer:         execer,
 			IptInterface:   iptInterface,
 			IpvsInterface:  ipvsInterface,
 			IpsetInterface: ipsetInterface,
@@ -218,7 +217,6 @@ func newProxyServer(
 			proxier, err = iptables.NewDualStackProxier(
 				ipt,
 				utilsysctl.New(),
-				execer,
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
@@ -241,7 +239,6 @@ func newProxyServer(
 			proxier, err = iptables.NewProxier(
 				iptInterface,
 				utilsysctl.New(),
-				execer,
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
@@ -289,7 +286,6 @@ func newProxyServer(
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.IPVS.SyncPeriod.Duration,
 				config.IPVS.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -320,7 +316,6 @@ func newProxyServer(
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.IPVS.SyncPeriod.Duration,
 				config.IPVS.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -352,7 +347,6 @@ func newProxyServer(
 			userspace.NewLoadBalancerRR(),
 			net.ParseIP(config.BindAddress),
 			iptInterface,
-			execer,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -370,7 +364,6 @@ func newProxyServer(
 		IptInterface:           iptInterface,
 		IpvsInterface:          ipvsInterface,
 		IpsetInterface:         ipsetInterface,
-		execer:                 execer,
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
 		Recorder:               recorder,
