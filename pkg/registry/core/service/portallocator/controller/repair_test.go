@@ -224,6 +224,28 @@ func TestCollectServiceNodePorts(t *testing.T) {
 			expected: []int{111, 112, 113},
 		},
 		{
+			name: "duplicated nodePort with TCP protocol",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 112, Protocol: corev1.ProtocolUDP},
+				},
+			},
+			expected: []int{111, 111, 112},
+		},
+		{
+			name: "duplicated nodePort with UDP protocol",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+					{NodePort: 112, Protocol: corev1.ProtocolTCP},
+				},
+			},
+			expected: []int{111, 111, 112},
+		},
+		{
 			name: "duplicated nodePort with different protocol",
 			serviceSpec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -257,7 +279,7 @@ func TestCollectServiceNodePorts(t *testing.T) {
 			expected: []int{111, 112},
 		},
 		{
-			name: "nodePort has same protocol with duplicated health check port",
+			name: "nodePort has same protocol as duplicated health check port",
 			serviceSpec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{NodePort: 111, Protocol: corev1.ProtocolUDP},

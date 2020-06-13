@@ -140,7 +140,7 @@ func (c *Repair) runOnce() error {
 			case nil:
 				if stored.Has(port) {
 					// remove it from the old set, so we can find leaks
-					_ = stored.Release(port)
+					stored.Release(port)
 				} else {
 					// doesn't seem to be allocated
 					c.recorder.Eventf(svc, corev1.EventTypeWarning, "PortNotAllocated", "Port %d is not allocated; repairing", port)
