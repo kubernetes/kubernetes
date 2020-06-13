@@ -53,6 +53,7 @@ filegroup(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/generated/openapi:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice:all-srcs",
     ],
     tags = ["automanaged"],

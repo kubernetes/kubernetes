@@ -42,8 +42,13 @@ type FakeVolumeBinder struct {
 	BindCalled   bool
 }
 
+// GetPodVolumes implements SchedulerVolumeBinder.GetPodVolumes.
+func (b *FakeVolumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
+	return nil, nil, nil, nil
+}
+
 // FindPodVolumes implements SchedulerVolumeBinder.FindPodVolumes.
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons ConflictReasons, err error) {
+func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, _, _ []*v1.PersistentVolumeClaim, node *v1.Node) (reasons ConflictReasons, err error) {
 	return b.config.FindReasons, b.config.FindErr
 }
 

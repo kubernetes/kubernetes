@@ -138,7 +138,7 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
-// ScaleREST implements a Scale for Deployment.
+// ScaleREST implements a Scale for ReplicaSet.
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -182,40 +182,10 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 
 // Update alters scale subset of ReplicaSet object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, false, errors.NewNotFound(apps.Resource("replicasets/scale"), name)
-	}
-	rs := obj.(*apps.ReplicaSet)
-
-	oldScale, err := scaleFromReplicaSet(rs)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// TODO: should this pass admission?
-	obj, err = objInfo.UpdatedObject(ctx, oldScale)
-	if err != nil {
-		return nil, false, err
-	}
-	if obj == nil {
-		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
-	}
-	scale, ok := obj.(*autoscaling.Scale)
-	if !ok {
-		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
-	}
-
-	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
-	}
-
-	rs.Spec.Replicas = scale.Spec.Replicas
-	rs.ResourceVersion = scale.ResourceVersion
-	obj, _, err = r.store.Update(
+	obj, _, err := r.store.Update(
 		ctx,
-		rs.Name,
-		rest.DefaultUpdatedObjectInfo(rs),
+		name,
+		&scaleUpdatedObjectInfo{name, objInfo},
 		toScaleCreateValidation(createValidation),
 		toScaleUpdateValidation(updateValidation),
 		false,
@@ -224,7 +194,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	if err != nil {
 		return nil, false, err
 	}
-	rs = obj.(*apps.ReplicaSet)
+	rs := obj.(*apps.ReplicaSet)
 	newScale, err := scaleFromReplicaSet(rs)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -279,4 +249,63 @@ func scaleFromReplicaSet(rs *apps.ReplicaSet) (*autoscaling.Scale, error) {
 			Selector: selector.String(),
 		},
 	}, nil
+}
+
+// scaleUpdatedObjectInfo transforms existing replicaset -> existing scale -> new scale -> new replicaset
+type scaleUpdatedObjectInfo struct {
+	name       string
+	reqObjInfo rest.UpdatedObjectInfo
+}
+
+func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
+	return i.reqObjInfo.Preconditions()
+}
+
+func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
+	replicaset, ok := oldObj.DeepCopyObject().(*apps.ReplicaSet)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("expected existing object type to be ReplicaSet, got %T", replicaset))
+	}
+	// if zero-value, the existing object does not exist
+	if len(replicaset.ResourceVersion) == 0 {
+		return nil, errors.NewNotFound(apps.Resource("replicasets/scale"), i.name)
+	}
+
+	// replicaset -> old scale
+	oldScale, err := scaleFromReplicaSet(replicaset)
+	if err != nil {
+		return nil, err
+	}
+
+	// old scale -> new scale
+	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
+	if err != nil {
+		return nil, err
+	}
+	if newScaleObj == nil {
+		return nil, errors.NewBadRequest("nil update passed to Scale")
+	}
+	scale, ok := newScaleObj.(*autoscaling.Scale)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", newScaleObj))
+	}
+
+	// validate
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), replicaset.Name, errs)
+	}
+
+	// validate precondition if specified (resourceVersion matching is handled by storage)
+	if len(scale.UID) > 0 && scale.UID != replicaset.UID {
+		return nil, errors.NewConflict(
+			apps.Resource("replicasets/scale"),
+			replicaset.Name,
+			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", scale.UID, replicaset.UID),
+		)
+	}
+
+	// move replicas/resourceVersion fields to object and return
+	replicaset.Spec.Replicas = scale.Spec.Replicas
+	replicaset.ResourceVersion = scale.ResourceVersion
+	return replicaset, nil
 }

@@ -40,6 +40,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -1323,7 +1324,7 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 
 func (ctrl *PersistentVolumeController) findPodsByPVCKey(key string) ([]*v1.Pod, error) {
 	pods := []*v1.Pod{}
-	objs, err := ctrl.podIndexer.ByIndex(pvcKeyIndex, key)
+	objs, err := ctrl.podIndexer.ByIndex(common.PodPVCIndex, key)
 	if err != nil {
 		return pods, err
 	}
@@ -1337,7 +1338,7 @@ func (ctrl *PersistentVolumeController) findPodsByPVCKey(key string) ([]*v1.Pod,
 	return pods, err
 }
 
-// isVolumeUsed returns list of pods that use given PV.
+// isVolumeUsed returns list of active pods that use given PV.
 func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([]string, bool, error) {
 	if pv.Spec.ClaimRef == nil {
 		return nil, false, nil
@@ -1349,12 +1350,15 @@ func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([
 		return nil, false, fmt.Errorf("error finding pods by pvc %q: %s", pvcKey, err)
 	}
 	for _, pod := range pods {
+		if util.IsPodTerminated(pod, pod.Status) {
+			continue
+		}
 		podNames.Insert(pod.Namespace + "/" + pod.Name)
 	}
 	return podNames.List(), podNames.Len() != 0, nil
 }
 
-// findNonScheduledPodsByPVC returns list of non-scheduled pods that reference given PVC.
+// findNonScheduledPodsByPVC returns list of non-scheduled active pods that reference given PVC.
 func (ctrl *PersistentVolumeController) findNonScheduledPodsByPVC(pvc *v1.PersistentVolumeClaim) ([]string, error) {
 	pvcKey := fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
 	pods, err := ctrl.findPodsByPVCKey(pvcKey)
@@ -1363,6 +1367,9 @@ func (ctrl *PersistentVolumeController) findNonScheduledPodsByPVC(pvc *v1.Persis
 	}
 	podNames := []string{}
 	for _, pod := range pods {
+		if util.IsPodTerminated(pod, pod.Status) {
+			continue
+		}
 		if len(pod.Spec.NodeName) == 0 {
 			podNames = append(podNames, pod.Name)
 		}

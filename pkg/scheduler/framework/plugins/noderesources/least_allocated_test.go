@@ -291,9 +291,9 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 
 			if len(test.wantErr) != 0 {
 				if err != nil && test.wantErr != err.Error() {
-					t.Fatalf("got err %w, want %w", err.Error(), test.wantErr)
+					t.Fatalf("got err %v, want %v", err.Error(), test.wantErr)
 				} else if err == nil {
-					t.Fatal("no error produced, wanted %w", test.wantErr)
+					t.Fatalf("no error produced, wanted %v", test.wantErr)
 				}
 				return
 			}

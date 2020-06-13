@@ -44,11 +44,11 @@ type Profile struct {
 // NewProfile builds a Profile for the given configuration.
 func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
 	opts ...framework.Option) (*Profile, error) {
-	f, err := frameworkFact(cfg, opts...)
+	r := recorderFact(cfg.SchedulerName)
+	f, err := frameworkFact(cfg, append(opts, framework.WithEventRecorder(r))...)
 	if err != nil {
 		return nil, err
 	}
-	r := recorderFact(cfg.SchedulerName)
 	return &Profile{
 		Framework: f,
 		Recorder:  r,

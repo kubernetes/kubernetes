@@ -233,7 +233,6 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		//    but node2 either i) doesn't have all required topologyKeys present, or ii) doesn't match
 		//    incoming pod's nodeSelector/nodeAffinity
 		{
-			// if there is only one candidate node, it should be scored to 10
 			name: "one constraint on node, no existing pods",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -248,7 +247,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 		},
 		{
-			// if there is only one candidate node, it should be scored to 10
+			// if there is only one candidate node, it should be scored to 100
 			name: "one constraint on node, only one node is candidate",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -315,12 +314,11 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 		},
 		{
-			// matching pods spread as 2/1/0/3.
-			// With maxSkew=2, counts change internally to 2/1/1/3.
 			name: "one constraint on node, all 4 nodes are candidates, maxSkew=2",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(2, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
+			// matching pods spread as 2/1/0/3.
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
@@ -337,20 +335,19 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 60},  // +20, compared to maxSkew=1
-				{Name: "node-b", Score: 100}, // +20, compared to maxSkew=1
+				{Name: "node-a", Score: 50}, // +10, compared to maxSkew=1
+				{Name: "node-b", Score: 83}, // +3, compared to maxSkew=1
 				{Name: "node-c", Score: 100},
-				{Name: "node-d", Score: 20}, // +20, compared to maxSkew=1
+				{Name: "node-d", Score: 16}, // +16, compared to maxSkew=1
 			},
 		},
 		{
-			// matching pods spread as 4/3/2/1.
-			// With maxSkew=3, counts change internally to 4/3/2/2.
 			name: "one constraint on node, all 4 nodes are candidates, maxSkew=3",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(3, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
+				// matching pods spread as 4/3/2/1.
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
@@ -370,9 +367,9 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 42},  // +28 compared to maxSkew=1
-				{Name: "node-b", Score: 71},  // +29 compared to maxSkew=1
-				{Name: "node-c", Score: 100}, // +29 compared to maxSkew=1
+				{Name: "node-a", Score: 33}, // +19 compared to maxSkew=1
+				{Name: "node-b", Score: 55}, // +13 compared to maxSkew=1
+				{Name: "node-c", Score: 77}, // +6 compared to maxSkew=1
 				{Name: "node-d", Score: 100},
 			},
 		},

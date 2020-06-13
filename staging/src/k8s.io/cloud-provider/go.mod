@@ -5,10 +5,13 @@ module k8s.io/cloud-provider
 go 1.13
 
 require (
+	github.com/google/go-cmp v0.4.0
+	github.com/stretchr/testify v1.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/klog/v2 v2.0.0
+	k8s.io/component-base v0.0.0
+	k8s.io/klog/v2 v2.1.0
 	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
 )
 
@@ -19,4 +22,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/cloud-provider => ../cloud-provider
+	k8s.io/component-base => ../component-base
 )

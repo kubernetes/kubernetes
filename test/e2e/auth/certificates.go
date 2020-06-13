@@ -52,7 +52,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		The certificatesigningrequests resource must accept a request for a certificate signed by kubernetes.io/kube-apiserver-client.
 		The issued certificate must be valid as a client certificate used to authenticate to the kube-apiserver.
 	*/
-	framework.ConformanceIt("should support building a client with a CSR", func() {
+	ginkgo.It("should support building a client with a CSR", func() {
 		const commonName = "tester-csr"
 
 		csrClient := f.ClientSet.CertificatesV1().CertificateSigningRequests()

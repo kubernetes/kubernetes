@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -49,6 +49,7 @@ type Controller struct {
 
 	podLister       corelisters.PodLister
 	podListerSynced cache.InformerSynced
+	podIndexer      cache.Indexer
 
 	queue workqueue.RateLimitingInterface
 
@@ -57,7 +58,7 @@ type Controller struct {
 }
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
+func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) (*Controller, error) {
 	e := &Controller{
 		client:                              cl,
 		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
@@ -78,6 +79,10 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
+	e.podIndexer = podInformer.Informer().GetIndexer()
+	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc); err != nil {
+		return nil, fmt.Errorf("Could not initialize pvc protection controller: %v", err)
+	}
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.podAddedDeletedUpdated(nil, obj, false)
@@ -90,7 +95,7 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 		},
 	})
 
-	return e
+	return e, nil
 }
 
 // Run runs the controller goroutines.
@@ -231,15 +236,20 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	klog.V(4).Infof("Looking for Pods using PVC %s/%s in the Informer's cache", pvc.Namespace, pvc.Name)
 
-	pods, err := c.podLister.Pods(pvc.Namespace).List(labels.Everything())
+	objs, err := c.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
 	if err != nil {
 		return false, fmt.Errorf("cache-based list of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
 	}
-
-	for _, pod := range pods {
-		if podUsesPVC(pod, pvc.Name) {
-			return true, nil
+	for _, obj := range objs {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			continue
 		}
+		if pod.Spec.NodeName == "" {
+			continue
+		}
+		// found a pod using this PVC
+		return true, nil
 	}
 
 	klog.V(4).Infof("No Pod using PVC %s/%s was found in the Informer's cache", pvc.Namespace, pvc.Name)

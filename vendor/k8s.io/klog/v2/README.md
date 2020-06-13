@@ -36,7 +36,7 @@ How to use klog
 **NOTE**: please use the newer go versions that support semantic import versioning in modules, ideally go 1.11.4 or greater.
 
 ### Coexisting with glog
-This package can be used side by side with glog. [This example](examples/coexist_glog/coexist_glog.go) shows how to initialize and syncronize flags from the global `flag.CommandLine` FlagSet. In addition, the example makes use of stderr as combined output by setting `alsologtostderr` (or `logtostderr`) to `true`.
+This package can be used side by side with glog. [This example](examples/coexist_glog/coexist_glog.go) shows how to initialize and synchronize flags from the global `flag.CommandLine` FlagSet. In addition, the example makes use of stderr as combined output by setting `alsologtostderr` (or `logtostderr`) to `true`.
 
 ## Community, discussion, contribution, and support
 
@@ -44,7 +44,7 @@ Learn how to engage with the Kubernetes community on the [community page](http:/
 
 You can reach the maintainers of this project at:
 
-- [Slack](https://kubernetes.slack.com/messages/sig-architecture)
+- [Slack](https://kubernetes.slack.com/messages/klog)
 - [Mailing List](https://groups.google.com/forum/#!forum/kubernetes-sig-architecture)
 
 ### Code of conduct

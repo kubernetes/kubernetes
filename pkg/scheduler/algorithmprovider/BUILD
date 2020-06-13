@@ -60,6 +60,7 @@ go_test(
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],

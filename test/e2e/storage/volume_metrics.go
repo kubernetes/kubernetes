@@ -59,9 +59,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		defaultScName, err = e2epv.GetDefaultStorageClassName(c)
-		if err != nil {
-			framework.Failf(err.Error())
-		}
+		framework.ExpectNoError(err)
+
 		test := testsuites.StorageClassTest{
 			Name:      "default",
 			ClaimSize: "2Gi",

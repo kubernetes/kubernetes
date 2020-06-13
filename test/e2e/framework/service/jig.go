@@ -260,21 +260,36 @@ func (j *TestJig) CreateLoadBalancerService(timeout time.Duration, tweak func(sv
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the Service are running.
 func (j *TestJig) GetEndpointNodes() (map[string][]string, error) {
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, MaxNodesForEndpointsTests)
-	if err != nil {
-		return nil, err
-	}
-	epNodes, err := j.GetEndpointNodeNames()
+	nodes, err := j.ListNodesWithEndpoint()
 	if err != nil {
 		return nil, err
 	}
 	nodeMap := map[string][]string{}
-	for _, n := range nodes.Items {
-		if epNodes.Has(n.Name) {
-			nodeMap[n.Name] = e2enode.GetAddresses(&n, v1.NodeExternalIP)
-		}
+	for _, node := range nodes {
+		nodeMap[node.Name] = e2enode.GetAddresses(&node, v1.NodeExternalIP)
 	}
 	return nodeMap, nil
+}
+
+// ListNodesWithEndpoint returns a list of nodes on which the
+// endpoints of the given Service are running.
+func (j *TestJig) ListNodesWithEndpoint() ([]v1.Node, error) {
+	nodeNames, err := j.GetEndpointNodeNames()
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.TODO()
+	allNodes, err := j.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	epNodes := make([]v1.Node, 0, nodeNames.Len())
+	for _, node := range allNodes.Items {
+		if nodeNames.Has(node.Name) {
+			epNodes = append(epNodes, node)
+		}
+	}
+	return epNodes, nil
 }
 
 // GetEndpointNodeNames returns a string set of node names on which the
@@ -901,10 +916,14 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 // checkExternalServiceReachability ensures service of type externalName resolves to IP address and no fake externalName is set
 // FQDN of kubernetes is used as externalName(for air tight platforms).
 func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) error {
+	// NOTE(claudiub): Windows does not support PQDN.
+	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
-	cmd := fmt.Sprintf("nslookup %s", svc.Name)
-	_, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
+	cmd := fmt.Sprintf("nslookup %s", svcName)
+	_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
+	// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
+	// we can check stderr for the error.
+	if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
 		return fmt.Errorf("ExternalName service %q must resolve to IP", pod.Namespace+"/"+pod.Name)
 	}
 	return nil

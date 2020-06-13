@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -211,7 +211,7 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 
 			client := fake.NewSimpleClientset(csr)
 			s := &CSRCleanerController{
-				csrClient: client.CertificatesV1beta1().CertificateSigningRequests(),
+				csrClient: client.CertificatesV1().CertificateSigningRequests(),
 			}
 
 			err := s.handle(csr)

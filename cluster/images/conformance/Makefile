@@ -34,9 +34,6 @@ CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 BASEIMAGE=debian:stretch-slim
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
-#output format for docker buildx build [push, load]
-OUTPUT=--load
-
 all: build
 
 build:
@@ -59,14 +56,15 @@ endif
 
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
-	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --pull --platform linux/$(ARCH) $(OUTPUT) -t ${REGISTRY}/conformance-${ARCH}:${VERSION} ${TEMP_DIR}
-ifeq ($(ARCH),amd64)
-	docker rmi ${REGISTRY}/conformance:${VERSION} 2>/dev/null || true
-	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --pull --platform linux/$(ARCH) $(OUTPUT) -t ${REGISTRY}/conformance:${VERSION} ${TEMP_DIR}
-endif
+	docker build --pull -t ${REGISTRY}/conformance-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 
-push: OUTPUT=--push
 push: build
+	docker push ${REGISTRY}/conformance-${ARCH}:${VERSION}
+ifeq ($(ARCH),amd64)
+	docker rmi ${REGISTRY}/conformance:${VERSION} 2>/dev/null || true
+	docker tag ${REGISTRY}/conformance-${ARCH}:${VERSION} ${REGISTRY}/conformance:${VERSION}
+	docker push ${REGISTRY}/conformance:${VERSION}
+endif
 
 .PHONY: build push all

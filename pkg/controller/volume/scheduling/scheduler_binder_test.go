@@ -771,6 +771,18 @@ func checkReasons(t *testing.T, actual, expected ConflictReasons) {
 	}
 }
 
+// findPodVolumes gets and finds volumes for given pod and node
+func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (ConflictReasons, error) {
+	boundClaims, claimsToBind, unboundClaimsImmediate, err := binder.GetPodVolumes(pod)
+	if err != nil {
+		return nil, err
+	}
+	if len(unboundClaimsImmediate) > 0 {
+		return nil, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
+	}
+	return binder.FindPodVolumes(pod, boundClaims, claimsToBind, node)
+}
+
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	type scenarioType struct {
 		// Inputs
@@ -907,7 +919,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		reasons, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
+		reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1012,7 +1024,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		reasons, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
+		reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1112,7 +1124,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		}
 
 		// Execute
-		reasons, err := testEnv.binder.FindPodVolumes(scenario.pod, node)
+		reasons, err := findPodVolumes(testEnv.binder, scenario.pod, node)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1933,7 +1945,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 
 	// Execute
 	// 1. Find matching PVs
-	reasons, err := testEnv.binder.FindPodVolumes(pod, testNode)
+	reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
 	if err != nil {
 		t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 	}
@@ -1959,7 +1971,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// This should always return the original chosen pv
 	// Run this many times in case sorting returns different orders for the two PVs.
 	for i := 0; i < 50; i++ {
-		reasons, err := testEnv.binder.FindPodVolumes(pod, testNode)
+		reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
 		if err != nil {
 			t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 		}

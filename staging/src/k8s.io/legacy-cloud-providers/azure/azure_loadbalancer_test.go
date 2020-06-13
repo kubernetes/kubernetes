@@ -1861,6 +1861,36 @@ func TestReconcileSecurityGroup(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:    "reconcileSecurityGroup shall create sgs with correct destinationPrefix for IPv6",
+			service: getTestService("test1", v1.ProtocolTCP, nil, true, 80),
+			existingSgs: map[string]network.SecurityGroup{"nsg": {
+				Name:                          to.StringPtr("nsg"),
+				SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{},
+			}},
+			lbIP:   to.StringPtr("fd00::eef0"),
+			wantLb: true,
+			expectedSg: &network.SecurityGroup{
+				Name: to.StringPtr("nsg"),
+				SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
+					SecurityRules: &[]network.SecurityRule{
+						{
+							Name: to.StringPtr("atest1-TCP-80-Internet"),
+							SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+								Protocol:                 network.SecurityRuleProtocol("Tcp"),
+								SourcePortRange:          to.StringPtr("*"),
+								DestinationPortRange:     to.StringPtr("80"),
+								SourceAddressPrefix:      to.StringPtr("Internet"),
+								DestinationAddressPrefix: to.StringPtr("fd00::eef0"),
+								Access:                   network.SecurityRuleAccess("Allow"),
+								Priority:                 to.Int32Ptr(500),
+								Direction:                network.SecurityRuleDirection("Inbound"),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for i, test := range testCases {

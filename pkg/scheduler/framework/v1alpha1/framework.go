@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -79,6 +80,7 @@ type framework struct {
 	permitPlugins         []PermitPlugin
 
 	clientSet       clientset.Interface
+	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
 	metricsRecorder *metricsRecorder
@@ -120,6 +122,7 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 
 type frameworkOptions struct {
 	clientSet            clientset.Interface
+	eventRecorder        events.EventRecorder
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister SharedLister
 	metricsRecorder      *metricsRecorder
@@ -135,6 +138,13 @@ type Option func(*frameworkOptions)
 func WithClientSet(clientSet clientset.Interface) Option {
 	return func(o *frameworkOptions) {
 		o.clientSet = clientSet
+	}
+}
+
+// WithEventRecorder sets clientSet for the scheduling framework.
+func WithEventRecorder(recorder events.EventRecorder) Option {
+	return func(o *frameworkOptions) {
+		o.eventRecorder = recorder
 	}
 }
 
@@ -214,6 +224,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
+		eventRecorder:         options.eventRecorder,
 		informerFactory:       options.informerFactory,
 		metricsRecorder:       options.metricsRecorder,
 		runAllFilters:         options.runAllFilters,
@@ -960,6 +971,11 @@ func (f *framework) ListPlugins() map[string][]config.Plugin {
 // ClientSet returns a kubernetes clientset.
 func (f *framework) ClientSet() clientset.Interface {
 	return f.clientSet
+}
+
+// EventRecorder returns an event recorder.
+func (f *framework) EventRecorder() events.EventRecorder {
+	return f.eventRecorder
 }
 
 // SharedInformerFactory returns a shared informer factory.

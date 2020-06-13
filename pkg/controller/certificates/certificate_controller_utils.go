@@ -17,7 +17,7 @@ limitations under the License.
 package certificates
 
 import (
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 )
 

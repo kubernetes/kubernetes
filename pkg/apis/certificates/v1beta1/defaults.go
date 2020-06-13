@@ -18,14 +18,12 @@ package v1beta1
 
 import (
 	"crypto/x509"
-	"fmt"
-	"reflect"
-	"strings"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -67,99 +65,24 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 	}
 }
 
-var (
-	organizationNotSystemNodesErr = fmt.Errorf("subject organization is not system:nodes")
-	commonNameNotSystemNode       = fmt.Errorf("subject common name does not begin with system:node:")
-	dnsOrIPSANRequiredErr         = fmt.Errorf("DNS or IP subjectAltName is required")
-	dnsSANNotAllowedErr           = fmt.Errorf("DNS subjectAltNames are not allowed")
-	emailSANNotAllowedErr         = fmt.Errorf("Email subjectAltNames are not allowed")
-	ipSANNotAllowedErr            = fmt.Errorf("IP subjectAltNames are not allowed")
-	uriSANNotAllowedErr           = fmt.Errorf("URI subjectAltNames are not allowed")
-)
-
 func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
-	return ValidateKubeletServingCSR(req, usages) == nil
+	return certificates.IsKubeletServingCSR(req, usagesToSet(usages))
 }
 func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
-	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
-		return organizationNotSystemNodesErr
-	}
-
-	// at least one of dnsNames or ipAddresses must be specified
-	if len(req.DNSNames) == 0 && len(req.IPAddresses) == 0 {
-		return dnsOrIPSANRequiredErr
-	}
-
-	if len(req.EmailAddresses) > 0 {
-		return emailSANNotAllowedErr
-	}
-	if len(req.URIs) > 0 {
-		return uriSANNotAllowedErr
-	}
-
-	requiredUsages := []certificatesv1beta1.KeyUsage{
-		certificatesv1beta1.UsageDigitalSignature,
-		certificatesv1beta1.UsageKeyEncipherment,
-		certificatesv1beta1.UsageServerAuth,
-	}
-	if !equalUnsorted(requiredUsages, usages) {
-		return fmt.Errorf("usages did not match %v", requiredUsages)
-	}
-
-	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
-		return commonNameNotSystemNode
-	}
-
-	return nil
+	return certificates.ValidateKubeletServingCSR(req, usagesToSet(usages))
 }
 
 func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
-	return ValidateKubeletClientCSR(req, usages) == nil
+	return certificates.IsKubeletClientCSR(req, usagesToSet(usages))
 }
 func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
-	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
-		return organizationNotSystemNodesErr
-	}
-
-	if len(req.DNSNames) > 0 {
-		return dnsSANNotAllowedErr
-	}
-	if len(req.EmailAddresses) > 0 {
-		return emailSANNotAllowedErr
-	}
-	if len(req.IPAddresses) > 0 {
-		return ipSANNotAllowedErr
-	}
-	if len(req.URIs) > 0 {
-		return uriSANNotAllowedErr
-	}
-
-	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
-		return commonNameNotSystemNode
-	}
-
-	requiredUsages := []certificatesv1beta1.KeyUsage{
-		certificatesv1beta1.UsageDigitalSignature,
-		certificatesv1beta1.UsageKeyEncipherment,
-		certificatesv1beta1.UsageClientAuth,
-	}
-	if !equalUnsorted(requiredUsages, usages) {
-		return fmt.Errorf("usages did not match %v", requiredUsages)
-	}
-
-	return nil
+	return certificates.ValidateKubeletClientCSR(req, usagesToSet(usages))
 }
 
-// equalUnsorted compares two []string for equality of contents regardless of
-// the order of the elements
-func equalUnsorted(left, right []certificatesv1beta1.KeyUsage) bool {
-	l := sets.NewString()
-	for _, s := range left {
-		l.Insert(string(s))
+func usagesToSet(usages []certificatesv1beta1.KeyUsage) sets.String {
+	result := sets.NewString()
+	for _, usage := range usages {
+		result.Insert(string(usage))
 	}
-	r := sets.NewString()
-	for _, s := range right {
-		r.Insert(string(s))
-	}
-	return l.Equal(r)
+	return result
 }

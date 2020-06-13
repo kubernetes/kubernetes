@@ -10,6 +10,8 @@ rules:
       - k8s.io/kubernetes/pkg/apis/apps/validation
       - k8s.io/kubernetes/pkg/apis/autoscaling
       - k8s.io/kubernetes/pkg/apis/batch
+      - k8s.io/kubernetes/pkg/apis/certificates
+      - k8s.io/kubernetes/pkg/apis/certificates/v1
       - k8s.io/kubernetes/pkg/apis/core
       - k8s.io/kubernetes/pkg/apis/core/helper
       - k8s.io/kubernetes/pkg/apis/core/install

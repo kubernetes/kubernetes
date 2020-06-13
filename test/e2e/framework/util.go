@@ -588,13 +588,19 @@ func isTimeout(err error) bool {
 
 // Exec runs the kubectl executable.
 func (b KubectlBuilder) Exec() (string, error) {
+	stdout, _, err := b.ExecWithFullOutput()
+	return stdout, err
+}
+
+// ExecWithFullOutput runs the kubectl executable, and returns the stdout and stderr.
+func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
+		return "", "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -608,18 +614,18 @@ func (b KubectlBuilder) Exec() (string, error) {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)
 			}
-			return stdout.String(), uexec.CodeExitError{
+			return stdout.String(), stderr.String(), uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
-		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
+		return "", "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
 	Logf("stdout: %q", stdout.String())
-	return stdout.String(), nil
+	return stdout.String(), stderr.String(), nil
 }
 
 // RunKubectlOrDie is a convenience wrapper over kubectlBuilder
@@ -630,6 +636,12 @@ func RunKubectlOrDie(namespace string, args ...string) string {
 // RunKubectl is a convenience wrapper over kubectlBuilder
 func RunKubectl(namespace string, args ...string) (string, error) {
 	return NewKubectlCommand(namespace, args...).Exec()
+}
+
+// RunKubectlWithFullOutput is a convenience wrapper over kubectlBuilder
+// It will also return the command's stderr.
+func RunKubectlWithFullOutput(namespace string, args ...string) (string, string, error) {
+	return NewKubectlCommand(namespace, args...).ExecWithFullOutput()
 }
 
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
@@ -1041,6 +1053,12 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
 	return RunKubectl(ns, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
+}
+
+// RunHostCmdWithFullOutput runs the given cmd in the context of the given pod using `kubectl exec`
+// inside of a shell. It will also return the command's stderr.
+func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
+	return RunKubectlWithFullOutput(ns, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.

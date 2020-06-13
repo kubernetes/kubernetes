@@ -6,7 +6,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 
 1. Docker, using one of the following configurations:
   * **macOS** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
-     **Note**: You will want to set the Docker VM to have at least 4.5GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
+     **Note**: You will want to set the Docker VM to have at least 8GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
   * **Windows with Docker Desktop WSL2 backend**  Install Docker according to the [instructions](https://docs.docker.com/docker-for-windows/wsl-tech-preview/). Be sure to store your sources in the local Linux file system, not the Windows remote mount at `/mnt/c`.
   * **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.

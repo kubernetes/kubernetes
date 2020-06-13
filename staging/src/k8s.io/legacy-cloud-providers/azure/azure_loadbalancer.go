@@ -1080,14 +1080,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 					EnableTCPReset:      enableTCPReset,
+					EnableFloatingIP:    to.BoolPtr(true),
 				},
-			}
-			// LB does not support floating IPs for IPV6 rules
-			if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-				expectedRule.BackendPort = to.Int32Ptr(port.NodePort)
-				expectedRule.EnableFloatingIP = to.BoolPtr(false)
-			} else {
-				expectedRule.EnableFloatingIP = to.BoolPtr(true)
 			}
 
 			if protocol == v1.ProtocolTCP {

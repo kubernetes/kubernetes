@@ -39,6 +39,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.NodeResourcesMostAllocatedArgs{}, func(obj interface{}) {
 		SetObjectDefaults_NodeResourcesMostAllocatedArgs(obj.(*v1beta1.NodeResourcesMostAllocatedArgs))
 	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*v1beta1.PodTopologySpreadArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.RequestedToCapacityRatioArgs{}, func(obj interface{}) {
 		SetObjectDefaults_RequestedToCapacityRatioArgs(obj.(*v1beta1.RequestedToCapacityRatioArgs))
 	})
@@ -60,6 +61,10 @@ func SetObjectDefaults_NodeResourcesLeastAllocatedArgs(in *v1beta1.NodeResources
 
 func SetObjectDefaults_NodeResourcesMostAllocatedArgs(in *v1beta1.NodeResourcesMostAllocatedArgs) {
 	SetDefaults_NodeResourcesMostAllocatedArgs(in)
+}
+
+func SetObjectDefaults_PodTopologySpreadArgs(in *v1beta1.PodTopologySpreadArgs) {
+	SetDefaults_PodTopologySpreadArgs(in)
 }
 
 func SetObjectDefaults_RequestedToCapacityRatioArgs(in *v1beta1.RequestedToCapacityRatioArgs) {

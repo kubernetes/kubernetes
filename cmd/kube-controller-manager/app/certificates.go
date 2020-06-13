@@ -39,7 +39,7 @@ import (
 )
 
 func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
-	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
 		klog.Warningf("Resource %s is not available now", gvr.String())
 		return nil, false, nil
@@ -89,7 +89,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 	}
 
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
-	csrInformer := ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests()
+	csrInformer := ctx.InformerFactory.Certificates().V1().CertificateSigningRequests()
 	certTTL := ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
 	caFile, caKeyFile := getKubeletServingSignerFiles(ctx.ComponentConfig.CSRSigningController)
 
@@ -129,7 +129,7 @@ func getKubeletServingSignerFiles(config csrsigningconfig.CSRSigningControllerCo
 }
 
 func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
-	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
 		klog.Warningf("Resource %s is not available now", gvr.String())
 		return nil, false, nil
@@ -137,7 +137,7 @@ func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, err
 
 	approver := approver.NewCSRApprovingController(
 		ctx.ClientBuilder.ClientOrDie("certificate-controller"),
-		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
 	go approver.Run(1, ctx.Stop)
 
@@ -146,8 +146,8 @@ func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, err
 
 func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
-		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1beta1().CertificateSigningRequests(),
-		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
 	go cleaner.Run(1, ctx.Stop)
 	return nil, true, nil

@@ -87,6 +87,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: nodeports.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
+				{Name: volumebinding.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
@@ -112,7 +113,6 @@ func getDefaultConfig() *schedulerapi.Plugins {
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
-				{Name: defaultpodtopologyspread.Name},
 				{Name: tainttoleration.Name},
 			},
 		},
@@ -128,7 +128,6 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				// - This is a score coming from user preference.
 				// - It makes its signal comparable to NodeResourcesLeastAllocated.
 				{Name: podtopologyspread.Name, Weight: 2},
-				{Name: defaultpodtopologyspread.Name, Weight: 1},
 				{Name: tainttoleration.Name, Weight: 1},
 			},
 		},
@@ -172,12 +171,13 @@ func getClusterAutoscalerConfig() *schedulerapi.Plugins {
 }
 
 func applyFeatureGates(config *schedulerapi.Plugins) {
-	// Prioritizes nodes that satisfy pod's resource limits
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
-		klog.Infof("Registering resourcelimits priority function")
-		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+		// When feature is enabled, the default spreading is done by
+		// PodTopologySpread plugin, which is enabled by default.
+		klog.Infof("Registering DefaultPodTopologySpread plugin")
+		s := schedulerapi.Plugin{Name: defaultpodtopologyspread.Name}
 		config.PreScore.Enabled = append(config.PreScore.Enabled, s)
-		s = schedulerapi.Plugin{Name: noderesources.ResourceLimitsName, Weight: 1}
+		s.Weight = 1
 		config.Score.Enabled = append(config.Score.Enabled, s)
 	}
 }

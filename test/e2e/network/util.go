@@ -53,6 +53,23 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) by
 	return body
 }
 
+// GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.
+func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
+	var body string
+	pollFn := func() (bool, error) {
+		resp, err := config.GetResponseFromTestContainer("http", dialCmd, host, port)
+		if err != nil || len(resp.Errors) > 0 || len(resp.Responses) == 0 {
+			return false, nil
+		}
+		body = resp.Responses[0]
+		return true, nil
+	}
+	if pollErr := wait.PollImmediate(framework.Poll, timeout, pollFn); pollErr != nil {
+		return "", pollErr
+	}
+	return body, nil
+}
+
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")

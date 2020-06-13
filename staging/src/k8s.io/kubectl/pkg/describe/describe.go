@@ -3252,26 +3252,57 @@ type CertificateSigningRequestDescriber struct {
 }
 
 func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
+
+	var (
+		crBytes    []byte
+		metadata   metav1.ObjectMeta
+		status     string
+		signerName string
+		username   string
+		events     *corev1.EventList
+	)
+
+	if csr, err := p.client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+		crBytes = csr.Spec.Request
+		metadata = csr.ObjectMeta
+		conditionTypes := []string{}
+		for _, c := range csr.Status.Conditions {
+			conditionTypes = append(conditionTypes, string(c.Type))
+		}
+		status = extractCSRStatus(conditionTypes, csr.Status.Certificate)
+		signerName = csr.Spec.SignerName
+		username = csr.Spec.Username
+		if describerSettings.ShowEvents {
+			events, _ = p.client.CoreV1().Events(namespace).Search(scheme.Scheme, csr)
+		}
+	} else if csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+		crBytes = csr.Spec.Request
+		metadata = csr.ObjectMeta
+		conditionTypes := []string{}
+		for _, c := range csr.Status.Conditions {
+			conditionTypes = append(conditionTypes, string(c.Type))
+		}
+		status = extractCSRStatus(conditionTypes, csr.Status.Certificate)
+		if csr.Spec.SignerName != nil {
+			signerName = *csr.Spec.SignerName
+		}
+		username = csr.Spec.Username
+		if describerSettings.ShowEvents {
+			events, _ = p.client.CoreV1().Events(namespace).Search(scheme.Scheme, csr)
+		}
+	} else {
 		return "", err
 	}
 
-	cr, err := certificate.ParseCSR(csr)
+	cr, err := certificate.ParseCSR(crBytes)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}
-	status := extractCSRStatus(csr)
 
-	var events *corev1.EventList
-	if describerSettings.ShowEvents {
-		events, _ = p.client.CoreV1().Events(namespace).Search(scheme.Scheme, csr)
-	}
-
-	return describeCertificateSigningRequest(csr, cr, status, events)
+	return describeCertificateSigningRequest(metadata, signerName, username, cr, status, events)
 }
 
-func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigningRequest, cr *x509.CertificateRequest, status string, events *corev1.EventList) (string, error) {
+func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string, username string, cr *x509.CertificateRequest, status string, events *corev1.EventList) (string, error) {
 	printListHelper := func(w PrefixWriter, prefix, name string, values []string) {
 		if len(values) == 0 {
 			return
@@ -3287,9 +3318,9 @@ func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigni
 		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(csr.Labels))
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
-		w.Write(LEVEL_0, "Requesting User:\t%s\n", csr.Spec.Username)
-		if csr.Spec.SignerName != nil {
-			w.Write(LEVEL_0, "Signer:\t%s\n", *csr.Spec.SignerName)
+		w.Write(LEVEL_0, "Requesting User:\t%s\n", username)
+		if len(signerName) > 0 {
+			w.Write(LEVEL_0, "Signer:\t%s\n", signerName)
 		}
 		w.Write(LEVEL_0, "Status:\t%s\n", status)
 
@@ -4719,11 +4750,6 @@ var maxAnnotationLen = 140
 func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[string]string) {
 	w.Write(LEVEL_0, "%s:\t", title)
 
-	if len(annotations) == 0 {
-		w.WriteLine("<none>")
-		return
-	}
-
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(annotations))
 	for key := range annotations {
@@ -4732,7 +4758,7 @@ func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[str
 		}
 		keys = append(keys, key)
 	}
-	if len(annotations) == 0 {
+	if len(keys) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4840,20 +4866,20 @@ func formatEndpoints(endpoints *corev1.Endpoints, ports sets.String) string {
 	return ret
 }
 
-func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) string {
+func extractCSRStatus(conditions []string, certificateBytes []byte) string {
 	var approved, denied, failed bool
-	for _, c := range csr.Status.Conditions {
-		switch c.Type {
-		case certificatesv1beta1.CertificateApproved:
+	for _, c := range conditions {
+		switch c {
+		case string(certificatesv1beta1.CertificateApproved):
 			approved = true
-		case certificatesv1beta1.CertificateDenied:
+		case string(certificatesv1beta1.CertificateDenied):
 			denied = true
-		case certificatesv1beta1.CertificateFailed:
+		case string(certificatesv1beta1.CertificateFailed):
 			failed = true
 		}
 	}
 	var status string
-	// must be in order of presidence
+	// must be in order of precedence
 	if denied {
 		status += "Denied"
 	} else if approved {
@@ -4864,7 +4890,7 @@ func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) string
 	if failed {
 		status += ",Failed"
 	}
-	if len(csr.Status.Certificate) > 0 {
+	if len(certificateBytes) > 0 {
 		status += ",Issued"
 	}
 	return status
