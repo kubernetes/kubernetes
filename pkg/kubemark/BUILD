@@ -27,6 +27,7 @@ go_library(
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/proxy/util/iptables:go_default_library",
+        "//pkg/util/conntrack:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",

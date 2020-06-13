@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -15,6 +9,7 @@ go_library(
         "hostport_syncer.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/conntrack:go_default_library",
@@ -23,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
@@ -58,4 +54,5 @@ filegroup(
         "//pkg/kubelet/dockershim/network/hostport/testing:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
