@@ -124,6 +124,7 @@ func TestApplyStripsFields(t *testing.T) {
 					Manager:    "update",
 					Operation:  metav1.ManagedFieldsOperationApply,
 					APIVersion: "apps/v1",
+					FieldsType: "FieldsV1",
 				},
 			},
 			ResourceVersion: "b",
@@ -181,9 +182,7 @@ func TestVersionCheck(t *testing.T) {
 func TestApplyDoesNotStripLabels(t *testing.T) {
 	f := NewTestFieldManager()
 
-	obj := &corev1.Pod{}
-	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
-
+	obj := &unstructured.Unstructured{}
 	newObj, err := f.Apply(obj, []byte(`{
 		"apiVersion": "apps/v1",
 		"kind": "Pod",
@@ -505,5 +504,104 @@ func TestApplySuccessWithNoManagedFields(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
+	}
+}
+
+// Tests that one can reset the managedFields by sending either an empty
+// list
+func TestResetManagedFieldsEmptyList(t *testing.T) {
+	f := NewTestFieldManager()
+
+	objBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`)
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(objBytes, &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	liveObj, err := f.Apply(&corev1.Pod{}, objBytes, "fieldmanager_test_apply", false)
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"managedFields": [],
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	liveObj, err = f.Update(liveObj, obj, "update_manager")
+	if err != nil {
+		t.Fatalf("failed to update with empty manager: %v", err)
+	}
+
+	accessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		t.Fatalf("couldn't get accessor: %v", err)
+	}
+
+	if m := accessor.GetManagedFields(); len(m) != 0 {
+		t.Fatalf("failed to reset managedFields: %v", m)
+	}
+}
+
+// Tests that one can reset the managedFields by sending either a list with one empty item.
+func TestResetManagedFieldsEmptyItem(t *testing.T) {
+	f := NewTestFieldManager()
+
+	objBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`)
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(objBytes, &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	liveObj, err := f.Apply(&corev1.Pod{}, objBytes, "fieldmanager_test_apply", false)
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"managedFields": [{}],
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	liveObj, err = f.Update(liveObj, obj, "update_manager")
+	if err != nil {
+		t.Fatalf("failed to update with empty manager: %v", err)
+	}
+
+	accessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		t.Fatalf("couldn't get accessor: %v", err)
+	}
+
+	if m := accessor.GetManagedFields(); len(m) != 0 {
+		t.Fatalf("failed to reset managedFields: %v", m)
 	}
 }
