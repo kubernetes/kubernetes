@@ -137,7 +137,7 @@ func (pl *InterPodAffinity) PreScore(
 	}
 
 	if pl.sharedLister == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("InterPodAffinity PreScore with empty shared lister found"))
+		return framework.NewStatus(framework.Error, fmt.Sprintf("BuildTopologyPairToScore with empty shared lister"))
 	}
 
 	affinity := pod.Spec.Affinity

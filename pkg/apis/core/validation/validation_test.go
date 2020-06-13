@@ -10193,12 +10193,12 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "allowed valid, service with invalid IPFamily is ignored (tested in conditional validation)",
+			name: "invalid, service with invalid IPFamily",
 			tweakSvc: func(s *core.Service) {
 				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
 				s.Spec.IPFamily = &invalidServiceIPFamily
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 		{
 			name: "valid topology keys",
@@ -12204,18 +12204,18 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "remove ipfamily (covered by conditional validation)",
+			name: "remove ipfamily",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				ipv6Service := core.IPv6Protocol
 				oldSvc.Spec.IPFamily = &ipv6Service
 
 				newSvc.Spec.IPFamily = nil
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 
 		{
-			name: "change ServiceIPFamily (covered by conditional validation)",
+			name: "change ServiceIPFamily",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				ipv4Service := core.IPv4Protocol
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
@@ -12225,7 +12225,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.IPFamily = &ipv6Service
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 		{
 			name: "update with valid app protocol, field unset, gate disabled",

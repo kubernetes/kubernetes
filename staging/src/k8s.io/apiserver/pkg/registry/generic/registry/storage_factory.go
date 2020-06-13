@@ -34,7 +34,7 @@ import (
 )
 
 // Creates a cacher based given storageConfig.
-func StorageWithCacher() generic.StorageDecorator {
+func StorageWithCacher(capacity int) generic.StorageDecorator {
 	return func(
 		storageConfig *storagebackend.Config,
 		resourcePrefix string,
@@ -49,11 +49,18 @@ func StorageWithCacher() generic.StorageDecorator {
 		if err != nil {
 			return s, d, err
 		}
+		if capacity <= 0 {
+			klog.V(5).Infof("Storage caching is disabled for %s", objectTypeToString(newFunc()))
+			return s, d, nil
+		}
 		if klog.V(5).Enabled() {
-			klog.Infof("Storage caching is enabled for %s", objectTypeToString(newFunc()))
+			klog.Infof("Storage caching is enabled for %s with capacity %v", objectTypeToString(newFunc()), capacity)
 		}
 
+		// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
+		// Currently it has two layers of same storage interface -- cacher and low level kv.
 		cacherConfig := cacherstorage.Config{
+			CacheCapacity:  capacity,
 			Storage:        s,
 			Versioner:      etcd3.APIObjectVersioner{},
 			ResourcePrefix: resourcePrefix,

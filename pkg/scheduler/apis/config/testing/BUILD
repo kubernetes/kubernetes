@@ -8,6 +8,7 @@ go_test(
     ],
     deps = [
         "//pkg/apis/core/install:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",

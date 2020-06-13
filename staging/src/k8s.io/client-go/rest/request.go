@@ -88,8 +88,6 @@ var noBackoff = &NoBackoff{}
 type Request struct {
 	c *RESTClient
 
-	warningHandler WarningHandler
-
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
 	timeout     time.Duration
@@ -137,13 +135,12 @@ func NewRequest(c *RESTClient) *Request {
 	}
 
 	r := &Request{
-		c:              c,
-		rateLimiter:    c.rateLimiter,
-		backoff:        backoff,
-		timeout:        timeout,
-		pathPrefix:     pathPrefix,
-		maxRetries:     10,
-		warningHandler: c.warningHandler,
+		c:           c,
+		rateLimiter: c.rateLimiter,
+		backoff:     backoff,
+		timeout:     timeout,
+		pathPrefix:  pathPrefix,
+		maxRetries:  10,
 	}
 
 	switch {
@@ -218,13 +215,6 @@ func (r *Request) BackOff(manager BackoffManager) *Request {
 	}
 
 	r.backoff = manager
-	return r
-}
-
-// WarningHandler sets the handler this client uses when warning headers are encountered.
-// If set to nil, this client will use the default warning handler (see SetDefaultWarningHandler).
-func (r *Request) WarningHandler(handler WarningHandler) *Request {
-	r.warningHandler = handler
 	return r
 }
 
@@ -702,8 +692,6 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		return nil, err
 	}
 
-	handleWarnings(resp.Header, r.warningHandler)
-
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
@@ -776,7 +764,6 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 	switch {
 	case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
-		handleWarnings(resp.Header, r.warningHandler)
 		return resp.Body, nil
 
 	default:
@@ -1033,7 +1020,6 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 				body:        body,
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
-				warnings:    handleWarnings(resp.Header, r.warningHandler),
 			}
 		}
 	}
@@ -1052,7 +1038,6 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			statusCode:  resp.StatusCode,
 			decoder:     decoder,
 			err:         err,
-			warnings:    handleWarnings(resp.Header, r.warningHandler),
 		}
 	}
 
@@ -1061,7 +1046,6 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
-		warnings:    handleWarnings(resp.Header, r.warningHandler),
 	}
 }
 
@@ -1197,7 +1181,6 @@ func retryAfterSeconds(resp *http.Response) (int, bool) {
 // Result contains the result of calling Request.Do().
 type Result struct {
 	body        []byte
-	warnings    []net.WarningHeader
 	contentType string
 	err         error
 	statusCode  int
@@ -1309,11 +1292,6 @@ func (r Result) Error() error {
 		}
 	}
 	return r.err
-}
-
-// Warnings returns any warning headers received in the response
-func (r Result) Warnings() []net.WarningHeader {
-	return r.warnings
 }
 
 // NameMayNotBe specifies strings that cannot be used as names specified as path segments (like the REST API or etcd store)

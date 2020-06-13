@@ -316,7 +316,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
-		if err := runDockershim(
+		runDockershim(
 			kubeCfg,
 			kubeDeps,
 			crOptions,
@@ -324,9 +324,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			remoteRuntimeEndpoint,
 			remoteImageEndpoint,
 			nonMasqueradeCIDR,
-		); err != nil {
-			return err
-		}
+		)
 	case kubetypes.RemoteContainerRuntime:
 		// No-op.
 		break

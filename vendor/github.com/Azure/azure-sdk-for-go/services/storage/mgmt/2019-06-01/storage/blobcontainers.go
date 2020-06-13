@@ -181,6 +181,13 @@ func (client BlobContainersClient) Create(ctx context.Context, resourceGroupName
 		{TargetValue: containerName,
 			Constraints: []validation.Constraint{{Target: "containerName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "containerName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
+		{TargetValue: blobContainer,
+			Constraints: []validation.Constraint{{Target: "blobContainer.ContainerProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "blobContainer.ContainerProperties.ImmutabilityPolicy", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{{Target: "blobContainer.ContainerProperties.ImmutabilityPolicy.ImmutabilityPolicyProperty", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "blobContainer.ContainerProperties.ImmutabilityPolicy.ImmutabilityPolicyProperty.ImmutabilityPeriodSinceCreationInDays", Name: validation.Null, Rule: true, Chain: nil}}},
+					}},
+				}}}},
 		{TargetValue: client.SubscriptionID,
 			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
 		return result, validation.NewError("storage.BlobContainersClient", "Create", err.Error())
@@ -290,7 +297,9 @@ func (client BlobContainersClient) CreateOrUpdateImmutabilityPolicy(ctx context.
 			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.ImmutabilityPolicyProperty", Name: validation.Null, Rule: true, Chain: nil}}}}}}); err != nil {
+				Chain: []validation.Constraint{{Target: "parameters.ImmutabilityPolicyProperty", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{{Target: "parameters.ImmutabilityPolicyProperty.ImmutabilityPeriodSinceCreationInDays", Name: validation.Null, Rule: true, Chain: nil}}},
+				}}}}}); err != nil {
 		return result, validation.NewError("storage.BlobContainersClient", "CreateOrUpdateImmutabilityPolicy", err.Error())
 	}
 
@@ -609,7 +618,9 @@ func (client BlobContainersClient) ExtendImmutabilityPolicy(ctx context.Context,
 			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.ImmutabilityPolicyProperty", Name: validation.Null, Rule: true, Chain: nil}}}}}}); err != nil {
+				Chain: []validation.Constraint{{Target: "parameters.ImmutabilityPolicyProperty", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{{Target: "parameters.ImmutabilityPolicyProperty.ImmutabilityPeriodSinceCreationInDays", Name: validation.Null, Rule: true, Chain: nil}}},
+				}}}}}); err != nil {
 		return result, validation.NewError("storage.BlobContainersClient", "ExtendImmutabilityPolicy", err.Error())
 	}
 
@@ -1000,8 +1011,7 @@ func (client BlobContainersClient) LeaseResponder(resp *http.Response) (result L
 // must be between 3 and 24 characters in length and use numbers and lower-case letters only.
 // maxpagesize - optional. Specified maximum number of containers that can be included in the list.
 // filter - optional. When specified, only container names starting with the filter will be listed.
-// include - optional, used to include the properties for soft deleted blob containers.
-func (client BlobContainersClient) List(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string, include ListContainersInclude) (result ListContainerItemsPage, err error) {
+func (client BlobContainersClient) List(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (result ListContainerItemsPage, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/BlobContainersClient.List")
 		defer func() {
@@ -1026,7 +1036,7 @@ func (client BlobContainersClient) List(ctx context.Context, resourceGroupName s
 	}
 
 	result.fn = client.listNextResults
-	req, err := client.ListPreparer(ctx, resourceGroupName, accountName, maxpagesize, filter, include)
+	req, err := client.ListPreparer(ctx, resourceGroupName, accountName, maxpagesize, filter)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "storage.BlobContainersClient", "List", nil, "Failure preparing request")
 		return
@@ -1048,7 +1058,7 @@ func (client BlobContainersClient) List(ctx context.Context, resourceGroupName s
 }
 
 // ListPreparer prepares the List request.
-func (client BlobContainersClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string, include ListContainersInclude) (*http.Request, error) {
+func (client BlobContainersClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
 		"accountName":       autorest.Encode("path", accountName),
 		"resourceGroupName": autorest.Encode("path", resourceGroupName),
@@ -1064,9 +1074,6 @@ func (client BlobContainersClient) ListPreparer(ctx context.Context, resourceGro
 	}
 	if len(filter) > 0 {
 		queryParameters["$filter"] = autorest.Encode("query", filter)
-	}
-	if len(string(include)) > 0 {
-		queryParameters["$include"] = autorest.Encode("query", include)
 	}
 
 	preparer := autorest.CreatePreparer(
@@ -1118,7 +1125,7 @@ func (client BlobContainersClient) listNextResults(ctx context.Context, lastResu
 }
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
-func (client BlobContainersClient) ListComplete(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string, include ListContainersInclude) (result ListContainerItemsIterator, err error) {
+func (client BlobContainersClient) ListComplete(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (result ListContainerItemsIterator, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/BlobContainersClient.List")
 		defer func() {
@@ -1129,7 +1136,7 @@ func (client BlobContainersClient) ListComplete(ctx context.Context, resourceGro
 			tracing.EndSpan(ctx, sc, err)
 		}()
 	}
-	result.page, err = client.List(ctx, resourceGroupName, accountName, maxpagesize, filter, include)
+	result.page, err = client.List(ctx, resourceGroupName, accountName, maxpagesize, filter)
 	return
 }
 

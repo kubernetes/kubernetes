@@ -75,7 +75,7 @@ func (p *Plugin) Validate(_ context.Context, a admission.Attributes, _ admission
 		return nil
 	}
 
-	csrParsed, err := certificatesapi.ParseCSR(csr.Spec.Request)
+	csrParsed, err := certificatesapi.ParseCSR(csr)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("failed to parse CSR: %v", err))
 	}

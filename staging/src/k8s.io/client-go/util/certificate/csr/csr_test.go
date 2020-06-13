@@ -25,7 +25,8 @@ import (
 	"encoding/pem"
 	"testing"
 
-	certificates "k8s.io/api/certificates/v1"
+	certificates "k8s.io/api/certificates/v1beta1"
+	"k8s.io/utils/pointer"
 )
 
 func TestEnsureCompatible(t *testing.T) {
@@ -49,7 +50,7 @@ func TestEnsureCompatible(t *testing.T) {
 			orig: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					Request:    req,
-					SignerName: "example.com/test",
+					SignerName: pointer.StringPtr("example.com/test"),
 				},
 			},
 			privateKey: privateKey,
@@ -58,7 +59,7 @@ func TestEnsureCompatible(t *testing.T) {
 			new: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					Request:    req,
-					SignerName: "example.com/test",
+					SignerName: pointer.StringPtr("example.com/test"),
 				},
 			},
 			orig: &certificates.CertificateSigningRequest{
@@ -72,13 +73,13 @@ func TestEnsureCompatible(t *testing.T) {
 			new: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					Request:    req,
-					SignerName: "example.com/test",
+					SignerName: pointer.StringPtr("example.com/test"),
 				},
 			},
 			orig: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					Request:    req,
-					SignerName: "example.com/test",
+					SignerName: pointer.StringPtr("example.com/test"),
 				},
 			},
 			privateKey: privateKey,
@@ -87,13 +88,13 @@ func TestEnsureCompatible(t *testing.T) {
 			new: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					Request:    req,
-					SignerName: "example.com/test",
+					SignerName: pointer.StringPtr("example.com/test"),
 				},
 			},
 			orig: &certificates.CertificateSigningRequest{
 				Spec: certificates.CertificateSigningRequestSpec{
 					Request:    req,
-					SignerName: "example.com/not-test",
+					SignerName: pointer.StringPtr("example.com/not-test"),
 				},
 			},
 			privateKey: privateKey,

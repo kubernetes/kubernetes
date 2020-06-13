@@ -21,14 +21,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	certificatesapi "k8s.io/api/certificates/v1"
+	"k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestIsCertificateRequestApproved(t *testing.T) {
 	testCases := []struct {
 		name               string
-		conditions         []certificatesapi.CertificateSigningRequestCondition
+		conditions         []v1beta1.CertificateSigningRequestCondition
 		expectedIsApproved bool
 	}{
 		{
@@ -37,28 +37,28 @@ func TestIsCertificateRequestApproved(t *testing.T) {
 			false,
 		}, {
 			"Approved not exist and Denied exist",
-			[]certificatesapi.CertificateSigningRequestCondition{
+			[]v1beta1.CertificateSigningRequestCondition{
 				{
-					Type: certificatesapi.CertificateDenied,
+					Type: v1beta1.CertificateDenied,
 				},
 			},
 			false,
 		}, {
 			"Approved exist and Denied not exist",
-			[]certificatesapi.CertificateSigningRequestCondition{
+			[]v1beta1.CertificateSigningRequestCondition{
 				{
-					Type: certificatesapi.CertificateApproved,
+					Type: v1beta1.CertificateApproved,
 				},
 			},
 			true,
 		}, {
 			"Both of Approved and Denied exist",
-			[]certificatesapi.CertificateSigningRequestCondition{
+			[]v1beta1.CertificateSigningRequestCondition{
 				{
-					Type: certificatesapi.CertificateApproved,
+					Type: v1beta1.CertificateApproved,
 				},
 				{
-					Type: certificatesapi.CertificateDenied,
+					Type: v1beta1.CertificateDenied,
 				},
 			},
 			false,
@@ -66,11 +66,11 @@ func TestIsCertificateRequestApproved(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		csr := &certificatesapi.CertificateSigningRequest{
+		csr := &v1beta1.CertificateSigningRequest{
 			ObjectMeta: v1.ObjectMeta{
 				Name: "fake-csr",
 			},
-			Status: certificatesapi.CertificateSigningRequestStatus{
+			Status: v1beta1.CertificateSigningRequestStatus{
 				Conditions: tc.conditions,
 			},
 		}

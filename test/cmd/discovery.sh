@@ -86,9 +86,12 @@ run_resource_aliasing_tests() {
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
 
   # all 4 cassandra's might not be in the request immediately...
-  # :? suffix is for possible service.kubernetes.io/headless
+  # first option with :: suffix is for possible service.kubernetes.io/headless
   # label with "" value
-  kube::test::get_object_assert "$object" "$request" '(cassandra:){2}(cassandra:(cassandra::?)?)?'
+  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:cassandra::' || \
+  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:cassandra:' || \
+  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:cassandra:' || \
+  kube::test::get_object_assert "$object" "$request" 'cassandra:cassandra:'
 
   kubectl delete all -l app=cassandra "${kube_flags[@]}"
 

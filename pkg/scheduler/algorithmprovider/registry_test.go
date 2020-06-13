@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/component-base/featuregate"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -58,7 +57,6 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodeports.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
-				{Name: volumebinding.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
@@ -84,8 +82,8 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
-				{Name: tainttoleration.Name},
 				{Name: defaultpodtopologyspread.Name},
+				{Name: tainttoleration.Name},
 			},
 		},
 		Score: &schedulerapi.PluginSet{
@@ -97,8 +95,8 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodeaffinity.Name, Weight: 1},
 				{Name: nodepreferavoidpods.Name, Weight: 10000},
 				{Name: podtopologyspread.Name, Weight: 2},
-				{Name: tainttoleration.Name, Weight: 1},
 				{Name: defaultpodtopologyspread.Name, Weight: 1},
+				{Name: tainttoleration.Name, Weight: 1},
 			},
 		},
 		Reserve: &schedulerapi.PluginSet{
@@ -137,12 +135,13 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 
 func TestApplyFeatureGates(t *testing.T) {
 	tests := []struct {
-		name       string
-		feature    featuregate.Feature
-		wantConfig *schedulerapi.Plugins
+		name            string
+		featuresEnabled bool
+		wantConfig      *schedulerapi.Plugins
 	}{
 		{
-			name: "Feature gates disabled",
+			name:            "Feature gates disabled",
+			featuresEnabled: false,
 			wantConfig: &schedulerapi.Plugins{
 				QueueSort: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
@@ -155,7 +154,6 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeports.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
-						{Name: volumebinding.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{
@@ -181,8 +179,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
-						{Name: tainttoleration.Name},
 						{Name: defaultpodtopologyspread.Name},
+						{Name: tainttoleration.Name},
 					},
 				},
 				Score: &schedulerapi.PluginSet{
@@ -194,8 +192,8 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeaffinity.Name, Weight: 1},
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
 						{Name: podtopologyspread.Name, Weight: 2},
-						{Name: tainttoleration.Name, Weight: 1},
 						{Name: defaultpodtopologyspread.Name, Weight: 1},
+						{Name: tainttoleration.Name, Weight: 1},
 					},
 				},
 				Reserve: &schedulerapi.PluginSet{
@@ -226,8 +224,8 @@ func TestApplyFeatureGates(t *testing.T) {
 			},
 		},
 		{
-			name:    "NewDefaultPodTopologySpread enabled",
-			feature: features.DefaultPodTopologySpread,
+			name:            "Feature gates enabled",
+			featuresEnabled: true,
 			wantConfig: &schedulerapi.Plugins{
 				QueueSort: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
@@ -240,7 +238,6 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeports.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
-						{Name: volumebinding.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{
@@ -266,7 +263,9 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
+						{Name: defaultpodtopologyspread.Name},
 						{Name: tainttoleration.Name},
+						{Name: noderesources.ResourceLimitsName},
 					},
 				},
 				Score: &schedulerapi.PluginSet{
@@ -278,7 +277,9 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeaffinity.Name, Weight: 1},
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
 						{Name: podtopologyspread.Name, Weight: 2},
+						{Name: defaultpodtopologyspread.Name, Weight: 1},
 						{Name: tainttoleration.Name, Weight: 1},
+						{Name: noderesources.ResourceLimitsName, Weight: 1},
 					},
 				},
 				Reserve: &schedulerapi.PluginSet{
@@ -312,9 +313,7 @@ func TestApplyFeatureGates(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.feature, true)()
-			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceLimitsPriorityFunction, test.featuresEnabled)()
 
 			r := NewRegistry()
 			gotConfig := r[schedulerapi.SchedulerDefaultProviderName]

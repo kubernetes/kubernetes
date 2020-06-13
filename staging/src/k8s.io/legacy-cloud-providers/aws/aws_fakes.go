@@ -358,12 +358,7 @@ func (m *FakeMetadata) GetMetadata(key string) (string, error) {
 		if len(keySplit) == 5 && keySplit[4] == "device-number" {
 			for i, macElem := range m.aws.networkInterfacesMacs {
 				if macParam == macElem {
-					n := i
-					if n > 0 {
-						// Introduce an artificial gap, just to test eg: [eth0, eth2]
-						n++
-					}
-					return fmt.Sprintf("%d\n", n), nil
+					return fmt.Sprintf("%d\n", i), nil
 				}
 			}
 		}

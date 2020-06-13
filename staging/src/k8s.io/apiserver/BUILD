@@ -52,7 +52,6 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/wsstream:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/warning:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook:all-srcs",

@@ -84,7 +84,7 @@ type certificateValidationOptions struct {
 // PEM-encoded PKCS#10 certificate signing request. If this is invalid, we must
 // not accept the CSR for further processing.
 func validateCSR(obj *certificates.CertificateSigningRequest) error {
-	csr, err := certificates.ParseCSR(obj.Spec.Request)
+	csr, err := certificates.ParseCSR(obj)
 	if err != nil {
 		return err
 	}

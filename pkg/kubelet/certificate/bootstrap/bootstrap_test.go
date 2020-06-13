@@ -17,22 +17,19 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
-	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/keyutil"
 )
 
@@ -95,7 +92,7 @@ users:
 }
 
 func TestRequestNodeCertificateNoKeyData(t *testing.T) {
-	certData, err := requestNodeCertificate(newClientset(fakeClient{}), []byte{}, "fake-node-name")
+	certData, err := requestNodeCertificate(&fakeClient{}, []byte{}, "fake-node-name")
 	if err == nil {
 		t.Errorf("Got no error, wanted error an error because there was an empty private key passed in.")
 	}
@@ -105,9 +102,9 @@ func TestRequestNodeCertificateNoKeyData(t *testing.T) {
 }
 
 func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
-	client := newClientset(fakeClient{
+	client := &fakeClient{
 		failureType: createError,
-	})
+	}
 	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)
@@ -128,7 +125,7 @@ func TestRequestNodeCertificate(t *testing.T) {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(newClientset(fakeClient{}), privateKeyData, "fake-node-name")
+	certData, err := requestNodeCertificate(&fakeClient{}, privateKeyData, "fake-node-name")
 	if err != nil {
 		t.Errorf("Got %v, wanted no error.", err)
 	}
@@ -147,74 +144,54 @@ const (
 
 type fakeClient struct {
 	certificatesclient.CertificateSigningRequestInterface
+	watch       *watch.FakeWatcher
 	failureType failureType
 }
 
-func newClientset(opts fakeClient) *fake.Clientset {
-	f := fake.NewSimpleClientset()
-	switch opts.failureType {
-	case createError:
-		f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-			switch action.GetResource().Version {
-			case "v1":
-				return true, nil, fmt.Errorf("create error")
-			default:
-				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
-			}
-		})
-	default:
-		f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-			switch action.GetResource().Version {
-			case "v1":
-				return true, &certificatesv1.CertificateSigningRequest{ObjectMeta: metav1.ObjectMeta{Name: "fake-certificate-signing-request-name", UID: "fake-uid"}}, nil
-			default:
-				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
-			}
-		})
-		f.PrependReactor("list", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-			switch action.GetResource().Version {
-			case "v1":
-				return true, &certificatesv1.CertificateSigningRequestList{Items: []certificatesv1.CertificateSigningRequest{{ObjectMeta: metav1.ObjectMeta{Name: "fake-certificate-signing-request-name", UID: "fake-uid"}}}}, nil
-			default:
-				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
-			}
-		})
-		f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
-			switch action.GetResource().Version {
-			case "v1":
-				w := watch.NewFakeWithChanSize(1, false)
-				w.Add(opts.generateCSR())
-				w.Stop()
-				return true, w, nil
-
-			default:
-				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
-			}
-		})
+func (c *fakeClient) Create(context.Context, *certificates.CertificateSigningRequest, metav1.CreateOptions) (*certificates.CertificateSigningRequest, error) {
+	if c.failureType == createError {
+		return nil, fmt.Errorf("fakeClient failed creating request")
 	}
-	return f
+	csr := certificates.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  "fake-uid",
+			Name: "fake-certificate-signing-request-name",
+		},
+	}
+	return &csr, nil
 }
 
-func (c fakeClient) generateCSR() runtime.Object {
-	var condition certificatesv1.CertificateSigningRequestCondition
+func (c *fakeClient) List(_ context.Context, opts metav1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+	return &certificates.CertificateSigningRequestList{}, nil
+}
+
+func (c *fakeClient) Watch(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	c.watch = watch.NewFakeWithChanSize(1, false)
+	c.watch.Add(c.generateCSR())
+	c.watch.Stop()
+	return c.watch, nil
+}
+
+func (c *fakeClient) generateCSR() *certificates.CertificateSigningRequest {
+	var condition certificates.CertificateSigningRequestCondition
 	var certificateData []byte
 	if c.failureType == certificateSigningRequestDenied {
-		condition = certificatesv1.CertificateSigningRequestCondition{
-			Type: certificatesv1.CertificateDenied,
+		condition = certificates.CertificateSigningRequestCondition{
+			Type: certificates.CertificateDenied,
 		}
 	} else {
-		condition = certificatesv1.CertificateSigningRequestCondition{
-			Type: certificatesv1.CertificateApproved,
+		condition = certificates.CertificateSigningRequestCondition{
+			Type: certificates.CertificateApproved,
 		}
 		certificateData = []byte(`issued certificate`)
 	}
 
-	csr := certificatesv1.CertificateSigningRequest{
+	csr := certificates.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "fake-uid",
 		},
-		Status: certificatesv1.CertificateSigningRequestStatus{
-			Conditions: []certificatesv1.CertificateSigningRequestCondition{
+		Status: certificates.CertificateSigningRequestStatus{
+			Conditions: []certificates.CertificateSigningRequestCondition{
 				condition,
 			},
 			Certificate: certificateData,

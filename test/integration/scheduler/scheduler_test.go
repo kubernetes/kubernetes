@@ -106,7 +106,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
-					{Name: "VolumeBinding"},
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
@@ -201,7 +200,6 @@ kind: Policy
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
-					{Name: "VolumeBinding"},
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
@@ -791,15 +789,15 @@ func TestSchedulerInformers(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                string
+		description         string
 		nodes               []*nodeConfig
 		existingPods        []*v1.Pod
 		pod                 *v1.Pod
 		preemptedPodIndexes map[int]struct{}
 	}{
 		{
-			name:  "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
-			nodes: []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			description: "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
+			nodes:       []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
 			existingPods: []*v1.Pod{
 				initPausePod(&pausePodConfig{
 					Name:          "pod1",
@@ -828,36 +826,34 @@ func TestSchedulerInformers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			for _, nodeConf := range test.nodes {
-				_, err := createNode(cs, nodeConf.name, nodeConf.res)
-				if err != nil {
-					t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
-				}
-			}
-
-			pods := make([]*v1.Pod, len(test.existingPods))
-			var err error
-			// Create and run existingPods.
-			for i, p := range test.existingPods {
-				if pods[i], err = runPausePod(cs, p); err != nil {
-					t.Fatalf("Error running pause pod: %v", err)
-				}
-			}
-			// Create the new "pod".
-			unschedulable, err := createPausePod(cs, test.pod)
+		for _, nodeConf := range test.nodes {
+			_, err := createNode(cs, nodeConf.name, nodeConf.res)
 			if err != nil {
-				t.Errorf("Error while creating new pod: %v", err)
+				t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
 			}
-			if err := waitForPodUnschedulable(cs, unschedulable); err != nil {
-				t.Errorf("Pod %v got scheduled: %v", unschedulable.Name, err)
-			}
+		}
 
-			// Cleanup
-			pods = append(pods, unschedulable)
-			testutils.CleanupPods(cs, t, pods)
-			cs.PolicyV1beta1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-			cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-		})
+		pods := make([]*v1.Pod, len(test.existingPods))
+		var err error
+		// Create and run existingPods.
+		for i, p := range test.existingPods {
+			if pods[i], err = runPausePod(cs, p); err != nil {
+				t.Fatalf("Test [%v]: Error running pause pod: %v", test.description, err)
+			}
+		}
+		// Create the new "pod".
+		unschedulable, err := createPausePod(cs, test.pod)
+		if err != nil {
+			t.Errorf("Error while creating new pod: %v", err)
+		}
+		if err := waitForPodUnschedulable(cs, unschedulable); err != nil {
+			t.Errorf("Pod %v got scheduled: %v", unschedulable.Name, err)
+		}
+
+		// Cleanup
+		pods = append(pods, unschedulable)
+		testutils.CleanupPods(cs, t, pods)
+		cs.PolicyV1beta1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	}
 }

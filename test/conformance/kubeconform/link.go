@@ -19,6 +19,9 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
 
 	"gopkg.in/yaml.v2"
 
@@ -26,21 +29,30 @@ import (
 )
 
 func link(o *options) error {
+	var behaviorFiles []string
 	behaviorsMapping := make(map[string][]string)
 	var conformanceDataList []behaviors.ConformanceData
 
-	behaviorFiles, err := behaviors.BehaviorFileList(o.behaviorsDir)
+	err := filepath.Walk(o.behaviorsDir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			r, _ := regexp.Compile(".+.yaml$")
+			if r.MatchString(path) {
+				behaviorFiles = append(behaviorFiles, path)
+			}
+			return nil
+		})
 	if err != nil {
 		return err
 	}
-
 	fmt.Println()
 	fmt.Printf("Using behaviors from these %d files:\n", len(behaviorFiles))
 	for _, f := range behaviorFiles {
 		fmt.Println("    ", f)
 	}
 	fmt.Println()
-
 	if o.listAll {
 		fmt.Println("All behaviors:")
 	} else {
@@ -48,14 +60,17 @@ func link(o *options) error {
 	}
 
 	for _, behaviorFile := range behaviorFiles {
-		suite, err := behaviors.LoadSuite(behaviorFile)
+		var suite behaviors.Suite
+
+		yamlFile, err := ioutil.ReadFile(behaviorFile)
 		if err != nil {
 			return err
 		}
-		err = behaviors.ValidateSuite(suite)
+		err = yaml.UnmarshalStrict(yamlFile, &suite)
 		if err != nil {
-			return fmt.Errorf("error validating %s: %q", behaviorFile, err.Error())
+			return err
 		}
+
 		for _, behavior := range suite.Behaviors {
 			behaviorsMapping[behavior.ID] = nil
 		}
@@ -63,12 +78,12 @@ func link(o *options) error {
 
 	conformanceYaml, err := ioutil.ReadFile(o.testdata)
 	if err != nil {
-		return fmt.Errorf("%s: %v", o.testdata, err)
+		return err
 	}
 
 	err = yaml.Unmarshal(conformanceYaml, &conformanceDataList)
 	if err != nil {
-		return fmt.Errorf("%s: %v", o.testdata, err)
+		return err
 	}
 
 	for _, data := range conformanceDataList {

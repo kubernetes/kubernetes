@@ -58,6 +58,7 @@ func NewInTreeRegistry() framework.Registry {
 		noderesources.MostAllocatedName:            noderesources.NewMostAllocated,
 		noderesources.LeastAllocatedName:           noderesources.NewLeastAllocated,
 		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio,
+		noderesources.ResourceLimitsName:           noderesources.NewResourceLimits,
 		volumebinding.Name:                         volumebinding.New,
 		volumerestrictions.Name:                    volumerestrictions.New,
 		volumezone.Name:                            volumezone.New,

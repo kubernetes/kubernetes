@@ -168,10 +168,39 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 
 // Update alters scale subset of StatefulSet object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, _, err := r.store.Update(
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	ss := obj.(*apps.StatefulSet)
+
+	oldScale, err := scaleFromStatefulSet(ss)
+	if err != nil {
+		return nil, false, err
+	}
+
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
+	if err != nil {
+		return nil, false, err
+	}
+	if obj == nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+	}
+	scale, ok := obj.(*autoscaling.Scale)
+	if !ok {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+	}
+
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
+	}
+
+	ss.Spec.Replicas = scale.Spec.Replicas
+	ss.ResourceVersion = scale.ResourceVersion
+	obj, _, err = r.store.Update(
 		ctx,
-		name,
-		&scaleUpdatedObjectInfo{name, objInfo},
+		ss.Name,
+		rest.DefaultUpdatedObjectInfo(ss),
 		toScaleCreateValidation(createValidation),
 		toScaleUpdateValidation(updateValidation),
 		false,
@@ -180,7 +209,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	if err != nil {
 		return nil, false, err
 	}
-	ss := obj.(*apps.StatefulSet)
+	ss = obj.(*apps.StatefulSet)
 	newScale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -235,63 +264,4 @@ func scaleFromStatefulSet(ss *apps.StatefulSet) (*autoscaling.Scale, error) {
 			Selector: selector.String(),
 		},
 	}, nil
-}
-
-// scaleUpdatedObjectInfo transforms existing statefulset -> existing scale -> new scale -> new statefulset
-type scaleUpdatedObjectInfo struct {
-	name       string
-	reqObjInfo rest.UpdatedObjectInfo
-}
-
-func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
-	return i.reqObjInfo.Preconditions()
-}
-
-func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
-	statefulset, ok := oldObj.DeepCopyObject().(*apps.StatefulSet)
-	if !ok {
-		return nil, errors.NewBadRequest(fmt.Sprintf("expected existing object type to be StatefulSet, got %T", statefulset))
-	}
-	// if zero-value, the existing object does not exist
-	if len(statefulset.ResourceVersion) == 0 {
-		return nil, errors.NewNotFound(apps.Resource("statefulsets/scale"), i.name)
-	}
-
-	// statefulset -> old scale
-	oldScale, err := scaleFromStatefulSet(statefulset)
-	if err != nil {
-		return nil, err
-	}
-
-	// old scale -> new scale
-	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
-	if err != nil {
-		return nil, err
-	}
-	if newScaleObj == nil {
-		return nil, errors.NewBadRequest("nil update passed to Scale")
-	}
-	scale, ok := newScaleObj.(*autoscaling.Scale)
-	if !ok {
-		return nil, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", newScaleObj))
-	}
-
-	// validate
-	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), statefulset.Name, errs)
-	}
-
-	// validate precondition if specified (resourceVersion matching is handled by storage)
-	if len(scale.UID) > 0 && scale.UID != statefulset.UID {
-		return nil, errors.NewConflict(
-			apps.Resource("statefulsets/scale"),
-			statefulset.Name,
-			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", scale.UID, statefulset.UID),
-		)
-	}
-
-	// move replicas/resourceVersion fields to object and return
-	statefulset.Spec.Replicas = scale.Spec.Replicas
-	statefulset.ResourceVersion = scale.ResourceVersion
-	return statefulset, nil
 }

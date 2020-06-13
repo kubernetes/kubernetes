@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"net"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +29,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service"
-	registry "k8s.io/kubernetes/pkg/registry/core/service"
 )
 
 type GenericREST struct {
@@ -38,19 +36,17 @@ type GenericREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet, hasSecondary bool) (*GenericREST, *StatusREST, error) {
-	strategy, _ := registry.StrategyForServiceCIDRs(serviceCIDR, hasSecondary)
-
+func NewGenericREST(optsGetter generic.RESTOptionsGetter) (*GenericREST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Service{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
 		DefaultQualifiedResource: api.Resource("services"),
 		ReturnDeletedObject:      true,
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
-		ExportStrategy: strategy,
+		CreateStrategy: service.Strategy,
+		UpdateStrategy: service.Strategy,
+		DeleteStrategy: service.Strategy,
+		ExportStrategy: service.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -60,7 +56,7 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = service.NewServiceStatusStrategy(strategy)
+	statusStore.UpdateStrategy = service.StatusStrategy
 	return &GenericREST{store}, &StatusREST{store: &statusStore}, nil
 }
 

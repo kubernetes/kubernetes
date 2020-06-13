@@ -30,11 +30,6 @@ import (
 
 type hnsV2 struct{}
 
-var (
-	// LoadBalancerFlagsIPv6 enables IPV6.
-	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
-)
-
 func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(name)
 	if err != nil {
@@ -95,14 +90,10 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 		equal := false
 		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
-
-			if !equal && len(endpoint.IpConfigurations) > 1 {
-				equal = endpoint.IpConfigurations[1].IpAddress == ip
-			}
 		}
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
 			return &endpointsInfo{
-				ip:         ip,
+				ip:         endpoint.IpConfigurations[0].IpAddress,
 				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
@@ -239,10 +230,6 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	lbFlags := hcn.LoadBalancerFlagsNone
 	if flags.isDSR {
 		lbFlags |= hcn.LoadBalancerFlagsDSR
-	}
-
-	if flags.isIPv6 {
-		lbFlags |= LoadBalancerFlagsIPv6
 	}
 
 	lbDistributionType := hcn.LoadBalancerDistributionNone

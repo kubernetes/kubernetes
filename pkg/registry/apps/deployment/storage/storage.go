@@ -279,10 +279,39 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 
 // Update alters scale subset of Deployment object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, _, err := r.store.Update(
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, false, errors.NewNotFound(apps.Resource("deployments/scale"), name)
+	}
+	deployment := obj.(*apps.Deployment)
+
+	oldScale, err := scaleFromDeployment(deployment)
+	if err != nil {
+		return nil, false, err
+	}
+
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
+	if err != nil {
+		return nil, false, err
+	}
+	if obj == nil {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+	}
+	scale, ok := obj.(*autoscaling.Scale)
+	if !ok {
+		return nil, false, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", obj))
+	}
+
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), name, errs)
+	}
+
+	deployment.Spec.Replicas = scale.Spec.Replicas
+	deployment.ResourceVersion = scale.ResourceVersion
+	obj, _, err = r.store.Update(
 		ctx,
-		name,
-		&scaleUpdatedObjectInfo{name, objInfo},
+		deployment.Name,
+		rest.DefaultUpdatedObjectInfo(deployment),
 		toScaleCreateValidation(createValidation),
 		toScaleUpdateValidation(updateValidation),
 		false,
@@ -291,7 +320,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	if err != nil {
 		return nil, false, err
 	}
-	deployment := obj.(*apps.Deployment)
+	deployment = obj.(*apps.Deployment)
 	newScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -346,63 +375,4 @@ func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error
 			Selector: selector.String(),
 		},
 	}, nil
-}
-
-// scaleUpdatedObjectInfo transforms existing deployment -> existing scale -> new scale -> new deployment
-type scaleUpdatedObjectInfo struct {
-	name       string
-	reqObjInfo rest.UpdatedObjectInfo
-}
-
-func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
-	return i.reqObjInfo.Preconditions()
-}
-
-func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
-	deployment, ok := oldObj.DeepCopyObject().(*apps.Deployment)
-	if !ok {
-		return nil, errors.NewBadRequest(fmt.Sprintf("expected existing object type to be Deployment, got %T", deployment))
-	}
-	// if zero-value, the existing object does not exist
-	if len(deployment.ResourceVersion) == 0 {
-		return nil, errors.NewNotFound(apps.Resource("deployments/scale"), i.name)
-	}
-
-	// deployment -> old scale
-	oldScale, err := scaleFromDeployment(deployment)
-	if err != nil {
-		return nil, err
-	}
-
-	// old scale -> new scale
-	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
-	if err != nil {
-		return nil, err
-	}
-	if newScaleObj == nil {
-		return nil, errors.NewBadRequest("nil update passed to Scale")
-	}
-	scale, ok := newScaleObj.(*autoscaling.Scale)
-	if !ok {
-		return nil, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", newScaleObj))
-	}
-
-	// validate
-	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), deployment.Name, errs)
-	}
-
-	// validate precondition if specified (resourceVersion matching is handled by storage)
-	if len(scale.UID) > 0 && scale.UID != deployment.UID {
-		return nil, errors.NewConflict(
-			apps.Resource("deployments/scale"),
-			deployment.Name,
-			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", scale.UID, deployment.UID),
-		)
-	}
-
-	// move replicas/resourceVersion fields to object and return
-	deployment.Spec.Replicas = scale.Spec.Replicas
-	deployment.ResourceVersion = scale.ResourceVersion
-	return deployment, nil
 }

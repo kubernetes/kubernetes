@@ -229,7 +229,6 @@ func (BasicPod) ParamNames() []generate.GeneratorParam {
 		{Name: "requests", Required: false},
 		{Name: "limits", Required: false},
 		{Name: "serviceaccount", Required: false},
-		{Name: "privileged", Required: false},
 	}
 }
 
@@ -282,18 +281,6 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	if len(restartPolicy) == 0 {
 		restartPolicy = v1.RestartPolicyAlways
 	}
-
-	privileged, err := generate.GetBool(params, "privileged", false)
-	if err != nil {
-		return nil, err
-	}
-	var securityContext *v1.SecurityContext
-	if privileged {
-		securityContext = &v1.SecurityContext{
-			Privileged: &privileged,
-		}
-	}
-
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
@@ -303,13 +290,12 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			ServiceAccountName: params["serviceaccount"],
 			Containers: []v1.Container{
 				{
-					Name:            name,
-					Image:           params["image"],
-					Stdin:           stdin,
-					StdinOnce:       !leaveStdinOpen && stdin,
-					TTY:             tty,
-					Resources:       resourceRequirements,
-					SecurityContext: securityContext,
+					Name:      name,
+					Image:     params["image"],
+					Stdin:     stdin,
+					StdinOnce: !leaveStdinOpen && stdin,
+					TTY:       tty,
+					Resources: resourceRequirements,
 				},
 			},
 			DNSPolicy:     v1.DNSClusterFirst,

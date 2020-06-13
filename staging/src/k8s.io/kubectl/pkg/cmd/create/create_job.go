@@ -32,7 +32,6 @@ import (
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -70,7 +69,6 @@ type CreateJobOptions struct {
 	DryRunVerifier   *resource.DryRunVerifier
 	Builder          *resource.Builder
 	FieldManager     string
-	CreateAnnotation bool
 
 	genericclioptions.IOStreams
 }
@@ -129,8 +127,6 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-
-	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -206,11 +202,6 @@ func (o *CreateJobOptions) Run() error {
 
 		job = o.createJobFromCronJob(cronJob)
 	}
-
-	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, job, scheme.DefaultJSONEncoder()); err != nil {
-		return err
-	}
-
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
 		if o.FieldManager != "" {

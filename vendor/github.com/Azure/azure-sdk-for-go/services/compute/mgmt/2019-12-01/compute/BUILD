@@ -22,7 +22,6 @@ go_library(
         "proximityplacementgroups.go",
         "resourceskus.go",
         "snapshots.go",
-        "sshpublickeys.go",
         "usage.go",
         "version.go",
         "virtualmachineextensionimages.go",
