@@ -842,6 +842,16 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
+	klog.V(2).Info("Flushing stale connections")
+
+	// Flush conntrack entries for stale connections to avoid blackholing traffic
+	for _, svcIP := range staleServices.UnsortedList() {
+		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
+		}
+	}
+	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
+
 	klog.V(2).Info("Syncing iptables rules")
 
 	success := false
@@ -1596,15 +1606,6 @@ func (proxier *Proxier) syncProxyRules() {
 	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
 		klog.Errorf("Error syncing healthcheck endpoints: %v", err)
 	}
-
-	// Finish housekeeping.
-	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
-			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
-		}
-	}
-	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
 }
 
 // Join all words with spaces, terminate with newline and write to buf.

@@ -2503,4 +2503,82 @@ COMMIT
 	assert.NotEqual(t, expectedIPTablesWithSlice, fp.iptablesData.String())
 }
 
+func TestClearStaleEntriesIptablesError(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipt.Error = fmt.Errorf("Failed to ensure that filter chain INPUT jumps to KUBE-EXTERNAL-SERVICES: error checking rule: exit status 4: Another app is currently holding the xtables lock")
+	fp := NewFakeProxier(ipt, false)
+	// Create a fake executor for the conntrack utility. This should only be
+	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			// conntrack clear entries for service
+			func() ([]byte, []byte, error) {
+				return []byte("conntrack v1.4.5 (conntrack-tools): 1 flow entries have been deleted."), nil, nil
+			},
+			// conntrack clear entries for endpoints
+			func() ([]byte, []byte, error) {
+				return []byte("conntrack v1.4.5 (conntrack-tools): 1 flow entries have been deleted."), nil, nil
+			},
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			// delete conntrack service
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			// delete conntrack endpoints
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+
+	fp.exec = &fexec
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolUDP,
+			}}
+		}),
+	)
+	makeEndpointsMap(fp)
+
+	epIP := "10.180.0.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: epIP,
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolUDP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	// Endpoints should be deleted
+	if fcmd.CombinedOutputLog[0][0] != "conntrack -D --orig-dst 10.20.30.41 -p udp" && fexec.CommandCalls != 1 {
+		t.Errorf("Endpoints conntrack entries were not deleted")
+	}
+
+	// No rules should be created
+	if len(fp.iptablesData.String()) != 0 {
+		t.Errorf("Unexpected rules created")
+	}
+}
+
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.

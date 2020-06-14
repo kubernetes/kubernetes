@@ -58,6 +58,7 @@ type FakeIPTables struct {
 	hasRandomFully bool
 	Lines          []byte
 	protocol       iptables.Protocol
+	Error          error
 }
 
 // NewFake returns a no-op iptables.Interface
@@ -77,28 +78,28 @@ func (f *FakeIPTables) SetHasRandomFully(can bool) *FakeIPTables {
 }
 
 // EnsureChain is part of iptables.Interface
-func (*FakeIPTables) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
-	return true, nil
+func (f *FakeIPTables) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
+	return true, f.Error
 }
 
 // FlushChain is part of iptables.Interface
-func (*FakeIPTables) FlushChain(table iptables.Table, chain iptables.Chain) error {
-	return nil
+func (f *FakeIPTables) FlushChain(table iptables.Table, chain iptables.Chain) error {
+	return f.Error
 }
 
 // DeleteChain is part of iptables.Interface
-func (*FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) error {
-	return nil
+func (f *FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) error {
+	return f.Error
 }
 
 // EnsureRule is part of iptables.Interface
-func (*FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
-	return true, nil
+func (f *FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
+	return true, f.Error
 }
 
 // DeleteRule is part of iptables.Interface
-func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
-	return nil
+func (f *FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
+	return f.Error
 }
 
 // IsIPv6 is part of iptables.Interface
@@ -115,24 +116,24 @@ func (f *FakeIPTables) Protocol() iptables.Protocol {
 func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
 	lines := make([]byte, len(f.Lines))
 	copy(lines, f.Lines)
-	return lines, nil
+	return lines, f.Error
 }
 
 // SaveInto is part of iptables.Interface
 func (f *FakeIPTables) SaveInto(table iptables.Table, buffer *bytes.Buffer) error {
 	buffer.Write(f.Lines)
-	return nil
+	return f.Error
 }
 
 // Restore is part of iptables.Interface
-func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
-	return nil
+func (f *FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+	return f.Error
 }
 
 // RestoreAll is part of iptables.Interface
 func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	f.Lines = data
-	return nil
+	return f.Error
 }
 
 // Monitor is part of iptables.Interface
