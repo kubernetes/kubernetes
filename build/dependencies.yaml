@@ -52,10 +52,6 @@ dependencies:
       match: ETCD_VERSION
     - path: cluster/gce/upgrade-aliases.sh
       match: ETCD_IMAGE|ETCD_VERSION
-    - path: cluster/images/etcd/Makefile
-      match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
-    - path: cluster/images/etcd/migrate-if-needed.sh
-      match: BUNDLED_VERSIONS=
     - path: cmd/kubeadm/app/constants/constants.go
     - path: hack/lib/etcd.sh
       match: ETCD_VERSION=
@@ -63,6 +59,14 @@ dependencies:
       match: quay.io/coreos/etcd
     - path: test/e2e/framework/nodes_util.go
       match: const etcdImage
+
+  - name: "etcd-image"
+    version: 3.4.9
+    refPaths:
+    - path: cluster/images/etcd/Makefile
+      match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
+    - path: cluster/images/etcd/migrate-if-needed.sh
+      match: BUNDLED_VERSIONS=
 
   - name: "golang"
     version: 1.13.9
