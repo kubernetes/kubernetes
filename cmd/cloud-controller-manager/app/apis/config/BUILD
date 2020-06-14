@@ -31,6 +31,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/cloud-controller-manager/app/apis/config/scheme:all-srcs",
+        "//cmd/cloud-controller-manager/app/apis/config/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
