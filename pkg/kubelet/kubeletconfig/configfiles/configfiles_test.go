@@ -18,16 +18,18 @@ package configfiles
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+
 	"path/filepath"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
+	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -36,27 +38,23 @@ import (
 const configDir = "/test-config-dir"
 const relativePath = "relative/path/test"
 const kubeletFile = "kubelet"
+const fakeAddress = "127.0.0.1"
 
-func TestLoad(t *testing.T) {
+func TestLoadAndLoadInstanceFile(t *testing.T) {
 	cases := []struct {
-		desc      string
-		file      *string
-		expect    *kubeletconfig.KubeletConfiguration
-		err       string
-		strictErr bool
+		desc string
+		file *string
+		err  string
 	}{
-		// missing file
 		{
 			desc: "missing file",
 			err:  "failed to read",
 		},
-		// empty file
 		{
 			desc: "empty file",
 			file: newString(``),
 			err:  "was empty",
 		},
-		// invalid format
 		{
 			desc: "invalid yaml",
 			file: newString(`*`),
@@ -67,7 +65,32 @@ func TestLoad(t *testing.T) {
 			file: newString(`{*`),
 			err:  "failed to decode",
 		},
-		// invalid object
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			loader, err := loadConfigFile(t, c.file)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			_, err = loader.Load()
+			utiltest.ExpectError(t, err, c.err)
+
+			_, err = loader.LoadInstance(&kubeletconfigv1beta1.KubeletInstanceConfiguration{})
+			utiltest.ExpectError(t, err, c.err)
+		})
+	}
+}
+
+func TestLoad(t *testing.T) {
+	cases := []struct {
+		desc      string
+		file      *string
+		expect    *kubeletconfig.KubeletConfiguration
+		err       string
+		strictErr bool
+	}{
 		{
 			desc: "missing kind",
 			file: newString(`{"apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
@@ -88,7 +111,6 @@ func TestLoad(t *testing.T) {
 			file: newString(`{"kind":"KubeletConfiguration","apiVersion":"bogusversion"}`),
 			err:  "failed to decode",
 		},
-
 		// empty object with correct kind and version should result in the defaults for that kind and version
 		{
 			desc: "default from yaml",
@@ -101,13 +123,12 @@ apiVersion: kubelet.config.k8s.io/v1beta1`),
 			file:   newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			expect: newConfig(t),
 		},
-
 		// relative path
 		{
 			desc: "yaml, relative path is resolved",
 			file: newString(fmt.Sprintf(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
-staticPodPath: %s`, relativePath)),
+staticPodPath: %s`, filepath.Join(configDir, relativePath))),
 			expect: func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
@@ -116,7 +137,7 @@ staticPodPath: %s`, relativePath)),
 		},
 		{
 			desc: "json, relative path is resolved",
-			file: newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
+			file: newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, filepath.Join(configDir, relativePath))),
 			expect: func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
@@ -129,7 +150,7 @@ staticPodPath: %s`, relativePath)),
 			file: newString(fmt.Sprintf(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
 staticPodPath: %s
-staticPodPath: %s/foo`, relativePath, relativePath)),
+staticPodPath: %s/foo`, filepath.Join(configDir, relativePath), filepath.Join(configDir, relativePath))),
 			// err:       `key "staticPodPath" already set`,
 			// strictErr: true,
 			expect: func() *kubeletconfig.KubeletConfiguration {
@@ -152,19 +173,11 @@ foo: bar`),
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			fs := utilfs.NewFakeFs()
-			path := filepath.Join(configDir, kubeletFile)
-			if c.file != nil {
-				if err := addFile(fs, path, *c.file); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-			}
-			loader, err := NewFsLoader(fs, path)
+			loader, err := loadConfigFile(t, c.file)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			kc, err := loader.Load()
-
 			if c.strictErr && !runtime.IsStrictDecodingError(errors.Cause(err)) {
 				t.Fatalf("got error: %v, want strict decoding error", err)
 			}
@@ -173,6 +186,102 @@ foo: bar`),
 			}
 			if !apiequality.Semantic.DeepEqual(c.expect, kc) {
 				t.Fatalf("expect %#v but got %#v", *c.expect, *kc)
+			}
+		})
+	}
+}
+
+func TestLoadInstance(t *testing.T) {
+	cases := []struct {
+		desc      string
+		file      *string
+		expect    *kubeletconfigv1beta1.KubeletInstanceConfiguration
+		err       string
+		strictErr bool
+	}{
+		{
+			desc: "unregistered kind",
+			file: newString(`{"kind":"BogusKind","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			err:  "failed to decode",
+		},
+		{
+			desc: "unregistered version",
+			file: newString(`{"kind":"KubeletInstanceConfiguration","apiVersion":"bogusversion"}`),
+			err:  "failed to decode",
+		},
+		{
+			desc: "empty correct object with default from yaml",
+			file: newString(`kind: KubeletInstanceConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1`),
+			expect: newInstanceConfig(t),
+		},
+		{
+			desc:   "default from json",
+			file:   newString(`{"kind":"KubeletInstanceConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			expect: newInstanceConfig(t),
+		},
+		{
+			desc: "yaml, relative path is resolved",
+			file: newString(fmt.Sprintf(`kind: KubeletInstanceConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+address: %s`, fakeAddress)),
+			expect: func() *kubeletconfigv1beta1.KubeletInstanceConfiguration {
+				kic := newInstanceConfig(t)
+				kic.Address = fakeAddress
+				return kic
+			}(),
+		},
+		{
+			desc: "json, relative path is resolved",
+			file: newString(fmt.Sprintf(`{"kind":"KubeletInstanceConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","address": "%s"}`, fakeAddress)),
+			expect: func() *kubeletconfigv1beta1.KubeletInstanceConfiguration {
+				kic := newInstanceConfig(t)
+				kic.Address = fakeAddress
+				return kic
+			}(),
+		},
+		{
+			// This should fail from v1beta2+
+			desc: "duplicate field",
+			file: newString(fmt.Sprintf(`kind: KubeletInstanceConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+address: 0.0.0.0
+address: %s`, fakeAddress)),
+			err: `key "address" already set`,
+			expect: func() *kubeletconfigv1beta1.KubeletInstanceConfiguration {
+				kic := newInstanceConfig(t)
+				kic.Address = fakeAddress
+				return kic
+			}(),
+		},
+		{
+			desc: "unknown field",
+			file: newString(`kind: KubeletInstanceConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+foo: bar`),
+			err:    "found unknown field: foo",
+			expect: newInstanceConfig(t),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			loader, err := loadConfigFile(t, c.file)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			defaultConfig := kubeletconfigv1beta1.KubeletInstanceConfiguration{}
+			kic, err := loader.LoadInstance(&defaultConfig)
+			if c.strictErr && !runtime.IsStrictDecodingError(errors.Cause(err)) {
+				t.Fatalf("got error: %v, want strict decoding error", err)
+			}
+
+			if utiltest.SkipRest(t, c.desc, err, c.err) {
+				return
+			}
+			if !apiequality.Semantic.DeepEqual(c.expect, kic) {
+				t.Fatalf("expect %#v but got %#v", *c.expect, *kic)
 			}
 		})
 	}
@@ -190,7 +299,10 @@ func TestResolveRelativePaths(t *testing.T) {
 		{"relative path", relativePath, filepath.Join(configDir, relativePath)},
 	}
 
-	paths := kubeletconfig.KubeletConfigurationPathRefs(newConfig(t))
+	kcE, _ := utilcodec.NewKubeletConfigurationE()
+	kc, _ := utilcodec.ConvertKubeletConfigurationI(kcE)
+	paths := kubeletconfig.KubeletConfigurationPathRefs(kc)
+
 	if len(paths) == 0 {
 		t.Fatalf("requires at least one path field to exist in the KubeletConfiguration type")
 	}
@@ -204,6 +316,22 @@ func TestResolveRelativePaths(t *testing.T) {
 			}
 		})
 	}
+}
+
+func loadConfigFile(t *testing.T, file *string) (Loader, error) {
+	fs := utilfs.NewFakeFs()
+	path := filepath.Join(configDir, kubeletFile)
+	if file != nil {
+		if err := addFile(fs, path, *file); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+	loader, err := NewFsLoader(fs, path)
+	if err != nil {
+		return nil, err
+
+	}
+	return loader, nil
 }
 
 func newString(s string) *string {
@@ -231,4 +359,14 @@ func newConfig(t *testing.T) *kubeletconfig.KubeletConfiguration {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	return kc
+}
+
+func newInstanceConfig(t *testing.T) *kubeletconfigv1beta1.KubeletInstanceConfiguration {
+	kind := "KubeletInstanceConfiguration"
+	kcE, err := utilcodec.NewKubeletInstanceConfigurationE()
+	kcE.TypeMeta = metav1.TypeMeta{APIVersion: kubeletconfigv1beta1.SchemeGroupVersion.String(), Kind: kind}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return kcE
 }

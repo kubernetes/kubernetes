@@ -26,9 +26,9 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
-        "//pkg/kubelet/apis/config/scheme:go_default_library",
         "//pkg/kubelet/apis/config/validation:go_default_library",
         "//pkg/kubelet/config:go_default_library",
+        "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/util/flag:go_default_library",
@@ -39,7 +39,6 @@ go_library(
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
-        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({

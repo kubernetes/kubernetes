@@ -90,6 +90,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	dynamickubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
+	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
@@ -113,9 +114,13 @@ const (
 func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletConfig, err := options.NewKubeletConfiguration()
-	// programmer error
+	if err != nil {
+		klog.Fatal(err)
+	}
+	kubeletConfigInstance, err := options.NewKubeletInstanceConfiguration()
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -200,7 +205,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				// We must enforce flag precedence by re-parsing the command line into the new object.
 				// This is necessary to preserve backwards-compatibility across binary upgrades.
 				// See issue #56171 for more details.
-				if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
+				if err := kubeletConfigFlagPrecedence(kubeletConfig, kubeletConfigInstance, args); err != nil {
 					klog.Fatal(err)
 				}
 				// update feature gates based on new config
@@ -225,7 +230,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 						// so that we get a complete validation at the same point where we can decide to reject dynamic config.
 						// This fixes the flag-precedence component of issue #63305.
 						// See issue #56171 for general details on flag precedence.
-						return kubeletConfigFlagPrecedence(kc, args)
+						return kubeletConfigFlagPrecedence(kc, &kubeletconfiginternal.KubeletInstanceConfiguration{}, args)
 					})
 				if err != nil {
 					klog.Fatal(err)
@@ -241,10 +246,16 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				}
 			}
 
+			kubeletConfig, kubeletConfigInstance, err = mergeInstanceConfiguration(kubeletConfig, kubeletFlags.KubeletInstanceConfigFile, args)
+			if err != nil {
+				klog.Fatal(err)
+			}
+
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
-				KubeletFlags:         *kubeletFlags,
-				KubeletConfiguration: *kubeletConfig,
+				KubeletFlags:                 *kubeletFlags,
+				KubeletConfiguration:         *kubeletConfig,
+				KubeletInstanceConfiguration: *kubeletConfigInstance,
 			}
 
 			// use kubeletServer to construct the default KubeletDeps
@@ -259,8 +270,10 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// set up signal context here in order to be reused by kubelet and docker shim
 			ctx := genericapiserver.SetupSignalContext()
 
-			// run the kubelet
 			klog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
+			klog.V(5).Infof("KubeletInstanceConfiguration: %#v", kubeletServer.KubeletInstanceConfiguration)
+
+			// run the kubelet
 			if err := Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate); err != nil {
 				klog.Fatal(err)
 			}
@@ -270,6 +283,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	// keep cleanFlagSet separate, so Cobra doesn't pollute it with the global flags
 	kubeletFlags.AddFlags(cleanFlagSet)
 	options.AddKubeletConfigFlags(cleanFlagSet, kubeletConfig)
+	options.AddKubeletInstanceConfigFlags(cleanFlagSet, kubeletConfigInstance)
 	options.AddGlobalFlags(cleanFlagSet)
 	cleanFlagSet.BoolP("help", "h", false, fmt.Sprintf("help for %s", cmd.Name()))
 
@@ -284,6 +298,107 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	})
 
 	return cmd
+}
+
+// generateV1Beta1Config returns the external serialization of both instance and shared configurations.
+// Fields that exists in both configurations are copied from the shared into the instance one.
+func generateV1Beta1Config(kc *kubeletconfiginternal.KubeletConfiguration) (
+	*kubeletconfigv1beta1.KubeletConfiguration,
+	*kubeletconfigv1beta1.KubeletInstanceConfiguration,
+	error,
+) {
+	s, _, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// convert the internal shared configuration into external
+	kce := &kubeletconfigv1beta1.KubeletConfiguration{}
+	if err := s.Convert(kc, kce, nil); err != nil {
+		return nil, nil, err
+	}
+
+	// generate a new instance external configuration
+	kcie, err := utilcodec.NewKubeletInstanceConfigurationE()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// merge the external shared configuration into the instance external configuration
+	mergeConfigurationExternal(kce, kcie)
+
+	return kce, kcie, nil
+}
+
+// mergeInstanceConfiguration converts the external shared and instance configuration to their respective
+// internal representation, reapplying flags and merge the instance into shared configuration.
+func mergeInstanceConfiguration(
+	kc *kubeletconfiginternal.KubeletConfiguration,
+	instanceConfigFile string,
+	args []string,
+) (
+	*kubeletconfiginternal.KubeletConfiguration,
+	*kubeletconfiginternal.KubeletInstanceConfiguration,
+	error,
+) {
+	kce, kcie, err := generateV1Beta1Config(kc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(instanceConfigFile) > 0 {
+		kcie, err = loadConfigInstanceFile(instanceConfigFile, kcie)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// convert external versioned configuration in internal
+	kc, err = utilcodec.ConvertKubeletConfigurationI(kce)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// convert external defaulted instance versioned configuration in internal
+	kci, err := utilcodec.ConvertKubeletInstanceConfigurationI(kcie)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// we must enforce flag precedence by re-parsing the command line into the new object.
+	if err := kubeletConfigFlagPrecedence(kc, kci, args); err != nil {
+		return nil, nil, err
+	}
+
+	// merge instance configuration into shared configuration
+	mergeConfigurationInternal(kc, kci)
+
+	// update feature gates based on new config
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
+		return nil, nil, err
+	}
+
+	return kc, kci, nil
+}
+
+// mergeKubeletConfigurationI merges the fields from KubeletInstanceConfiguration into KubeletConfiguration
+func mergeConfigurationInternal(
+	kc *kubeletconfiginternal.KubeletConfiguration,
+	kic *kubeletconfiginternal.KubeletInstanceConfiguration,
+) {
+	if kc.Address != kic.Address {
+		kc.Address = kic.Address
+	}
+}
+
+// mergeConfigurationExternal merges the fields from KubeletConfiguration into KubeletInstanceConfiguration
+func mergeConfigurationExternal(
+	kc *kubeletconfigv1beta1.KubeletConfiguration,
+	kic *kubeletconfigv1beta1.KubeletInstanceConfiguration,
+) {
+	if kc.Address != kic.Address {
+		kic.Address = kc.Address
+	}
 }
 
 // newFlagSetWithGlobals constructs a new pflag.FlagSet with global flags registered
@@ -312,7 +427,7 @@ func newFakeFlagSet(fs *pflag.FlagSet) *pflag.FlagSet {
 // We must enforce flag precedence by re-parsing the command line into the new object.
 // This is necessary to preserve backwards-compatibility across binary upgrades.
 // See issue #56171 for more details.
-func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration, args []string) error {
+func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration, kic *kubeletconfiginternal.KubeletInstanceConfiguration, args []string) error {
 	// We use a throwaway kubeletFlags and a fake global flagset to avoid double-parses,
 	// as some Set implementations accumulate values from multiple flag invocations.
 	fs := newFakeFlagSet(newFlagSetWithGlobals())
@@ -320,6 +435,9 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	options.NewKubeletFlags().AddFlags(fs)
 	// register new KubeletConfiguration
 	options.AddKubeletConfigFlags(fs, kc)
+	// register new KubeletInstanceConfiguration
+	options.AddKubeletInstanceConfigFlags(fs, kic)
+
 	// Remember original feature gates, so we can merge with flag gates later
 	original := kc.FeatureGates
 	// re-parse flags
@@ -335,6 +453,7 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	return nil
 }
 
+// loadConfigFile returns the external representation of KubeletConfiguration
 func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, error) {
 	const errFmt = "failed to load Kubelet config file %s, error %v"
 	// compute absolute path based on current working dir
@@ -353,11 +472,30 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 	return kc, err
 }
 
+// loadInstanceConfigFile returns the external representation of KubeletInstanceConfiguration
+func loadConfigInstanceFile(name string, defaultConfig *kubeletconfigv1beta1.KubeletInstanceConfiguration) (*kubeletconfigv1beta1.KubeletInstanceConfiguration, error) {
+	const errFmt = "failed to load Kubelet instance config file %s, error %v"
+	// compute absolute path based on current working dir
+	kubeletConfigFile, err := filepath.Abs(name)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	loader, err := configfiles.NewFsLoader(utilfs.DefaultFs{}, kubeletConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	kec, err := loader.LoadInstance(defaultConfig)
+	if err != nil {
+		return nil, fmt.Errorf(errFmt, name, err)
+	}
+	return kec, err
+}
+
 // UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.FeatureGate) (*kubelet.Dependencies, error) {
 	// Initialize the TLS Options
-	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
+	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration, &s.KubeletInstanceConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +673,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 	}
 
-	hostName, err := nodeutil.GetHostname(s.HostnameOverride)
+	hostName, err := nodeutil.GetHostname(s.KubeletInstanceConfiguration.HostnameOverride)
 	if err != nil {
 		return err
 	}
@@ -973,7 +1111,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
+func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration, kic *kubeletconfiginternal.KubeletInstanceConfiguration) (*server.TLSOptions, error) {
 	if !kc.ServerTLSBootstrap && kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
 		kc.TLSCertFile = path.Join(kf.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = path.Join(kf.CertDirectory, "kubelet.key")
@@ -983,7 +1121,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 			return nil, err
 		}
 		if !canReadCertAndKey {
-			hostName, err := nodeutil.GetHostname(kf.HostnameOverride)
+			hostName, err := nodeutil.GetHostname(kic.HostnameOverride)
 			if err != nil {
 				return nil, err
 			}
@@ -1069,7 +1207,7 @@ func setContentTypeForClient(cfg *restclient.Config, contentType string) {
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, runOnce bool) error {
-	hostname, err := nodeutil.GetHostname(kubeServer.HostnameOverride)
+	hostname, err := nodeutil.GetHostname(kubeServer.KubeletInstanceConfiguration.HostnameOverride)
 	if err != nil {
 		return err
 	}
@@ -1078,7 +1216,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	if err != nil {
 		return err
 	}
-	hostnameOverridden := len(kubeServer.HostnameOverride) > 0
+	hostnameOverridden := len(kubeServer.KubeletInstanceConfiguration.HostnameOverride) > 0
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
@@ -1100,7 +1238,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		hostname,
 		hostnameOverridden,
 		nodeName,
-		kubeServer.NodeIP,
+		kubeServer.KubeletInstanceConfiguration.NodeIP,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,

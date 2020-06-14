@@ -18,19 +18,22 @@ package configfiles
 
 import (
 	"fmt"
-	"path/filepath"
-
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	"path/filepath"
 )
 
 // Loader loads configuration from a storage layer
 type Loader interface {
 	// Load loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be loaded
 	Load() (*kubeletconfig.KubeletConfiguration, error)
+
+	// LoadInstance loads and returns the KubeletInstanceConfiguration from a storage layer, or an error if a configuration could not be loaded
+	LoadInstance(*kubeletconfigv1beta1.KubeletInstanceConfiguration) (*kubeletconfigv1beta1.KubeletInstanceConfiguration, error)
 }
 
 // fsLoader loads configuration from `configDir`
@@ -76,6 +79,24 @@ func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 	// make all paths absolute
 	resolveRelativePaths(kubeletconfig.KubeletConfigurationPathRefs(kc), filepath.Dir(loader.kubeletFile))
 	return kc, nil
+}
+
+func (loader *fsLoader) LoadInstance(defaultInstance *kubeletconfigv1beta1.KubeletInstanceConfiguration) (*kubeletconfigv1beta1.KubeletInstanceConfiguration, error) {
+	data, err := loader.fs.ReadFile(loader.kubeletFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read kubelet instance config file %q, error: %v", loader.kubeletFile, err)
+	}
+
+	// no configuration is an error, some parameters are required
+	if len(data) == 0 {
+		return nil, fmt.Errorf("kubelet instance config file %q was empty", loader.kubeletFile)
+	}
+
+	kic, err := utilcodec.DecodeKubeletInstanceConfiguration(loader.kubeletCodecs, data, defaultInstance)
+	if err != nil {
+		return nil, err
+	}
+	return kic, nil
 }
 
 // resolveRelativePaths makes relative paths absolute by resolving them against `root`

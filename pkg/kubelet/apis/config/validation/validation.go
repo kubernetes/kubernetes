@@ -168,3 +168,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 
 	return utilerrors.NewAggregate(allErrors)
 }
+
+// ValidateKubeletInstanceConfiguration validates `kic` and returns an error if it is invalid
+func ValidateKubeletInstanceConfiguration(kic *kubeletconfig.KubeletInstanceConfiguration) error {
+	return nil
+}

@@ -182,7 +182,7 @@ func run(config *hollowNodeConfig) {
 	}
 
 	if config.Morph == "kubelet" {
-		f, c := kubemark.GetHollowKubeletConfig(config.createHollowKubeletOptions())
+		f, c, i := kubemark.GetHollowKubeletConfig(config.createHollowKubeletOptions())
 
 		heartbeatClientConfig := *clientConfig
 		heartbeatClientConfig.Timeout = c.NodeStatusUpdateFrequency.Duration
@@ -218,7 +218,7 @@ func run(config *hollowNodeConfig) {
 		}
 
 		hollowKubelet := kubemark.NewHollowKubelet(
-			f, c,
+			f, c, i,
 			client,
 			heartbeatClient,
 			cadvisorInterface,

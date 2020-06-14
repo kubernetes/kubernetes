@@ -35,6 +35,7 @@ const (
 	DefaultIPTablesMasqueradeBit = 14
 	DefaultIPTablesDropBit       = 15
 	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	defaultAddress               = "0.0.0.0"
 )
 
 var (
@@ -62,7 +63,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
 	}
 	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
+		obj.Address = defaultAddress
 	}
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
@@ -238,5 +239,14 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	componentbaseconfigv1alpha1.RecommendedLoggingConfiguration(&obj.Logging)
 	if obj.EnableSystemLogHandler == nil {
 		obj.EnableSystemLogHandler = utilpointer.BoolPtr(true)
+	}
+}
+
+func SetDefaults_KubeletInstanceConfiguration(obj *kubeletconfigv1beta1.KubeletInstanceConfiguration) {
+	// Default values on both shared and instance configuration are advised have the same
+	// values, for correct merging.
+
+	if obj.Address == "" {
+		obj.Address = defaultAddress
 	}
 }

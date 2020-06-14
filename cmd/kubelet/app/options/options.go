@@ -30,14 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/pkg/master/ports"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
@@ -60,13 +59,6 @@ type KubeletFlags struct {
 	ChaosChance float64
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
-
-	// HostnameOverride is the hostname used to identify the kubelet instead
-	// of the actual hostname.
-	HostnameOverride string
-	// NodeIP is IP address of the node.
-	// If set, kubelet will use this IP address for the node.
-	NodeIP string
 
 	// Container-runtime-specific options.
 	config.ContainerRuntimeOptions
@@ -98,6 +90,11 @@ type KubeletFlags struct {
 	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
+
+	// The Kubelet will load its initial instance configuration from this file.
+	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
+	// Omit this flag to use the shared Kubelet configuration
+	KubeletInstanceConfigFile string
 
 	// registerNode enables automatic registration with the apiserver.
 	RegisterNode bool
@@ -230,20 +227,27 @@ func getLabelNamespace(key string) string {
 	return ""
 }
 
-// NewKubeletConfiguration will create a new KubeletConfiguration with default values
+// NewKubeletConfiguration will create a new internal KubeletConfiguration with default values.
 func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
+	versioned, err := utilcodec.NewKubeletConfigurationE()
 	if err != nil {
 		return nil, err
 	}
-	versioned := &v1beta1.KubeletConfiguration{}
-	scheme.Default(versioned)
-	config := &kubeletconfig.KubeletConfiguration{}
-	if err := scheme.Convert(versioned, config, nil); err != nil {
+	kc, err := utilcodec.ConvertKubeletConfigurationI(versioned)
+	if err != nil {
 		return nil, err
 	}
-	applyLegacyDefaults(config)
-	return config, nil
+	applyLegacyDefaults(kc)
+	return kc, nil
+}
+
+// NewKubeletInstanceConfiguration will create a new internal KubeletConfiguration with default values.
+func NewKubeletInstanceConfiguration() (*kubeletconfig.KubeletInstanceConfiguration, error) {
+	versioned, err := utilcodec.NewKubeletInstanceConfigurationE()
+	if err != nil {
+		return nil, err
+	}
+	return utilcodec.ConvertKubeletInstanceConfigurationI(versioned)
 }
 
 // applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
@@ -265,6 +269,7 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 type KubeletServer struct {
 	KubeletFlags
 	kubeletconfig.KubeletConfiguration
+	KubeletInstanceConfiguration kubeletconfig.KubeletInstanceConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -273,9 +278,15 @@ func NewKubeletServer() (*KubeletServer, error) {
 	if err != nil {
 		return nil, err
 	}
+	configInstance, err := NewKubeletInstanceConfiguration()
+	if err != nil {
+		return nil, err
+	}
+
 	return &KubeletServer{
-		KubeletFlags:         *NewKubeletFlags(),
-		KubeletConfiguration: *config,
+		KubeletFlags:                 *NewKubeletFlags(),
+		KubeletConfiguration:         *config,
+		KubeletInstanceConfiguration: *configInstance,
 	}, nil
 }
 
@@ -285,6 +296,11 @@ func ValidateKubeletServer(s *KubeletServer) error {
 	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
 		return err
 	}
+
+	if err := kubeletconfigvalidation.ValidateKubeletInstanceConfiguration(&s.KubeletInstanceConfiguration); err != nil {
+		return err
+	}
+
 	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {
 		return err
 	}
@@ -316,16 +332,14 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
+	fs.StringVar(&f.KubeletInstanceConfigFile, "instance-config", f.KubeletInstanceConfigFile, "The Kubelet will override any available configuration from this file.")
+
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
 		"The client certificate and key file will be stored in the directory pointed by --cert-dir.")
-
-	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname. If --cloud-provider is set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
-
-	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node. If unset, kubelet will use the node's default IPv4 address, if any, or its default IPv6 address if it has no IPv4 addresses. You can pass '::' to make it prefer the default IPv6 address rather than the default IPv4 address.")
 
 	fs.StringVar(&f.CertDirectory, "cert-dir", f.CertDirectory, "The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
@@ -409,7 +423,6 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.DurationVar(&c.HTTPCheckFrequency.Duration, "http-check-frequency", c.HTTPCheckFrequency.Duration, "Duration between checking http for new data")
 	fs.StringVar(&c.StaticPodURL, "manifest-url", c.StaticPodURL, "URL for accessing additional Pod specifications to run")
 	fs.Var(cliflag.NewColonSeparatedMultimapStringString(&c.StaticPodURLHeader), "manifest-url-header", "Comma-separated list of HTTP headers to use when accessing the url provided to --manifest-url. Multiple headers with the same name will be added in the same order provided. This flag can be repeatedly invoked. For example: --manifest-url-header 'a:hello,b:again,c:world' --manifest-url-header 'b:beautiful'")
-	fs.Var(utilflag.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
 	fs.Int32Var(&c.Port, "port", c.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&c.ReadOnlyPort, "read-only-port", c.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
 
@@ -540,4 +553,26 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 
 	// Graduated experimental flags, kept for backward compatibility
 	fs.BoolVar(&c.KernelMemcgNotification, "experimental-kernel-memcg-notification", c.KernelMemcgNotification, "Use kernelMemcgNotification configuration, this flag will be removed in 1.23.")
+}
+
+// AddKubeletInstanceConfigFlags adds flags for a specific kubeletconfig.KubeletInstanceConfiguration to the specified FlagSet
+func AddKubeletInstanceConfigFlags(mainfs *pflag.FlagSet, kic *kubeletconfig.KubeletInstanceConfiguration) {
+	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	defer func() {
+		// All KubeletInstanceConfiguration flags are now deprecated, and any new flags that point to
+		// KubeletInstanceConfiguration fields are deprecated-on-creation. When removing flags at the end
+		// of their deprecation period, be careful to check that they have *actually* been deprecated
+		// members of the KubeletInstanceConfiguration for the entire deprecation period:
+		// e.g. if a flag was added after this deprecation function, it may not be at the end
+		// of its lifetime yet, even if the rest are.
+		deprecated := "This parameter should be set via the instance config file specified by the Kubelet's --instance-config flag."
+		fs.VisitAll(func(f *pflag.Flag) {
+			f.Deprecated = deprecated
+		})
+		mainfs.AddFlagSet(fs)
+	}()
+
+	fs.Var(utilflag.IPVar{Val: &kic.Address}, "address", "The IP address for the Kubelet to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
+	fs.StringVar(&kic.HostnameOverride, "hostname-override", kic.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname. If --cloud-provider is set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
+	fs.StringVar(&kic.NodeIP, "node-ip", kic.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node. If unset, kubelet will use the node's default IPv4 address, if any, or its default IPv6 address if it has no IPv4 addresses. You can pass '::' to make it prefer the default IPv6 address rather than the default IPv4 address.")
 }

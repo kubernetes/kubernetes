@@ -884,3 +884,26 @@ type SerializedNodeConfigSource struct {
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// KubeletConfiguration contains the configuration for the Kubelet
+type KubeletInstanceConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
+	// for all interfaces).
+	// Default: "0.0.0.0"
+	// +optional
+	Address string `json:"address,omitempty"`
+	// HostnameOverride is the hostname used to identify the kubelet instead
+	// of the actual hostname.
+	// Default: ""
+	// +optional
+	HostnameOverride string `json:"hostnameOverride,omitempty"`
+	// NodeIP is the IP address of the node.
+	// If set, kubelet will use this IP address for the node.
+	// Default: ""
+	// +optional
+	NodeIP string `json:"nodeIP,omitempty"`
+}

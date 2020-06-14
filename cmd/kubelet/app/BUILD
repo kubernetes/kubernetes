@@ -40,6 +40,7 @@ go_library(
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/configfiles:go_default_library",
+        "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/stats/pidlimit:go_default_library",
@@ -146,8 +147,10 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//cmd/kubelet/app/options:go_default_library",
         "//pkg/apis/certificates/v1:go_default_library",
         "//pkg/controller/certificates/authority:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

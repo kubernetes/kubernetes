@@ -440,3 +440,20 @@ type SerializedNodeConfigSource struct {
 	// +optional
 	Source v1.NodeConfigSource
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// KubeletInstanceConfiguration contains the configuration for a Kubelet instance
+type KubeletInstanceConfiguration struct {
+	metav1.TypeMeta
+
+	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
+	// for all interfaces)
+	Address string
+	// HostnameOverride is the hostname used to identify the kubelet instead
+	// of the actual hostname.
+	HostnameOverride string
+	// NodeIP is the IP address of the node.
+	// If set, kubelet will use this IP address for the node.
+	NodeIP string
+}

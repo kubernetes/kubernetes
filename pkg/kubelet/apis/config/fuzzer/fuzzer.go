@@ -105,5 +105,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 		},
+		func(obj *kubeletconfig.KubeletInstanceConfiguration, c fuzz.Continue) {
+			obj.Address = "0.0.0.0"
+		},
 	}
 }

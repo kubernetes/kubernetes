@@ -46,12 +46,7 @@ filegroup(
         "//pkg/kubelet/kubeletconfig/checkpoint:all-srcs",
         "//pkg/kubelet/kubeletconfig/configfiles:all-srcs",
         "//pkg/kubelet/kubeletconfig/status:all-srcs",
-        "//pkg/kubelet/kubeletconfig/util/codec:all-srcs",
-        "//pkg/kubelet/kubeletconfig/util/equal:all-srcs",
-        "//pkg/kubelet/kubeletconfig/util/files:all-srcs",
-        "//pkg/kubelet/kubeletconfig/util/log:all-srcs",
-        "//pkg/kubelet/kubeletconfig/util/panic:all-srcs",
-        "//pkg/kubelet/kubeletconfig/util/test:all-srcs",
+        "//pkg/kubelet/kubeletconfig/util:all-srcs",
     ],
     tags = ["automanaged"],
 )

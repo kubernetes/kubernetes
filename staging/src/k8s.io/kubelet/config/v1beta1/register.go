@@ -38,6 +38,7 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeletConfiguration{},
+		&KubeletInstanceConfiguration{},
 		&SerializedNodeConfigSource{},
 	)
 	return nil

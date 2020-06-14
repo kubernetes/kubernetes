@@ -18,7 +18,6 @@ package codec
 
 import (
 	"fmt"
-
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 
@@ -29,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/component-base/codec"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 )
 
 // EncodeKubeletConfig encodes an internal KubeletConfiguration to an external YAML representation.
@@ -61,6 +60,54 @@ func NewKubeletconfigYAMLEncoder(targetVersion schema.GroupVersion) (runtime.Enc
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
 	return codecs.EncoderForVersion(info.Serializer, targetVersion), nil
+}
+
+// NewKubeletConfigurationE will create a new external KubeletConfiguration with default values.
+func NewKubeletConfigurationE() (*kubeletconfigv1beta1.KubeletConfiguration, error) {
+	s, _, err := scheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
+	s.Default(versioned)
+	return versioned, nil
+}
+
+// NewKubeletInstanceConfigurationE will create a new external KubeletInstanceConfiguration with default values.
+func NewKubeletInstanceConfigurationE() (*kubeletconfigv1beta1.KubeletInstanceConfiguration, error) {
+	s, _, err := scheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	versioned := &kubeletconfigv1beta1.KubeletInstanceConfiguration{}
+	s.Default(versioned)
+	return versioned, nil
+}
+
+// ConvertKubeletConfigurationI will convert the external KubeletConfigutaion to the internal.
+func ConvertKubeletConfigurationI(versioned *kubeletconfigv1beta1.KubeletConfiguration) (*kubeletconfig.KubeletConfiguration, error) {
+	s, _, err := scheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	config := &kubeletconfig.KubeletConfiguration{}
+	if err := s.Convert(versioned, config, nil); err != nil {
+		return nil, err
+	}
+	return config, err
+}
+
+// ConvertKubeletInstanceConfigurationI will convert the external KubeletInstanceConfiguration to the internal.
+func ConvertKubeletInstanceConfigurationI(versioned *kubeletconfigv1beta1.KubeletInstanceConfiguration) (*kubeletconfig.KubeletInstanceConfiguration, error) {
+	s, _, err := scheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	config := &kubeletconfig.KubeletInstanceConfiguration{}
+	if err := s.Convert(versioned, config, nil); err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 // NewYAMLEncoder generates a new runtime.Encoder that encodes objects to YAML.
@@ -108,7 +155,7 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 			return nil, lenientErr
 		}
 
-		obj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
+		obj, gvk, lenientErr = lenientCodecs.UniversalDecoder(kubeletconfig.SchemeGroupVersion).Decode(data, nil, nil)
 		if lenientErr != nil {
 			// Lenient decoding failed with the current version, return the
 			// original strict error.
@@ -118,10 +165,34 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
 	}
 
-	internalKC, ok := obj.(*kubeletconfig.KubeletConfiguration)
+	kc, ok := obj.(*kubeletconfig.KubeletConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("failed to cast object to KubeletConfiguration, unexpected type: %v", gvk)
 	}
 
-	return internalKC, nil
+	return kc, nil
+}
+
+// DecodeKubeletInstanceConfiguration decodes a serializer KubeletInstanceConfiguration to the external type,
+// use nil on defaultInstance to load the fields from YAML directly.
+func DecodeKubeletInstanceConfiguration(
+	kubeletCodecs *serializer.CodecFactory, data []byte,
+	defaultConfig *kubeletconfigv1beta1.KubeletInstanceConfiguration,
+) (*kubeletconfigv1beta1.KubeletInstanceConfiguration, error) {
+	var (
+		obj runtime.Object
+		gvk *schema.GroupVersionKind
+	)
+
+	obj, gvk, err := kubeletCodecs.UniversalDecoder(kubeletconfig.SchemeGroupVersion).Decode(data, nil, defaultConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode")
+	}
+
+	kic, ok := obj.(*kubeletconfigv1beta1.KubeletInstanceConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast object to KubeletInstanceConfiguration, unexpected type: %v", gvk)
+	}
+
+	return kic, nil
 }

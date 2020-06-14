@@ -30,9 +30,16 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*v1beta1.KubeletConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.KubeletInstanceConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeletInstanceConfiguration(obj.(*v1beta1.KubeletInstanceConfiguration))
+	})
 	return nil
 }
 
 func SetObjectDefaults_KubeletConfiguration(in *v1beta1.KubeletConfiguration) {
 	SetDefaults_KubeletConfiguration(in)
+}
+
+func SetObjectDefaults_KubeletInstanceConfiguration(in *v1beta1.KubeletInstanceConfiguration) {
+	SetDefaults_KubeletInstanceConfiguration(in)
 }

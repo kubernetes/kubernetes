@@ -62,9 +62,10 @@ import (
 )
 
 type HollowKubelet struct {
-	KubeletFlags         *options.KubeletFlags
-	KubeletConfiguration *kubeletconfig.KubeletConfiguration
-	KubeletDeps          *kubelet.Dependencies
+	KubeletFlags                 *options.KubeletFlags
+	KubeletConfiguration         *kubeletconfig.KubeletConfiguration
+	KubeletInstanceConfiguration *kubeletconfig.KubeletInstanceConfiguration
+	KubeletDeps                  *kubelet.Dependencies
 }
 
 func volumePlugins() []volume.VolumePlugin {
@@ -95,6 +96,7 @@ func volumePlugins() []volume.VolumePlugin {
 func NewHollowKubelet(
 	flags *options.KubeletFlags,
 	config *kubeletconfig.KubeletConfiguration,
+	instanceConfig *kubeletconfig.KubeletInstanceConfiguration,
 	client *clientset.Clientset,
 	heartbeatClient *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
@@ -119,17 +121,19 @@ func NewHollowKubelet(
 	}
 
 	return &HollowKubelet{
-		KubeletFlags:         flags,
-		KubeletConfiguration: config,
-		KubeletDeps:          d,
+		KubeletFlags:                 flags,
+		KubeletConfiguration:         config,
+		KubeletInstanceConfiguration: instanceConfig,
+		KubeletDeps:                  d,
 	}
 }
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
 	if err := kubeletapp.RunKubelet(&options.KubeletServer{
-		KubeletFlags:         *hk.KubeletFlags,
-		KubeletConfiguration: *hk.KubeletConfiguration,
+		KubeletFlags:                 *hk.KubeletFlags,
+		KubeletConfiguration:         *hk.KubeletConfiguration,
+		KubeletInstanceConfiguration: *hk.KubeletInstanceConfiguration,
 	}, hk.KubeletDeps, false); err != nil {
 		klog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
@@ -148,7 +152,7 @@ type HollowKubletOptions struct {
 
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
 // usual defaults are applied for fields we do not override.
-func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
+func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration, *kubeletconfig.KubeletInstanceConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
 	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
@@ -156,7 +160,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	// Flags struct
 	f := options.NewKubeletFlags()
 	f.RootDirectory = testRootDir
-	f.HostnameOverride = opt.NodeName
+
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
@@ -208,5 +212,15 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
 
-	return f, c
+	// Instance config
+	i, err := options.NewKubeletInstanceConfiguration()
+	if err != nil {
+		panic(err)
+	}
+
+	i.Address = "0.0.0.0"
+	i.HostnameOverride = opt.NodeName
+	i.NodeIP = ""
+
+	return f, c, i
 }
