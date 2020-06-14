@@ -1356,11 +1356,11 @@
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application  [Conformance]'
   description: Create Guestbook application that contains an agnhost master server,
-    2 agnhost slaves, frontend application, frontend service and agnhost master service
-    and agnhost slave service. Using frontend service, the test will write an entry
-    into the guestbook application which will store the entry into the backend agnhost
-    store. Application flow MUST work as expected and the data written MUST be available
-    to read.
+    2 agnhost replicas, frontend application, frontend service and agnhost master
+    service and agnhost replica service. Using frontend service, the test will write
+    an entry into the guestbook application which will store the entry into the backend
+    agnhost store. Application flow MUST work as expected and the data written MUST
+    be available to read.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, check version v1

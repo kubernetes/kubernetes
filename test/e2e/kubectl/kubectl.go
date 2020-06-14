@@ -343,12 +343,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"agnhost-slave-service.yaml",
+				"agnhost-replica-service.yaml",
 				"agnhost-master-service.yaml",
 				"frontend-service.yaml",
 				"frontend-deployment.yaml.in",
 				"agnhost-master-deployment.yaml.in",
-				"agnhost-slave-deployment.yaml.in",
+				"agnhost-replica-deployment.yaml.in",
 			} {
 				contents := commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
@@ -358,7 +358,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, guestbook application
-			Description: Create Guestbook application that contains an agnhost master server, 2 agnhost slaves, frontend application, frontend service and agnhost master service and agnhost slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
+			Description: Create Guestbook application that contains an agnhost master server, 2 agnhost replicas, frontend application, frontend service and agnhost master service and agnhost replica service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
 		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
