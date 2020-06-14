@@ -212,12 +212,12 @@ sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnho
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
 kubectl create -f ${guestbook}/agnhost-master-service.yaml
-kubectl create -f ${guestbook}/agnhost-slave-service.yaml
+kubectl create -f ${guestbook}/agnhost-replica-service.yaml
 
 # create the deployments.
 cat ${guestbook}/frontend-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
 cat ${guestbook}/agnhost-master-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
-cat ${guestbook}/agnhost-slave-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-replica-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
 ```
 
 
