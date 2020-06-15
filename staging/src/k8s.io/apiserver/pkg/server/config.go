@@ -221,6 +221,9 @@ type Config struct {
 	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
+
+	// A func that returns whether the server is terminating. This can be nil.
+	IsTerminating func() bool
 }
 
 type RecommendedConfig struct {
