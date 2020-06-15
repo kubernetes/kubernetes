@@ -114,6 +114,7 @@ go_test(
         "azure_config_test.go",
         "azure_controller_common_test.go",
         "azure_controller_standard_test.go",
+        "azure_controller_vmss_test.go",
         "azure_instances_test.go",
         "azure_loadbalancer_test.go",
         "azure_ratelimit_test.go",
