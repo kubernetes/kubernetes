@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -48,24 +47,24 @@ const (
 )
 
 var (
-	RecommendedConfigDir  = path.Join(homedir.HomeDir(), RecommendedHomeDir)
-	RecommendedHomeFile   = path.Join(RecommendedConfigDir, RecommendedFileName)
-	RecommendedSchemaFile = path.Join(RecommendedConfigDir, RecommendedSchemaName)
+	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), RecommendedHomeDir)
+	RecommendedHomeFile   = filepath.Join(RecommendedConfigDir, RecommendedFileName)
+	RecommendedSchemaFile = filepath.Join(RecommendedConfigDir, RecommendedSchemaName)
 )
 
 // currentMigrationRules returns a map that holds the history of recommended home directories used in previous versions.
 // Any future changes to RecommendedHomeFile and related are expected to add a migration rule here, in order to make
 // sure existing config files are migrated to their new locations properly.
 func currentMigrationRules() map[string]string {
-	oldRecommendedHomeFile := path.Join(os.Getenv("HOME"), "/.kube/.kubeconfig")
-	oldRecommendedWindowsHomeFile := path.Join(os.Getenv("HOME"), RecommendedHomeDir, RecommendedFileName)
-
-	migrationRules := map[string]string{}
-	migrationRules[RecommendedHomeFile] = oldRecommendedHomeFile
+	var oldRecommendedHomeFileName string
 	if goruntime.GOOS == "windows" {
-		migrationRules[RecommendedHomeFile] = oldRecommendedWindowsHomeFile
+		oldRecommendedHomeFileName = RecommendedFileName
+	} else {
+		oldRecommendedHomeFileName = ".kubeconfig"
 	}
-	return migrationRules
+	return map[string]string{
+		RecommendedHomeFile: filepath.Join(os.Getenv("HOME"), RecommendedHomeDir, oldRecommendedHomeFileName),
+	}
 }
 
 type ClientConfigLoader interface {
