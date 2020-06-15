@@ -60,27 +60,22 @@ func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overri
 }
 
 func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
-	if config.clientConfig == nil {
-		config.loadingLock.Lock()
-		defer config.loadingLock.Unlock()
+	config.loadingLock.Lock()
+	defer config.loadingLock.Unlock()
 
-		if config.clientConfig == nil {
-			mergedConfig, err := config.loader.Load()
-			if err != nil {
-				return nil, err
-			}
-
-			var mergedClientConfig ClientConfig
-			if config.fallbackReader != nil {
-				mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loader)
-			} else {
-				mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loader)
-			}
-
-			config.clientConfig = mergedClientConfig
-		}
+	if config.clientConfig != nil {
+		return config.clientConfig, nil
+	}
+	mergedConfig, err := config.loader.Load()
+	if err != nil {
+		return nil, err
 	}
 
+	if config.fallbackReader != nil {
+		config.clientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loader)
+	} else {
+		config.clientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loader)
+	}
 	return config.clientConfig, nil
 }
 
