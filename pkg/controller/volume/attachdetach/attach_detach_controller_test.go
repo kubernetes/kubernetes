@@ -48,6 +48,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
+		informerFactory.Storage().V1().VolumeAttachments(),
 		nil, /* cloud */
 		nil, /* plugins */
 		nil, /* prober */
@@ -249,6 +250,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
+		informerFactory.Storage().V1().VolumeAttachments(),
 		nil, /* cloud */
 		plugins,
 		prober,
