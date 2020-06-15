@@ -232,7 +232,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	restMapper.Reset()
-	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *result.ClientConfig
 	metadataClient, err := metadata.NewForConfig(&config)
 	if err != nil {
@@ -249,7 +248,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	gc, err := garbagecollector.NewGarbageCollector(
 		metadataClient,
 		restMapper,
-		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
 		controller.NewInformerFactory(sharedInformers, metadataInformers),
 		alwaysStarted,
