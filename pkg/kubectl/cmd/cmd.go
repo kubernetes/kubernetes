@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/clusterinfo"
 	"k8s.io/kubectl/pkg/cmd/completion"
 	cmdconfig "k8s.io/kubectl/pkg/cmd/config"
+	"k8s.io/kubectl/pkg/cmd/cp"
 	"k8s.io/kubectl/pkg/cmd/create"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/describe"
@@ -73,7 +74,6 @@ import (
 	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/cp"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/kustomize"

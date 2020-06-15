@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/convert:go_default_library",
-        "//pkg/kubectl/cmd/cp:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/completion:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/config:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/cp:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/describe:go_default_library",
@@ -86,7 +86,6 @@ filegroup(
         ":package-srcs",
         "//pkg/kubectl/cmd/auth:all-srcs",
         "//pkg/kubectl/cmd/convert:all-srcs",
-        "//pkg/kubectl/cmd/cp:all-srcs",
         "//pkg/kubectl/cmd/plugin/testdata:all-srcs",
     ],
     tags = ["automanaged"],
