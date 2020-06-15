@@ -104,7 +104,8 @@ func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
 			current, err = m.minorVersionUpgrade(current, stepVersion)
 		case current.version.Major == 3 && target.version.Major == 3 && current.version.Minor > target.version.Minor:
 			klog.Infof("rolling etcd back from %s to %s", current, target)
-			current, err = m.rollbackEtcd3MinorVersion(current, target)
+			klog.Infof("rollbackEtcd3MinorVersion is disabled for GKE etcd rollback")
+			// current, err = m.rollbackEtcd3MinorVersion(current, target)
 		}
 		if err != nil {
 			return err
