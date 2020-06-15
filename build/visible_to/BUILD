@@ -238,7 +238,6 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/convert",
-        "//pkg/kubectl/cmd/cp",
         "//pkg/kubectl/explain",
         "//staging/src/k8s.io/kubectl/pkg/cmd",
         "//staging/src/k8s.io/kubectl/pkg/cmd/annotate",
