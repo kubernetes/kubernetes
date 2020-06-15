@@ -81,7 +81,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	}
 	versioner := etcd3.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, reflect.TypeOf(&example.Pod{}))
+	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, clock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -89,7 +89,6 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	wc.lowerBoundCapacity = min(capacity, defaultLowerBoundCapacity)
 	wc.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
 
-	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }
 

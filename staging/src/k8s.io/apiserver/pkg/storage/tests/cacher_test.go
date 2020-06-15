@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -112,6 +113,7 @@ func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage
 		NewFunc:        func() runtime.Object { return &example.Pod{} },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          clock.RealClock{},
 	}
 	cacher, err := cacherstorage.NewCacherFromConfig(config)
 	return cacher, v, err
