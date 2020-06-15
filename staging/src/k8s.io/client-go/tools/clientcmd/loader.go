@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -282,18 +281,13 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
 		}
 
-		in, err := os.Open(source)
+		data, err := ioutil.ReadFile(source)
 		if err != nil {
 			return err
 		}
-		defer in.Close()
-		out, err := os.Create(destination)
+		// destination is created with mode 0666 before umask
+		err = ioutil.WriteFile(destination, data, 0666)
 		if err != nil {
-			return err
-		}
-		defer out.Close()
-
-		if _, err = io.Copy(out, in); err != nil {
 			return err
 		}
 	}
