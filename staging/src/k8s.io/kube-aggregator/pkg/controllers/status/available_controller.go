@@ -292,7 +292,7 @@ func (c *AvailableConditionController) sync(key string) error {
 					discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 				}
 
-				errCh := make(chan error)
+				errCh := make(chan error, 1)
 				go func() {
 					// be sure to check a URL that the aggregated API server is required to serve
 					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)
