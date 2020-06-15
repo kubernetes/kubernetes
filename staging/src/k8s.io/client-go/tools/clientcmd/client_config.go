@@ -548,11 +548,12 @@ func (config *inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 }
 
 func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) {
-	if config.inClusterConfigProvider == nil {
-		config.inClusterConfigProvider = restclient.InClusterConfig
+	inClusterConfigProvider := config.inClusterConfigProvider
+	if inClusterConfigProvider == nil {
+		inClusterConfigProvider = restclient.InClusterConfig
 	}
 
-	icc, err := config.inClusterConfigProvider()
+	icc, err := inClusterConfigProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +573,7 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		}
 	}
 
-	return icc, err
+	return icc, nil
 }
 
 func (config *inClusterClientConfig) Namespace() (string, bool, error) {
