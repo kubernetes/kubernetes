@@ -160,12 +160,6 @@ type NetworkingTestConfig struct {
 	Namespace string
 }
 
-// NetexecDialResponse represents the response returned by the `netexec` subcommand of `agnhost`
-type NetexecDialResponse struct {
-	Responses []string `json:"responses"`
-	Errors    []string `json:"errors"`
-}
-
 // DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.
 func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
 	config.DialFromContainer(protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
@@ -218,18 +212,6 @@ func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	return expectedEps
 }
 
-func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort int) string {
-	// The current versions of curl included in CentOS and RHEL distros
-	// misinterpret square brackets around IPv6 as globbing, so use the -g
-	// argument to disable globbing to handle the IPv6 case.
-	return fmt.Sprintf("curl -g -q -s 'http://%s/dial?request=%s&protocol=%s&host=%s&port=%d&tries=1'",
-		ipPort,
-		dialCmd,
-		protocol,
-		targetIP,
-		targetPort)
-}
-
 // DialFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol
 // argument in the url.
@@ -250,19 +232,38 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // pod and confirm it doesn't show up as an endpoint.
 func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
-	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
+	// The current versions of curl included in CentOS and RHEL distros
+	// misinterpret square brackets around IPv6 as globbing, so use the -g
+	// argument to disable globbing to handle the IPv6 case.
+	cmd := fmt.Sprintf("curl -g -q -s 'http://%s/dial?request=%s&protocol=%s&host=%s&port=%d&tries=1'",
+		ipPort,
+		dialCommand,
+		protocol,
+		targetIP,
+		targetPort)
 
 	responses := sets.NewString()
 
 	for i := 0; i < maxTries; i++ {
-		resp, err := config.GetResponseFromContainer(protocol, dialCommand, containerIP, targetIP, containerHTTPPort, targetPort)
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
 		if err != nil {
-			continue
-		}
-		for _, response := range resp.Responses {
-			trimmed := strings.TrimSpace(response)
-			if trimmed != "" {
-				responses.Insert(trimmed)
+			// A failure to kubectl exec counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr %q", cmd, err, stdout, stderr)
+		} else {
+			var output map[string][]string
+			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+					cmd, config.HostTestContainerPod.Name, stdout, err)
+				continue
+			}
+
+			for _, response := range output["responses"] {
+				trimmed := strings.TrimSpace(response)
+				if trimmed != "" {
+					responses.Insert(trimmed)
+				}
 			}
 		}
 		framework.Logf("Waiting for responses: %v", expectedResponses.Difference(responses))
@@ -313,14 +314,14 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
 			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
-			var output NetexecDialResponse
+			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
 					cmd, config.HostTestContainerPod.Name, stdout, err)
 				continue
 			}
 
-			for _, hostName := range output.Responses {
+			for _, hostName := range output["responses"] {
 				trimmed := strings.TrimSpace(hostName)
 				if trimmed != "" {
 					eps.Insert(trimmed)
@@ -331,34 +332,6 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 		}
 	}
 	return eps, nil
-}
-
-// GetResponseFromContainer executes a curl via kubectl exec in a container.
-func (config *NetworkingTestConfig) GetResponseFromContainer(protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort int) (NetexecDialResponse, error) {
-	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
-	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
-
-	stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
-	if err != nil {
-		// A failure to kubectl exec counts as a try, not a hard fail.
-		// Also note that we will keep failing for maxTries in tests where
-		// we confirm unreachability.
-		framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
-		return NetexecDialResponse{}, err
-	}
-
-	var output NetexecDialResponse
-	if err := json.Unmarshal([]byte(stdout), &output); err != nil {
-		framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-			cmd, config.HostTestContainerPod.Name, stdout, err)
-		return NetexecDialResponse{}, err
-	}
-	return output, nil
-}
-
-// GetResponseFromTestContainer executes a curl via kubectl exec in a test container.
-func (config *NetworkingTestConfig) GetResponseFromTestContainer(protocol, dialCommand, targetIP string, targetPort int) (NetexecDialResponse, error) {
-	return config.GetResponseFromContainer(protocol, dialCommand, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort)
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
