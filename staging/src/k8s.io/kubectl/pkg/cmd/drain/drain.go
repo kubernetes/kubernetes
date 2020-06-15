@@ -308,6 +308,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 			err := o.deleteOrEvictPodsSimple(info)
 			deleteOrEvictResultMutex.Lock()
 			defer deleteOrEvictResultMutex.Unlock()
+			defer deleteOrEvictWaitGroup.Done()
 
 			if err == nil {
 				drainedNodes.Insert(info.Name)
@@ -316,15 +317,11 @@ func (o *DrainCmdOptions) RunDrain() error {
 				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q\n\n", info.Name)
 				deleteOrEvictErrors = append(deleteOrEvictErrors, err)
 			}
-
-			deleteOrEvictWaitGroup.Done()
 		}(info)
 	}
 
 	deleteOrEvictWaitGroup.Wait()
 	remainingNodes := []string{}
-	deleteOrEvictResultMutex.Lock()
-	defer deleteOrEvictResultMutex.Unlock()
 	for _, remainingInfo := range o.nodeInfos {
 		if drainedNodes.Has(remainingInfo.Name) {
 			continue
