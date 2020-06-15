@@ -39,6 +39,7 @@ type ServerRunOptions struct {
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
 	GoawayChance                float64
+	TerminationGoaway           bool
 	LivezGracePeriod            time.Duration
 	MinRequestTimeout           int
 	ShutdownDelayDuration       time.Duration
@@ -78,6 +79,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
+	c.TerminationGoaway = s.TerminationGoaway
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
@@ -193,6 +195,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"The client's other in-flight requests won't be affected, and the client will reconnect, likely landing on a different apiserver after going through the load balancer again. "+
 		"This argument sets the fraction of requests that will be sent a GOAWAY. Clusters with single apiservers, or which don't use a load balancer, should NOT enable this. "+
 		"Min is 0 (off), Max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point.")
+
+	fs.BoolVar(&s.TerminationGoaway, "termination-goaway", s.TerminationGoaway, ""+
+		"This option speeds up draining of a terminating apiserver by sending GOAWAY frames immediately after termination has been initiated (i.e. before shutdown-delay-duration has passed).")
 
 	fs.DurationVar(&s.LivezGracePeriod, "livez-grace-period", s.LivezGracePeriod, ""+
 		"This option represents the maximum amount of time it should take for apiserver to complete its startup sequence "+
