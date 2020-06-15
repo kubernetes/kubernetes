@@ -175,7 +175,8 @@ type Plugins struct {
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet `json:"score,omitempty"`
 
-	// Reserve is a list of plugins invoked when reserving a node to run the pod.
+	// Reserve is a list of plugins invoked when reserving/unreserving resources
+	// after a node is assigned to run the pod.
 	Reserve *PluginSet `json:"reserve,omitempty"`
 
 	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
@@ -190,9 +191,6 @@ type Plugins struct {
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
 	PostBind *PluginSet `json:"postBind,omitempty"`
-
-	// Unreserve is a list of plugins invoked when a pod that was previously reserved is rejected in a later phase.
-	Unreserve *PluginSet `json:"unreserve,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.

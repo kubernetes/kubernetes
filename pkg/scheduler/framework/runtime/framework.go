@@ -77,7 +77,6 @@ type frameworkImpl struct {
 	preBindPlugins        []framework.PreBindPlugin
 	bindPlugins           []framework.BindPlugin
 	postBindPlugins       []framework.PostBindPlugin
-	unreservePlugins      []framework.UnreservePlugin
 	permitPlugins         []framework.PermitPlugin
 
 	clientSet       clientset.Interface
@@ -116,7 +115,6 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{plugins.PreBind, &f.preBindPlugins},
 		{plugins.Bind, &f.bindPlugins},
 		{plugins.PostBind, &f.postBindPlugins},
-		{plugins.Unreserve, &f.unreservePlugins},
 		{plugins.Permit, &f.permitPlugins},
 		{plugins.QueueSort, &f.queueSortPlugins},
 	}
@@ -787,18 +785,19 @@ func (f *frameworkImpl) runPostBindPlugin(ctx context.Context, pl framework.Post
 	f.metricsRecorder.observePluginDurationAsync(postBind, pl.Name(), nil, metrics.SinceInSeconds(startTime))
 }
 
-// RunReservePlugins runs the set of configured reserve plugins. If any of these
-// plugins returns an error, it does not continue running the remaining ones and
-// returns the error. In such case, pod will not be scheduled.
-func (f *frameworkImpl) RunReservePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
+// RunReservePluginsReserve runs the Reserve method in the set of configured
+// reserve plugins. If any of these plugins returns an error, it does not
+// continue running the remaining ones and returns the error. In such a case,
+// the pod will not be scheduled.
+func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.reservePlugins {
-		status = f.runReservePlugin(ctx, pl, state, pod, nodeName)
+		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running Reserve in %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return framework.NewStatus(framework.Error, msg)
 		}
@@ -806,7 +805,7 @@ func (f *frameworkImpl) RunReservePlugins(ctx context.Context, state *framework.
 	return nil
 }
 
-func (f *frameworkImpl) runReservePlugin(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (f *frameworkImpl) runReservePluginReserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Reserve(ctx, state, pod, nodeName)
 	}
@@ -816,18 +815,21 @@ func (f *frameworkImpl) runReservePlugin(ctx context.Context, pl framework.Reser
 	return status
 }
 
-// RunUnreservePlugins runs the set of configured unreserve plugins.
-func (f *frameworkImpl) RunUnreservePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+// RunReservePluginsUnreserve runs the Unreserve method in the set of
+// configured reserve plugins.
+func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(unreserve, framework.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	for _, pl := range f.unreservePlugins {
-		f.runUnreservePlugin(ctx, pl, state, pod, nodeName)
+	// Execute the Unreserve operation of each reserve plugin in the
+	// *reverse* order in which the Reserve operation was executed.
+	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
+		f.runReservePluginUnreserve(ctx, f.reservePlugins[i], state, pod, nodeName)
 	}
 }
 
-func (f *frameworkImpl) runUnreservePlugin(ctx context.Context, pl framework.UnreservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (f *frameworkImpl) runReservePluginUnreserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	if !state.ShouldRecordPluginMetrics() {
 		pl.Unreserve(ctx, state, pod, nodeName)
 		return

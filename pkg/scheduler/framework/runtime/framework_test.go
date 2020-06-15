@@ -184,14 +184,14 @@ func (pl *TestPlugin) Reserve(ctx context.Context, state *v1alpha1.CycleState, p
 	return v1alpha1.NewStatus(v1alpha1.Code(pl.inj.ReserveStatus), "injected status")
 }
 
+func (pl *TestPlugin) Unreserve(ctx context.Context, state *v1alpha1.CycleState, p *v1.Pod, nodeName string) {
+}
+
 func (pl *TestPlugin) PreBind(ctx context.Context, state *v1alpha1.CycleState, p *v1.Pod, nodeName string) *v1alpha1.Status {
 	return v1alpha1.NewStatus(v1alpha1.Code(pl.inj.PreBindStatus), "injected status")
 }
 
 func (pl *TestPlugin) PostBind(ctx context.Context, state *v1alpha1.CycleState, p *v1.Pod, nodeName string) {
-}
-
-func (pl *TestPlugin) Unreserve(ctx context.Context, state *v1alpha1.CycleState, p *v1.Pod, nodeName string) {
 }
 
 func (pl *TestPlugin) Permit(ctx context.Context, state *v1alpha1.CycleState, p *v1.Pod, nodeName string) (*v1alpha1.Status, time.Duration) {
@@ -1322,7 +1322,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.Unschedulable)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin" reserve plugin for pod "": injected status`),
 		},
 		{
 			name: "ErrorReservePlugin",
@@ -1332,7 +1332,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.Error)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin" reserve plugin for pod "": injected status`),
 		},
 		{
 			name: "UnschedulableReservePlugin",
@@ -1342,7 +1342,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.UnschedulableAndUnresolvable)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin" reserve plugin for pod "": injected status`),
 		},
 		{
 			name: "SuccessSuccessReservePlugins",
@@ -1370,7 +1370,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.Error)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin" reserve plugin for pod "": injected status`),
 		},
 		{
 			name: "SuccessErrorReservePlugins",
@@ -1384,7 +1384,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.Error)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin 1" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin 1" reserve plugin for pod "": injected status`),
 		},
 		{
 			name: "ErrorSuccessReservePlugin",
@@ -1398,7 +1398,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.Success)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin" reserve plugin for pod "": injected status`),
 		},
 		{
 			name: "UnschedulableAndSuccessReservePlugin",
@@ -1412,7 +1412,7 @@ func TestReservePlugins(t *testing.T) {
 					inj:  injectedResult{ReserveStatus: int(v1alpha1.Success)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" reserve plugin for pod "": injected status`),
+			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running Reserve in "TestPlugin" reserve plugin for pod "": injected status`),
 		},
 	}
 
@@ -1440,7 +1440,7 @@ func TestReservePlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunReservePlugins(context.TODO(), nil, pod, "")
+			status := f.RunReservePluginsReserve(context.TODO(), nil, pod, "")
 
 			if !reflect.DeepEqual(status, tt.wantStatus) {
 				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
@@ -1602,13 +1602,13 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "Reserve - Success",
-			action:             func(f v1alpha1.Framework) { f.RunReservePlugins(context.Background(), state, pod, "") },
+			action:             func(f v1alpha1.Framework) { f.RunReservePluginsReserve(context.Background(), state, pod, "") },
 			wantExtensionPoint: "Reserve",
 			wantStatus:         v1alpha1.Success,
 		},
 		{
 			name:               "Unreserve - Success",
-			action:             func(f v1alpha1.Framework) { f.RunUnreservePlugins(context.Background(), state, pod, "") },
+			action:             func(f v1alpha1.Framework) { f.RunReservePluginsUnreserve(context.Background(), state, pod, "") },
 			wantExtensionPoint: "Unreserve",
 			wantStatus:         v1alpha1.Success,
 		},
@@ -1660,7 +1660,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "Reserve - Error",
-			action:             func(f v1alpha1.Framework) { f.RunReservePlugins(context.Background(), state, pod, "") },
+			action:             func(f v1alpha1.Framework) { f.RunReservePluginsReserve(context.Background(), state, pod, "") },
 			inject:             injectedResult{ReserveStatus: int(v1alpha1.Error)},
 			wantExtensionPoint: "Reserve",
 			wantStatus:         v1alpha1.Error,
@@ -1718,7 +1718,6 @@ func TestRecordingMetrics(t *testing.T) {
 				PreBind:   pluginSet,
 				Bind:      pluginSet,
 				PostBind:  pluginSet,
-				Unreserve: pluginSet,
 			}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
 			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder), WithProfileName(testProfileName))
