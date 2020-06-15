@@ -171,7 +171,7 @@ func copyFile(src, dst string) (err error) {
 	}
 	defer func() {
 		cerr := out.Close()
-		if cerr == nil {
+		if err == nil {
 			err = cerr
 		}
 	}()
