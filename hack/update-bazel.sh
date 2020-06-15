@@ -60,6 +60,14 @@ for repo in "${staging_repos[@]}"; do
   touch "${KUBE_ROOT}/staging/src/${repo}/BUILD"
 done
 
+# Warning: Please be careful when ignoring these pkg-config errors.
+# As gazelle doesn't support pkg-config, if we suppress these errors here, we actually need to modify the script below to handle it manually.
+# For instance, in the case of `libseccomp`, we set the link option `-lseccomp` to make it work properly.
+KNOWN_PKG_CONFIG_ERRORS=(
+  "vendor/github.com/seccomp/libseccomp-golang/seccomp(_internal)?.go: pkg-config not supported: #cgo pkg-config: libseccomp"
+  "vendor/github.com/google/cadvisor/nvm/machine_libipmctl.go: pkg-config not supported: #cgo pkg-config: libipmctl"
+)
+
 # Run gazelle to update Go rules in BUILD files.
 # filter out known pkg-config error (see buildozer workaround below)
 # NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors 
@@ -69,7 +77,7 @@ gazelle fix \
     -mode=fix \
     -repo_root "${KUBE_ROOT}" \
     "${KUBE_ROOT}" \
-    2>&1 | grep -Ev "vendor/github.com/seccomp/libseccomp-golang/seccomp(_internal)?.go: pkg-config not supported: #cgo pkg-config: libseccomp" || (exit "${PIPESTATUS[0]}")
+    2>&1 | grep -Ev "$(kube::util::join \| "${KNOWN_PKG_CONFIG_ERRORS[@]}")" || (exit "${PIPESTATUS[0]}")
 
 # Run kazel to update the pkg-srcs and all-srcs rules as well as handle
 # Kubernetes code generators.
