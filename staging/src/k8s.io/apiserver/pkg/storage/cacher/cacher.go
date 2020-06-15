@@ -97,6 +97,8 @@ type Config struct {
 	NewListFunc func() runtime.Object
 
 	Codec runtime.Codec
+
+	Clock clock.Clock
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -323,7 +325,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		}
 	}
 
-	clock := clock.RealClock{}
+	if config.Clock == nil {
+		config.Clock = clock.RealClock{}
+	}
 	objType := reflect.TypeOf(obj)
 	cacher := &Cacher{
 		ready:          newReady(),
@@ -346,9 +350,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
 		stopCh:           stopCh,
-		clock:            clock,
+		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
-		bookmarkWatchers: newTimeBucketWatchers(clock, defaultBookmarkFrequency),
+		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
 	}
 
 	// Ensure that timer is stopped.
@@ -359,7 +363,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, objType)
+		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, objType)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 

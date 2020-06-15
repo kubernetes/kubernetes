@@ -271,6 +271,7 @@ func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner, er
 		NewFunc:        func() runtime.Object { return &example.Pod{} },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          clock.RealClock{},
 	}
 	cacher, err := NewCacherFromConfig(config)
 	return cacher, testVersioner{}, err
