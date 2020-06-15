@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
