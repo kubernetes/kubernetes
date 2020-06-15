@@ -56,13 +56,25 @@ func WithProbabilisticGoaway(inner http.Handler, chance float64) http.Handler {
 	}
 }
 
+// WithTerminationGoaway sends a GOAWAY when isTerminating is returning true.
+func WithTerminationGoaway(inner http.Handler, isTerminating func() bool) http.Handler {
+	return &goaway{
+		handler: inner,
+		decider: GoawayDeciderFunc(
+			func(r *http.Request) bool {
+				return isTerminating()
+			},
+		),
+	}
+}
+
 // goaway send a GOAWAY to client according to decider for HTTP2 requests
 type goaway struct {
 	handler http.Handler
 	decider GoawayDecider
 }
 
-// ServeHTTP implement HTTP handler
+// ServeHTTP implements HTTP handler
 func (h *goaway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Proto == "HTTP/2.0" && h.decider.Goaway(r) {
 		// Send a GOAWAY and tear down the TCP connection when idle.
@@ -72,17 +84,21 @@ func (h *goaway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handler.ServeHTTP(w, r)
 }
 
-// probabilisticGoawayDecider send GOAWAY probabilistically according to chance
+// probabilisticGoawayDecider sends GOAWAY probabilistically according to chance
 type probabilisticGoawayDecider struct {
 	chance float64
 	next   func() float64
 }
 
-// Goaway implement GoawayDecider
+// Goaway implements GoawayDecider
 func (p *probabilisticGoawayDecider) Goaway(r *http.Request) bool {
-	if p.next() < p.chance {
-		return true
-	}
+	return p.next() < p.chance
+}
 
-	return false
+// GoawayDeciderFunc wraps a decider func as decider interface.
+type GoawayDeciderFunc func(r *http.Request) bool
+
+// GoawayDeciderFunc implements GoawayDecider
+func (f GoawayDeciderFunc) Goaway(r *http.Request) bool {
+	return f(r)
 }
