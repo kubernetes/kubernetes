@@ -39,6 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/discovery/v1alpha1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -212,6 +213,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=discovery.k8s.io, Version=v1beta1
 	case discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Discovery().V1beta1().EndpointSlices().Informer()}, nil
+
+		// Group=events.k8s.io, Version=v1
+	case eventsv1.SchemeGroupVersion.WithResource("events"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Events().V1().Events().Informer()}, nil
 
 		// Group=events.k8s.io, Version=v1beta1
 	case eventsv1beta1.SchemeGroupVersion.WithResource("events"):

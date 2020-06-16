@@ -67,7 +67,7 @@ func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) 
 	}
 	if event.Source.Component != "" || event.Source.Host != "" {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("source"), "", "needs to be unset"))
-	}	
+	}
 	return allErrs
 }
 
