@@ -186,7 +186,7 @@ only this superuser group is authorized.
 5. Use curl to access the server using the client certificate in p12 format for authentication:
 
    ``` shell
-   curl -fv -k --cert client.p12:password \
+   curl -fv -k --cert-type P12 --cert client.p12:password \
       https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
