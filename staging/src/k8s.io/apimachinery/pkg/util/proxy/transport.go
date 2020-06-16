@@ -109,7 +109,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 		resp.Header.Set("Content-Type", "text/plain; charset=utf-8")
 		resp.Header.Set("X-Content-Type-Options", "nosniff")
-		return resp, nil
+		return resp, err
 	}
 
 	if redirect := resp.Header.Get("Location"); redirect != "" {
