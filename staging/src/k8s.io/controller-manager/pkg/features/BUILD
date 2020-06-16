@@ -7,9 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["doc.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager",
-    importpath = "k8s.io/controller-manager",
+    srcs = ["kube_features.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/pkg/features",
+    importpath = "k8s.io/controller-manager/pkg/features",
+    deps = ["//staging/src/k8s.io/component-base/featuregate:go_default_library"],
 )
 
 filegroup(
@@ -23,9 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/controller-manager/config:all-srcs",
-        "//staging/src/k8s.io/controller-manager/pkg/features:all-srcs",
+        "//staging/src/k8s.io/controller-manager/pkg/features/register:all-srcs",
     ],
     tags = ["automanaged"],
-    visibility = ["//visibility:public"],
 )

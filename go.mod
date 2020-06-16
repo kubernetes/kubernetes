@@ -121,6 +121,7 @@ require (
 	k8s.io/cluster-bootstrap v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
+	k8s.io/controller-manager v0.0.0
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
