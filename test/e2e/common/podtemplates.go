@@ -24,9 +24,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+	"time"
 
 	"github.com/onsi/ginkgo"
+)
+
+const (
+	podTemplateRetryPeriod  = 1 * time.Second
+	podTemplateRetryTimeout = 1 * time.Minute
 )
 
 var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
@@ -99,4 +107,71 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 		framework.ExpectNoError(err, "failed to list PodTemplate")
 		framework.ExpectEqual(len(podTemplateList.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
 	})
+
+	ginkgo.It("should delete a collection of pod templates", func() {
+		podTemplateNames := []string{"test-podtemplate-1", "test-podtemplate-2", "test-podtemplate-3"}
+
+		ginkgo.By("Create set of pod templates")
+		// create a set of pod templates in test namespace
+		for _, podTemplateName := range podTemplateNames {
+			_, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).Create(context.TODO(), &v1.PodTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   podTemplateName,
+					Labels: map[string]string{"podtemplate-set": "true"},
+				},
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "token-test", Image: imageutils.GetE2EImage(imageutils.Agnhost)},
+						},
+					},
+				},
+			}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create pod template")
+			framework.Logf("created %v", podTemplateName)
+		}
+
+		ginkgo.By("get a list of pod templates with a label in the current namespace")
+		// get a list of pod templates
+		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "podtemplate-set=true",
+		})
+		framework.ExpectNoError(err, "failed to get a list of pod templates")
+
+		framework.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
+
+		ginkgo.By("delete collection of pod templates")
+		// delete collection
+
+		framework.Logf("requesting DeleteCollection of pod templates")
+		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "podtemplate-set=true"})
+		framework.ExpectNoError(err, "failed to delete all pod templates")
+
+		ginkgo.By("check that the list of pod templates matches the requested quantity")
+
+		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, checkPodTemplateListQuantity(f, "podtemplate-set=true", 0))
+		framework.ExpectNoError(err, "failed to count required pod templates")
+	})
+
 })
+
+func checkPodTemplateListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		framework.Logf("requesting list of pod templates to confirm quantity")
+
+		list, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != quantity {
+			return false, err
+		}
+		return true, nil
+	}
+}
