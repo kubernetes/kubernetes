@@ -793,11 +793,12 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	KernelMemcgNotification bool `json:"kernelMemcgNotification,omitempty"`
-	// LogFormat specifies the structure of log messages.
+	// LoggingConfig specifies the options of logging.
 	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
-	// Default: "text"
+	// Defaults:
+	//   loggingFormat: text
 	// + optional
-	LogFormat string `json:"logFormat,omitempty"`
+	LoggingConfig LoggingConfig `json:"loggingConfig,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -877,4 +878,12 @@ type SerializedNodeConfigSource struct {
 	// Source is the source that we are serializing
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
+}
+
+// LoggingConfig contains logging options
+type LoggingConfig struct {
+	// LoggingFormat Flag specifies the structure of log messages.
+	// default value of loggingFormat is `text`
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	LoggingFormat string `json:"loggingFormat,omitempty"`
 }

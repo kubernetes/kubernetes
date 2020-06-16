@@ -357,10 +357,9 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
-	// LogFormat Flag specifies the structure of log messages.
-	// default value of logFormat is `text`
+	// LoggingConfig specifies the options of logging.
 	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
-	LogFormat string
+	LoggingConfig LoggingConfig
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -437,4 +436,12 @@ type SerializedNodeConfigSource struct {
 	// Source is the source that we are serializing
 	// +optional
 	Source v1.NodeConfigSource
+}
+
+// LoggingConfig contains logging options
+type LoggingConfig struct {
+	// LoggingFormat Flag specifies the structure of log messages.
+	// default value of loggingFormat is `text`
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	LoggingFormat string
 }
