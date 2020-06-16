@@ -80,7 +80,7 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, corein
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	podInformer := informerFactory.Core().V1().Pods()
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: clientSet.EventsV1beta1().Events("")})
+		Interface: clientSet.EventsV1()})
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
@@ -401,7 +401,7 @@ func InitTestSchedulerWithOptions(
 	}
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: testCtx.ClientSet.EventsV1beta1().Events(""),
+		Interface: testCtx.ClientSet.EventsV1(),
 	})
 
 	if policy != nil {

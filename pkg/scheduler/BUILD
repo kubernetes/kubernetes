@@ -80,7 +80,7 @@ go_test(
         "//pkg/scheduler/profile:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/events/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/events/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

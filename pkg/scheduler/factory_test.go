@@ -449,7 +449,7 @@ func newConfigFactoryWithFrameworkRegistry(
 	registry frameworkruntime.Registry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	snapshot := internalcache.NewEmptySnapshot()
-	recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
+	recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
 	return &Configurator{
 		client:                   client,
 		informerFactory:          informerFactory,
