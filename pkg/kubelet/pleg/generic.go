@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -423,12 +424,16 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 }
 
 func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
-	// Set the number of running pods in the parameter
-	metrics.RunningPodCount.Set(float64(len(pods)))
 	// intermediate map to store the count of each "container_state"
 	containerStateCount := make(map[string]int)
+	runningPods := 0
 
 	for _, pod := range pods {
+		// Count only Running pods
+		p := pod.ToAPIPod()
+		if p.Status.Phase == v1.PodRunning {
+			runningPods++
+		}
 		containers := pod.Containers
 		for _, container := range containers {
 			// update the corresponding "container_state" in map to set value for the gaugeVec metrics
@@ -438,6 +443,9 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	for key, value := range containerStateCount {
 		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
 	}
+
+	// Set the number of running pods in the parameter
+	metrics.RunningPodCount.Set(float64(runningPods))
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {
