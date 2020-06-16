@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"syscall"
+	"errors"
 
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -29,6 +32,7 @@ import (
 type retriable interface {
 	ShouldRetry() bool
 	Reset()
+	LastKnownError() error
 }
 
 type retryDetector struct {
@@ -54,6 +58,17 @@ func (d *retryDetector) Reset() {
 	for _, delegate := range d.delegates {
 		delegate.Reset()
 	}
+}
+
+func (d *retryDetector) LastKnownError() error {
+	for _, delegate := range d.delegates {
+		err := delegate.LastKnownError()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type statusResponseWriter struct {
@@ -103,7 +118,11 @@ func (p *hijackProtector) ShouldRetry() bool {
 }
 
 func (p *hijackProtector) Reset() {
-	// no-op
+	p.delegate.Reset()
+}
+
+func (p *hijackProtector) LastKnownError() error {
+	return p.delegate.LastKnownError()
 }
 
 type maxRetries struct {
@@ -119,7 +138,7 @@ func newMaxRetries(delegate retriable, max int) *maxRetries {
 }
 
 func (r *maxRetries) Reset() {
-	// no-op
+	r.delegate.Reset()
 }
 
 func (r *maxRetries) ShouldRetry() bool {
@@ -131,10 +150,15 @@ func (r *maxRetries) ShouldRetry() bool {
 	return r.delegate.ShouldRetry()
 }
 
+func (r *maxRetries) LastKnownError() error {
+	return r.delegate.LastKnownError()
+}
+
 type hijackResponder struct {
 	delegate proxy.ErrorResponder
 	req *http.Request
 	retry  bool
+	lastKnownError error
 }
 
 var _ proxy.ErrorResponder = &hijackResponder{}
@@ -146,6 +170,7 @@ func newHijackResponder(delegate proxy.ErrorResponder, req *http.Request) *hijac
 
 func (hr *hijackResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
 	// if we can retry the request do not send a response to the client
+	hr.lastKnownError = err
 	if !hr.canRetry(err) {
 		hr.delegate.Error(w, r, err)
 		return
@@ -155,14 +180,19 @@ func (hr *hijackResponder) Error(w http.ResponseWriter, r *http.Request, err err
 
 func (hr *hijackResponder) Reset() {
 	hr.retry = false
+	hr.lastKnownError = nil
 }
 
 func (hr *hijackResponder) ShouldRetry() bool {
 	return hr.retry
 }
 
+func (hr *hijackResponder) LastKnownError() error {
+	return hr.lastKnownError
+}
+
 func (hr *hijackResponder) canRetry(err error) bool {
-	if isHTTPVerbRetriable(hr.req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err)) {
+	if isHTTPVerbRetriable(hr.req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) ||  isExperimental(err)) {
 		return true
 	}
 	return false
@@ -170,4 +200,18 @@ func (hr *hijackResponder) canRetry(err error) bool {
 
 func isHTTPVerbRetriable(req *http.Request) bool {
 	return req.Method == "GET"
+}
+
+func isExperimental(err error) bool {
+	var osErr *os.SyscallError
+	if errors.As(err, &osErr) {
+		err = osErr.Err
+	}
+
+	// blocking the network traffic to a node gives: dial tcp 10.129.0.31:8443: connect: no route to host
+	// no rsp has been sent to the client so it's okay to retry and can pick up a different EP
+	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EHOSTUNREACH {
+		return true
+	}
+	return false
 }

@@ -112,7 +112,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO: to builder pattern
 	retryManager := newHijackProtector(w.(*statusResponseWriter), newMaxRetries(newRetryDetector(errRsp), 3))
 
-	usedEPs := []*url.URL{}
+	visitedURLs := []*url.URL{}
 	for {
 		// TODO: do we have to clone the req ?
 		// TODO: detect disconnected client
@@ -121,9 +121,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// TODO: what to report ?
 		//   - success, failure
 		//   - response time
-		ep := r.serveHTTP(w, req, errRsp, usedEPs)
-		if ep != nil {
-			usedEPs = append(usedEPs, ep)
+		visitedURL := r.serveHTTP(w, req, errRsp, visitedURLs)
+		if visitedURL != nil {
+			visitedURLs = append(visitedURLs, visitedURL)
 		}
 
 		// TODO: add logs
