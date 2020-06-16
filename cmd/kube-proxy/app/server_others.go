@@ -122,7 +122,6 @@ func newProxyServer(
 	execer := exec.New()
 
 	iptInterface = utiliptables.New(execer, protocol)
-	ctClearer = conntrack.NewClearer(execer)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
 	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
@@ -141,6 +140,12 @@ func newProxyServer(
 			IpvsInterface:  ipvsInterface,
 			IpsetInterface: ipsetInterface,
 		}, nil
+	}
+
+	// check if the conntrack binary exists
+	ctClearer = conntrack.NewClearer(execer)
+	if !ctClearer.Exists() {
+		return nil, fmt.Errorf("the conntrack binary is not installed, UDP and SCTP connections may fail after services and endpoints changes")
 	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
