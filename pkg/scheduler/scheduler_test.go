@@ -319,6 +319,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					testSchedulerName: &profile.Profile{
 						Framework: fwk,
 						Recorder:  eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName),
+						Name:      testSchedulerName,
 					},
 				},
 			}
@@ -770,6 +771,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	prof := &profile.Profile{
 		Framework: fwk,
 		Recorder:  &events.FakeRecorder{},
+		Name:      testSchedulerName,
 	}
 	if broadcaster != nil {
 		prof.Recorder = broadcaster.NewRecorder(scheme.Scheme, testSchedulerName)
