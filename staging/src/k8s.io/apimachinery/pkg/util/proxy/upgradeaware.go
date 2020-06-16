@@ -232,6 +232,7 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
+	proxy.ErrorHandler = h.Responder.Error
 	proxy.ServeHTTP(w, newReq)
 }
 
@@ -412,12 +413,12 @@ func getResponse(r io.Reader) (*http.Response, []byte, error) {
 func dial(req *http.Request, transport http.RoundTripper) (net.Conn, error) {
 	conn, err := dialURL(req.Context(), req.URL, transport)
 	if err != nil {
-		return nil, fmt.Errorf("error dialing backend: %v", err)
+		return nil, fmt.Errorf("error dialing backend: %w", err)
 	}
 
 	if err = req.Write(conn); err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("error sending request: %v", err)
+		return nil, fmt.Errorf("error sending request: %w", err)
 	}
 
 	return conn, err

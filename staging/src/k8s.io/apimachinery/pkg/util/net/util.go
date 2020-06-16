@@ -17,6 +17,7 @@ limitations under the License.
 package net
 
 import (
+	"errors"
 	"net"
 	"net/url"
 	"os"
@@ -40,13 +41,16 @@ func IPNetEqual(ipnet1, ipnet2 *net.IPNet) bool {
 
 // Returns if the given err is "connection reset by peer" error.
 func IsConnectionReset(err error) bool {
-	if urlErr, ok := err.(*url.Error); ok {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
 		err = urlErr.Err
 	}
-	if opErr, ok := err.(*net.OpError); ok {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
 		err = opErr.Err
 	}
-	if osErr, ok := err.(*os.SyscallError); ok {
+	var osErr *os.SyscallError
+	if errors.As(err, &osErr) {
 		err = osErr.Err
 	}
 	if errno, ok := err.(syscall.Errno); ok && errno == syscall.ECONNRESET {
@@ -57,13 +61,16 @@ func IsConnectionReset(err error) bool {
 
 // Returns if the given err is "connection refused" error
 func IsConnectionRefused(err error) bool {
-	if urlErr, ok := err.(*url.Error); ok {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
 		err = urlErr.Err
 	}
-	if opErr, ok := err.(*net.OpError); ok {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
 		err = opErr.Err
 	}
-	if osErr, ok := err.(*os.SyscallError); ok {
+	var osErr *os.SyscallError
+	if errors.As(err, &osErr) {
 		err = osErr.Err
 	}
 	if errno, ok := err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
