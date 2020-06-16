@@ -40,19 +40,22 @@ type FrameworkFactory func(config.KubeSchedulerProfile, ...frameworkruntime.Opti
 type Profile struct {
 	framework.Framework
 	Recorder events.EventRecorder
+	Name     string
 }
 
 // NewProfile builds a Profile for the given configuration.
 func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (*Profile, error) {
-	r := recorderFact(cfg.SchedulerName)
-	f, err := frameworkFact(cfg, append(opts, frameworkruntime.WithEventRecorder(r))...)
+	recorder := recorderFact(cfg.SchedulerName)
+	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
+	fwk, err := frameworkFact(cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &Profile{
-		Framework: f,
-		Recorder:  r,
+		Name:      cfg.SchedulerName,
+		Framework: fwk,
+		Recorder:  recorder,
 	}, nil
 }
 
