@@ -71,25 +71,49 @@ func (d *retryDetector) LastKnownError() error {
 	return nil
 }
 
-type statusResponseWriter struct {
+type responseWriterInterceptor interface {
+	WasHijacked() bool
+	StatusCode() int
+}
+
+type responseWriterExtended struct {
+	*responseWriter
+}
+
+func (w *responseWriterExtended) CloseNotify() <-chan bool {
+	return w.ResponseWriter.(http.CloseNotifier).CloseNotify()
+}
+
+func (w *responseWriterExtended) Flush() {
+	w.ResponseWriter.(http.Flusher).Flush()
+}
+
+// newExtendedResponseWriterInterceptor extends responseWriter
+// primarily to satisfy metrics.InstrumentRouteFunc/InstrumentHandlerFunc
+//
+// It turns out that not all ResponseWrites support CloseNotify and Flush methods
+func newExtendedResponseWriterInterceptor(rw *responseWriter) *responseWriterExtended {
+	return &responseWriterExtended{rw}
+}
+
+type responseWriter struct {
 	http.ResponseWriter
 
-	req *http.Request
 	statusCode int
 	wasHijacked bool
 }
 
-
-func newStatusResponseWriter(w http.ResponseWriter, req *http.Request) *statusResponseWriter {
-	return &statusResponseWriter{w, req, 0, false}
+// newResponseWriterInterceptor wraps the given ResponseWrite and intercept WriteHeader and Hijack methods
+func newResponseWriterInterceptor(w http.ResponseWriter) *responseWriter {
+	return &responseWriter{w,  0, false}
 }
 
-func (w *statusResponseWriter) WriteHeader(code int) {
+func (w *responseWriter) WriteHeader(code int) {
 	w.statusCode = code
 	w.ResponseWriter.WriteHeader(code)
 }
 
-func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (w *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	requestHijacker, ok := w.ResponseWriter.(http.Hijacker)
 	if !ok {
 		return nil, nil, fmt.Errorf("unable to hijack response writer: %T", w.ResponseWriter)
@@ -99,19 +123,27 @@ func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return requestHijacker.Hijack()
 }
 
+func (w *responseWriter) WasHijacked() bool {
+	return w.wasHijacked
+}
+
+func (w *responseWriter) StatusCode() int {
+	return w.statusCode
+}
+
 type hijackProtector struct {
 	delegate retriable
-	rw *statusResponseWriter
+	rw responseWriterInterceptor
 }
 
 var _ retriable = &hijackProtector{}
 
-func newHijackProtector(rw *statusResponseWriter, delegate retriable) *hijackProtector {
+func newHijackProtector(rw responseWriterInterceptor, delegate retriable) *hijackProtector {
 	return &hijackProtector{delegate, rw}
 }
 
 func (p *hijackProtector) ShouldRetry() bool {
-	if p.rw.wasHijacked {
+	if p.rw.WasHijacked() {
 		return false
 	}
 	return p.delegate.ShouldRetry()
