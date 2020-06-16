@@ -28,6 +28,7 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/go-openapi/spec"
+	"go.uber.org/atomic"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -355,6 +356,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		Listener:   s.SecureServingInfo.Listener,
 		stopCh:     stopCh,
 		lateStopCh: lateStopCh,
+		Eventf:     s.Eventf,
 	}
 
 	// close socket after delayed stopCh
@@ -678,6 +680,8 @@ func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...
 type terminationLoggingListener struct {
 	net.Listener
 	stopCh, lateStopCh <-chan struct{}
+	Eventf             func(eventType, reason, messageFmt string, args ...interface{})
+	lateConnReceived   atomic.Bool
 }
 
 func (l *terminationLoggingListener) Accept() (net.Conn, error) {
@@ -688,7 +692,10 @@ func (l *terminationLoggingListener) Accept() (net.Conn, error) {
 
 	select {
 	case <-l.lateStopCh:
-		klog.Warningf("Accepted new connection from %s very late in the graceful termination process (more than 80%% has passed), possibly a hint for a broken load balancer setup.", c.RemoteAddr().String())
+		klog.Warningf("Accepted new connection from %s very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", c.RemoteAddr().String())
+		if swapped := l.lateConnReceived.CAS(false, true); swapped {
+			l.Eventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections very late in the graceful termination process, possibly a sign for a broken load balancer setup.")
+		}
 	default:
 		select {
 		case <-l.stopCh:
