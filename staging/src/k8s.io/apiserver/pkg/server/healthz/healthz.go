@@ -172,35 +172,38 @@ func getExcludedChecks(r *http.Request) sets.String {
 // handleRootHealthz returns an http.HandlerFunc that serves the provided checks.
 func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		failed := false
 		excluded := getExcludedChecks(r)
-		var verboseOut bytes.Buffer
+		// failedVerboseLogOutput is for output to the log.  It indicates detailed failed output information for the log.
+		var failedVerboseLogOutput bytes.Buffer
+		var failedChecks []string
+		var individualCheckOutput bytes.Buffer
 		for _, check := range checks {
 			// no-op the check if we've specified we want to exclude the check
 			if excluded.Has(check.Name()) {
 				excluded.Delete(check.Name())
-				fmt.Fprintf(&verboseOut, "[+]%v excluded: ok\n", check.Name())
+				fmt.Fprintf(&individualCheckOutput, "[+]%s excluded: ok\n", check.Name())
 				continue
 			}
 			if err := check.Check(r); err != nil {
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.
-				klog.V(4).Infof("healthz check %v failed: %v", check.Name(), err)
-				fmt.Fprintf(&verboseOut, "[-]%v failed: reason withheld\n", check.Name())
-				failed = true
+				fmt.Fprintf(&individualCheckOutput, "[-]%s failed: reason withheld\n", check.Name())
+				// but we do want detailed information for our log
+				fmt.Fprintf(&failedVerboseLogOutput, "[-]%s failed: %v\n", check.Name(), err)
+				failedChecks = append(failedChecks, check.Name())
 			} else {
-				fmt.Fprintf(&verboseOut, "[+]%v ok\n", check.Name())
+				fmt.Fprintf(&individualCheckOutput, "[+]%s ok\n", check.Name())
 			}
 		}
 		if excluded.Len() > 0 {
-			fmt.Fprintf(&verboseOut, "warn: some health checks cannot be excluded: no matches for %v\n", formatQuoted(excluded.List()...))
-			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %v",
+			fmt.Fprintf(&individualCheckOutput, "warn: some health checks cannot be excluded: no matches for %s\n", formatQuoted(excluded.List()...))
+			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %s",
 				formatQuoted(excluded.List()...))
 		}
 		// always be verbose on failure
-		if failed {
-			klog.V(2).Infof("%vhealthz check failed", verboseOut.String())
-			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%vhealthz check failed", verboseOut.String()), http.StatusInternalServerError)
+		if len(failedChecks) > 0 {
+			klog.V(2).Infof("healthz check failed: %s\n%v", strings.Join(failedChecks, ","), failedVerboseLogOutput.String())
+			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%shealthz check failed", individualCheckOutput.String()), http.StatusInternalServerError)
 			return
 		}
 
@@ -211,7 +214,7 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 			return
 		}
 
-		verboseOut.WriteTo(w)
+		individualCheckOutput.WriteTo(w)
 		fmt.Fprint(w, "healthz check passed\n")
 	})
 }
