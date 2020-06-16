@@ -1117,7 +1117,7 @@
   release: ""
   file: test/e2e/apps/daemon_set.go
   behaviors:
-  - apps/daemonset/revive-pod
+  - apps/daemonset/failed-pod
 - testname: DaemonSet-Rollback
   codename: '[sig-apps] Daemon set [Serial] should rollback without unnecessary restarts
     [Conformance]'
@@ -1133,6 +1133,8 @@
   file: test/e2e/apps/daemon_set.go
   behaviors:
   - apps/daemonset/create-node-selector
+  - apps/daemonset/add-pods
+  - apps/daemonset/remove-pods
 - testname: DaemonSet-Creation
   codename: '[sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]'
   description: A conformant Kubernetes distribution MUST support the creation of DaemonSets.
@@ -1142,6 +1144,7 @@
   file: test/e2e/apps/daemon_set.go
   behaviors:
   - apps/daemonset/create
+  - apps/daemonset/deleted-pod
 - testname: DaemonSet-RollingUpdate
   codename: '[sig-apps] Daemon set [Serial] should update pod when spec was updated
     and update strategy is RollingUpdate [Conformance]'
@@ -1150,6 +1153,7 @@
   file: test/e2e/apps/daemon_set.go
   behaviors:
   - apps/daemonset/update-pod
+  - apps/daemonset/create-controller-revision
 - testname: Deployment Recreate
   codename: '[sig-apps] Deployment RecreateDeployment should delete old pods and create
     new ones [Conformance]'
