@@ -320,6 +320,9 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 		// Annotations must be excluded for the reasons described in
 		// https://github.com/kubernetes/kubernetes/issues/52914.
 		p.Annotations = nil
+		// Same as above, when annotations are modified with ServerSideApply,
+		// ManagedFields may also change and must be excluded
+		p.ManagedFields = nil
 		// The following might be changed by external controllers, but they don't
 		// affect scheduling decisions.
 		p.Finalizers = nil
