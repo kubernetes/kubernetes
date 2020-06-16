@@ -179,7 +179,10 @@ func collectHistogram(metric string, labels map[string]string) *DataItem {
 		klog.Error(err)
 		return nil
 	}
-
+	if hist.Histogram == nil {
+		klog.Errorf("metric %q is not a Histogram metric", metric)
+		return nil
+	}
 	if err := hist.Validate(); err != nil {
 		klog.Error(err)
 		return nil
