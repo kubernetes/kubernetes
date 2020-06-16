@@ -218,7 +218,7 @@ func RunServer(
 		defer utilruntime.HandleCrash()
 
 		var listener net.Listener
-		listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
+		listener = tcpKeepAliveListener{ln}
 		if server.TLSConfig != nil {
 			listener = tls.NewListener(listener, server.TLSConfig)
 		}
@@ -244,15 +244,17 @@ func RunServer(
 //
 // Copied from Go 1.7.2 net/http/server.go
 type tcpKeepAliveListener struct {
-	*net.TCPListener
+	net.Listener
 }
 
 func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
-	tc, err := ln.AcceptTCP()
+	c, err := ln.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
-	return tc, nil
+	if tc, ok := c.(*net.TCPConn); ok {
+		tc.SetKeepAlive(true)
+		tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
+	}
+	return c, nil
 }
