@@ -399,6 +399,14 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 		klog.V(4).Infof("error recording current command: %v", err)
 	}
 
+	if len(info.Name) == 0 {
+		metadata, _ := meta.Accessor(info.Object)
+		generatedName := metadata.GetGenerateName()
+		if len(generatedName) > 0 {
+			return fmt.Errorf("from %s: cannot use generate name with apply", generatedName)
+		}
+	}
+
 	helper := resource.NewHelper(info.Client, info.Mapping).
 		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 		WithFieldManager(o.FieldManager)
