@@ -112,6 +112,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO: to builder pattern
 	retryManager := newHijackProtector(w.(*statusResponseWriter), newMaxRetries(newRetryDetector(errRsp), 3))
 
+	usedEPs := []*url.URL{}
 	for {
 		// TODO: do we have to clone the req ?
 		// TODO: detect disconnected client
@@ -120,7 +121,10 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// TODO: what to report ?
 		//   - success, failure
 		//   - response time
-		r.serveHTTP(w, req, errRsp)
+		ep := r.serveHTTP(w, req, errRsp, usedEPs)
+		if ep != nil {
+			usedEPs = append(usedEPs, ep)
+		}
 
 		// TODO: add logs
 		// TODO: backoff, jitter
@@ -137,37 +141,36 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errResponder proxy.ErrorResponder) {
+func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errResponder proxy.ErrorResponder, usedEPs []*url.URL) *url.URL {
 	value := r.handlingInfo.Load()
 	if value == nil {
 		r.localDelegate.ServeHTTP(w, req)
-		return
+		return nil
 	}
 	handlingInfo := value.(proxyHandlingInfo)
 	if handlingInfo.local {
 		if r.localDelegate == nil {
 			http.Error(w, "", http.StatusNotFound)
-			return
+			return nil
 		}
 		r.localDelegate.ServeHTTP(w, req)
-		return
+		return nil
 	}
 
 	if !handlingInfo.serviceAvailable {
-		// TODO: retry
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
-		return
+		return nil
 	}
 
 	if handlingInfo.transportBuildingError != nil {
 		proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
-		return
+		return nil
 	}
 
 	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		proxyError(w, req, "missing user", http.StatusInternalServerError)
-		return
+		return nil
 	}
 
 	// write a new location based on the existing request pointed at the target service
@@ -176,9 +179,8 @@ func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errRe
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
-		// TODO: retry
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
-		return
+		return nil
 	}
 	location.Host = rloc.Host
 	location.Path = req.URL.Path
@@ -189,14 +191,14 @@ func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errRe
 
 	if handlingInfo.proxyRoundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
-		return
+		return nil
 	}
 
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
 	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
 	if err != nil {
 		proxyError(w, req, err.Error(), http.StatusInternalServerError)
-		return
+		return nil
 	}
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
@@ -210,6 +212,7 @@ func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errRe
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, errResponder)
 	handler.ServeHTTP(w, newReq)
+	return rloc
 }
 
 // newRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests

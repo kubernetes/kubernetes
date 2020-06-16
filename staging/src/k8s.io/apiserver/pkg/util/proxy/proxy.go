@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 )
 
@@ -38,8 +39,8 @@ func findServicePort(svc *v1.Service, port int32) (*v1.ServicePort, error) {
 	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", port, svc.Name))
 }
 
-// ResourceLocation returns a URL to which one can send traffic for the specified service.
-func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port int32) (*url.URL, error) {
+// ResolveEndpoint returns a URL to which one can send traffic for the specified service.
+func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port int32, seenEndpoints ...*url.URL) (*url.URL, error) {
 	svc, err := services.Services(namespace).Get(id)
 	if err != nil {
 		return nil, err
@@ -68,6 +69,21 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 	// Pick a random Subset to start searching from.
 	ssSeed := rand.Intn(len(eps.Subsets))
 
+
+	seenEndpointsToAddressesFn := func(scheme, port string) (sets.String, error) {
+		ret := sets.String{}
+		for _, ep := range seenEndpoints {
+			if ep.Scheme == scheme && ep.Port() == port {
+				ip, _, err := net.SplitHostPort(ep.Host)
+				if err != nil {
+					return nil, err
+				}
+				ret.Insert(ip)
+			}
+		}
+		return ret, nil
+	}
+
 	// Find a Subset that has the port.
 	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
 		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
@@ -77,8 +93,22 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == svcPort.Name {
 				// Pick a random address.
-				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
 				port := int(ss.Ports[i].Port)
+				seenAddresses, err := seenEndpointsToAddressesFn("https", strconv.Itoa(port))
+				if err != nil {
+					return nil, err
+				}
+				availablePoolOfAddresses := []string{}
+				for _, ep := range ss.Addresses {
+					if seenAddresses.Has(ep.IP) {
+						continue
+					}
+					availablePoolOfAddresses = append(availablePoolOfAddresses, ep.IP)
+				}
+				if len(availablePoolOfAddresses) == 0 {
+					continue
+				}
+				ip := availablePoolOfAddresses[rand.Intn(len(availablePoolOfAddresses))]
 				return &url.URL{
 					Scheme: "https",
 					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
