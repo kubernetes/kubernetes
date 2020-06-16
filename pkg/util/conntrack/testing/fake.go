@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/conntrack"
 )
 
-// FakeConntrack is no-op implementation of conntrack Clearer.
-type FakeConntrack struct {
+// NetworkFlow defines a network flow in the conntrack table
+type NetworkFlow struct {
 	OrigSrcIP   string
 	OrigSrcPort int
 	OrigDstIP   string
@@ -36,6 +36,15 @@ type FakeConntrack struct {
 	Proto       v1.Protocol
 }
 
+// FakeConntrack is no-op implementation of conntrack Clearer.
+// it stores the conntrack entries in a table internally
+// and stores the results of the operations performed on the
+// internal table
+type FakeConntrack struct {
+	ConntrackTable []NetworkFlow
+	DeletedFlows   int
+}
+
 var _ = conntrack.Clearer(&FakeConntrack{})
 
 // NewFakeClearer returns a no-op conntrack.Clearer
@@ -44,42 +53,118 @@ func NewFakeClearer() *FakeConntrack {
 }
 
 // Exists returns true if conntrack binary is installed.
-func (f FakeConntrack) Exists() bool {
+func (f *FakeConntrack) Exists() bool {
 	return true
 }
 
 // ClearEntriesForIP delete conntrack entries by the destination IP and protocol
-func (f FakeConntrack) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
-	if protocol == f.Proto && ip == f.OrigDstIP {
-		return nil
+func (f *FakeConntrack) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
+	filter := NetworkFlow{
+		Proto:     protocol,
+		OrigDstIP: ip,
 	}
-	return fmt.Errorf(conntrack.NoConnectionToDelete)
+
+	f.DeletedFlows = f.filter(filter)
+	if f.DeletedFlows == 0 {
+		return fmt.Errorf(conntrack.NoConnectionToDelete)
+	}
+	return nil
 }
 
 // ClearEntriesForPort delete conntrack entries by the destination Port and protocol
-func (f FakeConntrack) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
-	if protocol == f.Proto && port == f.OrigDstPort {
-		return nil
+func (f *FakeConntrack) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
+	filter := NetworkFlow{
+		Proto:       protocol,
+		OrigDstPort: port,
 	}
-	return fmt.Errorf(conntrack.NoConnectionToDelete)
+
+	f.DeletedFlows = f.filter(filter)
+	if f.DeletedFlows == 0 {
+		return fmt.Errorf(conntrack.NoConnectionToDelete)
+	}
+	return nil
 }
 
 // ClearEntriesForNAT delete conntrack entries by the NAT source and destination IP and protocol
-func (f FakeConntrack) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
-	if protocol == f.Proto &&
-		origin == f.OrigDstIP &&
-		dest == f.NatDstIP {
-		return nil
+func (f *FakeConntrack) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
+	filter := NetworkFlow{
+		Proto:     protocol,
+		NatDstIP:  dest,
+		OrigDstIP: origin,
 	}
-	return fmt.Errorf(conntrack.NoConnectionToDelete)
+
+	f.DeletedFlows = f.filter(filter)
+	if f.DeletedFlows == 0 {
+		return fmt.Errorf(conntrack.NoConnectionToDelete)
+	}
+	return nil
 }
 
 // ClearEntriesForPortNAT delete conntrack entries by the NAT destination IP and Port and protocol
-func (f FakeConntrack) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
-	if protocol == f.Proto &&
-		port == f.OrigDstPort &&
-		dest == f.NatDstIP {
-		return nil
+func (f *FakeConntrack) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
+	filter := NetworkFlow{
+		Proto:       protocol,
+		NatDstIP:    dest,
+		OrigDstPort: port,
 	}
-	return fmt.Errorf(conntrack.NoConnectionToDelete)
+
+	f.DeletedFlows = f.filter(filter)
+	if f.DeletedFlows == 0 {
+		return fmt.Errorf(conntrack.NoConnectionToDelete)
+	}
+	return nil
+}
+
+// filter returns the number of flows that should be filtered
+// by the passed filter
+func (f *FakeConntrack) filter(flowFilter NetworkFlow) int {
+	count := 0
+	for _, flow := range f.ConntrackTable {
+		if matchConntrackFlow(flow, flowFilter) {
+			count++
+		}
+	}
+	return count
+}
+
+// matchConntrackFlow return true if the flow match the filter fields
+func matchConntrackFlow(flow, flowFilter NetworkFlow) bool {
+	if flowFilter.Proto != flow.Proto {
+		// different Layer 4 protocol always not match
+		return false
+	}
+
+	if flowFilter.OrigSrcIP != "" && flowFilter.OrigSrcIP != flow.OrigSrcIP {
+		return false
+	}
+
+	if flowFilter.OrigDstIP != "" && flowFilter.OrigDstIP != flow.OrigDstIP {
+		return false
+	}
+
+	if flowFilter.NatSrcIP != "" && flowFilter.NatSrcIP != flow.NatSrcIP {
+		return false
+	}
+
+	if flowFilter.NatDstIP != "" && flowFilter.NatDstIP != flow.NatDstIP {
+		return false
+	}
+
+	if flowFilter.OrigSrcPort > 0 && flowFilter.OrigSrcPort != flow.OrigSrcPort {
+		return false
+	}
+
+	if flowFilter.OrigDstPort > 0 && flowFilter.OrigDstPort != flow.OrigDstPort {
+		return false
+	}
+
+	if flowFilter.NatSrcPort > 0 && flowFilter.NatSrcPort != flow.NatSrcPort {
+		return false
+	}
+
+	if flowFilter.NatDstPort > 0 && flowFilter.NatDstPort != flow.NatDstPort {
+		return false
+	}
+
+	return true
 }
