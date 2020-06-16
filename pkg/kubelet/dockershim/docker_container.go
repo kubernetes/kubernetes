@@ -29,6 +29,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
+	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/blkio"
@@ -281,7 +282,7 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 	}
 	err = blkio.UpdateBlkio(r.ContainerId, ds.client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set blkio when the container %q starts, %v", r.ContainerId, err)
+		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
 	}
 
 	return &runtimeapi.StartContainerResponse{}, nil

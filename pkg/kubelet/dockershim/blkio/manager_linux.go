@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -42,7 +42,7 @@ func UpdateBlkio(containerId string, docker libdocker.Interface) (err error) {
 	}
 	blkiolable, ok := sandboxInfo.Config.Labels[BlkioKey]
 	if !ok {
-		glog.V(4).Infof("the sandbox is not set %s, sandboxID:%s, containerId:%s", BlkioKey, sandboxID, containerId)
+		klog.V(4).Infof("the sandbox is not set %s, sandboxID:%s, containerId:%s", BlkioKey, sandboxID, containerId)
 		return nil
 	}
 	blkio := Blkio{}
@@ -53,12 +53,12 @@ func UpdateBlkio(containerId string, docker libdocker.Interface) (err error) {
 
 	driverName := info.GraphDriver.Name
 	if driverName != GraphDriverName {
-		glog.V(4).Infof("the container driver is %v, sandboxID:%s, containerId:%s", driverName, sandboxID, containerId)
+		klog.V(4).Infof("the container driver is %v, sandboxID:%s, containerId:%s", driverName, sandboxID, containerId)
 		return nil
 	}
 	deviceName, ok := info.GraphDriver.Data[GraphDriverDeviceNameKey]
 	if !ok {
-		glog.V(4).Infof("the container GraphDriverDeviceName not found. sandboxID:%s, containerId:%s", sandboxID, containerId)
+		klog.V(4).Infof("the container GraphDriverDeviceName not found. sandboxID:%s, containerId:%s", sandboxID, containerId)
 		return nil
 	}
 	containerRoot := filepath.Join(DeviceRoot, deviceName)
@@ -79,6 +79,6 @@ func UpdateBlkio(containerId string, docker libdocker.Interface) (err error) {
 	if err != nil {
 		return fmt.Errorf("blkioSubsystem.Set failed. sandboxID:%s, containerId:%s, %v", sandboxID, containerId, err.Error())
 	}
-	glog.V(4).Infof("set Blkio cgroup success. sandboxID:%s, containerId:%s, cgroup path:%v, cgroup:%+v", sandboxID, containerId, cpath, cgroupToString(cg))
+	klog.V(4).Infof("set Blkio cgroup success. sandboxID:%s, containerId:%s, cgroup path:%v, cgroup:%+v", sandboxID, containerId, cpath, cgroupToString(cg))
 	return nil
 }

@@ -14,7 +14,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/apimachinery/pkg/api/resource"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -153,7 +153,7 @@ func (b *BlkioMockBuilder) setMock() (docker libdocker.Interface, err error) {
 		StatFn: func(name string) (info os.FileInfo, err error) {
 			info, ok := b.Fsinfo[name]
 			if !ok {
-				glog.Errorf("Notfound the file %s, Fsinfo:%+v", name, b.Fsinfo)
+				klog.Errorf("Notfound the file %s, Fsinfo:%+v", name, b.Fsinfo)
 				return info, ErrorNotFound
 			}
 			return info, nil
