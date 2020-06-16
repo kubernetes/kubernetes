@@ -107,42 +107,24 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	_, supportsCloseNotifier := w.(http.CloseNotifier)
-	_, supportsFlusher := w.(http.Flusher)
-	if supportsCloseNotifier && supportsFlusher {
-		w = newExtendedResponseWriterInterceptor(newResponseWriterInterceptor(w))
-	} else {
-		w = newResponseWriterInterceptor(w)
-	}
-	errRsp := newHijackResponder(&responder{w: w}, req)
-	// TODO: to builder pattern
-	retryManager := newHijackProtector(w.(responseWriterInterceptor), newMaxRetries(newRetryDetector(errRsp), 3))
+	w = newResponseWriterInterceptor(w)
+	errRsp := newHijackErrorResponder(&responder{w: w}, req)
+	retryDecorator := newRetryDecorator(w.(responseWriterInterceptor), errRsp, 3)
 
 	visitedURLs := []*url.URL{}
 	for {
 		// TODO: do we have to clone the req ?
-		// TODO: detect disconnected client
-		// TODO: pick up a different EP on retry
-		// TODO: always report the status to the service resolver - this will influence available EPs pool
-		// TODO: what to report ?
-		//   - success, failure
-		//   - response time
 		visitedURL := r.serveHTTP(w, req, errRsp, visitedURLs)
 		if visitedURL != nil {
 			visitedURLs = append(visitedURLs, visitedURL)
 		}
 
-		// TODO: add logs
-		// TODO: backoff, jitter
-		if !retryManager.ShouldRetry(){
+		if !retryDecorator.RetryIfNeeded() {
 			break
 		}
-		retryManager.Reset()
 	}
 
-	if w.(responseWriterInterceptor).StatusCode() == 0 && !w.(responseWriterInterceptor).WasHijacked(){
-		// TODO: send HTTP 503 if the error is retriable
-		//       otherwise send HTTP 500
+	if w.(responseWriterInterceptor).StatusCode() == 0 && !w.(responseWriterInterceptor).WasHijacked() {
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 	}
 }

@@ -18,57 +18,27 @@ package apiserver
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"syscall"
-	"errors"
 
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 )
 
-type retriable interface {
-	ShouldRetry() bool
-	Reset()
-	LastKnownError() error
-}
-
-type retryDetector struct {
-	delegates []retriable
-}
-
-var _ retriable = &retryDetector{}
-
-func newRetryDetector(delegates ...retriable) *retryDetector {
-	return &retryDetector{delegates: delegates}
-}
-
-func (d *retryDetector) ShouldRetry() bool {
-	for _, delegate := range d.delegates {
-		if delegate.ShouldRetry() {
-			return true
-		}
+// newResponseWriterInterceptor wraps http.ResponseWriter for detecting Hijacked connections
+func newResponseWriterInterceptor(w http.ResponseWriter) http.ResponseWriter {
+	_, supportsCloseNotifier := w.(http.CloseNotifier)
+	_, supportsFlusher := w.(http.Flusher)
+	if supportsCloseNotifier && supportsFlusher {
+		w = newExtendedResponseWriterInterceptor(newSimpleResponseWriterInterceptor(w))
+	} else {
+		w = newSimpleResponseWriterInterceptor(w)
 	}
-	return false
-}
-
-func (d *retryDetector) Reset() {
-	for _, delegate := range d.delegates {
-		delegate.Reset()
-	}
-}
-
-func (d *retryDetector) LastKnownError() error {
-	for _, delegate := range d.delegates {
-		err := delegate.LastKnownError()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return w
 }
 
 type responseWriterInterceptor interface {
@@ -91,11 +61,12 @@ func (w *responseWriterExtended) Flush() {
 // newExtendedResponseWriterInterceptor extends responseWriter
 // primarily to satisfy metrics.InstrumentRouteFunc/InstrumentHandlerFunc
 //
-// It turns out that not all ResponseWrites support CloseNotify and Flush methods
+// it turns out that not all ResponseWrites support CloseNotify and Flush methods
 func newExtendedResponseWriterInterceptor(rw *responseWriter) *responseWriterExtended {
 	return &responseWriterExtended{rw}
 }
 
+// responseWriter wraps http.ResponseWriter for detecting Hijacked connections
 type responseWriter struct {
 	http.ResponseWriter
 
@@ -103,8 +74,8 @@ type responseWriter struct {
 	wasHijacked bool
 }
 
-// newResponseWriterInterceptor wraps the given ResponseWrite and intercept WriteHeader and Hijack methods
-func newResponseWriterInterceptor(w http.ResponseWriter) *responseWriter {
+// newSimpleResponseWriterInterceptor wraps the given ResponseWrite and intercept WriteHeader() and Hijack() methods
+func newSimpleResponseWriterInterceptor(w http.ResponseWriter) *responseWriter {
 	return &responseWriter{w,  0, false}
 }
 
@@ -131,46 +102,44 @@ func (w *responseWriter) StatusCode() int {
 	return w.statusCode
 }
 
-type hijackProtector struct {
+type retriable interface {
+	shouldRetry() bool
+	reset()
+}
+
+type retryDecorator struct {
 	delegate retriable
 	rw responseWriterInterceptor
 }
 
-var _ retriable = &hijackProtector{}
-
-func newHijackProtector(rw responseWriterInterceptor, delegate retriable) *hijackProtector {
-	return &hijackProtector{delegate, rw}
+// newRetryDecorator wraps delegate for detecting Hijacked connections
+func newRetryDecorator(rw responseWriterInterceptor, delegate retriable, retry int) *retryDecorator {
+	return &retryDecorator{withMaxRetries(delegate, retry), rw}
 }
 
-func (p *hijackProtector) ShouldRetry() bool {
+// RetryIfNeeded returns true if the request failed and can be safely retried otherwise it returns false
+func (p *retryDecorator) RetryIfNeeded() bool {
 	if p.rw.WasHijacked() {
 		return false
 	}
-	return p.delegate.ShouldRetry()
-}
 
-func (p *hijackProtector) Reset() {
-	p.delegate.Reset()
-}
-
-func (p *hijackProtector) LastKnownError() error {
-	return p.delegate.LastKnownError()
+	if p.delegate.shouldRetry() {
+		p.delegate.reset()
+		return true
+	}
+	return false
 }
 
 type maxRetries struct {
-	delegate retriable
+	retriable
 	counter int
 	max int
 }
 
 var _ retriable = &maxRetries{}
 
-func newMaxRetries(delegate retriable, max int) *maxRetries {
-	return &maxRetries{delegate:delegate, max:max}
-}
-
-func (r *maxRetries) Reset() {
-	r.delegate.Reset()
+func withMaxRetries(delegate retriable, max int) retriable {
+	return &maxRetries{retriable:delegate, max:max}
 }
 
 func (r *maxRetries) ShouldRetry() bool {
@@ -179,51 +148,48 @@ func (r *maxRetries) ShouldRetry() bool {
 		return false
 	}
 
-	return r.delegate.ShouldRetry()
+	return r.retriable.shouldRetry()
 }
 
-func (r *maxRetries) LastKnownError() error {
-	return r.delegate.LastKnownError()
-}
-
-type hijackResponder struct {
+// hijackErrorResponder wraps proxy.ErrorResponder and prevents errors from being written to the client if they can be retried
+type hijackErrorResponder struct {
+	// delegate knows how to write errors to the client
 	delegate proxy.ErrorResponder
 	req *http.Request
 	retry  bool
 	lastKnownError error
 }
 
-var _ proxy.ErrorResponder = &hijackResponder{}
-var _ retriable = &hijackResponder{}
+var _ proxy.ErrorResponder = &hijackErrorResponder{}
+var _ retriable = &hijackErrorResponder{}
 
-func newHijackResponder(delegate proxy.ErrorResponder, req *http.Request) *hijackResponder {
-	return &hijackResponder{delegate: delegate, req: req}
+// newHijackErrorResponder creates a new ErrorResponder that wraps the delegate for supporting reties
+func newHijackErrorResponder(delegate proxy.ErrorResponder, req *http.Request) *hijackErrorResponder {
+	return &hijackErrorResponder{delegate: delegate, req: req}
 }
 
-func (hr *hijackResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
+// Error reports the err to the client or suppress it if it's not retriable
+func (hr *hijackErrorResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
 	// if we can retry the request do not send a response to the client
 	hr.lastKnownError = err
 	if !hr.canRetry(err) {
+		hr.retry = false
 		hr.delegate.Error(w, r, err)
 		return
 	}
 	hr.retry = true
 }
 
-func (hr *hijackResponder) Reset() {
+func (hr *hijackErrorResponder) reset() {
 	hr.retry = false
 	hr.lastKnownError = nil
 }
 
-func (hr *hijackResponder) ShouldRetry() bool {
+func (hr *hijackErrorResponder) shouldRetry() bool {
 	return hr.retry
 }
 
-func (hr *hijackResponder) LastKnownError() error {
-	return hr.lastKnownError
-}
-
-func (hr *hijackResponder) canRetry(err error) bool {
+func (hr *hijackErrorResponder) canRetry(err error) bool {
 	if isHTTPVerbRetriable(hr.req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) ||  isExperimental(err)) {
 		return true
 	}
@@ -241,7 +207,7 @@ func isExperimental(err error) bool {
 	}
 
 	// blocking the network traffic to a node gives: dial tcp 10.129.0.31:8443: connect: no route to host
-	// no rsp has been sent to the client so it's okay to retry and can pick up a different EP
+	// no rsp has been sent to the client so it's okay to retry and pick up a different EP
 	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EHOSTUNREACH {
 		return true
 	}
