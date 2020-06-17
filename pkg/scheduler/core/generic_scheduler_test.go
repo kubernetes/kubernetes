@@ -710,7 +710,9 @@ func TestGenericScheduler(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			prof := &profile.Profile{Framework: fwk}
+			prof := &profile.Profile{
+				Framework: fwk,
+			}
 
 			var pvcs []v1.PersistentVolumeClaim
 			pvcs = append(pvcs, test.pvcs...)
