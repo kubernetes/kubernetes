@@ -283,7 +283,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				emptySnapshot,
 				extenders,
 				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
