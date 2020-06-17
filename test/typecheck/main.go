@@ -266,7 +266,7 @@ func (c *collector) handlePath(path string, info os.FileInfo, err error) error {
 	}
 	if info.IsDir() {
 		// Ignore hidden directories (.git, .cache, etc)
-		if len(path) > 1 && path[0] == '.' {
+		if len(path) > 1 && (path[0] == '.' || path[0] == '_') {
 			return filepath.SkipDir
 		}
 		for _, dir := range c.ignoreDirs {
