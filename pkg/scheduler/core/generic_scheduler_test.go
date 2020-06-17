@@ -693,9 +693,6 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
@@ -724,7 +721,6 @@ func TestGenericScheduler(t *testing.T) {
 				snapshot,
 				[]framework.Extender{},
 				pvcLister,
-				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
@@ -752,7 +748,7 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 		cache,
 		internalqueue.NewSchedulingQueue(nil),
 		emptySnapshot,
-		nil, nil, nil, false,
+		nil, nil, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -1044,7 +1040,6 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				emptySnapshot,
 				[]framework.Extender{},
-				nil,
 				nil,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
@@ -1508,9 +1503,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-
 			filterFailedNodeReturnCodeMap := map[string]framework.Code{}
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
@@ -1558,7 +1550,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				snapshot,
 				[]framework.Extender{},
 				nil,
-				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			g := scheduler.(*genericScheduler)
@@ -2306,7 +2297,6 @@ func TestPreempt(t *testing.T) {
 				deletedPodNames.Insert(action.(clienttesting.DeleteAction).GetName())
 				return true, nil, nil
 			})
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 			stop := make(chan struct{})
 			cache := internalcache.New(time.Duration(0), stop)
@@ -2344,29 +2334,21 @@ func TestPreempt(t *testing.T) {
 				extenders = append(extenders, extender)
 			}
 
+			podNominator := internalqueue.NewPodNominator()
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
 				test.registerPlugins,
 				framework.WithClientSet(client),
+				framework.WithEventRecorder(&events.FakeRecorder{}),
+				framework.WithExtenders(extenders),
+				framework.WithPodNominator(podNominator),
 				framework.WithSnapshotSharedLister(snapshot),
+				framework.WithInformerFactory(informers.NewSharedInformerFactory(client, 0)),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
-			prof := &profile.Profile{
-				Framework: fwk,
-				Recorder:  &events.FakeRecorder{},
-			}
 
-			scheduler := NewGenericScheduler(
-				cache,
-				internalqueue.NewSchedulingQueue(nil),
-				snapshot,
-				extenders,
-				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-				false,
-				schedulerapi.DefaultPercentageOfNodesToScore)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
 			preFilterStatus := fwk.RunPreFilterPlugins(context.Background(), state, test.pod)
@@ -2378,7 +2360,7 @@ func TestPreempt(t *testing.T) {
 			if test.failedNodeToStatusMap != nil {
 				failedNodeToStatusMap = test.failedNodeToStatusMap
 			}
-			node, err := scheduler.Preempt(context.Background(), prof, state, test.pod, failedNodeToStatusMap)
+			node, err := Preempt(context.Background(), fwk, state, test.pod, failedNodeToStatusMap)
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
@@ -2416,7 +2398,7 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, err = scheduler.Preempt(context.Background(), prof, state, test.pod, failedNodeToStatusMap)
+			node, err = Preempt(context.Background(), fwk, state, test.pod, failedNodeToStatusMap)
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}

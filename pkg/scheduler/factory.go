@@ -30,15 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -192,7 +189,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 		c.nodeInfoSnapshot,
 		extenders,
 		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		GetPodDisruptionBudgetLister(c.informerFactory),
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
 	)
@@ -477,12 +473,4 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 			klog.Error(err)
 		}
 	}
-}
-
-// GetPodDisruptionBudgetLister returns pdb lister from the given informer factory. Returns nil if PodDisruptionBudget feature is disabled.
-func GetPodDisruptionBudgetLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		return informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister()
-	}
-	return nil
 }

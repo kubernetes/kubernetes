@@ -48,6 +48,7 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/defaultbinder:all-srcs",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:all-srcs",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
         "//pkg/scheduler/framework/plugins/helper:all-srcs",
         "//pkg/scheduler/framework/plugins/imagelocality:all-srcs",
