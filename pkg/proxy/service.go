@@ -296,6 +296,7 @@ func UpdateServiceMap(serviceMap ServiceMap, changes *ServiceChangeTracker) (res
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to serviceMap.
 	result.HCServiceNodePorts = make(map[types.NamespacedName]uint16)
+	result.NoHealthCheck = make(map[types.NamespacedName]bool)
 	for svcPortName, info := range serviceMap {
 		if info.HealthCheckNodePort() != 0 {
 			result.HCServiceNodePorts[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
