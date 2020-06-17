@@ -130,13 +130,13 @@ func TestServer(t *testing.T) {
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
 	}
-	hcs.SyncEndpoints(nil)
+	hcs.SyncEndpoints(nil, nil)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
 	}
 
 	// sync unknown endpoints, should be dropped
-	hcs.SyncEndpoints(map[types.NamespacedName]int{mknsn("a", "b"): 93})
+	hcs.SyncEndpoints(map[types.NamespacedName]int{mknsn("a", "b"): 93}, nil)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
 	}
@@ -160,7 +160,7 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
 
 	// sync an endpoint
-	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 18})
+	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 18}, nil)
 	if len(hcs.services) != 1 {
 		t.Errorf("expected 1 service, got %d", len(hcs.services))
 	}
@@ -171,7 +171,7 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn, http.StatusOK, 18, t)
 
 	// sync zero endpoints
-	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 0})
+	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 0}, nil)
 	if len(hcs.services) != 1 {
 		t.Errorf("expected 1 service, got %d", len(hcs.services))
 	}
@@ -182,7 +182,7 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
 
 	// put the endpoint back
-	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 11})
+	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 11}, nil)
 	if len(hcs.services) != 1 {
 		t.Errorf("expected 1 service, got %d", len(hcs.services))
 	}
@@ -190,7 +190,7 @@ func TestServer(t *testing.T) {
 		t.Errorf("expected 18 endpoints, got %d", hcs.services[nsn].endpoints)
 	}
 	// sync nil endpoints
-	hcs.SyncEndpoints(nil)
+	hcs.SyncEndpoints(nil, nil)
 	if len(hcs.services) != 1 {
 		t.Errorf("expected 1 service, got %d", len(hcs.services))
 	}
@@ -201,7 +201,7 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
 
 	// put the endpoint back
-	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 18})
+	hcs.SyncEndpoints(map[types.NamespacedName]int{nsn: 18}, nil)
 	if len(hcs.services) != 1 {
 		t.Errorf("expected 1 service, got %d", len(hcs.services))
 	}
@@ -249,7 +249,7 @@ func TestServer(t *testing.T) {
 		nsn1: 9,
 		nsn2: 3,
 		nsn3: 7,
-	})
+	}, nil)
 	if len(hcs.services) != 3 {
 		t.Errorf("expected 3 services, got %d", len(hcs.services))
 	}
@@ -297,7 +297,7 @@ func TestServer(t *testing.T) {
 		nsn2: 3,
 		nsn3: 7,
 		nsn4: 6,
-	})
+	}, nil)
 	if len(hcs.services) != 3 {
 		t.Errorf("expected 3 services, got %d", len(hcs.services))
 	}
@@ -319,7 +319,7 @@ func TestServer(t *testing.T) {
 	hcs.SyncEndpoints(map[types.NamespacedName]int{
 		nsn3: 7,
 		nsn4: 6,
-	})
+	}, nil)
 	if len(hcs.services) != 3 {
 		t.Errorf("expected 3 services, got %d", len(hcs.services))
 	}

@@ -45,7 +45,7 @@ type ServiceHealthServer interface {
 	// Make the new set of endpoints be active.  Endpoints for services that do
 	// not exist will be dropped.  The value of the map is the number of
 	// endpoints the service has on this node.
-	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
+	SyncEndpoints(newEndpoints map[types.NamespacedName]int, noHealthCheck map[types.NamespacedName]bool) error
 }
 
 func newServiceHealthServer(hostname string, recorder record.EventRecorder, listener listener, factory httpServerFactory) ServiceHealthServer {
@@ -174,13 +174,15 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		`, h.name.Namespace, h.name.Name, count)), "\n"))
 }
 
-func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
+func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int, noHealthCheck map[types.NamespacedName]bool) error {
 	hcs.lock.Lock()
 	defer hcs.lock.Unlock()
 
 	for nsn, count := range newEndpoints {
 		if hcs.services[nsn] == nil {
-			klog.V(3).Infof("Not saving endpoints for unknown healthcheck %q", nsn.String())
+			if !noHealthCheck[nsn] {
+				klog.V(3).Infof("Not saving endpoints for unknown healthcheck %q", nsn.String())
+			}
 			continue
 		}
 		klog.V(3).Infof("Reporting %d endpoints for healthcheck %q", count, nsn.String())
@@ -208,6 +210,6 @@ func (fake FakeServiceHealthServer) SyncServices(_ map[types.NamespacedName]uint
 }
 
 // SyncEndpoints is part of ServiceHealthServer
-func (fake FakeServiceHealthServer) SyncEndpoints(_ map[types.NamespacedName]int) error {
+func (fake FakeServiceHealthServer) SyncEndpoints(_ map[types.NamespacedName]int, noHealthCheck map[types.NamespacedName]bool) error {
 	return nil
 }

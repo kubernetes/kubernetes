@@ -284,6 +284,8 @@ type UpdateServiceMapResult struct {
 	// UDPStaleClusterIP holds stale (no longer assigned to a Service) Service IPs that had UDP ports.
 	// Callers can use this to abort timeout-waits or clear connection-tracking information.
 	UDPStaleClusterIP sets.String
+	// NoHealthCheck is a map of Service names to node port numbers which means no need health checking.
+	NoHealthCheck map[types.NamespacedName]bool
 }
 
 // UpdateServiceMap updates ServiceMap based on the given changes.
@@ -297,6 +299,8 @@ func UpdateServiceMap(serviceMap ServiceMap, changes *ServiceChangeTracker) (res
 	for svcPortName, info := range serviceMap {
 		if info.HealthCheckNodePort() != 0 {
 			result.HCServiceNodePorts[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
+		} else {
+			result.NoHealthCheck[svcPortName.NamespacedName] = true
 		}
 	}
 
