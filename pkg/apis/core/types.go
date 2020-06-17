@@ -2725,7 +2725,7 @@ type PodSpec struct {
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
-	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+	// This field is beta-level.
 	// +optional
 	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.

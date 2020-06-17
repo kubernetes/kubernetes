@@ -163,6 +163,9 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 		if pod.Spec.Priority == nil && oldPod.Spec.Priority != nil {
 			pod.Spec.Priority = oldPod.Spec.Priority
 		}
+		if pod.Spec.PreemptionPolicy == nil && oldPod.Spec.PreemptionPolicy != nil {
+			pod.Spec.PreemptionPolicy = oldPod.Spec.PreemptionPolicy
+		}
 		return nil
 	}
 

@@ -466,6 +466,7 @@ const (
 
 	// owner: @denkensk
 	// alpha: v1.15
+	// beta: v1.19
 	//
 	// Enables NonPreempting option for priorityClass and pod.
 	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
@@ -649,7 +650,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
-	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
+	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
