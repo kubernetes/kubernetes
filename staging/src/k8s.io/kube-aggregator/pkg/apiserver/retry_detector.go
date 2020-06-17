@@ -123,6 +123,7 @@ func (p *retryDecorator) RetryIfNeeded() bool {
 		return false
 	}
 
+	//TODO: for env with only a single server we should back off before retrying
 	if p.delegate.shouldRetry() {
 		p.delegate.reset()
 		return true
@@ -142,7 +143,7 @@ func withMaxRetries(delegate retriable, max int) retriable {
 	return &maxRetries{retriable:delegate, max:max}
 }
 
-func (r *maxRetries) ShouldRetry() bool {
+func (r *maxRetries) shouldRetry() bool {
 	r.counter++
 	if r.counter > r.max {
 		return false

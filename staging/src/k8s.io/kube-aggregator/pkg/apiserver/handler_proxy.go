@@ -109,6 +109,7 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w = newResponseWriterInterceptor(w)
 	errRsp := newHijackErrorResponder(&responder{w: w}, req)
+	// TODO: we could retry len(ResolveEndpoint(service)) - picking a different server on each retry
 	retryDecorator := newRetryDecorator(w.(responseWriterInterceptor), errRsp, 3)
 
 	visitedURLs := []*url.URL{}
@@ -123,6 +124,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// if an error is not retriable and we haven't sent a response to the client return StatusServiceUnavailable
 	if w.(responseWriterInterceptor).StatusCode() == 0 && !w.(responseWriterInterceptor).WasHijacked() {
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 	}

@@ -19,6 +19,7 @@ package apiserver
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/websocket"
@@ -90,8 +91,26 @@ type mockedRouter struct {
 	err             error
 }
 
-func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32, seenEndpoints ...*url.URL) (*url.URL, error) {
 	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
+}
+
+type mockedRouterWithCounter struct {
+	delegate *mockedRouter
+	counter  int
+}
+
+func (r *mockedRouterWithCounter) ResolveEndpoint(namespace, name string, port int32, seenEndpoints ...*url.URL) (*url.URL, error) {
+	r.counter++
+	return r.delegate.ResolveEndpoint(name, name, port)
+}
+
+type fakeRT struct {
+	err error
+}
+
+func (frt *fakeRT) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, frt.err
 }
 
 func TestProxyHandler(t *testing.T) {
@@ -461,7 +480,7 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 }
 
-func TestProxyRetries(t *testing.T) {
+func TestProxyRetriesIntegration(t *testing.T) {
 	testCases := map[string]struct {
 		APIService *apiregistration.APIService
 	}{
@@ -557,6 +576,103 @@ func TestProxyRetries(t *testing.T) {
 		}()
 	}
 }
+
+func TestProxyRetries(t *testing.T) {
+	testCases := map[string]struct {
+		apiService *apiregistration.APIService
+		backendError error
+		expectedStatusCode int
+	}{
+		"retry on connection reset by peer error: test (OK)-> proxy <-(ERROR) backend": {
+			apiService: &apiregistration.APIService{
+				Spec: apiregistration.APIServiceSpec{
+					CABundle: testCACrt,
+					Group:    "mygroup",
+					Version:  "v1",
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			backendError: errors.New("connection reset by peer"),
+			expectedStatusCode: http.StatusServiceUnavailable,
+		},
+		// TODO: add more scenarios; i.e. test errors that are not retriable
+	}
+
+	for name, testCase := range testCases {
+		testCaseName := name
+		path := "/apis/" + testCase.apiService.Spec.Group + "/" + testCase.apiService.Spec.Version + "/foo"
+
+		func() {
+			// set up the aggregator
+			serverURL, _ := url.Parse("https://fake.com")
+			proxyHandler := &proxyHandler{
+				serviceResolver: &mockedRouterWithCounter{&mockedRouter{destinationHost: serverURL.Host}, 0},
+				proxyTransport:  &http.Transport{},
+			}
+			proxyHandler.updateAPIService(testCase.apiService)
+
+			value := proxyHandler.handlingInfo.Load()
+			handlingInfo := value.(proxyHandlingInfo)
+			handlingInfo.proxyRoundTripper = &fakeRT{testCase.backendError}
+			proxyHandler.handlingInfo.Store(handlingInfo)
+
+			aggregator := httptest.NewUnstartedServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
+			aggregatorCert, err := tls.X509KeyPair(aggregatorCrt, aggregatorKey)
+			if err != nil {
+				t.Fatalf("aggregator: invalid x509/key pair: %v", err)
+			}
+			aggregator.TLS = &tls.Config{
+				Certificates: []tls.Certificate{aggregatorCert},
+				NextProtos:   []string{http2.NextProtoTLS},
+			}
+			aggregator.StartTLS()
+			defer aggregator.Close()
+
+			clientCACertPool := x509.NewCertPool()
+			clientCACertPool.AppendCertsFromPEM(aggregatorCrt)
+			clientTLSConfig := &tls.Config{
+				RootCAs:    clientCACertPool,
+				NextProtos: []string{http2.NextProtoTLS},
+			}
+			client := &http.Client{}
+			client.Transport = &http2.Transport{
+				TLSClientConfig: clientTLSConfig,
+			}
+
+			// act
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%d%s", aggregator.Listener.Addr().(*net.TCPAddr).Port, path))
+			if err != nil {
+				t.Fatalf("%s: %v", testCaseName, err)
+			}
+
+			// validate
+			defer resp.Body.Close()
+			_, err = ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("%s: %v", testCaseName, err)
+			}
+			if resp.StatusCode != testCase.expectedStatusCode {
+				t.Errorf("unexpected HTTP staus: %v, expected: %v", resp.StatusCode, testCase.expectedStatusCode)
+			}
+			expectedProto := "HTTP/2.0"
+			if resp.Proto != expectedProto {
+				t.Errorf("unexpected response proto: %v, expected: %v", resp.Proto, expectedProto)
+			}
+
+			actualRetries := proxyHandler.serviceResolver.(*mockedRouterWithCounter).counter
+			if 4 != actualRetries {
+				t.Errorf("expected %d retries but got %d", 4, actualRetries)
+			}
+		}()
+	}
+}
+
+
 
 // valid for localhost
 var aggregatorCrt = []byte(`-----BEGIN CERTIFICATE-----
