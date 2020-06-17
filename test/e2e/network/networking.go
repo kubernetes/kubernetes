@@ -278,7 +278,7 @@ var _ = SIGDescribe("Networking", func() {
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterHTTPPort))
 
 			// Check if number of endpoints returned are exactly one.
-			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterHTTPPort, e2enetwork.SessionAffinityChecks)
+			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries)
 			if err != nil {
 				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
 			}
@@ -296,7 +296,7 @@ var _ = SIGDescribe("Networking", func() {
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterUDPPort))
 
 			// Check if number of endpoints returned are exactly one.
-			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterUDPPort, e2enetwork.SessionAffinityChecks)
+			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries)
 			if err != nil {
 				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
 			}

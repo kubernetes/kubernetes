@@ -74,8 +74,6 @@ const (
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
 	maxNetProxyPodsCount = 10
-	// SessionAffinityChecks is number of checks to hit a given set of endpoints when enable session affinity.
-	SessionAffinityChecks = 10
 	// RegexIPv4 is a regex to match IPv4 addresses
 	RegexIPv4 = "(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)"
 	// RegexIPv6 is a regex to match IPv6 addresses
@@ -255,7 +253,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-					cmd, config.HostTestContainerPod.Name, stdout, err)
+					cmd, config.TestContainerPod.Name, stdout, err)
 				continue
 			}
 
@@ -272,7 +270,6 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 		if (responses.Equal(expectedResponses) || responses.Len() == 0 && expectedResponses.Len() == 0) && i+1 >= minTries {
 			return
 		}
-		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
 
@@ -313,11 +310,11 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// we confirm unreachability.
 			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
-			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
+			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.TestContainerPod)
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-					cmd, config.HostTestContainerPod.Name, stdout, err)
+					cmd, config.TestContainerPod.Name, stdout, err)
 				continue
 			}
 
@@ -327,7 +324,6 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 					eps.Insert(trimmed)
 				}
 			}
-			// TODO: get rid of this delay #36281
 			time.Sleep(hitEndpointRetryDelay)
 		}
 	}
@@ -384,7 +380,6 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 
 		framework.Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
 
-		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
 
