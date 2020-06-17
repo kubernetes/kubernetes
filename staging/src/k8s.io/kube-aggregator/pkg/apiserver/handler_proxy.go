@@ -237,7 +237,7 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 }
 
 func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
-	http.Error(r.w, err.Error(), http.StatusInternalServerError)
+	http.Error(r.w, err.Error(), http.StatusServiceUnavailable)
 }
 
 // these methods provide locked access to fields

@@ -561,7 +561,7 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "Error trying to reach service: 'context deadline exceeded'") {
+	if !strings.Contains(string(body), "context deadline exceeded") {
 		t.Error(string(body))
 	}
 

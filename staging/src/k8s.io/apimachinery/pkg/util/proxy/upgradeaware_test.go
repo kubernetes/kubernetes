@@ -901,7 +901,8 @@ func TestFlushIntervalHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, false, nil)
+	responder := &fakeResponder{t: t}
+	proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, false, responder)
 
 	frontend := httptest.NewServer(proxyHandler)
 	defer frontend.Close()
@@ -921,6 +922,53 @@ func TestFlushIntervalHeaders(t *testing.T) {
 
 	if res.Header.Get("MyHeader") != expected {
 		t.Errorf("got header %q; expected %q", res.Header.Get("MyHeader"), expected)
+	}
+}
+
+type fakeRT struct {
+	err error
+}
+
+func (frt *fakeRT) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, frt.err
+}
+
+// TestErrorPropagation checks if the default transport doesn't swallow the errors by providing a fakeResponder that intercepts and stores the error.
+func TestErrorPropagation(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("unreachable")
+	}))
+	defer backend.Close()
+
+	backendURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	responder := &fakeResponder{t: t}
+	expectedErr := errors.New("nasty error")
+	proxyHandler := NewUpgradeAwareHandler(backendURL, &fakeRT{err: expectedErr}, true, false, responder)
+
+	frontend := httptest.NewServer(proxyHandler)
+	defer frontend.Close()
+
+	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req.Close = true
+
+	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	res, err := frontend.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != fakeStatusCode {
+		t.Fatalf("unexpected HTTP status code returned: %v, expected: %v", res.StatusCode, fakeStatusCode)
+	}
+	if !strings.Contains(responder.err.Error(), expectedErr.Error()) {
+		t.Fatalf("responder got unexpected error: %v, expected the error to contain %q", responder.err.Error(), expectedErr.Error())
 	}
 }
 
