@@ -3603,6 +3603,37 @@ func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, load
 	return sgList, setupSg, nil
 }
 
+// sortELBSecurityGroupList returns a list of sorted securityGroupIDs based on the original order
+// from buildELBSecurityGroupList. The logic is:
+//  * securityGroups specified by ServiceAnnotationLoadBalancerSecurityGroups appears first in order
+//  * securityGroups specified by ServiceAnnotationLoadBalancerExtraSecurityGroups appears last in order
+func (c *Cloud) sortELBSecurityGroupList(securityGroupIDs []string, annotations map[string]string) {
+	annotatedSGList := getSGListFromAnnotation(annotations[ServiceAnnotationLoadBalancerSecurityGroups])
+	annotatedExtraSGList := getSGListFromAnnotation(annotations[ServiceAnnotationLoadBalancerExtraSecurityGroups])
+	annotatedSGIndex := make(map[string]int, len(annotatedSGList))
+	annotatedExtraSGIndex := make(map[string]int, len(annotatedExtraSGList))
+
+	for i, sgID := range annotatedSGList {
+		annotatedSGIndex[sgID] = i
+	}
+	for i, sgID := range annotatedExtraSGList {
+		annotatedExtraSGIndex[sgID] = i
+	}
+	sgOrderMapping := make(map[string]int, len(securityGroupIDs))
+	for _, sgID := range securityGroupIDs {
+		if i, ok := annotatedSGIndex[sgID]; ok {
+			sgOrderMapping[sgID] = i
+		} else if j, ok := annotatedExtraSGIndex[sgID]; ok {
+			sgOrderMapping[sgID] = len(annotatedSGIndex) + 1 + j
+		} else {
+			sgOrderMapping[sgID] = len(annotatedSGIndex)
+		}
+	}
+	sort.Slice(securityGroupIDs, func(i, j int) bool {
+		return sgOrderMapping[securityGroupIDs[i]] < sgOrderMapping[securityGroupIDs[j]]
+	})
+}
+
 // buildListener creates a new listener from the given port, adding an SSL certificate
 // if indicated by the appropriate annotations.
 func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts *portSets) (*elb.Listener, error) {
@@ -4015,7 +4046,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	}
 
-	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
+	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances, annotations)
 	if err != nil {
 		klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
 		return nil, err
@@ -4173,26 +4204,18 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 
 // Open security group ingress rules on the instances so that the load balancer can talk to them
 // Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
-func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[InstanceID]*ec2.Instance) error {
+func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[InstanceID]*ec2.Instance, annotations map[string]string) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}
 
 	// Determine the load balancer security group id
-	loadBalancerSecurityGroupID := ""
-	for _, securityGroup := range lb.SecurityGroups {
-		if aws.StringValue(securityGroup) == "" {
-			continue
-		}
-		if loadBalancerSecurityGroupID != "" {
-			// We create LBs with one SG
-			klog.Warningf("Multiple security groups for load balancer: %q", aws.StringValue(lb.LoadBalancerName))
-		}
-		loadBalancerSecurityGroupID = *securityGroup
-	}
-	if loadBalancerSecurityGroupID == "" {
+	lbSecurityGroupIDs := aws.StringValueSlice(lb.SecurityGroups)
+	if len(lbSecurityGroupIDs) == 0 {
 		return fmt.Errorf("could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
+	c.sortELBSecurityGroupList(lbSecurityGroupIDs, annotations)
+	loadBalancerSecurityGroupID := lbSecurityGroupIDs[0]
 
 	// Get the actual list of groups that allow ingress from the load-balancer
 	var actualGroups []*ec2.SecurityGroup
@@ -4368,7 +4391,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 
 	{
 		// De-authorize the load balancer security group from the instances security group
-		err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, nil)
+		err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, nil, service.Annotations)
 		if err != nil {
 			klog.Errorf("Error deregistering load balancer from instance security groups: %q", err)
 			return err
@@ -4533,7 +4556,7 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 		return nil
 	}
 
-	err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, instances)
+	err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, instances, service.Annotations)
 	if err != nil {
 		return err
 	}
