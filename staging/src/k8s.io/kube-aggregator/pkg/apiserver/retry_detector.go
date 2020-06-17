@@ -197,7 +197,7 @@ func (hr *hijackErrorResponder) canRetry(err error) bool {
 }
 
 func isHTTPVerbRetriable(req *http.Request) bool {
-	return req.Method == "GET"
+	return req.Method == "GET" || req.Method == "DELETE"
 }
 
 func isExperimental(err error) bool {
