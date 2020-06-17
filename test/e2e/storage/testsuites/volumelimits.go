@@ -187,7 +187,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the pod Running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, l.runningPod.Name, l.ns.Name, testSlowMultiplier*framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, l.runningPod.Name, l.ns.Name, testSlowMultiplier*e2epod.PodStartTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
@@ -203,7 +203,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err, "Failed to create an extra pod with one volume to exceed the limit")
 
 		ginkgo.By("Waiting for the pod to get unschedulable with the right message")
-		err = e2epod.WaitForPodCondition(l.cs, l.ns.Name, l.unschedulablePod.Name, "Unschedulable", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		err = e2epod.WaitForPodCondition(l.cs, l.ns.Name, l.unschedulablePod.Name, "Unschedulable", e2epod.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 			if pod.Status.Phase == v1.PodPending {
 				reg, err := regexp.Compile(`max.+volume.+count`)
 				if err != nil {

@@ -38,8 +38,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-const (
-	serverStartTimeout = framework.PodStartTimeout + 3*time.Minute
+var (
+	serverStartTimeout = e2epod.PodStartTimeout + 3*time.Minute
 )
 
 var _ = framework.KubeDescribe("[Feature:Example]", func() {

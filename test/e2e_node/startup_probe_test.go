@@ -173,7 +173,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+			e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 
 			p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

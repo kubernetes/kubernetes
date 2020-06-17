@@ -206,7 +206,7 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		}
 
 		ginkgo.By("Waiting for claim to be in bound phase")
-		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PV to the node")

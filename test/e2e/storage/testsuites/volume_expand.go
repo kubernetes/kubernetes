@@ -40,8 +40,6 @@ import (
 
 const (
 	resizePollInterval = 2 * time.Second
-	// total time to wait for cloudprovider or file system resize to finish
-	totalResizeWaitPeriod = 10 * time.Minute
 	// time to wait for PVC conditions to sync
 	pvcConditionSyncPeriod = 2 * time.Minute
 )
@@ -171,7 +169,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
 			}
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, e2epod.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -199,7 +197,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
-			err = WaitForControllerVolumeResize(l.resource.Pvc, f.ClientSet, totalResizeWaitPeriod)
+			err = WaitForControllerVolumeResize(l.resource.Pvc, f.ClientSet, e2epod.TotalResizeWaitPeriod)
 			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 			ginkgo.By("Checking for conditions on pvc")
@@ -214,7 +212,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
 			}
-			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, e2epod.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
@@ -241,7 +239,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
 			}
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, e2epod.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -265,7 +263,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
-			err = WaitForControllerVolumeResize(l.resource.Pvc, f.ClientSet, totalResizeWaitPeriod)
+			err = WaitForControllerVolumeResize(l.resource.Pvc, f.ClientSet, e2epod.TotalResizeWaitPeriod)
 			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 			ginkgo.By("Waiting for file system resize to finish")
@@ -392,7 +390,7 @@ func WaitForPendingFSResizeCondition(pvc *v1.PersistentVolumeClaim, c clientset.
 // WaitForFSResize waits for the filesystem in the pv to be resized
 func WaitForFSResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	var updatedPVC *v1.PersistentVolumeClaim
-	waitErr := wait.PollImmediate(resizePollInterval, totalResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollImmediate(resizePollInterval, e2epod.TotalResizeWaitPeriod, func() (bool, error) {
 		var err error
 		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 

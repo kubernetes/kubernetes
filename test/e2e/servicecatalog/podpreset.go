@@ -140,7 +140,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 			if event.Type != watch.Added {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
-		case <-time.After(framework.PodStartTimeout):
+		case <-time.After(e2epod.PodStartTimeout):
 			framework.Failf("Timeout while waiting for pod creation")
 		}
 
@@ -260,7 +260,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 			if event.Type != watch.Added {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
-		case <-time.After(framework.PodStartTimeout):
+		case <-time.After(e2epod.PodStartTimeout):
 			framework.Failf("Timeout while waiting for pod creation")
 		}
 

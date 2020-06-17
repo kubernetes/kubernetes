@@ -52,7 +52,7 @@ var _ = framework.KubeDescribe("ImageID [NodeFeature: ImageID]", func() {
 		pod := f.PodClient().Create(podDesc)
 
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+			f.ClientSet, pod.Name, f.Namespace.Name, e2epod.PodStartTimeout))
 		runningPod, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 

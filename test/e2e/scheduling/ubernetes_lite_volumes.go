@@ -154,7 +154,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	// Wait for all claims bound
 	for _, claim := range pvcList {
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, claim.Namespace, claim.Name, framework.Poll, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 	}
 

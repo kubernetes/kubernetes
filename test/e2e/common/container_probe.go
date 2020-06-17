@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
 		containerName := "test-webserver"
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)

@@ -262,7 +262,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		var podClient *framework.PodClient = f.PodClient()
 		pod = podClient.Create(pod)
 
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, e2epod.PodStartTimeout)
 		framework.ExpectError(err, "while waiting for pod to be running")
 
 		ginkgo.By("updating the pod")
@@ -271,7 +271,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		})
 
 		ginkgo.By("waiting for pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, e2epod.PodStartTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
@@ -332,7 +332,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		pod = podClient.Create(pod)
 
 		ginkgo.By("waiting for pod running")
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, e2epod.PodStartTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("creating a file in subpath")
@@ -355,7 +355,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		})
 
 		ginkgo.By("waiting for annotated pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, e2epod.PodStartTimeout)
 		framework.ExpectNoError(err, "while waiting for annotated pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
@@ -476,7 +476,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 
-	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, e2epod.PodStartTimeout)
 	framework.ExpectError(err, "while waiting for pod to be running")
 }
 

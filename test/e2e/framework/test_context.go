@@ -100,14 +100,16 @@ type TestContextType struct {
 	Prefix         string
 	MinStartupPods int
 	// Timeout for waiting for system pods to be running
-	SystemPodsStartupTimeout    time.Duration
-	EtcdUpgradeStorage          string
-	EtcdUpgradeVersion          string
-	GCEUpgradeScript            string
-	ContainerRuntime            string
-	ContainerRuntimeEndpoint    string
-	ContainerRuntimeProcessName string
-	ContainerRuntimePidFile     string
+	SystemPodsStartupTimeout time.Duration
+	// Timeout multiplier for waiting for system pods to be started
+	SystemPodsStartupTimeoutMultiplier int
+	EtcdUpgradeStorage                 string
+	EtcdUpgradeVersion                 string
+	GCEUpgradeScript                   string
+	ContainerRuntime                   string
+	ContainerRuntimeEndpoint           string
+	ContainerRuntimeProcessName        string
+	ContainerRuntimePidFile            string
 	// SystemdServices are comma separated list of systemd services the test framework
 	// will dump logs for.
 	SystemdServices string
@@ -347,6 +349,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cloudConfig.ConfigFile, "cloud-config-file", "", "Cloud config file.  Only required if provider is azure or vsphere.")
 	flags.IntVar(&TestContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
 	flags.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
+	flags.IntVar(&TestContext.SystemPodsStartupTimeoutMultiplier, "system-pods-startup-timeout-multiplier", 1, "Timeout multiplier for waiting for all system pods to be running before starting tests.")
 	flags.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 30*time.Minute, "Timeout for waiting for all nodes to be schedulable.")
 	flags.DurationVar(&TestContext.SystemDaemonsetStartupTimeout, "system-daemonsets-startup-timeout", 5*time.Minute, "Timeout for waiting for all system daemonsets to be ready.")
 	flags.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")

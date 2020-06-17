@@ -473,7 +473,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, e2epod.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 		})
@@ -699,7 +699,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, e2epod.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), claim.Name, metav1.GetOptions{})
@@ -736,7 +736,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, e2epod.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), claim.Name, metav1.GetOptions{})
@@ -814,7 +814,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// Event delivery is not reliable and it's used only as a quick way how to check if volume with wrong KMS
 			// key was not provisioned. If the event is not delivered, we check that the volume is not Bound for whole
 			// ClaimProvisionTimeout in the very same loop.
-			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
+			err = wait.Poll(time.Second, e2epod.ClaimProvisionTimeout, func() (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					return false, fmt.Errorf("could not list PVC events in %s: %v", claim.Namespace, err)
@@ -837,7 +837,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				return false, nil
 			})
 			if err == wait.ErrWaitTimeout {
-				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
+				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", e2epod.ClaimProvisionTimeout)
 				err = nil
 			}
 			framework.ExpectNoError(err, "Error waiting for PVC to fail provisioning: %v", err)

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -92,7 +93,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
-		pvs, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		pvs, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to wait until PVC phase set to bound: %v", err))
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 

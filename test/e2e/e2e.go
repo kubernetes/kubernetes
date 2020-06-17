@@ -273,6 +273,12 @@ func setupSuite() {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
+
+	if framework.TestContext.SystemPodsStartupTimeoutMultiplier != 1 {
+		podStartupTimeoutMultiplier := framework.TestContext.SystemPodsStartupTimeoutMultiplier
+		e2epod.SetPodStartTimeoutMultiplier(podStartupTimeoutMultiplier)
+	}
+
 	// TODO: In large clusters, we often observe a non-starting pods due to
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the

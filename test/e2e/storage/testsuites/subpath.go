@@ -765,7 +765,7 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	waitErr := wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	waitErr := wait.PollImmediate(framework.Poll, e2epod.PodStartTimeout, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

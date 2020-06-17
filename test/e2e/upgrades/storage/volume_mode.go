@@ -85,7 +85,7 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	t.pvc, err = e2epv.CreatePVC(cs, ns, t.pvc)
 	framework.ExpectNoError(err)
 
-	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, e2epod.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	t.pvc, err = cs.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Get(context.TODO(), t.pvc.Name, metav1.GetOptions{})
@@ -100,7 +100,7 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 		PVCs:         []*v1.PersistentVolumeClaim{t.pvc},
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
-	t.pod, err = e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
+	t.pod, err = e2epod.CreateSecPod(cs, &podConfig, e2epod.PodStartTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")

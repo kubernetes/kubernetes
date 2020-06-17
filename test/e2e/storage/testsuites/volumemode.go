@@ -235,7 +235,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "Unable to attach or mount volumes"
 
-				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, e2epod.PodStartTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					framework.Logf("Warning: did not get event about FailedMountVolume")
@@ -272,7 +272,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "does not support block volume provisioning"
 
-				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
+				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, e2epod.ClaimProvisionTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					framework.Logf("Warning: did not get event about provisioing failed")
@@ -330,7 +330,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		} else {
 			msg = "has volumeMode Filesystem, but is specified in volumeDevices"
 		}
-		err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+		err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, e2epod.PodStartTimeout)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
 			framework.Logf("Warning: did not get event about mismatched volume use")

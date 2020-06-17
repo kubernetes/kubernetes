@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
@@ -85,7 +86,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
-	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	err = wait.Poll(framework.Poll, e2epod.PodStartTimeout, func() (bool, error) {
 		return checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	})
 	framework.ExpectNoError(err)

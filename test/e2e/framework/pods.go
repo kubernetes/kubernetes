@@ -232,7 +232,7 @@ func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
-	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+	err := wait.Poll(Poll, e2epod.PodStartTimeout, func() (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)

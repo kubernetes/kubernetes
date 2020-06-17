@@ -63,7 +63,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			podServer, service = createServerPodAndService(f, f.Namespace, "server", []int{80, 81})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err)
 			})
 
@@ -112,7 +112,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			podB, serviceB := createServerPodAndService(f, nsB, "pod-b", []int{80, 81})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err)
 			})
 
@@ -969,7 +969,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 			// Wait for Server with Service in NS-B to be ready
 			framework.Logf("Waiting for servers to be ready.")
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, framework.PodStartTimeout)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, e2epod.PodStartTimeout)
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Create a network policy for the server which denies both Ingress and Egress traffic.")
@@ -1060,14 +1060,14 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 			// Wait for Server with Service in NS-A to be ready
 			framework.Logf("Waiting for servers to be ready.")
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, podServer.Namespace, framework.PodStartTimeout)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, podServer.Namespace, e2epod.PodStartTimeout)
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			// Wait for Servers with Services in NS-B to be ready
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerA.Name, nsBpodServerA.Namespace, framework.PodStartTimeout)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerA.Name, nsBpodServerA.Namespace, e2epod.PodStartTimeout)
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerB.Name, nsBpodServerB.Namespace, framework.PodStartTimeout)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerB.Name, nsBpodServerB.Namespace, e2epod.PodStartTimeout)
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only to a server in different namespace.")
@@ -1203,7 +1203,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			defer cleanupServerPodAndService(f, podServerB, serviceB)
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
@@ -1379,7 +1379,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			// Creating pod-b and service-b
 			podServerB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []int{80})
 			ginkgo.By("Waiting for pod-b to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			defer cleanupServerPodAndService(f, podServerB, serviceB)
@@ -1640,7 +1640,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			// Before applying policy, communication should be successful between pod-a and pod-b
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []int{80})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			ginkgo.By("Creating client pod-b which should be able to contact the server pod-a.", func() {
@@ -1650,7 +1650,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 			podB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []int{80})
 			ginkgo.By("Waiting for pod-b to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			ginkgo.By("Creating client pod-a which should be able to contact the server pod-b.", func() {
@@ -1732,7 +1732,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			// Creating server pod with label "pod-name": "pod-a" to deny traffic from client pod with label "pod-name": "pod-b"
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []int{80})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, e2epod.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
@@ -1841,7 +1841,7 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 }
 
 func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	err := e2epod.WaitForPodCondition(f.ClientSet, ns.Name, podClient.Name, "terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+	err := e2epod.WaitForPodCondition(f.ClientSet, ns.Name, podClient.Name, "terminated", e2epod.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 		statuses := pod.Status.ContainerStatuses
 		if len(statuses) == 0 || statuses[0].State.Terminated == nil {
 			return false, nil

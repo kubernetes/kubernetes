@@ -460,7 +460,7 @@ func verifyPodHostPathTypeFailure(f *framework.Framework, nodeSelector map[strin
 	}.AsSelector().String()
 	msg := "hostPath type check failed"
 
-	err = e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodStartTimeout)
+	err = e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, msg, e2epod.PodStartTimeout)
 	// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 	if err != nil {
 		framework.Logf("Warning: did not get event about FailedMountVolume")
@@ -478,7 +478,7 @@ func verifyPodHostPathType(f *framework.Framework, nodeSelector map[string]strin
 	newPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
 		newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, framework.PodStartShortTimeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, e2epod.PodStartTimeout))
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), newPod.Name, *metav1.NewDeleteOptions(0))
 }

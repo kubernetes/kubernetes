@@ -406,7 +406,7 @@ func getBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.
 
 // checkProvisioning verifies that the claim is bound and has the correct properities
 func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
-	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, e2epod.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("checking the claim")
@@ -595,7 +595,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 
 	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
 	ginkgo.By("checking the claims are in pending state")
-	err = e2epv.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, framework.ClaimProvisionShortTimeout, true)
+	err = e2epv.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, e2epod.ClaimProvisionShortTimeout, true)
 	framework.ExpectError(err)
 	verifyPVCsPending(t.Client, createdClaims)
 
@@ -629,7 +629,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		claim, err = t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		// make sure claim did bind
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		pv, err := t.Client.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
@@ -763,7 +763,7 @@ func prepareSnapshotDataSourceForProvisioning(
 	snapshot, err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Create(context.TODO(), snapshot, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	WaitForSnapshotReady(dynamicClient, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	WaitForSnapshotReady(dynamicClient, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, e2epod.SnapshotCreateTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("[Initialize dataSource]checking the snapshot")

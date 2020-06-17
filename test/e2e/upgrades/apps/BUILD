@@ -30,6 +30,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/job:go_default_library",
+        "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/framework/statefulset:go_default_library",
         "//test/e2e/upgrades:go_default_library",

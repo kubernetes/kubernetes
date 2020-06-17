@@ -148,7 +148,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		var pvs []*v1.PersistentVolume
 
-		pvs, err = e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		pvs, err = e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
 

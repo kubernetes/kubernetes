@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				hostPID,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 		}
 
 		nginxPid := ""
@@ -215,7 +215,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 		}
 
 		hostSharedMemoryID := ""
@@ -295,7 +295,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 		}
 
 		listeningPort := ""

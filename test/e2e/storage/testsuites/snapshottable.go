@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -160,7 +161,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			StopPod(l.cs, l.pod)
 		})
 
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the claim")
@@ -271,7 +272,7 @@ func TestSnapshottable(l *snapshottableLocal, sct SnapshotClassTest) {
 			framework.Failf("Error deleting snapshot %q. Error: %v", l.pvc.Name, err)
 		}
 	}()
-	err = WaitForSnapshotReady(l.dc, l.vs.GetNamespace(), l.vs.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	err = WaitForSnapshotReady(l.dc, l.vs.GetNamespace(), l.vs.GetName(), framework.Poll, e2epod.SnapshotCreateTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("checking the snapshot")
@@ -328,7 +329,7 @@ func TestSnapshotDeleted(l *snapshottableLocal, sct SnapshotClassTest) {
 			framework.Failf("Error deleting snapshot %q. Error: %v", l.pvc.Name, err)
 		}
 	}()
-	err = WaitForSnapshotReady(l.dc, l.vs.GetNamespace(), l.vs.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	err = WaitForSnapshotReady(l.dc, l.vs.GetNamespace(), l.vs.GetName(), framework.Poll, e2epod.SnapshotCreateTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("get the snapshot to delete")

@@ -74,13 +74,6 @@ import (
 const (
 	// PodListTimeout is how long to wait for the pod to be listable.
 	PodListTimeout = time.Minute
-	// PodStartTimeout is how long to wait for the pod to be started.
-	PodStartTimeout = 5 * time.Minute
-
-	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
-	// Use it case by case when we are sure pod start will not be delayed.
-	// minutes by slow docker pulls or something else.
-	PodStartShortTimeout = 2 * time.Minute
 
 	// PodDeleteTimeout is how long to wait for a pod to be deleted.
 	PodDeleteTimeout = 5 * time.Minute
@@ -116,13 +109,6 @@ const (
 	// PodReadyBeforeTimeout is how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
-	// ClaimProvisionShortTimeout is same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
-	// Use it case by case when we are sure this timeout is enough.
-	ClaimProvisionShortTimeout = 1 * time.Minute
-
-	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
-	ClaimProvisionTimeout = 5 * time.Minute
-
 	// RestartNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute
@@ -130,9 +116,6 @@ const (
 	// RestartPodReadyAgainTimeout is how long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
-
-	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
-	SnapshotCreateTimeout = 5 * time.Minute
 
 	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
 	SnapshotDeleteTimeout = 5 * time.Minute

@@ -123,7 +123,7 @@ done`, testCmd)
 		framework.ExpectNoError(err)
 	} else {
 		pod = podClient.CreateSync(pod)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, e2epod.PodStartTimeout))
 	}
 
 	// Verify Pod affinity colocated the Pods.

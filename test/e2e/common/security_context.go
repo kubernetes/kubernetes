@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				userid,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 		}
 
 		/*
@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
 			podClient.Create(pod)
 
-			podClient.WaitForSuccess(name, framework.PodStartTimeout)
+			podClient.WaitForSuccess(name, e2epod.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1000"))
 		})
 		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func() {
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			pod := makeNonRootPod(name, nonRootImage, nil)
 			podClient.Create(pod)
 
-			podClient.WaitForSuccess(name, framework.PodStartTimeout)
+			podClient.WaitForSuccess(name, e2epod.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
 		})
 		ginkgo.It("should not run without a specified user ID", func() {
@@ -193,9 +193,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			))
 
 			if readOnlyRootFilesystem {
-				waitForFailure(f, podName, framework.PodStartTimeout)
+				waitForFailure(f, podName, e2epod.PodStartTimeout)
 			} else {
-				podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+				podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 			}
 
 			return podName
@@ -252,7 +252,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
 				privileged,
 			))
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 			return podName
 		}
 		/*
@@ -314,7 +314,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				allowPrivilegeEscalation,
 				uid,
 			))
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2epod.PodStartTimeout)
 			return podClient.MatchContainerOutput(podName, podName, output)
 		}
 

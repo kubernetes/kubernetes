@@ -686,7 +686,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, e2epod.ClaimProvisionTimeout)
 				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
 
 				ginkgo.By("Waiting for expected CSI calls")
@@ -1006,7 +1006,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
-		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
+		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, e2epod.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 	}
 

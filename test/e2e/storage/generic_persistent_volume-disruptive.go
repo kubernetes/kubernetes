@@ -102,7 +102,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, e2epod.ClaimProvisionTimeout)
 	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 	framework.ExpectEqual(len(pvs), 1)
 
@@ -112,7 +112,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		PVCs:         pvcClaims,
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
-	pod, err := e2epod.CreateSecPod(c, &podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPod(c, &podConfig, e2epod.PodStartTimeout)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

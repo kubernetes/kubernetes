@@ -39,6 +39,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -217,7 +218,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2epod.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w,
 			recordEvents(events, conditions.PodCompleted),
@@ -296,7 +297,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2epod.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, conditions.PodRunning))
 		gomega.Expect(err).To(gomega.BeNil())
@@ -375,7 +376,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		}
 
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2epod.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(
 			ctx,
@@ -500,7 +501,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		}
 
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2epod.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(
 			ctx, startedPod.ResourceVersion, w,

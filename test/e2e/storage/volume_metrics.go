@@ -185,7 +185,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Pod %s/%s", pod.Namespace, pod.Name)
 
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, e2epod.PodStartTimeout)
 		framework.ExpectError(err)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)

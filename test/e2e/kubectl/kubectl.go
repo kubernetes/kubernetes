@@ -262,7 +262,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 	// test files.
 	// Print debug info if atLeast Pods are not found before the timeout
 	waitForOrFailWithDebug := func(atLeast int) {
-		pods, err := clusterState().WaitFor(atLeast, framework.PodStartTimeout)
+		pods, err := clusterState().WaitFor(atLeast, e2epod.PodStartTimeout)
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
 			framework.DumpAllNamespaceInfo(f.ClientSet, ns)
@@ -393,7 +393,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout), true)
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, e2epod.PodStartTimeout), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -620,7 +620,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("executing a command with run")
 			framework.RunKubectlOrDie(ns, "run", podName, "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
 
-			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, e2epod.PodStartTimeout) {
 				framework.Failf("Pod for run-log-test was not ready")
 			}
 
@@ -1259,8 +1259,8 @@ metadata:
 			ginkgo.By("Waiting for Agnhost primary to start.")
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
-				framework.Logf("wait on agnhost-primary startup in %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "agnhost-primary", "Paused", framework.PodStartTimeout)
+				framework.Logf("wait on agnhost-master startup in %v ", ns)
+				framework.LookForStringInLog(ns, pod.Name, "agnhost-master", "Paused", e2epod.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -1330,7 +1330,7 @@ metadata:
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout), true)
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, e2epod.PodStartTimeout), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1371,7 +1371,7 @@ metadata:
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout), true)
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, e2epod.PodStartTimeout), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -1436,12 +1436,12 @@ metadata:
 			}
 
 			ginkgo.By("Waiting for log generator to start.")
-			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, e2epod.PodStartTimeout) {
 				framework.Failf("Pod %s was not ready", podName)
 			}
 
 			ginkgo.By("checking for a matching strings")
-			_, err := framework.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", framework.PodStartTimeout)
+			_, err := framework.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", e2epod.PodStartTimeout)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("limiting log lines")
@@ -2199,7 +2199,7 @@ func validateController(c clientset.Interface, containerImage string, replicas i
 
 	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
-	for start := time.Now(); time.Since(start) < framework.PodStartTimeout; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < e2epod.PodStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := framework.RunKubectlOrDie(ns, "get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
@@ -2237,5 +2237,5 @@ waitLoop:
 		}
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
-	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", e2epod.PodStartTimeout.Seconds(), testname)
 }

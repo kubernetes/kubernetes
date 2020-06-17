@@ -407,7 +407,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		SeLinuxLabel:  e2epv.SELinuxLabel,
 		NodeSelection: node,
 	}
-	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, e2epod.PodStartTimeout)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
@@ -486,7 +486,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 			NodeSelection: node,
 			PVCsReadOnly:  readOnly,
 		}
-		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
+		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, e2epod.PodStartTimeout)
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()
