@@ -12,7 +12,7 @@ spec:
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
-    image: us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-server:v0.0.8
+    image: us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-server:v0.0.9
     resources:
       requests:
         cpu: 25m
@@ -21,7 +21,7 @@ spec:
       httpGet:
         scheme: HTTP
         host: 127.0.0.1
-        port: {{ admin_port }}
+        port: {{ health_port }}
         path: /healthz
       initialDelaySeconds: {{ liveness_probe_initial_delay }}
       timeoutSeconds: 60
@@ -29,6 +29,9 @@ spec:
     - name: agentport
       containerPort: {{ agent_port }}
       hostPort: {{ agent_port }}
+    - name: healthport
+      containerPort: {{ health_port }}
+      hostPort: {{ health_port }}
     - name: adminport
       containerPort: {{ admin_port }}
       hostPort: {{ admin_port }}
