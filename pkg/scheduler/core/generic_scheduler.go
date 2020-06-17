@@ -941,9 +941,12 @@ func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudg
 				// We have found a matching PDB.
 				if pdbsAllowed[i] <= 0 {
 					pdbForPodIsViolated = true
-					break
 				} else {
-					pdbsAllowed[i]--
+					// Only decrement the matched pdb when it's not in its <DisruptedPods>;
+					// otherwise we may over-decrement the budget number.
+					if _, exist := pdb.Status.DisruptedPods[pod.Name]; !exist {
+						pdbsAllowed[i]--
+					}
 				}
 			}
 		}
