@@ -54,6 +54,7 @@ func TestInterPodAffinity(t *testing.T) {
 		"zone":   "z11",
 	}
 	for _, node := range nodes {
+		// TODO(nodo): Use PodWrapper to directly initialize node with labels.
 		if err = utils.AddLabelsToNode(testCtx.ClientSet, node.Name, labels1); err != nil {
 			t.Fatalf("Cannot add labels to node: %v", err)
 		}
@@ -895,6 +896,7 @@ func TestEvenPodsSpreadPredicate(t *testing.T) {
 			"zone": fmt.Sprintf("zone-%d", i/2),
 			"node": node.Name,
 		}
+		// TODO(nodo): Use PodWrapper to directly initialize node with labels.
 		if err = utils.AddLabelsToNode(cs, node.Name, labels); err != nil {
 			t.Fatalf("Cannot add labels to node: %v", err)
 		}
@@ -1106,7 +1108,95 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				return nil
 			},
 		},
-		// TODO(#91111): Add more test cases.
+		{
+			name: "pod with pod-affinity gets added",
+			init: func(cs kubernetes.Interface, _ string) error {
+				node, err := createNode(cs, "node-1", nil)
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+				// TODO(nodo): Use PodWrapper to directly initialize node with labels.
+				if err := utils.AddLabelsToNode(cs, node.Name, map[string]string{"region": "test"}); err != nil {
+					return fmt.Errorf("cannot add labels to node: %v", err)
+				}
+				return nil
+			},
+			pod: &pausePodConfig{
+				Name: "pod-1",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"pod-with-affinity": "true",
+									},
+								},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				podConfig := &pausePodConfig{
+					Name:      "pod-with-affinity",
+					Namespace: ns,
+					Labels: map[string]string{
+						"pod-with-affinity": "true",
+					},
+				}
+				if _, err := createPausePod(cs, initPausePod(podConfig)); err != nil {
+					return fmt.Errorf("cannot create pod: %v", err)
+				}
+				return nil
+			},
+		},
+		{
+			name: "scheduled pod gets updated to match affinity",
+			init: func(cs kubernetes.Interface, ns string) error {
+				node, err := createNode(cs, "node-1", nil)
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+				// TODO(nodo): Use PodWrapper to directly initialize node with labels.
+				if err := utils.AddLabelsToNode(cs, node.Name, map[string]string{"region": "test"}); err != nil {
+					return fmt.Errorf("cannot add labels to node: %v", err)
+				}
+				if _, err := createPausePod(cs, initPausePod(&pausePodConfig{Name: "pod-to-be-updated", Namespace: ns})); err != nil {
+					return fmt.Errorf("cannot create pod: %v", err)
+				}
+				return nil
+			},
+			pod: &pausePodConfig{
+				Name: "pod-1",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"pod-with-affinity": "true",
+									},
+								},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				pod, err := getPod(cs, "pod-to-be-updated", ns)
+				if err != nil {
+					return fmt.Errorf("cannot get pod: %v", err)
+				}
+				pod.Labels = map[string]string{"pod-with-affinity": "true"}
+				if _, err := cs.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("cannot update pod: %v", err)
+				}
+				return nil
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
