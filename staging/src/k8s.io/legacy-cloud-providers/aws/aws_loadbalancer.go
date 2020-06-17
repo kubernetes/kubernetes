@@ -721,6 +721,9 @@ func (c *Cloud) getVpcCidrBlocks() ([]string, error) {
 
 	cidrBlocks := make([]string, 0, len(vpcs.Vpcs[0].CidrBlockAssociationSet))
 	for _, cidr := range vpcs.Vpcs[0].CidrBlockAssociationSet {
+		if aws.StringValue(cidr.CidrBlockState.State) != ec2.VpcCidrBlockStateCodeAssociated {
+			continue
+		}
 		cidrBlocks = append(cidrBlocks, aws.StringValue(cidr.CidrBlock))
 	}
 	return cidrBlocks, nil
