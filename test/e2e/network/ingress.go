@@ -628,8 +628,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 
 			ginkgo.By("Cleaning up cloud resources")
-			err := gceController.CleanupIngressController()
-			framework.ExpectNoError(err)
+			if gceController != nil {
+				err := gceController.CleanupIngressController()
+				framework.ExpectNoError(err)
+			}
 		})
 
 		ginkgo.It("should conform to Ingress spec", func() {
