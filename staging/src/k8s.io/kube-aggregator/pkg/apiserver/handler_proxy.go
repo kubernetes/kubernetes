@@ -113,8 +113,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	visitedURLs := []*url.URL{}
 	for {
-		// TODO: do we have to clone the req ?
-		visitedURL := r.serveHTTP(w, req, errRsp, visitedURLs)
+		visitedURL := r.serveHTTP(w, utilnet.CloneRequest(req), errRsp, visitedURLs)
 		if visitedURL != nil {
 			visitedURLs = append(visitedURLs, visitedURL)
 		}
