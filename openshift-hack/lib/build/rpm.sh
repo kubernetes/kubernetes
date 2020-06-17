@@ -87,7 +87,7 @@ function os::build::rpm::format_nvra() {
 		os::build::rpm::get_nvra_vars
 	fi
 	if [[ -z "${OS_RPM_NAME-}" ]]; then
-		OS_RPM_SPECFILE="$( find "${OS_ROOT}" -name *.spec )"
+		OS_RPM_SPECFILE="$( find "${OS_ROOT}" -name '*.spec' )"
 		OS_RPM_NAME="$( rpmspec -q --qf '%{name}\n' "${OS_RPM_SPECFILE}" | head -1 )"
 	fi
 

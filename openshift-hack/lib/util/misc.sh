@@ -13,7 +13,8 @@
 #  None
 function os::util::describe_return_code() {
 	local return_code=$1
-	local message="$( os::util::repository_relative_path $0 ) exited with code ${return_code} "
+	local message
+    message="$( os::util::repository_relative_path "$0" ) exited with code ${return_code} "
 
 	if [[ -n "${OS_SCRIPT_START_TIME:-}" ]]; then
 		local end_time
@@ -78,9 +79,9 @@ function os::util::repository_relative_path() {
 	filename="$( basename "${filename}" )"
 
 	if [[ "${directory}" != "${OS_ROOT}"* ]]; then
-		pushd "${OS_ORIGINAL_WD}" >/dev/null 2>&1
+		pushd "${OS_ORIGINAL_WD}" >/dev/null 2>&1 || exit 1
 		directory="$( os::util::absolute_path "${directory}" )"
-		popd >/dev/null 2>&1
+		popd >/dev/null 2>&1 || exit 1
 	fi
 
 	directory="${directory##*${OS_ROOT}/}"

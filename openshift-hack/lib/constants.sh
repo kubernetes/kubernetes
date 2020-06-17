@@ -314,11 +314,11 @@ function os::build::images() {
   # images that depend on "${tag_prefix}-source" or "${tag_prefix}-base"
   ( os::build::image "${tag_prefix}-hyperkube"               images/hyperkube ) &
 
-  for i in `jobs -p`; do wait $i; done
+  for i in $(jobs -p); do wait "$i"; done
 
   # images that depend on "${tag_prefix}-cli" or hyperkube
   ( os::build::image "${tag_prefix}-tests"          images/tests ) &
 
-  for i in `jobs -p`; do wait $i; done
+  for i in $(jobs -p); do wait "$i"; done
 }
 readonly -f os::build::images

@@ -192,25 +192,32 @@ function os::cmd::internal::expect_exit_code_run_grep() {
 	os::cmd::internal::init_tempdir
 	os::test::junit::declare_test_start
 
-	local name=$(os::cmd::internal::describe_call "${cmd}" "${cmd_eval_func}" "${grep_args}" "${test_eval_func}")
+	local name
+    name=$(os::cmd::internal::describe_call "${cmd}" "${cmd_eval_func}" "${grep_args}" "${test_eval_func}")
 	local preamble="Running ${name}..."
 	echo "${preamble}"
 	# for ease of parsing, we want the entire declaration on one line, so we replace '\n' with ';'
 	junit_log+=( "${name//$'\n'/;}" )
 
-	local start_time=$(os::cmd::internal::seconds_since_epoch)
+	local start_time
+    start_time=$(os::cmd::internal::seconds_since_epoch)
 
-	local cmd_result=$( os::cmd::internal::run_collecting_output "${cmd}"; echo $? )
-	local cmd_succeeded=$( ${cmd_eval_func} "${cmd_result}"; echo $? )
+	local cmd_result
+    cmd_result=$( os::cmd::internal::run_collecting_output "${cmd}"; echo $? )
+	local cmd_succeeded
+    cmd_succeeded=$( ${cmd_eval_func} "${cmd_result}"; echo $? )
 
 	local test_result=0
 	if [[ -n "${grep_args}" ]]; then
-		test_result=$( os::cmd::internal::run_collecting_output 'grep -Eq "${grep_args}" <(os::cmd::internal::get_results)'; echo $? )
+		test_result=$( os::cmd::internal::run_collecting_output 'grep -Eq "'"${grep_args}"'" <(os::cmd::internal::get_results)'; echo $? )
 	fi
-	local test_succeeded=$( ${test_eval_func} "${test_result}"; echo $? )
+	local test_succeeded
+    test_succeeded=$( ${test_eval_func} "${test_result}"; echo $? )
 
-	local end_time=$(os::cmd::internal::seconds_since_epoch)
-	local time_elapsed=$(echo "scale=3; ${end_time} - ${start_time}" | bc | xargs printf '%5.3f') # in decimal seconds, we need leading zeroes for parsing later
+	local end_time
+    end_time=$(os::cmd::internal::seconds_since_epoch)
+	local time_elapsed
+    time_elapsed=$(echo "scale=3; ${end_time} - ${start_time}" | bc | xargs printf '%5.3f') # in decimal seconds, we need leading zeroes for parsing later
 
 	# clear the preamble so we can print out the success or error message
 	os::text::clear_string "${preamble}"
@@ -225,7 +232,8 @@ function os::cmd::internal::expect_exit_code_run_grep() {
 		fi
 		return_code=0
 	else
-		local cause=$(os::cmd::internal::assemble_causes "${cmd_succeeded}" "${test_succeeded}")
+	    local cause
+        cause=$(os::cmd::internal::assemble_causes "${cmd_succeeded}" "${test_succeeded}")
 
 		os::text::print_red_bold "FAILURE after ${time_elapsed}s: ${name}: ${cause}"
 		junit_log+=( "FAILURE after ${time_elapsed}s: ${name//$'\n'/;}: ${cause}" )
@@ -258,10 +266,12 @@ function os::cmd::internal::describe_call() {
 	local grep_args=${3:-}
 	local test_eval_func=${4:-}
 
-	local caller_id=$(os::cmd::internal::determine_caller)
+	local caller_id
+    caller_id=$(os::cmd::internal::determine_caller)
 	local full_name="${caller_id}: executing '${cmd}'"
 
-	local cmd_expectation=$(os::cmd::internal::describe_expectation "${cmd_eval_func}")
+	local cmd_expectation
+    cmd_expectation=$(os::cmd::internal::describe_expectation "${cmd_eval_func}")
 	local full_name="${full_name} expecting ${cmd_expectation}"
 
 	if [[ -n "${grep_args}" ]]; then
@@ -284,8 +294,8 @@ readonly -f os::cmd::internal::describe_call
 function os::cmd::internal::determine_caller() {
 	local call_depth=
 	local len_sources="${#BASH_SOURCE[@]}"
-	for (( i=0; i<${len_sources}; i++ )); do
-		if [ ! $(echo "${BASH_SOURCE[i]}" | grep "hack/lib/cmd\.sh$") ]; then
+	for (( i=0; i<len_sources; i++ )); do
+		if grep -q "hack/lib/cmd\.sh$" "${BASH_SOURCE[i]}"; then
 			call_depth=i
 			break
 		fi
@@ -307,7 +317,8 @@ function os::cmd::internal::describe_expectation() {
 	"os::cmd::internal::failure_func")
 		echo "failure" ;;
 	"os::cmd::internal::specific_code_func"*[0-9])
-		local code=$(echo "${func}" | grep -Eo "[0-9]+$")
+	    local code
+        code=$(echo "${func}" | grep -Eo "[0-9]+$")
 		echo "exit code ${code}" ;;
 	"")
 		echo "any result"
@@ -318,13 +329,14 @@ readonly -f os::cmd::internal::describe_expectation
 # os::cmd::internal::seconds_since_epoch returns the number of seconds elapsed since the epoch
 # with milli-second precision
 function os::cmd::internal::seconds_since_epoch() {
-	local ns=$(date +%s%N)
+    local ns
+    ns=$(date +%s%N)
 	# if `date` doesn't support nanoseconds, return second precision
 	if [[ "$ns" == *N ]]; then
 		date "+%s.000"
 		return
 	fi
-	echo $(bc <<< "scale=3; ${ns}/1000000000")
+	bc <<< "scale=3; ${ns}/1000000000"
 }
 readonly -f os::cmd::internal::seconds_since_epoch
 
@@ -334,7 +346,7 @@ function os::cmd::internal::run_collecting_output() {
 	local cmd=$1
 
 	local result=
-	$( eval "${cmd}" 1>>"${os_cmd_internal_tmpout}" 2>>"${os_cmd_internal_tmperr}" ) || result=$?
+	eval "${cmd}" 1>>"${os_cmd_internal_tmpout}" 2>>"${os_cmd_internal_tmperr}" || result=$?
 	local result=${result:-0} # if we haven't set result yet, the command succeeded
 
 	return "${result}"
@@ -383,8 +395,8 @@ readonly -f os::cmd::internal::get_results
 
 # os::cmd::internal::get_last_results prints the stderr and stdout from the last attempt
 function os::cmd::internal::get_last_results() {
-	cat "${os_cmd_internal_tmpout}" | awk 'BEGIN { RS = "\x1e" } END { print $0 }'
-	cat "${os_cmd_internal_tmperr}" | awk 'BEGIN { RS = "\x1e" } END { print $0 }'
+	awk 'BEGIN { RS = "\x1e" } END { print $0 }' "${os_cmd_internal_tmpout}"
+	awk 'BEGIN { RS = "\x1e" } END { print $0 }' "${os_cmd_internal_tmperr}"
 }
 readonly -f os::cmd::internal::get_last_results
 
@@ -400,7 +412,7 @@ readonly -f os::cmd::internal::mark_attempt
 function os::cmd::internal::compress_output() {
 	local logfile=$1
 
-	awk -f ${OS_ROOT}/hack/lib/compress.awk $logfile
+	awk -f "${OS_ROOT}/hack/lib/compress.awk" "${logfile}"
 }
 readonly -f os::cmd::internal::compress_output
 
@@ -447,7 +459,8 @@ function os::cmd::internal::assemble_causes() {
 		causes+=("the output content test failed")
 	fi
 
-	local list=$(printf '; %s' "${causes[@]}")
+	local list
+    list=$(printf '; %s' "${causes[@]}")
 	echo "${list:2}"
 }
 readonly -f os::cmd::internal::assemble_causes
@@ -480,20 +493,24 @@ function os::cmd::internal::run_until_exit_code() {
 	os::cmd::internal::init_tempdir
 	os::test::junit::declare_test_start
 
-	local description=$(os::cmd::internal::describe_call "${cmd}" "${cmd_eval_func}")
-	local duration_seconds=$(echo "scale=3; $(( duration )) / 1000" | bc | xargs printf '%5.3f')
+	local description
+    description=$(os::cmd::internal::describe_call "${cmd}" "${cmd_eval_func}")
+	local duration_seconds
+    duration_seconds=$(echo "scale=3; $(( duration )) / 1000" | bc | xargs printf '%5.3f')
 	local description="${description}; re-trying every ${interval}s until completion or ${duration_seconds}s"
 	local preamble="Running ${description}..."
 	echo "${preamble}"
 	# for ease of parsing, we want the entire declaration on one line, so we replace '\n' with ';'
 	junit_log+=( "${description//$'\n'/;}" )
 
-	local start_time=$(os::cmd::internal::seconds_since_epoch)
+	local start_time
+    start_time=$(os::cmd::internal::seconds_since_epoch)
 
-	local deadline=$(( $(date +%s000) + $duration ))
+	local deadline=$(( $(date +%s000) + duration ))
 	local cmd_succeeded=0
-	while [ $(date +%s000) -lt $deadline ]; do
-		local cmd_result=$( os::cmd::internal::run_collecting_output "${cmd}"; echo $? )
+	while [ "$(date +%s000)" -lt $deadline ]; do
+	    local cmd_result
+        cmd_result=$( os::cmd::internal::run_collecting_output "${cmd}"; echo $? )
 		cmd_succeeded=$( ${cmd_eval_func} "${cmd_result}"; echo $? )
 		if (( cmd_succeeded )); then
 			break
@@ -502,8 +519,10 @@ function os::cmd::internal::run_until_exit_code() {
 		os::cmd::internal::mark_attempt
 	done
 
-	local end_time=$(os::cmd::internal::seconds_since_epoch)
-	local time_elapsed=$(echo "scale=9; ${end_time} - ${start_time}" | bc | xargs printf '%5.3f') # in decimal seconds, we need leading zeroes for parsing later
+	local end_time
+    end_time=$(os::cmd::internal::seconds_since_epoch)
+	local time_elapsed
+    time_elapsed=$(echo "scale=9; ${end_time} - ${start_time}" | bc | xargs printf '%5.3f') # in decimal seconds, we need leading zeroes for parsing later
 
 	# clear the preamble so we can print out the success or error message
 	os::text::clear_string "${preamble}"
@@ -563,22 +582,27 @@ function os::cmd::internal::run_until_text() {
 	os::cmd::internal::init_tempdir
 	os::test::junit::declare_test_start
 
-	local description=$(os::cmd::internal::describe_call "${cmd}" "" "${text}" "${test_eval_func}")
-	local duration_seconds=$(echo "scale=3; $(( duration )) / 1000" | bc | xargs printf '%5.3f')
+	local description
+    description=$(os::cmd::internal::describe_call "${cmd}" "" "${text}" "${test_eval_func}")
+	local duration_seconds
+    duration_seconds=$(echo "scale=3; $(( duration )) / 1000" | bc | xargs printf '%5.3f')
 	local description="${description}; re-trying every ${interval}s until completion or ${duration_seconds}s"
 	local preamble="Running ${description}..."
 	echo "${preamble}"
 	# for ease of parsing, we want the entire declaration on one line, so we replace '\n' with ';'
 	junit_log+=( "${description//$'\n'/;}" )
 
-	local start_time=$(os::cmd::internal::seconds_since_epoch)
+	local start_time
+    start_time=$(os::cmd::internal::seconds_since_epoch)
 
-	local deadline=$(( $(date +%s000) + $duration ))
+	local deadline
+    deadline=$(( $(date +%s000) + duration ))
 	local test_succeeded=0
-	while [ $(date +%s000) -lt $deadline ]; do
-		local cmd_result=$( os::cmd::internal::run_collecting_output "${cmd}"; echo $? )
+	while [ "$(date +%s000)" -lt $deadline ]; do
+	    local cmd_result=
+        cmd_result=$( os::cmd::internal::run_collecting_output "${cmd}"; echo $? )
 		local test_result
-		test_result=$( os::cmd::internal::run_collecting_output 'grep -Eq "${text}" <(os::cmd::internal::get_last_results)'; echo $? )
+		test_result=$( os::cmd::internal::run_collecting_output 'grep -Eq "'"${text}"'" <(os::cmd::internal::get_last_results)'; echo $? )
 		test_succeeded=$( ${test_eval_func} "${test_result}"; echo $? )
 
 		if (( test_succeeded )); then
@@ -588,8 +612,10 @@ function os::cmd::internal::run_until_text() {
 		os::cmd::internal::mark_attempt
 	done
 
-	local end_time=$(os::cmd::internal::seconds_since_epoch)
-	local time_elapsed=$(echo "scale=9; ${end_time} - ${start_time}" | bc | xargs printf '%5.3f') # in decimal seconds, we need leading zeroes for parsing later
+	local end_time
+    end_time=$(os::cmd::internal::seconds_since_epoch)
+	local time_elapsed
+    time_elapsed=$(echo "scale=9; ${end_time} - ${start_time}" | bc | xargs printf '%5.3f') # in decimal seconds, we need leading zeroes for parsing later
 
     # clear the preamble so we can print out the success or error message
     os::text::clear_string "${preamble}"
