@@ -2895,10 +2895,6 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
-	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
-	// sysctls (by the container runtime) might fail to launch.
-	// +optional
-	Sysctls []Sysctl
 	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
 	// before being exposed inside Pod. This field will only apply to
 	// volume types which support fsGroup based ownership(and permissions).
@@ -2907,6 +2903,10 @@ type PodSecurityContext struct {
 	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
+	// +optional
+	Sysctls []Sysctl
 	// Defines behavior of changing SELinux labels of the volume before being exposed inside Pod
 	// (Alpha feature).
 	// This field is ignored for Pod's volumes and/or for Linux installations that do not support
