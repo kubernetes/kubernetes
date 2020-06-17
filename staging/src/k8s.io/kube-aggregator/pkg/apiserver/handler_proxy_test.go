@@ -265,7 +265,7 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusServiceUnavailable,
+			expectedStatusCode: http.StatusInternalServerError,
 		},
 	}
 
@@ -706,14 +706,14 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusServiceUnavailable {
+	if resp.StatusCode != http.StatusInternalServerError {
 		t.Error(err)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "Error trying to reach service: 'context deadline exceeded'") {
+	if !strings.Contains(string(body), "context deadline exceeded") {
 		t.Error(string(body))
 	}
 
