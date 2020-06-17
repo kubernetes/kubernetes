@@ -75,3 +75,17 @@ func NewInTreeRegistry() runtime.Registry {
 		defaultpreemption.Name:                     defaultpreemption.New,
 	}
 }
+
+// IsCSIRelatedPlugins returns true if the specific plugin name is a CSI related plugin.
+func IsCSIRelatedPlugins(name string) bool {
+	switch name {
+	case nodevolumelimits.CSIName,
+		nodevolumelimits.AzureDiskName,
+		nodevolumelimits.GCEPDName,
+		nodevolumelimits.EBSName,
+		nodevolumelimits.CinderName,
+		volumebinding.Name:
+		return true
+	}
+	return false
+}

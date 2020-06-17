@@ -30,6 +30,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
@@ -423,7 +424,7 @@ func addAllEventHandlers(
 		},
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) && responsibleForCSI(sched) {
 		informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    sched.onCSINodeAdd,
@@ -466,6 +467,17 @@ func addAllEventHandlers(
 			AddFunc: sched.onStorageClassAdd,
 		},
 	)
+}
+
+func responsibleForCSI(sched *Scheduler) bool {
+	for _, pro := range sched.Profiles {
+		for _, plugin := range pro.ListPlugins()["FilterPlugin"] {
+			if plugins.IsCSIRelatedPlugins(plugin.Name) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) string {
