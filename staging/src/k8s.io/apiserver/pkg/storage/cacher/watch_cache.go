@@ -198,6 +198,7 @@ func newWatchCache(
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	versioner storage.Versioner,
 	indexers *cache.Indexers,
+	clock clock.Clock,
 	objectType reflect.Type) *watchCache {
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
@@ -212,7 +213,7 @@ func newWatchCache(
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
-		clock:               clock.RealClock{},
+		clock:               clock,
 		versioner:           versioner,
 		objectType:          objectType,
 	}
