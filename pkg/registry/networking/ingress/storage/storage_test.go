@@ -62,6 +62,13 @@ var (
 	defaultTLS          = []networking.IngressTLS{
 		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
 	}
+	serviceBackend = &networking.IngressServiceBackend{
+		Name: "defaultbackend",
+		Port: networking.ServiceBackendPort{
+			Name:   "",
+			Number: 80,
+		},
+	}
 )
 
 type IngressRuleValues map[string]string
@@ -73,8 +80,13 @@ func toHTTPIngressPaths(pathMap map[string]string) []networking.HTTPIngressPath 
 			Path:     path,
 			PathType: &defaultPathType,
 			Backend: networking.IngressBackend{
-				ServiceName: backend,
-				ServicePort: defaultBackendPort,
+				Service: &networking.IngressServiceBackend{
+					Name: backend,
+					Port: networking.ServiceBackendPort{
+						Name:   defaultBackendPort.StrVal,
+						Number: defaultBackendPort.IntVal,
+					},
+				},
 			},
 		})
 	}
@@ -103,9 +115,8 @@ func newIngress(pathMap map[string]string) *networking.Ingress {
 			Namespace: namespace,
 		},
 		Spec: networking.IngressSpec{
-			Backend: &networking.IngressBackend{
-				ServiceName: defaultBackendName,
-				ServicePort: defaultBackendPort,
+			DefaultBackend: &networking.IngressBackend{
+				Service: serviceBackend.DeepCopy(),
 			},
 			Rules: toIngressRules(map[string]IngressRuleValues{
 				defaultHostname: pathMap,
@@ -132,16 +143,16 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
 	ingress := validIngress()
-	noBackendAndRules := validIngress()
-	noBackendAndRules.Spec.Backend = &networking.IngressBackend{}
-	noBackendAndRules.Spec.Rules = []networking.IngressRule{}
+	noDefaultBackendAndRules := validIngress()
+	noDefaultBackendAndRules.Spec.DefaultBackend.Service = &networking.IngressServiceBackend{}
+	noDefaultBackendAndRules.Spec.Rules = []networking.IngressRule{}
 	badPath := validIngress()
 	badPath.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 		"foo.bar.com": {"invalid-no-leading-slash": "svc"}})
 	test.TestCreate(
 		// valid
 		ingress,
-		noBackendAndRules,
+		noDefaultBackendAndRules,
 		badPath,
 	)
 }
