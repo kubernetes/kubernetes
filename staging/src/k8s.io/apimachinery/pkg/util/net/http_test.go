@@ -330,13 +330,13 @@ func TestConnectWithRedirects(t *testing.T) {
 		redirects:   []string{"/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9", "/10"},
 		expectError: true,
 	}, {
-		desc:              "redirect to different host are prevented",
-		redirects:         []string{"http://example.com/foo"},
-		expectedRedirects: 0,
+		desc:        "redirect to different host are prevented",
+		redirects:   []string{"http://example.com/foo"},
+		expectError: true,
 	}, {
-		desc:              "multiple redirect to different host forbidden",
-		redirects:         []string{"/1", "/2", "/3", "http://example.com/foo"},
-		expectedRedirects: 3,
+		desc:        "multiple redirect to different host forbidden",
+		redirects:   []string{"/1", "/2", "/3", "http://example.com/foo"},
+		expectError: true,
 	}, {
 		desc:              "redirect to different port is allowed",
 		redirects:         []string{"http://HOST/foo"},
