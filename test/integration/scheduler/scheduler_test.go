@@ -148,7 +148,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
 				"BindPlugin":      {{Name: "DefaultBinder"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 		},
 		{
@@ -243,7 +242,6 @@ kind: Policy
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
 				"BindPlugin":      {{Name: "DefaultBinder"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 		},
 		{
