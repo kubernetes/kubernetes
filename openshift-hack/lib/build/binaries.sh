@@ -57,7 +57,7 @@ function os::build::platform_arch() {
     platform=$(os::build::host_platform)
   fi
 
-  echo $(echo ${platform} | tr '[:lower:]/' '[:upper:]_')
+  echo "${platform}" | tr '[:lower:]/' '[:upper:]_'
 }
 readonly -f os::build::platform_arch
 
@@ -95,7 +95,8 @@ function os::build::setup_env() {
   GOPATH="${OS_OUTPUT}/go"
   OS_TARGET_BIN="${OS_OUTPUT}/go/bin"
   local go_pkg_dir="${GOPATH}/src/${OS_GO_PACKAGE}"
-  local go_pkg_basedir=$(dirname "${go_pkg_dir}")
+  local go_pkg_basedir
+  go_pkg_basedir="$(dirname "${go_pkg_dir}")"
 
   mkdir -p "${go_pkg_basedir}"
   rm -f "${go_pkg_dir}"
@@ -104,7 +105,7 @@ function os::build::setup_env() {
   ln -s "${OS_ROOT}" "${go_pkg_dir}"
 
   # lots of tools "just don't work" unless we're in the GOPATH
-  cd "${go_pkg_dir}"
+  cd "${go_pkg_dir}" || exit 1
 
   # Append OS_EXTRA_GOPATH to the GOPATH if it is defined.
   if [[ -n ${OS_EXTRA_GOPATH:-} ]]; then
@@ -174,7 +175,7 @@ os::build::internal::build_binaries() {
 
     os::build::export_targets "$@"
 
-    if [[ ! "${targets[@]:+${targets[@]}}" || ! "${binaries[@]:+${binaries[@]}}" ]]; then
+    if [[ ! "${targets[*]:+${targets[*]}}" || ! "${binaries[*]:+${binaries[*]}}" ]]; then
       return 0
     fi
 
@@ -182,9 +183,9 @@ os::build::internal::build_binaries() {
     local -a tests=()
     for binary in "${binaries[@]-}"; do
       if [[ "${binary}" =~ ".test"$ ]]; then
-        tests+=($binary)
+        tests+=("$binary")
       else
-        nonstatics+=($binary)
+        nonstatics+=("$binary")
       fi
     done
 
@@ -193,21 +194,24 @@ os::build::internal::build_binaries() {
       pkgdir+="/static"
     fi
 
-    local host_platform=$(os::build::host_platform)
+    local host_platform
+    host_platform=$(os::build::host_platform)
     local platform
     for platform in "${platforms[@]+"${platforms[@]}"}"; do
       echo "++ Building go targets for ${platform}:" "${targets[@]}"
       mkdir -p "${OS_OUTPUT_BINPATH}/${platform}"
 
       # output directly to the desired location
-      if [[ $platform == $host_platform ]]; then
+      if [[ "$platform" == "$host_platform" ]]; then
         export GOBIN="${OS_OUTPUT_BINPATH}/${platform}"
       else
         unset GOBIN
       fi
 
-      local platform_gotags_envvar=OS_GOFLAGS_TAGS_$(os::build::platform_arch ${platform})
-      local platform_gotags_test_envvar=OS_GOFLAGS_TAGS_TEST_$(os::build::platform_arch ${platform})
+      local platform_gotags_envvar
+      platform_gotags_envvar=OS_GOFLAGS_TAGS_$(os::build::platform_arch "${platform}")
+      local platform_gotags_test_envvar
+      platform_gotags_test_envvar=OS_GOFLAGS_TAGS_TEST_$(os::build::platform_arch "${platform}")
 
       # work around https://github.com/golang/go/issues/11887
       local local_ldflags="${version_ldflags}"
@@ -229,7 +233,7 @@ os::build::internal::build_binaries() {
           "${nonstatics[@]}"
 
         # GOBIN is not supported on cross-compile in Go 1.5+ - move to the correct target
-        if [[ $platform != $host_platform ]]; then
+        if [[ "$platform" != "$host_platform" ]]; then
           local platform_src="/${platform//\//_}"
           mv "${OS_TARGET_BIN}/${platform_src}/"* "${OS_OUTPUT_BINPATH}/${platform}/"
         fi
@@ -240,14 +244,15 @@ os::build::internal::build_binaries() {
       fi
 
       for test in "${tests[@]:+${tests[@]}}"; do
-        local outfile="${OS_OUTPUT_BINPATH}/${platform}/$(basename ${test})"
+        local outfile
+        outfile="${OS_OUTPUT_BINPATH}/${platform}/$(basename "${test}")"
         # disabling cgo allows use of delve
         CGO_ENABLED="${OS_TEST_CGO_ENABLED:-}" GOOS=${platform%/*} GOARCH=${platform##*/} go test \
           -tags "${OS_GOFLAGS_TAGS-} ${!platform_gotags_test_envvar:-}" \
           -ldflags "${local_ldflags}" \
           -i -c -o "${outfile}" \
           "${goflags[@]:+${goflags[@]}}" \
-          "$(dirname ${test})"
+          "$(dirname "${test}")"
       done
     done
 
@@ -308,7 +313,7 @@ function os::build::place_bins() {
       # Create an array of binaries to release. Append .exe variants if the platform is windows.
       local -a binaries=()
       for binary in "${targets[@]}"; do
-        binary=$(basename $binary)
+        binary=$(basename "$binary")
         if [[ $platform == "windows/amd64" ]]; then
           binaries+=("${binary}.exe")
         else
@@ -316,19 +321,14 @@ function os::build::place_bins() {
         fi
       done
 
-      # Link binaries that we want to link (eg. oc->kubectl)
-      local suffix=""
-      if [[ $platform == "windows/amd64" ]]; then
-        suffix=".exe"
-      fi
-
       # If no release archive was requested, we're done.
       if [[ "${OS_RELEASE_ARCHIVE-}" == "" ]]; then
         continue
       fi
 
       # Create a temporary bin directory containing only the binaries marked for release.
-      local release_binpath=$(mktemp -d openshift.release.${OS_RELEASE_ARCHIVE}.XXX)
+      local release_binpath
+      release_binpath=$(mktemp -d "openshift.release.${OS_RELEASE_ARCHIVE}.XXX")
       for binary in "${binaries[@]}"; do
         cp "${OS_OUTPUT_BINPATH}/${platform}/${binary}" "${release_binpath}/"
       done
@@ -366,9 +366,9 @@ readonly -f os::build::place_bins
 # os::build::release_sha calculates a SHA256 checksum over the contents of the
 # built release directory.
 function os::build::release_sha() {
-  pushd "${OS_OUTPUT_RELEASEPATH}" &> /dev/null
+  pushd "${OS_OUTPUT_RELEASEPATH}" &> /dev/null || exit 1
   find . -maxdepth 1 -type f | xargs sha256sum > CHECKSUM
-  popd &> /dev/null
+  popd &> /dev/null || exit 1
 }
 readonly -f os::build::release_sha
 
@@ -390,7 +390,7 @@ readonly -f os::build::ldflag
 
 # os::build::require_clean_tree exits if the current Git tree is not clean.
 function os::build::require_clean_tree() {
-  if ! git diff-index --quiet HEAD -- || test $(git ls-files --exclude-standard --others | wc -l) != 0; then
+  if ! git diff-index --quiet HEAD -- || test "$(git ls-files --exclude-standard --others | wc -l)" != 0; then
     echo "You can't have any staged or dirty files in $(pwd) for this command."
     echo "Either commit them or unstage them to continue."
     exit 1
@@ -407,14 +407,14 @@ function os::build::commit_range() {
   remote="${UPSTREAM_REMOTE:-origin}"
   if [[ "$1" =~ ^-?[0-9]+$ ]]; then
     local target
-    target="$(git rev-parse ${remote}/pr/$1)"
+    target="$(git rev-parse "${remote}/pr/$1")"
     if [[ $? -ne 0 ]]; then
       echo "Branch does not exist, or you have not configured ${remote}/pr/* style branches from GitHub" 1>&2
       exit 1
     fi
 
     local base
-    base="$(git merge-base ${target} $2)"
+    base="$(git merge-base "${target}" "$2")"
     if [[ $? -ne 0 ]]; then
       echo "Branch has no common commits with $2" 1>&2
       exit 1
@@ -422,7 +422,7 @@ function os::build::commit_range() {
     if [[ "${base}" == "${target}" ]]; then
 
       # DO NOT TRUST THIS CODE
-      merged="$(git rev-list --reverse ${target}..$2 --ancestry-path | head -1)"
+      merged="$(git rev-list --reverse "${target}".."$2" --ancestry-path | head -1)"
       if [[ -z "${merged}" ]]; then
         echo "Unable to find the commit that merged ${remote}/pr/$1" 1>&2
         exit 1
@@ -432,12 +432,12 @@ function os::build::commit_range() {
       #  exit 1
       #fi
       echo "++ pr/$1 appears to have merged at ${merged}" 1>&2
-      leftparent="$(git rev-list --parents -n 1 ${merged} | cut -f2 -d ' ')"
+      leftparent="$(git rev-list --parents -n 1 "${merged}" | cut -f2 -d ' ')"
       if [[ $? -ne 0 ]]; then
         echo "Unable to find the left-parent for the merge of for $1" 1>&2
         exit 1
       fi
-      base="$(git merge-base ${target} ${leftparent})"
+      base="$(git merge-base "${target}" "${leftparent}")"
       if [[ $? -ne 0 ]]; then
         echo "Unable to find the common commit between ${leftparent} and $1" 1>&2
         exit 1

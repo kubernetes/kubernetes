@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-source "$(dirname "${BASH_SOURCE}")/lib/init.sh"
+
+# shellcheck source=openshift-hack/lib/init.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/init.sh"
 
 function cleanup() {
     return_code=$?

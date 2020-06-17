@@ -70,7 +70,7 @@ readonly -f os::text::clear_last_line
 function os::text::clear_string() {
     local -r string="$1"
     if os::text::internal::is_tty; then
-        echo "${string}" | while read line; do
+        echo "${string}" | while read -r line; do
             # num_lines is the number of terminal lines this one line of output
             # would have taken up with the current terminal width in columns
             local num_lines=$(( ${#line} / $( tput cols ) ))
