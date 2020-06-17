@@ -23,12 +23,11 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-prefix="${KUBE_ROOT%"k8s.io/kubernetes"}"
 
 register_files=()
-while IFS= read -d $'\0' -r file ; do
+while read -r file ; do
 	register_files+=("${file}")
-done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0)
+done < <(find pkg/apis -name register.go | sort)
 
 # every register file should contain a GroupName.  Gather the different representations.
 # 1. group directory name for client gen
@@ -38,9 +37,8 @@ group_dirnames=()
 external_group_versions=()
 expected_install_packages=()
 for register_file in "${register_files[@]}"; do
-	package="${register_file#"${prefix}"}"
-	package="${package%"/register.go"}"
-	group_dirname="${package#"k8s.io/kubernetes/pkg/apis/"}"
+	package="${register_file%"/register.go"}"
+	group_dirname="${package#"pkg/apis/"}"
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
@@ -50,11 +48,11 @@ for register_file in "${register_files[@]}"; do
 		exit 1
 	fi
 
-	# does the dirname doesn't have a slash, then it's the internal package.
-	# if does have one, then its an external
+	# If the dirname doesn't have a slash, then it's the internal package.
+	# if does have one, then it's versioned (e.g. foobar/v1).
 	if [[ "${group_dirname#*'/'}" == "${group_dirname}" ]]; then
 		group_dirnames+=("${group_dirname}")
-		expected_install_packages+=("${package}")
+		expected_install_packages+=("k8s.io/kubernetes/${package}")
 	else
 		version=$(echo "${group_dirname}" | cut -d/ -f2 -)
 		external_group_versions+=("${group_name}/${version}")
