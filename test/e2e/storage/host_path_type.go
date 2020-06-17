@@ -193,12 +193,9 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 		ginkgo.By("Create a pod for further testing")
 		hostBaseDir = path.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = f.PodClient().CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
+		basePod = f.PodClient().CreateSync(newHostPathTypeTestPodWithCommand(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate, fmt.Sprintf("nc -lU %s", path.Join(mountBaseDir, "asocket"))))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
 		targetSocket = path.Join(hostBaseDir, "asocket")
-		ginkgo.By("Create a socket for further testing")
-		_, err := utils.PodExec(f, basePod, fmt.Sprintf("nc -lU %s &", path.Join(mountBaseDir, "asocket")))
-		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent socket 'does-not-exist-socket' when HostPathType is HostPathSocket", func() {
@@ -391,6 +388,45 @@ func newHostPathTypeTestPod(nodeSelector map[string]string, hostDir, mountDir st
 							ReadOnly:  false,
 						},
 					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "host",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: hostDir,
+							Type: hostPathType,
+						},
+					},
+				},
+			},
+		},
+	}
+	return pod
+}
+
+func newHostPathTypeTestPodWithCommand(nodeSelector map[string]string, hostDir, mountDir string, hostPathType *v1.HostPathType, command string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-hostpath-type-",
+		},
+		Spec: v1.PodSpec{
+			NodeSelector:  nodeSelector,
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:  "host-path-sh-testing",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "host",
+							MountPath: mountDir,
+							ReadOnly:  false,
+						},
+					},
+					Command: []string{"sh"},
+					Args:    []string{"-c", command},
 				},
 			},
 			Volumes: []v1.Volume{
