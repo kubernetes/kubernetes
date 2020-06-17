@@ -190,7 +190,7 @@ func (hr *hijackErrorResponder) shouldRetry() bool {
 }
 
 func (hr *hijackErrorResponder) canRetry(err error) bool {
-	if isHTTPVerbRetriable(hr.req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) ||  isExperimental(err)) {
+	if isHTTPVerbRetriable(hr.req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) || knet.IsProbableEOF(err) ||  isExperimental(err)) {
 		return true
 	}
 	return false
