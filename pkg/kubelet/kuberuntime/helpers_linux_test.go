@@ -203,7 +203,7 @@ func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 }
 
 func TestSharesToMilliCPU(t *testing.T) {
-	knownMilliCpuToShares := map[int64]int64{
+	knownMilliCPUToShares := map[int64]int64{
 		0:    2,
 		1:    2,
 		2:    2,
@@ -220,21 +220,21 @@ func TestSharesToMilliCPU(t *testing.T) {
 	}
 
 	t.Run("sharesToMilliCPUTest", func(t *testing.T) {
-		var testMilliCpu int64
-		for testMilliCpu = 0; testMilliCpu <= 2000; testMilliCpu++ {
-			shares := milliCPUToShares(testMilliCpu)
-			if expectedShares, found := knownMilliCpuToShares[testMilliCpu]; found {
+		var testMilliCPU int64
+		for testMilliCPU = 0; testMilliCPU <= 2000; testMilliCPU++ {
+			shares := milliCPUToShares(testMilliCPU)
+			if expectedShares, found := knownMilliCPUToShares[testMilliCPU]; found {
 				if shares != expectedShares {
-					t.Errorf("Test milliCPIToShares: Input milliCpu %v, expected shares %v, but got %v", testMilliCpu, expectedShares, shares)
+					t.Errorf("Test milliCPIToShares: Input milliCPU %v, expected shares %v, but got %v", testMilliCPU, expectedShares, shares)
 				}
 			}
-			expectedMilliCpu := testMilliCpu
-			if testMilliCpu < 2 {
-				expectedMilliCpu = 2
+			expectedMilliCPU := testMilliCPU
+			if testMilliCPU < 2 {
+				expectedMilliCPU = 2
 			}
-			milliCpu := sharesToMilliCPU(shares)
-			if milliCpu != expectedMilliCpu {
-				t.Errorf("Test sharesToMilliCPU: Input shares %v, expected milliCpu %v, but got %v", shares, expectedMilliCpu, milliCpu)
+			milliCPU := sharesToMilliCPU(shares)
+			if milliCPU != expectedMilliCPU {
+				t.Errorf("Test sharesToMilliCPU: Input shares %v, expected milliCPU %v, but got %v", shares, expectedMilliCPU, milliCPU)
 			}
 		}
 	})
@@ -272,9 +272,9 @@ func TestQuotaToMilliCPU(t *testing.T) {
 			expected: int64(1500),
 		}} {
 		t.Run(tc.name, func(t *testing.T) {
-			milliCpu := quotaToMilliCPU(tc.quota, tc.period)
-			if milliCpu != tc.expected {
-				t.Errorf("Test %s: Input quota %v and period %v, expected milliCpu %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCpu)
+			milliCPU := quotaToMilliCPU(tc.quota, tc.period)
+			if milliCPU != tc.expected {
+				t.Errorf("Test %s: Input quota %v and period %v, expected milliCPU %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCPU)
 			}
 		})
 	}

@@ -677,8 +677,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 				specLim := container.Resources.Limits
 				statusLim := apiContainerStatus.Resources.Limits
 				restartMem := determineContainerResize(v1.ResourceMemory, specLim.Memory().Value(), statusLim.Memory().Value())
-				restartCpu := determineContainerResize(v1.ResourceCPU, specLim.Cpu().MilliValue(), statusLim.Cpu().MilliValue())
-				if restartMem || restartCpu {
+				restartCPU := determineContainerResize(v1.ResourceCPU, specLim.Cpu().MilliValue(), statusLim.Cpu().MilliValue())
+				if restartMem || restartCPU {
 					// resize policy requires this container to restart
 					changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
 						name:      containerStatus.Name,
@@ -974,12 +974,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			}
 		}
 		if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || len(podContainerChanges.ContainersToRestart) > 0 {
-			currentPodCpuQuota, _, _, err := pcm.GetPodCgroupCpuConfig(pod)
+			currentPodCPUQuota, _, _, err := pcm.GetPodCgroupCpuConfig(pod)
 			if err != nil {
 				klog.Errorf("GetPodCgroupCpuConfig for pod %s failed: %v", pod.Name, err)
 				return
 			}
-			if errResize := resizeContainers(v1.ResourceCPU, currentPodCpuQuota, *podResources.CpuQuota); errResize != nil {
+			if errResize := resizeContainers(v1.ResourceCPU, currentPodCPUQuota, *podResources.CpuQuota); errResize != nil {
 				return
 			}
 		}

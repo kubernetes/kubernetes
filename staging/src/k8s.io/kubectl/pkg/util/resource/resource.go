@@ -25,8 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
@@ -69,7 +67,7 @@ func PodResourceAllocations(pod *corev1.Pod) (allocations corev1.ResourceList) {
 	for _, container := range pod.Spec.InitContainers {
 		maxResourceList(allocations, container.Resources.Requests)
 	}
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil {
 		addResourceList(allocations, pod.Spec.Overhead)
 	}
 	return

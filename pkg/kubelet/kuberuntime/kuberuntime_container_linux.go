@@ -38,6 +38,15 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	return nil
 }
 
+// generateContainerResources generates platform specific (linux) container resources config for runtime
+func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+	return &runtimeapi.ContainerResources{
+		R: &runtimeapi.ContainerResources_Linux{
+			Linux: m.generateLinuxContainerResources(pod, container),
+		},
+	}
+}
+
 // generateLinuxContainerResources generates linux container resources config for runtime
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.LinuxContainerResources {
 	linuxContainerResources := &runtimeapi.LinuxContainerResources{}

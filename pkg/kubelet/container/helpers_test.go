@@ -650,11 +650,12 @@ func TestHashContainerWithResources(t *testing.T) {
 	cpuPolicyRestart := v1.ResizePolicy{ResourceName: v1.ResourceCPU, Policy: v1.RestartContainer}
 	memPolicyRestart := v1.ResizePolicy{ResourceName: v1.ResourceMemory, Policy: v1.RestartContainer}
 
-	tests := []struct {
+	type testCase struct {
 		container    *v1.Container
 		scalingFg    bool
 		expectedHash uint64
-	}{
+	}
+	tests := []testCase{
 		{
 			&v1.Container{
 				Name:  "foo",
@@ -761,11 +762,16 @@ func TestHashContainerWithResources(t *testing.T) {
 		},
 	}
 
-	for i, tt := range tests {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.scalingFg)
-		containerCopy := tt.container.DeepCopy()
-		hash := HashContainer(tt.container)
-		assert.Equal(t, tt.expectedHash, hash, "[%d]", i)
-		assert.Equal(t, containerCopy, tt.container, "[%d]", i)
+	testFunc := func(idx int, tc testCase) {
+		if tc.scalingFg {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+		}
+		containerCopy := tc.container.DeepCopy()
+		hash := HashContainer(tc.container)
+		assert.Equal(t, tc.expectedHash, hash, "[%d]", idx)
+		assert.Equal(t, containerCopy, tc.container, "[%d]", idx)
+	}
+	for i, tc := range tests {
+		testFunc(i, tc)
 	}
 }

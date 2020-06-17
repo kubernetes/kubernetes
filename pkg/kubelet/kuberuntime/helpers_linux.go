@@ -72,11 +72,11 @@ func milliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 
 // sharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
 func sharesToMilliCPU(shares int64) int64 {
-	milliCpu := int64(0)
+	milliCPU := int64(0)
 	if shares >= minShares {
-		milliCpu = int64(math.Ceil(float64(shares*milliCPUToCPU) / float64(sharesPerCPU)))
+		milliCPU = int64(math.Ceil(float64(shares*milliCPUToCPU) / float64(sharesPerCPU)))
 	}
-	return milliCpu
+	return milliCPU
 }
 
 // quotaToMilliCPU converts cpu.cfs_quota_us and cpu.cfs_period_us to milli-CPU value

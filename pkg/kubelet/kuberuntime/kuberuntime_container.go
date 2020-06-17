@@ -294,14 +294,11 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 }
 
 func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
-	//TODO: Call platform-specific generateContainerResources when windows support is added
-	linuxContainerResources := m.generateLinuxContainerResources(pod, container)
-	containerResources := runtimeapi.ContainerResources{
-		R: &runtimeapi.ContainerResources_Linux{
-			Linux: linuxContainerResources,
-		},
+	containerResources := m.generateContainerResources(pod, container)
+	if containerResources == nil {
+		return fmt.Errorf("Container %q UpdateContainerResources failed: cannot generate resources config", containerID.String())
 	}
-	err := m.runtimeService.UpdateContainerResources(containerID.ID, &containerResources)
+	err := m.runtimeService.UpdateContainerResources(containerID.ID, containerResources)
 	if err != nil {
 		klog.Errorf("Container %q UpdateContainerResources failed with error: %v", containerID.String(), err)
 	}
@@ -507,15 +504,15 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		if statusResources != nil {
 			var cpuLimit, memLimit, cpuRequest *resource.Quantity
 			if statusResources.CpuPeriod > 0 {
-				milliCpu := quotaToMilliCPU(statusResources.CpuQuota, statusResources.CpuPeriod)
-				if milliCpu > 0 {
-					cpuLimit = resource.NewMilliQuantity(milliCpu, resource.DecimalSI)
+				milliCPU := quotaToMilliCPU(statusResources.CpuQuota, statusResources.CpuPeriod)
+				if milliCPU > 0 {
+					cpuLimit = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 				}
 			}
 			if statusResources.CpuShares > 0 {
-				milliCpu := sharesToMilliCPU(statusResources.CpuShares)
-				if milliCpu > 0 {
-					cpuRequest = resource.NewMilliQuantity(milliCpu, resource.DecimalSI)
+				milliCPU := sharesToMilliCPU(statusResources.CpuShares)
+				if milliCPU > 0 {
+					cpuRequest = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 				}
 			}
 			if statusResources.MemoryLimitInBytes > 0 {

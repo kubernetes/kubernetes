@@ -498,7 +498,8 @@ func TestStartSpec(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
+	require.NoError(t, errCreate)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",

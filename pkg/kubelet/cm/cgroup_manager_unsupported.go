@@ -70,6 +70,22 @@ func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error 
 	return nil
 }
 
+func (m *unsupportedCgroupManager) GetCgroupMemoryConfig(name CgroupName) (uint64, error) {
+	return 0, fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
+func (m *unsupportedCgroupManager) GetCgroupCpuConfig(name CgroupName) (int64, uint64, uint64, error) {
+	return 0, 0, 0, fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
+func (m *unsupportedCgroupManager) SetCgroupMemoryConfig(name CgroupName, memoryLimit int64) error {
+	return fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
+func (m *unsupportedCgroupManager) SetCgroupCpuConfig(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
+	return fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
 var RootCgroupName = CgroupName([]string{})
 
 func NewCgroupName(base CgroupName, components ...string) CgroupName {

@@ -2457,8 +2457,8 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		Namespace:         testPod.Namespace,
 		ContainerStatuses: []*kubecontainer.Status{&testKubeContainerStatus},
 	}
-	Cpu1AndMem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
-	Cpu2AndMem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
+	CPU1AndMem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	CPU2AndMem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
 
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
@@ -2473,16 +2473,16 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	}{
 		"GuaranteedQoSPod with CPU and memory CRI status": {
 			Pod:            testPod,
-			Resources:      []v1.ResourceRequirements{{Limits: Cpu1AndMem1G, Requests: Cpu1AndMem1G}},
+			Resources:      []v1.ResourceRequirements{{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G}},
 			PodStatus:      testPodStatus,
-			ResourceLimits: []v1.ResourceList{Cpu1AndMem1G},
+			ResourceLimits: []v1.ResourceList{CPU1AndMem1G},
 			OldStatus: []v1.ContainerStatus{
 				{
 					Name:      testContainerName,
 					Image:     "img",
 					ImageID:   "img1234",
 					State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
-					Resources: v1.ResourceRequirements{Limits: Cpu1AndMem1G, Requests: Cpu1AndMem1G},
+					Resources: v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
 				},
 			},
 			Expected: []v1.ContainerStatus{
@@ -2492,13 +2492,13 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 					Image:       "img",
 					ImageID:     "img1234",
 					State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					Resources:   v1.ResourceRequirements{Limits: Cpu1AndMem1G, Requests: Cpu1AndMem1G},
+					Resources:   v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
 				},
 			},
 		},
 		"BurstableQoSPod, nil CRI status (not supported by runtime)": {
 			Pod:       testPod,
-			Resources: []v1.ResourceRequirements{{Limits: Cpu1AndMem1G, Requests: Cpu1AndMem1G}},
+			Resources: []v1.ResourceRequirements{{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G}},
 			PodStatus: testPodStatus,
 			OldStatus: []v1.ContainerStatus{
 				{
@@ -2506,7 +2506,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 					Image:     "img",
 					ImageID:   "img1234",
 					State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
-					Resources: v1.ResourceRequirements{Limits: Cpu2AndMem2G, Requests: Cpu1AndMem1G},
+					Resources: v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU1AndMem1G},
 				},
 			},
 			Expected: []v1.ContainerStatus{
@@ -2516,7 +2516,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 					Image:       "img",
 					ImageID:     "img1234",
 					State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
-					Resources:   v1.ResourceRequirements{Limits: Cpu1AndMem1G, Requests: Cpu1AndMem1G},
+					Resources:   v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
 				},
 			},
 		},

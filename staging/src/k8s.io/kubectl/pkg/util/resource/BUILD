@@ -7,11 +7,9 @@ go_library(
     importpath = "k8s.io/kubectl/pkg/util/resource",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
