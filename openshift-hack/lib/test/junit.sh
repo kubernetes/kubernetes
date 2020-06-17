@@ -17,7 +17,7 @@ function os::test::junit::declare_suite_start() {
     local num_suites=${NUM_OS_JUNIT_SUITES_IN_FLIGHT:-0}
 
     echo "=== BEGIN TEST SUITE github.com/openshift/origin/test/${suite_name} ===" >> "${JUNIT_REPORT_OUTPUT:-/dev/null}"
-    NUM_OS_JUNIT_SUITES_IN_FLIGHT=$(( ${num_suites} + 1 ))
+    NUM_OS_JUNIT_SUITES_IN_FLIGHT=$(( num_suites + 1 ))
     export NUM_OS_JUNIT_SUITES_IN_FLIGHT
 }
 readonly -f os::test::junit::declare_suite_start
@@ -41,7 +41,7 @@ function os::test::junit::declare_suite_end() {
     fi
 
     echo "=== END TEST SUITE ===" >> "${JUNIT_REPORT_OUTPUT:-/dev/null}"
-    NUM_OS_JUNIT_SUITES_IN_FLIGHT=$(( ${num_suites} - 1 ))
+    NUM_OS_JUNIT_SUITES_IN_FLIGHT=$(( num_suites - 1 ))
     export NUM_OS_JUNIT_SUITES_IN_FLIGHT
 }
 readonly -f os::test::junit::declare_suite_end
@@ -72,7 +72,7 @@ function os::test::junit::declare_test_start() {
     fi
 
     echo "=== BEGIN TEST CASE ===" >> "${JUNIT_REPORT_OUTPUT:-/dev/null}"
-    NUM_OS_JUNIT_TESTS_IN_FLIGHT=$(( ${num_tests} + 1 ))
+    NUM_OS_JUNIT_TESTS_IN_FLIGHT=$(( num_tests + 1 ))
     export NUM_OS_JUNIT_TESTS_IN_FLIGHT
 }
 readonly -f os::test::junit::declare_test_start
@@ -96,7 +96,7 @@ function os::test::junit::declare_test_end() {
     fi
 
     echo "=== END TEST CASE ===" >> "${JUNIT_REPORT_OUTPUT:-/dev/null}"
-    NUM_OS_JUNIT_TESTS_IN_FLIGHT=$(( ${num_tests} - 1 ))
+    NUM_OS_JUNIT_TESTS_IN_FLIGHT=$(( num_tests - 1 ))
     export NUM_OS_JUNIT_TESTS_IN_FLIGHT
 }
 readonly -f os::test::junit::declare_test_end
@@ -185,7 +185,7 @@ function os::test::junit::internal::generate_report() {
 
     local report_file
     report_file="$( mktemp "${ARTIFACT_DIR}/${report_type}_report_XXXXX" ).xml"
-    os::log::info "jUnit XML report placed at $( os::util::repository_relative_path ${report_file} )"
+    os::log::info "jUnit XML report placed at $( os::util::repository_relative_path "${report_file}" )"
     junitreport --type "${report_type}"             \
                 --suites nested                     \
                 --roots github.com/openshift/origin \

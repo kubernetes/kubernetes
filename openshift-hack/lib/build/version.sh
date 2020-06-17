@@ -54,9 +54,10 @@ function os::build::version::git_vars() {
 			# This translates the "git describe" to an actual semver.org
 			# compatible semantic version that looks something like this:
 			#   v1.1.0-alpha.0.6+84c76d1-345
+            # shellcheck disable=SC2001
 			OS_GIT_VERSION=$(echo "${OS_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{7,40\}\)$/\+\2-\1/")
 			# If this is an exact tag, remove the last segment.
-			OS_GIT_VERSION=$(echo "${OS_GIT_VERSION}" | sed "s/-0$//")
+			OS_GIT_VERSION="${OS_GIT_VERSION//-0$/}"
 			if [[ "${OS_GIT_TREE_STATE}" == "dirty" ]]; then
 				# git describe --dirty only considers changes to existing files, but
 				# that is problematic since new untracked .go files affect the build,
@@ -89,6 +90,7 @@ function os::build::version::kubernetes_vars() {
 	#
 	# TODO: We continue calling this "git version" because so many
 	# downstream consumers are expecting it there.
+    # shellcheck disable=SC2001
 	KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{7,40\}\)$/\+${OS_GIT_COMMIT:-\2}/")
 
 	# Try to match the "git describe" output to a regex to try to extract

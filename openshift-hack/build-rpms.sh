@@ -4,7 +4,8 @@
 # All build dependencies are required on the host.
 # We will be running `hack/build-cross.sh` under the covers,
 # so we transitively consume all of the relevant envars.
-source "$(dirname "${BASH_SOURCE}")/lib/init.sh"
+# shellcheck source=openshift-hack/lib/init.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/init.sh"
 
 function cleanup() {
 	return_code=$?
@@ -36,7 +37,7 @@ fi
 
 os::build::rpm::get_nvra_vars
 
-OS_RPM_SPECFILE="$( find "${OS_ROOT}" -name *.spec )"
+OS_RPM_SPECFILE="$( find "${OS_ROOT}" -name '*.spec' )"
 OS_RPM_NAME="$( rpmspec -q --qf '%{name}\n' "${OS_RPM_SPECFILE}" | head -1 )"
 
 os::log::info "Building release RPMs for ${OS_RPM_SPECFILE} ..."
@@ -106,7 +107,7 @@ else
 		mv "${output_directory}"/* "${OS_OUTPUT}"
 	else
 		cp -R "${output_directory}"/* "${OS_OUTPUT}"
-		rm -rf "${output_directory}"/*
+		rm -rf "${output_directory:?}"/*
 	fi
 
 	mkdir -p "${OS_OUTPUT_RPMPATH}"

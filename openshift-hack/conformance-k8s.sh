@@ -6,7 +6,7 @@
 #
 # * all nodes that users can run workloads under marked as schedulable
 #
-source "$(dirname "${BASH_SOURCE}")/../../hack/lib/init.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../hack/lib/init.sh"
 
 # Check inputs
 if [[ -z "${KUBECONFIG-}" ]]; then
@@ -71,12 +71,13 @@ unschedulable="$( ( oc get nodes -o name -l 'node-role.kubernetes.io/master'; ) 
 # TODO: undo these operations
 
 # Execute Kubernetes prerequisites
-pushd "${kubernetes}" > /dev/null
+pushd "${kubernetes}" > /dev/null || exit 1
 git checkout "${version}"
 make WHAT=cmd/kubectl
 make WHAT=test/e2e/e2e.test
 make WHAT=vendor/github.com/onsi/ginkgo/ginkgo
-export PATH="${kubernetes}/_output/local/bin/$( os::build::host_platform ):${PATH}"
+PATH="${kubernetes}/_output/local/bin/$( os::build::host_platform ):${PATH}"
+export PATH
 
 kubectl version  > "${test_report_dir}/version.txt"
 echo "-----"    >> "${test_report_dir}/version.txt"
@@ -86,16 +87,18 @@ oc version      >> "${test_report_dir}/version.txt"
 
 rc=0
 
+# shellcheck disable=SC2086
 ginkgo \
-  -nodes 1 -noColor '-focus=(\[Conformance\].*\[Serial\]|\[Serial\].*\[Conformance\])' $( which e2e.test ) -- \
+  -nodes 1 -noColor '-focus=(\[Conformance\].*\[Serial\]|\[Serial\].*\[Conformance\])' "$( which e2e.test )" -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \
   2>&1 | tee -a "${test_report_dir}/e2e.log" || rc=1
 
-rename -v junit_ junit_serial_ ${test_report_dir}/junit*.xml
+rename -v junit_ junit_serial_ "${test_report_dir}"/junit*.xml
 
+# shellcheck disable=SC2086
 ginkgo \
-  -nodes 4 -noColor '-skip=\[Serial\]' '-focus=\[Conformance\]' $( which e2e.test ) -- \
+  -nodes 4 -noColor '-skip=\[Serial\]' '-focus=\[Conformance\]' "$( which e2e.test )" -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \
   2>&1 | tee -a "${test_report_dir}/e2e.log" || rc=1

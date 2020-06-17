@@ -31,9 +31,9 @@ readonly -f os::util::environment::use_sudo
 function os::util::environment::setup_time_vars() {
     TIME_MS=1
     export TIME_MS
-    TIME_SEC="$(( 1000  * ${TIME_MS} ))"
+    TIME_SEC="$(( 1000  * TIME_MS ))"
     export TIME_SEC
-    TIME_MIN="$(( 60 * ${TIME_SEC} ))"
+    TIME_MIN="$(( 60 * TIME_SEC ))"
     export TIME_MIN
 }
 readonly -f os::util::environment::setup_time_vars
