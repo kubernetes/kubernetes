@@ -284,7 +284,7 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 			vmList:     map[string]string{"vm3": "PowerState/Deallocating"},
 			nodeName:   "vm3",
 			providerID: "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm3",
-			expected:   false,
+			expected:   true,
 		},
 		{
 			name:       "InstanceShutdownByProviderID should return false if the vm is in PowerState/Starting status",
