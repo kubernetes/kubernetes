@@ -18,12 +18,14 @@ package fieldmanager
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
@@ -36,6 +38,8 @@ const DefaultMaxUpdateManagers int = 10
 // DefaultTrackOnCreateProbability defines the default probability that the field management of an object
 // starts being tracked from the object's creation, instead of from the first time the object is applied to.
 const DefaultTrackOnCreateProbability float32 = 1
+
+var atMostEverySecond = internal.NewAtMostEvery(time.Second)
 
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
@@ -120,7 +124,9 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 		// don't understand managedFields from deleting it accidentally.
 		managed, err = internal.DecodeObjectManagedFields(liveObj)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
+			// If we also can't decode the liveObject, then
+			// just restart managedFields from scratch.
+			managed = internal.NewEmptyManaged()
 		}
 	}
 
@@ -136,6 +142,25 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	}
 
 	return object, nil
+}
+
+// UpdateNoErrors is the same as Update, but it will not return
+// errors. If an error happens, the object is returned with
+// managedFields cleared.
+func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager string) runtime.Object {
+	obj, err := f.Update(liveObj, newObj, manager)
+	if err != nil {
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to update managedFields for %v: %v",
+				newObj.GetObjectKind().GroupVersionKind(),
+				err)
+		})
+		// Explicitly remove managedFields on failure, so that
+		// we can't have garbage in it.
+		internal.RemoveObjectManagedFields(newObj)
+		return newObj
+	}
+	return obj
 }
 
 // Apply is used when server-side apply is called, as it merges the
