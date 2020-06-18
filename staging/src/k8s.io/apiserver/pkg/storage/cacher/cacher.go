@@ -399,6 +399,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	c.watchCache.SetOnReplace(func() {
 		successfulList = true
 		c.ready.set(true)
+		klog.V(1).Infof("cacher (%v): initialized", c.objectType.String())
 	})
 	defer func() {
 		if successfulList {
@@ -412,7 +413,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// Also note that startCaching is called in a loop, so there's no need
 	// to have another loop here.
 	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
-		klog.Errorf("unexpected ListAndWatch error: %v", err)
+		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.objectType.String(), err)
 	}
 }
 
