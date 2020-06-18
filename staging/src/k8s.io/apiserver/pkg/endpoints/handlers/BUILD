@@ -61,7 +61,6 @@ go_library(
         "rest.go",
         "update.go",
         "watch.go",
-        "events.go"
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers",

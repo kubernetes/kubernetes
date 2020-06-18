@@ -16,7 +16,6 @@ limitations under the License.
 
 package events
 
-
 import (
 	"bufio"
 	"bytes"

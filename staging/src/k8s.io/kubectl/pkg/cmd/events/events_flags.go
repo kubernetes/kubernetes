@@ -166,7 +166,6 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 		cmd.Flags().BoolVar(f.NoHeaders, "no-headers", *f.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
 	}
 
-
 }
 
 // NewGetPrintFlags returns flags associated with humanreadable,
@@ -179,7 +178,7 @@ func NewGetPrintFlags() *PrintFlags {
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 		NoHeaders:    &noHeaders,
-		SortBy:     &sortBy,
+		SortBy:       &sortBy,
 
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		NamePrintFlags:     genericclioptions.NewNamePrintFlags(""),

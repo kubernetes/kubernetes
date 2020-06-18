@@ -94,7 +94,6 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		ShowLabels:    showLabels,
 	})
 
-
 	return p, nil
 }
 

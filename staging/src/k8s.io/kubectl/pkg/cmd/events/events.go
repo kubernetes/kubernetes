@@ -3,12 +3,11 @@
 package events
 
 import (
-
 	"fmt"
 	"io"
 	"net/url"
-	"strings"
 	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -34,10 +33,9 @@ import (
 // EventsOptions contains the input to the events command.
 type EventsOptions struct {
 	PrintFlags             *PrintFlags
-	ToPrinter   func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
+	ToPrinter              func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 	PrintWithOpenAPICols   bool
-
 
 	resource.FilenameOptions
 
@@ -60,11 +58,10 @@ type EventsOptions struct {
 	Sort           bool
 	IgnoreNotFound bool
 	Export         bool
-	SortBy       string
+	SortBy         string
 
 	genericclioptions.IOStreams
 	builder *resource.Builder
-
 }
 
 var (
@@ -97,8 +94,8 @@ const (
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewEventOptions(streams genericclioptions.IOStreams) *EventsOptions {
 	return &EventsOptions{
-		PrintFlags:  NewGetPrintFlags(),
-		IOStreams:   streams,
+		PrintFlags: NewGetPrintFlags(),
+		IOStreams:  streams,
 		//ChunkSize:   500,
 		ServerPrint: true,
 	}
@@ -139,7 +136,6 @@ func NewCmdEvents(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
-
 func (o *EventsOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
 		restClient, err := f.RESTClient()
@@ -148,7 +144,6 @@ func (o *EventsOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string
 		}
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
-
 
 	chunkSize := o.ChunkSize
 	if o.Sort {
@@ -163,7 +158,6 @@ func (o *EventsOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
-		ExportParam(o.Export).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, "events").
 		ContinueOnError().
@@ -190,7 +184,6 @@ func (o *EventsOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string
 	for ix := range infos {
 		objs[ix] = infos[ix].Object
 	}
-
 
 	sorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
@@ -244,7 +237,7 @@ func (o *EventsOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string
 				separatorWriter.SetReady(true)
 			}
 
-			printer, err = o.ToPrinter( mapping, nil, printWithNamespace, false)
+			printer, err = o.ToPrinter(mapping, nil, printWithNamespace, false)
 
 			if err != nil {
 				if !errs.Has(err.Error()) {
@@ -331,14 +324,11 @@ func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 			return nil, err
 		}
 
-
 		if o.ServerPrint {
 			printer = &TablePrinter{Delegate: printer}
 		}
 		return printer.PrintObj, nil
 	}
-
-
 
 	switch {
 	case o.Watch || o.WatchOnly:
@@ -384,7 +374,6 @@ func addServerPrintColumnFlags(cmd *cobra.Command, opt *EventsOptions) {
 	cmd.Flags().BoolVar(&opt.ServerPrint, useServerPrintColumns, opt.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
-
 func (o *EventsOptions) transformRequests(req *rest.Request) {
 	// We need full objects if printing with openapi columns
 	if o.PrintWithOpenAPICols {
@@ -406,7 +395,6 @@ func (o *EventsOptions) transformRequests(req *rest.Request) {
 	}
 }
 
-
 // OriginalPositioner and NopPositioner is required for swap/sort operations of data in table format
 type OriginalPositioner interface {
 	OriginalPosition(int) int
@@ -419,8 +407,6 @@ type NopPositioner struct{}
 func (t *NopPositioner) OriginalPosition(ix int) int {
 	return ix
 }
-
-
 
 // RuntimeSorter holds the required objects to perform sorting of runtime objects
 type RuntimeSorter struct {
@@ -493,7 +479,6 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 	}
 }
 
-
 type trackingWriterWrapper struct {
 	Delegate io.Writer
 	Written  int
@@ -528,11 +513,9 @@ func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping
 }
 
 func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
-//	return cmdutil.GetFlagString(cmd, "output") != ""
-return true
+	//	return cmdutil.GetFlagString(cmd, "output") != ""
+	return true
 }
-
-
 
 var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
 
@@ -562,5 +545,3 @@ func RelaxedJSONPathExpression(pathExpression string) (string, error) {
 	}
 	return fmt.Sprintf("{.%s}", fieldSpec), nil
 }
-
-
