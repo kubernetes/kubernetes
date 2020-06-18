@@ -245,9 +245,23 @@ func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 				return true, nil
 			}
 		}
+		if strings.Contains(string(out), "xtables lock") {
+			runner.dumpDebugInfo()
+		}
 		return false, fmt.Errorf("error creating chain %q: %v: %s", chain, err, out)
 	}
 	return false, nil
+}
+
+
+func (runner *runner) dumpDebugInfo() {
+	dumpScript := `apt-get update && apt-get install -y procps lsof && lslocks && ps -aux && lsof`
+	out, err := runner.exec.Command("/bin/sh", "-c", dumpScript).CombinedOutput()
+	if err != nil {
+		klog.Errorf("dump error: %v", err)
+		return
+	}
+	klog.Errorf("dump output:\n%s", out)
 }
 
 // FlushChain is part of Interface.
@@ -259,6 +273,9 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 
 	out, err := runner.run(opFlushChain, fullArgs)
 	if err != nil {
+		if strings.Contains(string(out), "xtables lock") {
+			runner.dumpDebugInfo()
+		}
 		return fmt.Errorf("error flushing chain %q: %v: %s", chain, err, out)
 	}
 	return nil
@@ -274,6 +291,9 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	// TODO: we could call iptables -S first, ignore the output and check for non-zero return (more like DeleteRule)
 	out, err := runner.run(opDeleteChain, fullArgs)
 	if err != nil {
+		if strings.Contains(string(out), "xtables lock") {
+			runner.dumpDebugInfo()
+		}
 		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
 	}
 	return nil
@@ -295,6 +315,9 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 	}
 	out, err := runner.run(operation(position), fullArgs)
 	if err != nil {
+		if strings.Contains(string(out), "xtables lock") {
+			runner.dumpDebugInfo()
+		}
 		return false, fmt.Errorf("error appending rule: %v: %s", err, out)
 	}
 	return false, nil
@@ -316,6 +339,9 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 	}
 	out, err := runner.run(opDeleteRule, fullArgs)
 	if err != nil {
+		if strings.Contains(string(out), "xtables lock") {
+			runner.dumpDebugInfo()
+		}
 		return fmt.Errorf("error deleting rule: %v: %s", err, out)
 	}
 	return nil
