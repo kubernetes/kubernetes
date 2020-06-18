@@ -119,7 +119,8 @@ func newRetryDecorator(rw responseWriterInterceptor, delegate retriable, retry i
 
 // RetryIfNeeded returns true if the request failed and can be safely retried otherwise it returns false
 func (p *retryDecorator) RetryIfNeeded() bool {
-	if p.rw.WasHijacked() {
+	// do not retry if the request has been hijecked or a response has already been sent to a client
+	if p.rw.WasHijacked() || p.rw.StatusCode() != 0 {
 		return false
 	}
 

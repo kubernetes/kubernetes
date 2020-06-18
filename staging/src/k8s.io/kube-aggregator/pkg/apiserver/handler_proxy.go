@@ -18,17 +18,12 @@ package apiserver
 
 import (
 	"context"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync/atomic"
-	"time"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -40,6 +35,11 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync/atomic"
+	"time"
 )
 
 const (
@@ -107,6 +107,41 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	value := r.handlingInfo.Load()
+	if value == nil {
+		r.localDelegate.ServeHTTP(w, req)
+		return
+	}
+	handlingInfo := value.(proxyHandlingInfo)
+	if handlingInfo.local {
+		if r.localDelegate == nil {
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+		r.localDelegate.ServeHTTP(w, req)
+		return
+	}
+
+	if !handlingInfo.serviceAvailable {
+		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	if handlingInfo.transportBuildingError != nil {
+		proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	user, ok := genericapirequest.UserFrom(req.Context())
+	if !ok {
+		proxyError(w, req, "missing user", http.StatusInternalServerError)
+		return
+	}
+
+	r.serveHTTPWithRetry(w, req, handlingInfo, user)
+}
+
+func (r *proxyHandler) serveHTTPWithRetry(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, user user.Info) {
 	w = newResponseWriterInterceptor(w)
 	errRsp := newHijackErrorResponder(&responder{w: w}, req)
 	// TODO: we could retry len(ResolveEndpoint(service)) - picking a different server on each retry
@@ -114,7 +149,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	visitedURLs := []*url.URL{}
 	for {
-		visitedURL := r.serveHTTP(w, utilnet.CloneRequest(req), errRsp, visitedURLs)
+		visitedURL := r.serveHTTP(w, utilnet.CloneRequest(req), handlingInfo, errRsp, user, visitedURLs)
 		if visitedURL != nil {
 			visitedURLs = append(visitedURLs, visitedURL)
 		}
@@ -130,38 +165,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errResponder proxy.ErrorResponder, usedEPs []*url.URL) *url.URL {
-	value := r.handlingInfo.Load()
-	if value == nil {
-		r.localDelegate.ServeHTTP(w, req)
-		return nil
-	}
-	handlingInfo := value.(proxyHandlingInfo)
-	if handlingInfo.local {
-		if r.localDelegate == nil {
-			http.Error(w, "", http.StatusNotFound)
-			return nil
-		}
-		r.localDelegate.ServeHTTP(w, req)
-		return nil
-	}
-
-	if !handlingInfo.serviceAvailable {
-		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
-		return nil
-	}
-
-	if handlingInfo.transportBuildingError != nil {
-		proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
-		return nil
-	}
-
-	user, ok := genericapirequest.UserFrom(req.Context())
-	if !ok {
-		proxyError(w, req, "missing user", http.StatusInternalServerError)
-		return nil
-	}
-
+func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, errResponder proxy.ErrorResponder, user user.Info, usedEPs []*url.URL) *url.URL {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
