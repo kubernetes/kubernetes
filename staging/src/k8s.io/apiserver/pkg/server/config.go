@@ -605,12 +605,17 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	genericApiServerHookName := "generic-apiserver-start-informers"
-	if c.SharedInformerFactory != nil && !s.isPostStartHookRegistered(genericApiServerHookName) {
-		err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
-			c.SharedInformerFactory.Start(context.StopCh)
-			return nil
-		})
-		if err != nil {
+	if c.SharedInformerFactory != nil {
+		if !s.isPostStartHookRegistered(genericApiServerHookName) {
+			err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
+				c.SharedInformerFactory.Start(context.StopCh)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+		if err := s.addReadyzChecks(healthz.NewInformerSyncHealthz(c.SharedInformerFactory)); err != nil {
 			return nil, err
 		}
 	}

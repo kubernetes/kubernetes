@@ -98,10 +98,15 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
-	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do(context.TODO())
+func endpointReturnsStatusOK(t *testing.T, client *kubernetes.Clientset, path string) bool {
+	res := client.CoreV1().RESTClient().Get().RequestURI(path).Do(context.TODO())
 	var status int
 	res.StatusCode(&status)
+	raw, err := res.Raw()
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	t.Logf("Got raw response to %v path: %v", path, string(raw))
 	return status == http.StatusOK
 }
 
@@ -113,10 +118,10 @@ func TestLivezAndReadyz(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !endpointReturnsStatusOK(client, "/livez") {
+	if !endpointReturnsStatusOK(t, client, "/livez") {
 		t.Fatalf("livez should be healthy")
 	}
-	if !endpointReturnsStatusOK(client, "/readyz") {
+	if !endpointReturnsStatusOK(t, client, "/readyz?verbose=true") {
 		t.Fatalf("readyz should be healthy")
 	}
 }

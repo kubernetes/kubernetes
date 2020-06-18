@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
 )
 
@@ -79,6 +80,76 @@ func (l *log) Check(_ *http.Request) error {
 		return nil
 	}
 	return fmt.Errorf("logging blocked")
+}
+
+type informerSync struct {
+	startOnce             sync.Once
+	sharedInformerFactory informers.SharedInformerFactory
+	err                   atomic.Value
+	done                  chan struct{}
+}
+
+var _ HealthChecker = &informerSync{}
+
+// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given sharedInformerFactory sync.
+func NewInformerSyncHealthz(sharedInformerFactory informers.SharedInformerFactory) HealthChecker {
+	i := &informerSync{
+		sharedInformerFactory: sharedInformerFactory,
+		done:                  make(chan struct{}),
+	}
+	// i.err.Store(errors.New("not finished"))
+	// go func() {
+	// 	if err := i.waitForCacheSync(wait.NeverStop); err != nil {
+	// 		i.err.Store(err)
+	// 	}
+	// 	close(i.done)
+	// }()
+
+	return i
+}
+
+func (i *informerSync) Name() string {
+	return "informer-sync"
+}
+
+// func (i *informerSync) waitForCacheSync(stopCh <-chan struct{}) error {
+// 	started := i.sharedInformerFactory.WaitForCacheSync(stopCh)
+// 	klog.Infof("SharedInformerFactory.WaitForCacheSync finished with: %v", started)
+// 	var notStarted []string
+// 	for informType, started := range started {
+// 		if !started {
+// 			klog.Warningf("informer for %v failed to sync", informType.String())
+// 			notStarted = append(notStarted, informType.String())
+// 		}
+// 	}
+// 	if len(notStarted) != 0 {
+// 		return fmt.Errorf("%d informers not started yet: %v", len(notStarted), notStarted)
+// 	}
+// 	return nil
+// }
+
+func (i *informerSync) Check(_ *http.Request) error {
+	stopCh := make(chan struct{})
+	close(stopCh)
+	started := i.sharedInformerFactory.WaitForCacheSync(stopCh)
+	klog.Infof("SharedInformerFactory.WaitForCacheSync finished with: %v", started)
+	var notStarted []string
+	for informType, started := range started {
+		if !started {
+			klog.Warningf("informer for %v failed to sync", informType.String())
+			notStarted = append(notStarted, informType.String())
+		}
+	}
+	if len(notStarted) != 0 {
+		return fmt.Errorf("%d informers not started yet: %v", len(notStarted), notStarted)
+	}
+	return nil
+	// select {
+	// case <-i.done:
+	// 	return i.err.Load().(error)
+	// default:
+	// 	return errors.New("not finished")
+	// }
 }
 
 // NamedCheck returns a healthz checker for the given name and function.
