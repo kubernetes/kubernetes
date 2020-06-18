@@ -363,16 +363,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			ginkgo.By("Performing a canary update")
-			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
-					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: func() *int32 {
-							i := int32(2)
-							return &i
-						}()}
-				}(),
-			}
 			ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 					Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -1320,7 +1310,7 @@ func deleteStatefulPodAtIndex(c clientset.Interface, index int, ss *appsv1.State
 	}
 }
 
-// getStatefulSetPodNameAtIndex gets formated pod name given index.
+// getStatefulSetPodNameAtIndex gets formatted pod name given index.
 func getStatefulSetPodNameAtIndex(index int, ss *appsv1.StatefulSet) string {
 	// TODO: we won't use "-index" as the name strategy forever,
 	// pull the name out from an identity mapper.
@@ -1329,7 +1319,7 @@ func getStatefulSetPodNameAtIndex(index int, ss *appsv1.StatefulSet) string {
 
 type updateStatefulSetFunc func(*appsv1.StatefulSet)
 
-// updateStatefulSetWithRetries updates statfulset template with retries.
+// updateStatefulSetWithRetries updates statefulset template with retries.
 func updateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1.StatefulSet, err error) {
 	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error
