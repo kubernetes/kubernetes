@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce
+package node
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -103,12 +104,12 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 
 // Recreate all the nodes in the test instance group
 func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
-	err := RecreateNodes(c, nodes)
+	err := gce.RecreateNodes(c, nodes)
 	if err != nil {
 		framework.Failf("Test failed; failed to start the restart instance group command.")
 	}
 
-	err = WaitForNodeBootIdsToChange(c, nodes, recreateNodeReadyAgainTimeout)
+	err = gce.WaitForNodeBootIdsToChange(c, nodes, recreateNodeReadyAgainTimeout)
 	if err != nil {
 		framework.Failf("Test failed; failed to recreate at least one node in %v.", recreateNodeReadyAgainTimeout)
 	}
