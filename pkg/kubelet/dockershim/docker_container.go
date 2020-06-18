@@ -33,6 +33,7 @@ import (
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // ListContainers lists all containers matching the filter.
@@ -416,9 +417,16 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	}
 
 	labels, annotations := extractLabels(r.Config.Labels)
+	imageInSpec := annotations[types.KubernetesContainerImageLabel]
+
 	imageName := r.Config.Image
 	if ir != nil && len(ir.RepoTags) > 0 {
-		imageName = ir.RepoTags[0]
+		if findImageTag(imageInSpec, ir.RepoTags) {
+			// if image tag in pod spec field has been previously stored, use that image tag firstly
+			imageName = imageInSpec
+		} else {
+			imageName = ir.RepoTags[0]
+		}
 	}
 	status := &runtimeapi.ContainerStatus{
 		Id:          r.ID,
@@ -438,6 +446,19 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
+}
+
+func findImageTag(imageInSpec string, allTags []string) bool {
+	if len(imageInSpec) == 0 {
+		return false
+	}
+
+	for _, tag := range allTags {
+		if tag == imageInSpec {
+			return true
+		}
+	}
+	return false
 }
 
 func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {

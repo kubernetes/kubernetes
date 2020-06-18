@@ -29,6 +29,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -194,6 +195,86 @@ func TestContainerStatus(t *testing.T) {
 	require.NoError(t, err)
 	resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
 	assert.Error(t, err, fmt.Sprintf("status of container: %+v", resp))
+}
+
+// TestContainerStatusWithMultiImageTags tests the situation when an image has multiple tags on a node, the ContainerStatus
+// should return the image stored in container annotation, to keep returned image name consistent with name specified in container spec.
+func TestContainerStatusWithMultiImageTags(t *testing.T) {
+	ds, fDocker, _ := newTestDockerService()
+	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
+	labels := map[string]string{"abc.xyz": "foo"}
+
+	// two image tags share same imageId
+	imageId := "imageId"
+	imageTagInSpec := "image.in.spec:v1"
+	imageTag2 := "another.tag:v1"
+	// store image specified in container spec to annotation, mock the behavior of kubeGenericRuntimeManager
+	annotations := map[string]string{"foo.bar.baz": "abc", types.KubernetesContainerImageLabel: imageTagInSpec}
+	config := makeContainerConfig(sConfig, "pause", imageId, 0, labels, annotations)
+
+	cases := []struct {
+		desc        string
+		imageTags   []string
+		expectImage *runtimeapi.ImageSpec
+	}{
+		{
+			desc:        "if image inspect return no tags, should use imageId",
+			imageTags:   []string{},
+			expectImage: &runtimeapi.ImageSpec{Image: imageId},
+		},
+		{
+			desc:        "if image inspect return one tag and it equals image stored in annotation, should use it",
+			imageTags:   []string{imageTagInSpec},
+			expectImage: &runtimeapi.ImageSpec{Image: imageTagInSpec},
+		},
+		{
+			desc:        "if image inspect return multiple tags, should use tag stored in annotation",
+			imageTags:   []string{imageTag2, imageTagInSpec},
+			expectImage: &runtimeapi.ImageSpec{Image: imageTagInSpec},
+		},
+		{
+			desc:        "if returned images do not include image stored in annotation, should use firstly returned image",
+			imageTags:   []string{imageTag2},
+			expectImage: &runtimeapi.ImageSpec{Image: imageTag2},
+		},
+	}
+
+	for _, tc := range cases {
+		fDocker.InjectImages([]dockertypes.ImageSummary{{ID: imageId, RepoTags: tc.imageTags}})
+		const sandboxId = "sandboxid"
+
+		// create container
+		req := &runtimeapi.CreateContainerRequest{PodSandboxId: sandboxId, Config: config, SandboxConfig: sConfig}
+		createResp, err := ds.CreateContainer(getTestCTX(), req)
+		require.NoError(t, err)
+
+		id := createResp.ContainerId
+		resp, err := ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+		require.NoError(t, err)
+		assert.Equal(t, tc.expectImage, resp.Status.Image)
+
+		// start container
+		_, err = ds.StartContainer(getTestCTX(), &runtimeapi.StartContainerRequest{ContainerId: id})
+		require.NoError(t, err)
+
+		resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+		require.NoError(t, err)
+		assert.Equal(t, tc.expectImage, resp.Status.Image)
+
+		// stop container
+		_, err = ds.StopContainer(getTestCTX(), &runtimeapi.StopContainerRequest{ContainerId: id, Timeout: int64(0)})
+		require.NoError(t, err)
+
+		resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+		require.NoError(t, err)
+		assert.Equal(t, tc.expectImage, resp.Status.Image)
+
+		// remove container
+		_, err = ds.RemoveContainer(getTestCTX(), &runtimeapi.RemoveContainerRequest{ContainerId: id})
+		require.NoError(t, err)
+		resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+		assert.Error(t, err, fmt.Sprintf("status of container: %+v", resp))
+	}
 }
 
 // TestContainerLogPath tests the container log creation logic.
