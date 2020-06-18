@@ -33,6 +33,7 @@ type DefaultPodTopologySpread struct {
 	handle framework.FrameworkHandle
 }
 
+var _ framework.PreScorePlugin = &DefaultPodTopologySpread{}
 var _ framework.ScorePlugin = &DefaultPodTopologySpread{}
 
 const (
