@@ -6,3 +6,4 @@ linux/s390x=s390x/debian:jessie
 windows/amd64/1809=REGISTRY/busybox:1.29-windows-amd64-1809
 windows/amd64/1903=REGISTRY/busybox:1.29-windows-amd64-1903
 windows/amd64/1909=REGISTRY/busybox:1.29-windows-amd64-1909
+windows/amd64/2004=REGISTRY/busybox:1.29-windows-amd64-2004
