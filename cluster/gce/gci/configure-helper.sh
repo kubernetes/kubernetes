@@ -364,6 +364,13 @@ function ensure-local-ssds() {
   # The following mounts or symlinks NVMe devices
   get-local-disk-num "nvme" "block"
   local nvmeblocknum="${localdisknum}"
+  get-local-disk-num "nvme" "fs"
+  local nvmefsnum="${localdisknum}"
+  # Check if NVMe SSD specified.
+  if [ "${nvmeblocknum}" -eq "0" ] && [ "${nvmefsnum}" -eq "0" ]; then
+    echo "No local NVMe SSD specified."
+    return
+  fi
   local i=0
   for ssd in /dev/nvme*; do
     if [ -e "${ssd}" ]; then
