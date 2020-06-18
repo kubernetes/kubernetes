@@ -91,7 +91,7 @@ type mockedRouter struct {
 	err             error
 }
 
-func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32, seenEndpoints ...*url.URL) (*url.URL, error) {
+func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
 }
 
@@ -100,7 +100,7 @@ type mockedRouterWithCounter struct {
 	counter  int
 }
 
-func (r *mockedRouterWithCounter) ResolveEndpoint(namespace, name string, port int32, seenEndpoints ...*url.URL) (*url.URL, error) {
+func (r *mockedRouterWithCounter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	r.counter++
 	return r.delegate.ResolveEndpoint(name, name, port)
 }
@@ -583,7 +583,7 @@ func TestProxyRetries(t *testing.T) {
 		backendError error
 		expectedStatusCode int
 	}{
-		"retry on connection reset by peer error: test (OK)-> proxy <-(ERROR) backend": {
+		"single host: retry on connection reset by peer error: test (OK)-> proxy <-(ERROR) backend": {
 			apiService: &apiregistration.APIService{
 				Spec: apiregistration.APIServiceSpec{
 					CABundle: testCACrt,

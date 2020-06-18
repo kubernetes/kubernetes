@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"context"
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
@@ -141,21 +142,30 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.serveHTTPWithRetry(w, req, handlingInfo, user)
 }
 
+// TODO: doc
 func (r *proxyHandler) serveHTTPWithRetry(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, user user.Info) {
 	w = newResponseWriterInterceptor(w)
 	errRsp := newHijackErrorResponder(&responder{w: w}, req)
-	// TODO: we could retry len(ResolveEndpoint(service)) - picking a different server on each retry
-	retryDecorator := newRetryDecorator(w.(responseWriterInterceptor), errRsp, 3)
+	retryDecorator, endpointsCount, err := createRetryDecorator(w, errRsp, handlingInfo, r.serviceResolver, 3)
+	if err != nil {
+		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
+		return
+	}
 
 	visitedURLs := []*url.URL{}
 	for {
-		visitedURL := r.serveHTTP(w, utilnet.CloneRequest(req), handlingInfo, errRsp, user, visitedURLs)
+		visitedURL := serveHTTP(w, utilnet.CloneRequest(req), handlingInfo, errRsp, user, r.serviceResolverWrapper(visitedURLs))
 		if visitedURL != nil {
 			visitedURLs = append(visitedURLs, visitedURL)
 		}
 
 		if !retryDecorator.RetryIfNeeded() {
 			break
+		}
+		// at this point, we need to retry, reset the counter if there are no remaining endpoints
+		// and let it retry the default number of times
+		if endpointsCount - len(visitedURLs) == 0 {
+			visitedURLs = []*url.URL{}
 		}
 	}
 
@@ -165,11 +175,11 @@ func (r *proxyHandler) serveHTTPWithRetry(w http.ResponseWriter, req *http.Reque
 	}
 }
 
-func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, errResponder proxy.ErrorResponder, user user.Info, usedEPs []*url.URL) *url.URL {
+func serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, errResponder proxy.ErrorResponder, user user.Info, serviceResolverFn func(namespace, name string, port int32) (*url.URL, error)) *url.URL {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
-	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
+	rloc, err := serviceResolverFn(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
@@ -253,6 +263,44 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 
 	return wrappedRT, true, nil
 }
+
+// createRetryDecorator returns a new retry decorator object. It reads the total number of endpoints for the given service from the resolver and use it as the number of reties.
+// In case only a single endpoint will be used it will retry defaultRetryCount.
+func createRetryDecorator(w http.ResponseWriter, errRsp *retriableHijackErrorResponder, handlingInfo proxyHandlingInfo, serviceResolver ServiceResolver, defaultRetryCount int) (*retryDecorator, int, error) {
+	var allEPs int
+
+	if extendedServiceResolver, ok := serviceResolver.(ServiceResolverExtended); ok {
+		var err error
+		allEPs, err = extendedServiceResolver.EndpointCount(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
+		if err != nil {
+			return nil, 0, fmt.Errorf("error resolving endpoints count %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		}
+
+		if allEPs == 0 {
+			return nil, 0, fmt.Errorf("an empty set returned while resolving endpoints count for %s/%s", handlingInfo.serviceNamespace, handlingInfo.serviceName)
+		}
+	} else {
+		// assume a single endpoint if the provided serviceResolver doesn't support the extended interface
+		allEPs = 1
+	}
+
+	if allEPs == 1 {
+		return newRetryDecorator(w.(responseWriterInterceptor), errRsp, true, defaultRetryCount), allEPs, nil
+	}
+
+	return newRetryDecorator(w.(responseWriterInterceptor), errRsp, false, allEPs), allEPs, nil
+}
+
+func (r *proxyHandler) serviceResolverWrapper(visitedEPs []*url.URL) func(namespace, name string, port int32) (*url.URL, error) {
+	serviceResolverWrapper := func(namespace, name string, port int32) (*url.URL, error) {
+		if extendedServiceResolver, ok := r.serviceResolver.(ServiceResolverExtended); ok {
+			return extendedServiceResolver.ResolveEndpointWithVisited(namespace, name, port, visitedEPs)
+		}
+		return r.serviceResolver.ResolveEndpoint(namespace, name, port)
+	}
+	return serviceResolverWrapper
+}
+
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
 type responder struct {

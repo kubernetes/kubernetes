@@ -17,8 +17,11 @@ limitations under the License.
 package apiserver
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/util/proxy"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 )
@@ -26,6 +29,17 @@ import (
 // A ServiceResolver knows how to get a URL given a service.
 type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
+}
+
+// ServiceResolverExtended extends ServiceResolver interface by providing a few additional methods for supporting requests retries
+type ServiceResolverExtended interface {
+	ServiceResolver
+
+	// ResolveEndpointWithVisited resolves an endpoint excluding already visited ones. Facilitates supporting retry mechanisms.
+	ResolveEndpointWithVisited(namespace, name string, port int32, visitedEPs []*url.URL) (*url.URL, error)
+
+	// EndpointCount return the total number of endpoints for the given service
+	EndpointCount(namespace, name string, port int32) (int, error)
 }
 
 // NewEndpointServiceResolver returns a ServiceResolver that chooses one of the
@@ -81,4 +95,74 @@ func (r *loopbackResolver) ResolveEndpoint(namespace, name string, port int32) (
 		return r.host, nil
 	}
 	return r.delegate.ResolveEndpoint(namespace, name, port)
+}
+
+type fakeLoopbackResolver struct{}
+
+func (f *fakeLoopbackResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return nil, errors.New("a lookback resolver hasn't been provided")
+}
+
+// NewExtendedEndpointServiceResolver returns a service resolver that extends ServiceResolver interface by providing a few additional methods for supporting requests retries
+func NewExtendedEndpointServiceResolver(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, loopbackResolver ServiceResolver) ServiceResolver {
+	if loopbackResolver == nil {
+		loopbackResolver = &fakeLoopbackResolver{}
+	}
+	return &serviceResolver{
+		services:         services,
+		endpoints:        endpoints,
+		loopbackResolver: loopbackResolver,
+	}
+}
+
+type serviceResolver struct {
+	services         listersv1.ServiceLister
+	endpoints        listersv1.EndpointsLister
+	loopbackResolver ServiceResolver
+}
+
+// ResolveEndpoint resolves (randomly) an endpoint to a given service.
+//
+// Note: Kube uses one service resolver for webhooks and the aggregator this method satisfies webhook.ServiceResolver interface
+func (r *serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	localEndpoint, err := r.loopbackResolver.ResolveEndpoint(namespace, name, port)
+	if err == nil && localEndpoint != nil {
+		return localEndpoint, nil
+	}
+
+	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name, port)
+}
+
+// ResolveEndpointWithVisited resolves an endpoint excluding already visited ones. Facilitates supporting retry mechanisms.
+func (r *serviceResolver) ResolveEndpointWithVisited(namespace, name string, port int32, visitedEPs []*url.URL) (*url.URL, error) {
+	localEndpoint, err := r.loopbackResolver.ResolveEndpoint(namespace, name, port)
+	if err == nil && localEndpoint != nil {
+		return localEndpoint, nil
+	}
+
+	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name, port, visitedEPs...)
+}
+
+// EndpointCount return the total number of endpoints for the given service
+func (r *serviceResolver) EndpointCount(namespace, name string, port int32) (int, error) {
+	localEndpoint, err := r.loopbackResolver.ResolveEndpoint(namespace, name, port)
+	if err == nil && localEndpoint != nil {
+		return 1, nil
+	}
+
+	allEndpoints := []*url.URL{}
+
+	for {
+		newEndpoint, err := proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name, port, allEndpoints...)
+		if err != nil {
+			break
+		}
+		allEndpoints = append(allEndpoints, newEndpoint)
+	}
+
+	if len(allEndpoints) == 0 {
+		return 0, kerrors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q/%q", namespace, name))
+	}
+
+	return len(allEndpoints), nil
 }

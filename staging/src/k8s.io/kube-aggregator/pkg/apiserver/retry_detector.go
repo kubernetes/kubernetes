@@ -103,7 +103,7 @@ func (w *responseWriter) StatusCode() int {
 }
 
 type retriable interface {
-	shouldRetry() bool
+	retry() bool
 	reset()
 }
 
@@ -113,19 +113,26 @@ type retryDecorator struct {
 }
 
 // newRetryDecorator wraps delegate for detecting Hijacked connections
-func newRetryDecorator(rw responseWriterInterceptor, delegate retriable, retry int) *retryDecorator {
+func newRetryDecorator(rw responseWriterInterceptor, errRsp *retriableHijackErrorResponder, singleEndpoint bool, retry int) *retryDecorator {
+	var delegate retriable
+
+	if singleEndpoint {
+		delegate = withBackOff(withHijackErrorResponderForSingleEndpoint(errRsp))
+	} else {
+		delegate = withHijackErrorResponderForMultipleEndpoints(errRsp)
+	}
+
 	return &retryDecorator{withMaxRetries(delegate, retry), rw}
 }
 
 // RetryIfNeeded returns true if the request failed and can be safely retried otherwise it returns false
 func (p *retryDecorator) RetryIfNeeded() bool {
-	// do not retry if the request has been hijecked or a response has already been sent to a client
+	// do not retry if the request has been hijacked or a response has already been sent to a client
 	if p.rw.WasHijacked() || p.rw.StatusCode() != 0 {
 		return false
 	}
 
-	//TODO: for env with only a single server we should back off before retrying
-	if p.delegate.shouldRetry() {
+	if p.delegate.retry() {
 		p.delegate.reset()
 		return true
 	}
@@ -144,58 +151,84 @@ func withMaxRetries(delegate retriable, max int) retriable {
 	return &maxRetries{retriable:delegate, max:max}
 }
 
-func (r *maxRetries) shouldRetry() bool {
+func (r *maxRetries) retry() bool {
 	r.counter++
 	if r.counter > r.max {
 		return false
 	}
 
-	return r.retriable.shouldRetry()
+	return r.retriable.retry()
 }
 
-// hijackErrorResponder wraps proxy.ErrorResponder and prevents errors from being written to the client if they can be retried
-type hijackErrorResponder struct {
+type backOff struct {
+	retriable
+}
+
+var _ retriable = &backOff{}
+
+func withBackOff(delegate retriable) retriable {
+	return &backOff{delegate}
+}
+
+func (b *backOff) retry() bool {
+	// TODO: implement back off
+	return b.retriable.retry()
+}
+
+// retriableHijackErrorResponder wraps proxy.ErrorResponder and prevents errors from being written to the client if they can be retried
+type retriableHijackErrorResponder struct {
 	// delegate knows how to write errors to the client
 	delegate proxy.ErrorResponder
 	req *http.Request
-	retry  bool
 	lastKnownError error
+	isRetriable func(req *http.Request, err error) bool
 }
 
-var _ proxy.ErrorResponder = &hijackErrorResponder{}
-var _ retriable = &hijackErrorResponder{}
+var _ proxy.ErrorResponder = &retriableHijackErrorResponder{}
+var _ retriable = &retriableHijackErrorResponder{}
 
 // newHijackErrorResponder creates a new ErrorResponder that wraps the delegate for supporting reties
-func newHijackErrorResponder(delegate proxy.ErrorResponder, req *http.Request) *hijackErrorResponder {
-	return &hijackErrorResponder{delegate: delegate, req: req}
+func newHijackErrorResponder(delegate proxy.ErrorResponder, req *http.Request) *retriableHijackErrorResponder {
+	return &retriableHijackErrorResponder{delegate: delegate, req: req}
 }
 
 // Error reports the err to the client or suppress it if it's not retriable
-func (hr *hijackErrorResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
+func (hr *retriableHijackErrorResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
 	// if we can retry the request do not send a response to the client
 	hr.lastKnownError = err
-	if !hr.canRetry(err) {
-		hr.retry = false
-		hr.delegate.Error(w, r, err)
-		return
+	if !hr.isRetriable(hr.req, err) {
+		hr.delegate.Error(w, r, err) // this might send a response to a client
 	}
-	hr.retry = true
 }
 
-func (hr *hijackErrorResponder) reset() {
-	hr.retry = false
+func (hr *retriableHijackErrorResponder) reset() {
 	hr.lastKnownError = nil
 }
 
-func (hr *hijackErrorResponder) shouldRetry() bool {
-	return hr.retry
+func (hr *retriableHijackErrorResponder) retry() bool {
+	return hr.isRetriable(hr.req, hr.lastKnownError)
 }
 
-func (hr *hijackErrorResponder) canRetry(err error) bool {
-	if isHTTPVerbRetriable(hr.req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) || knet.IsProbableEOF(err) ||  isExperimental(err)) {
-		return true
+// TODO: doc
+func withHijackErrorResponderForSingleEndpoint(hr *retriableHijackErrorResponder) retriable {
+	hr.isRetriable = func(req *http.Request, err error) bool {
+		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsProbableEOF(err) ||  isExperimental(err)) {
+			return true
+		}
+		return false
 	}
-	return false
+	return hr
+}
+
+// TODO: doc
+func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorResponder) retriable {
+	hr.isRetriable = func(req *http.Request, err error) bool {
+		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) || knet.IsProbableEOF(err) ||  isExperimental(err)) {
+			return true
+		}
+		return false
+	}
+	return hr
 }
 
 func isHTTPVerbRetriable(req *http.Request) bool {
