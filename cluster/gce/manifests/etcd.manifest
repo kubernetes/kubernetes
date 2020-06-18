@@ -53,6 +53,9 @@
       },
       { "name": "ETCD_SNAPSHOT_COUNT",
         "value": "10000"
+      },
+      { "name": "ETCD_HOSTNAME",
+        "value": "{{ hostname }}"
       }
         ],
     "livenessProbe": {
