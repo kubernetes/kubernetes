@@ -32,9 +32,10 @@ import (
 )
 
 const (
-	vmPowerStatePrefix      = "PowerState/"
-	vmPowerStateStopped     = "stopped"
-	vmPowerStateDeallocated = "deallocated"
+	vmPowerStatePrefix       = "PowerState/"
+	vmPowerStateStopped      = "stopped"
+	vmPowerStateDeallocated  = "deallocated"
+	vmPowerStateDeallocating = "deallocating"
 )
 
 var (
@@ -230,7 +231,8 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 	}
 	klog.V(5).Infof("InstanceShutdownByProviderID gets power status %q for node %q", powerStatus, nodeName)
 
-	return strings.ToLower(powerStatus) == vmPowerStateStopped || strings.ToLower(powerStatus) == vmPowerStateDeallocated, nil
+	status := strings.ToLower(powerStatus)
+	return status == vmPowerStateStopped || status == vmPowerStateDeallocated || status == vmPowerStateDeallocating, nil
 }
 
 // InstanceMetadataByProviderID returns metadata of the specified instance.
