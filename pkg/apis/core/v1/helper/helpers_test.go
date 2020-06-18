@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestIsNativeResource(t *testing.T) {
@@ -493,6 +494,70 @@ func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 			}
 			t.Errorf("[%s] expect tolerations %+v tolerate filtered taints %+v in taints %+v", tc.description, tc.tolerations, filteredTaints, tc.taints)
 		}
+	}
+}
+
+func TestFindMatchingUntoleratedTaintWithoutTolerationSeconds(t *testing.T) {
+	testCases := []struct {
+		description     string
+		tolerations     []v1.Toleration
+		taints          []v1.Taint
+		inclusionFilter taintsFilterFunc
+		expectTolerated bool
+	}{
+		{
+			description: "toleration match taint, no toleration seconds, expect tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "foo",
+					Operator: "Exists",
+					Effect:   v1.TaintEffectNoExecute,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "foo",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+			inclusionFilter: func(t *v1.Taint) bool { return true },
+			expectTolerated: true,
+		},
+		{
+			description: "toleration match taint, but has toleration seconds, expect untolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:               "foo",
+					Operator:          "Exists",
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: utilpointer.Int64Ptr(30),
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "foo",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+			inclusionFilter: func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			_, untolerated := FindMatchingUntoleratedTaintWithoutTolerationSeconds(tc.taints, tc.tolerations, tc.inclusionFilter)
+			if !untolerated != tc.expectTolerated {
+				filteredTaints := []v1.Taint{}
+				for _, taint := range tc.taints {
+					if tc.inclusionFilter != nil && !tc.inclusionFilter(&taint) {
+						continue
+					}
+					filteredTaints = append(filteredTaints, taint)
+				}
+				t.Errorf("[%s] expect tolerations %+v tolerate filtered taints %+v in taints %+v", tc.description, tc.tolerations, filteredTaints, tc.taints)
+			}
+		})
 	}
 }
 

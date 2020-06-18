@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
@@ -299,6 +300,17 @@ func TestTaintTolerationFilter(t *testing.T) {
 				{Key: "dedicated", Value: "user2", Effect: "NoSchedule"},
 				{Key: "foo", Value: "bar", Effect: "NoSchedule"},
 			}),
+		},
+		{
+			name: "A pod has a toleration with TolerationSeconds, node has one taint, the toleration will be ignored",
+			pod: podWithTolerations("pod1", []v1.Toleration{
+				{Key: "foo", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: utilpointer.Int64Ptr(30)},
+			}),
+			node: nodeWithTaints("nodeA", []v1.Taint{
+				{Key: "foo", Effect: "NoExecute"},
+			}),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+				"node(s) had taint {foo: }, that the pod didn't tolerate"),
 		},
 		{
 			name: "A pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +

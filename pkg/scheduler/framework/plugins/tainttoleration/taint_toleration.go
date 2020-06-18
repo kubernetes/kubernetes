@@ -61,7 +61,7 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, filterPredicate)
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaintWithoutTolerationSeconds(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, filterPredicate)
 	if !isUntolerated {
 		return nil
 	}

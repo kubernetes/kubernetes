@@ -455,6 +455,26 @@ func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration
 	return v1.Taint{}, false
 }
 
+// FindMatchingUntoleratedTaintWithoutTolerationSeconds filters the given tolerations
+// with TolerationSeconds and check if they tolerate all the filtered taints, and
+// returns the first taint without a toleration
+func FindMatchingUntoleratedTaintWithoutTolerationSeconds(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
+	filteredTaints := getFilteredTaints(taints, inclusionFilter)
+	filteredTolerations := []v1.Toleration{}
+	for _, toleration := range tolerations {
+		if toleration.Effect == v1.TaintEffectNoExecute && toleration.TolerationSeconds != nil {
+			continue
+		}
+		filteredTolerations = append(filteredTolerations, toleration)
+	}
+	for _, taint := range filteredTaints {
+		if !TolerationsTolerateTaint(filteredTolerations, &taint) {
+			return taint, true
+		}
+	}
+	return v1.Taint{}, false
+}
+
 // getFilteredTaints returns a list of taints satisfying the filter predicate
 func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1.Taint {
 	if inclusionFilter == nil {
