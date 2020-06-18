@@ -37,6 +37,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	defer os.Remove(configFile.Name())
 	if err = configFile.Close(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -206,6 +207,7 @@ func TestEmbeddedConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	defer os.Remove(configFile.Name())
 	if err = configFile.Close(); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
