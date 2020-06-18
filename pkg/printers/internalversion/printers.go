@@ -581,6 +581,16 @@ func listWithMoreString(list []string, more bool, count, max int) string {
 	return ret
 }
 
+// translateMicroTimestampSince returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateMicroTimestampSince(timestamp metav1.MicroTime) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
+}
+
 // translateTimestampSince returns the elapsed time since timestamp in
 // human-readable approximation.
 func translateTimestampSince(timestamp metav1.Time) string {
@@ -1447,7 +1457,13 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1beta1
 	}
 
 	firstTimestamp := translateTimestampSince(obj.FirstTimestamp)
+	if obj.FirstTimestamp.IsZero() {
+		firstTimestamp = translateMicroTimestampSince(obj.EventTime)
+	}
 	lastTimestamp := translateTimestampSince(obj.LastTimestamp)
+	if obj.LastTimestamp.IsZero() {
+		lastTimestamp = firstTimestamp
+	}
 
 	var target string
 	if len(obj.InvolvedObject.Name) > 0 {
