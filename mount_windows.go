@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
+	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/keymutex"
 )
 
@@ -221,38 +222,38 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 
 	// format disk if it is unformatted(raw)
 	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru"+
-		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
+		" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
 	if output, err := mounter.Exec.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
 	}
 	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
-	volumeIds, err := listVolumesOnDisk(source)
+	driveLetter, err := getDriveLetterByDiskNumber(source, mounter.Exec)
 	if err != nil {
 		return err
 	}
-	volumeID := volumeIds[0]
+	driverPath := driveLetter + ":"
 	target = NormalizeWindowsPath(target)
-	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, volumeID).CombinedOutput()
+	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
 	if err != nil {
-		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, volumeID, err, string(output))
+		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, driverPath, err, string(output))
 		return err
 	}
-	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", volumeID, fstype, target, string(output))
+	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", driverPath, fstype, target, string(output))
 	return nil
 }
 
-// ListVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID).
-func listVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
-	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume).UniqueId", diskID)
+// Get drive letter according to windows disk number
+func getDriveLetterByDiskNumber(diskNum string, exec utilexec.Interface) (string, error) {
+	cmd := fmt.Sprintf("(Get-Partition -DiskNumber %s).DriveLetter", diskNum)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	klog.V(4).Infof("listVolumesOnDisk id from %s: %s", diskID, string(output))
 	if err != nil {
-		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
+		return "", fmt.Errorf("azureMount: Get Drive Letter failed: %v, output: %q", err, string(output))
 	}
-
-	volumeIds := strings.Split(strings.TrimSpace(string(output)), "\r\n")
-	return volumeIds, nil
+	if len(string(output)) < 1 {
+		return "", fmt.Errorf("azureMount: Get Drive Letter failed, output is empty")
+	}
+	return string(output)[:1], nil
 }
 
 // getAllParentLinks walks all symbolic links and return all the parent targets recursively
