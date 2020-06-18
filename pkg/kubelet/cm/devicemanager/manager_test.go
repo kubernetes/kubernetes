@@ -467,6 +467,7 @@ func TestCheckpoint(t *testing.T) {
 	as := assert.New(t)
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
 	testManager := &ManagerImpl{
@@ -863,6 +864,7 @@ func TestUpdatePluginResources(t *testing.T) {
 	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
@@ -963,6 +965,7 @@ func TestResetExtendedResource(t *testing.T) {
 	as := assert.New(t)
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
 	testManager := &ManagerImpl{

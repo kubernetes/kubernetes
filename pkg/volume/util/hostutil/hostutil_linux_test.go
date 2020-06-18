@@ -283,6 +283,7 @@ func TestGetFileType(t *testing.T) {
 
 	for idx, tc := range testCase {
 		path, cleanUpPath, err := tc.setUp()
+		defer os.RemoveAll(cleanUpPath) // RemoveAll can deal with a empty path ""
 		if err != nil {
 			// Locally passed, but upstream CI is not friendly to create such device files
 			// Leave "Operation not permitted" out, which can be covered in an e2e test
@@ -290,9 +291,6 @@ func TestGetFileType(t *testing.T) {
 				continue
 			}
 			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
-		}
-		if len(cleanUpPath) > 0 {
-			defer os.RemoveAll(cleanUpPath)
 		}
 
 		fileType, err := hu.GetFileType(path)
