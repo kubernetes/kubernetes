@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	gpath "path"
@@ -339,6 +340,23 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		s.Eventf(corev1.EventTypeNormal, "TerminationMinimalShutdownDurationFinished", "The minimal shutdown duration of %v finished", s.ShutdownDelayDuration)
 	}()
 
+	lateStopCh := make(chan struct{})
+	if s.ShutdownDelayDuration > 0 {
+		go func() {
+			defer close(lateStopCh)
+
+			<-stopCh
+
+			time.Sleep(s.ShutdownDelayDuration * 8 / 10)
+		}()
+	}
+
+	s.SecureServingInfo.Listener = &terminationLoggingListener{
+		Listener:   s.SecureServingInfo.Listener,
+		stopCh:     stopCh,
+		lateStopCh: lateStopCh,
+	}
+
 	// close socket after delayed stopCh
 	stoppedCh, err := s.NonBlockingRun(delayedStopCh)
 	if err != nil {
@@ -653,4 +671,31 @@ func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...
 	if _, err := s.eventSink.Create(e); err != nil {
 		klog.Warningf("failed to create event %s/%s: %v", e.Namespace, e.Name, err)
 	}
+}
+
+// terminationLoggingListener wraps the given listener and logs new connections
+// after the stopCh has been closed, i.e. when termination has begun.
+type terminationLoggingListener struct {
+	net.Listener
+	stopCh, lateStopCh <-chan struct{}
+}
+
+func (l *terminationLoggingListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-l.lateStopCh:
+		klog.Warningf("Accepted new connection from %s very late in the graceful termination process (more than 80%% has passed), possibly a hint for a broken load balancer setup.", c.RemoteAddr().String())
+	default:
+		select {
+		case <-l.stopCh:
+			klog.V(2).Infof("Accepted new connection from %s during graceful termination.", c.RemoteAddr())
+		default:
+		}
+	}
+
+	return c, err
 }
