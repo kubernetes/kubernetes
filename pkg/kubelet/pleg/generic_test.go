@@ -136,7 +136,8 @@ func TestRelisting(t *testing.T) {
 	// The second relist should not send out any event because no container has
 	// changed.
 	pleg.relist()
-	verifyEvents(t, expected, actual)
+	actual = getEventsFromChannel(ch)
+	assert.True(t, len(actual) == 0, "no container has changed, event length should be 0")
 
 	runtime.AllPodList = []*containertest.FakePod{
 		{Pod: &kubecontainer.Pod{
