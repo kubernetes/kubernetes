@@ -191,7 +191,7 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		if i > triesBeforeBackOff {
 			p.BackOff.Sleep(backOffPeriod)
 		}
-		current, getErr = p.Helper.Get(namespace, name, false)
+		current, getErr = p.Helper.Get(namespace, name)
 		if getErr != nil {
 			return nil, nil, getErr
 		}
@@ -209,7 +209,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	}
 	// TODO: use wait
 	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
-		if _, err := p.Helper.Get(namespace, name, false); !errors.IsNotFound(err) {
+		if _, err := p.Helper.Get(namespace, name); !errors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil

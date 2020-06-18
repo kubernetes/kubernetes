@@ -100,8 +100,6 @@ type Builder struct {
 
 	singleItemImplied bool
 
-	export bool
-
 	schema ContentValidator
 
 	// fakeClientFn is used for testing
@@ -458,12 +456,6 @@ func (b *Builder) FieldSelectorParam(s string) *Builder {
 		return b
 	}
 	b.fieldSelector = &s
-	return b
-}
-
-// ExportParam accepts the export boolean for these resources
-func (b *Builder) ExportParam(export bool) *Builder {
-	b.export = export
 	return b
 }
 
@@ -870,7 +862,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
@@ -970,7 +962,6 @@ func (b *Builder) visitByResource() *Result {
 			Mapping:   mapping,
 			Namespace: selectorNamespace,
 			Name:      tuple.Name,
-			Export:    b.export,
 		}
 		items = append(items, info)
 	}
@@ -1035,7 +1026,6 @@ func (b *Builder) visitByName() *Result {
 			Mapping:   mapping,
 			Namespace: selectorNamespace,
 			Name:      name,
-			Export:    b.export,
 		}
 		visitors = append(visitors, info)
 	}
