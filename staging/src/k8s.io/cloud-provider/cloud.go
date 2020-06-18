@@ -49,6 +49,9 @@ type Interface interface {
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 	Instances() (Instances, bool)
+	// InstancesV2 is an implementation for instances only used by cloud node-controller now.
+	// Also returns true if the interface is supported, false otherwise.
+	InstancesV2() (InstancesV2, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
@@ -184,6 +187,17 @@ type Instances interface {
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+}
+
+// InstancesV2 is an abstract, pluggable interface for sets of instances.
+// Unlike Instances, it is only used by cloud node-controller now.
+type InstancesV2 interface {
+	// InstanceExistsByProviderID returns true if the instance for the given provider exists.
+	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider.
+	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceMetadataByProviderID returns the instance's metadata.
+	InstanceMetadataByProviderID(ctx context.Context, providerID string) (*InstanceMetadata, error)
 }
 
 // Route is a representation of an advanced routing rule.
