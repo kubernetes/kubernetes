@@ -376,16 +376,7 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-
-  if [[ "${CONTAINER_RUNTIME_NAME:-}" == "docker" ]]; then
-    load_image_command=${LOAD_IMAGE_COMMAND:-docker load -i}
-  elif [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" ]]; then
-    load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
-  else
-    load_image_command="${LOAD_IMAGE_COMMAND:-}"
-  fi
-
-  until timeout 30 ${load_image_command} "${img}"; do
+  until timeout 30 ${LOAD_IMAGE_COMMAND:-docker load -i} "${img}"; do
     if [[ "${attempt_num}" == "${max_attempts}" ]]; then
       echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
       exit 1
