@@ -473,6 +473,16 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		existingResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(existing)
+		if err != nil {
+			return nil, nil, err
+		}
+		if existingResourceVersion == 0 {
+			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
+				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
+			}
+		}
+
 		// Given the existing object, get the new object
 		obj, err := objInfo.UpdatedObject(ctx, existing)
 		if err != nil {
@@ -483,20 +493,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// the user does not have a resource version, then we populate it with
 		// the latest version. Else, we check that the version specified by
 		// the user matches the version of latest storage object.
-		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+		newResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 		if err != nil {
 			return nil, nil, err
 		}
-		doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
+		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
-		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
-		if err != nil {
-			return nil, nil, err
-		}
-		if version == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
-				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
-			}
+		if existingResourceVersion == 0 {
 			creating = true
 			creatingObj = obj
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -529,15 +532,15 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		} else {
 			// Check if the object's resource version matches the latest
 			// resource version.
-			if resourceVersion == 0 {
+			if newResourceVersion == 0 {
 				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
 				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
-				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), resourceVersion, "must be specified for an update")}
+				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newResourceVersion, "must be specified for an update")}
 				return nil, nil, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
-			if resourceVersion != version {
+			if newResourceVersion != existingResourceVersion {
 				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
