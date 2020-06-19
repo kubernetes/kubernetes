@@ -2682,4 +2682,61 @@ COMMIT
 	assert.NotEqual(t, expectedIPTablesWithSlice, fp.iptablesData.String())
 }
 
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcLBIP := "1.2.3.4"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP:        svcLBIP,
+				RouteType: v1.LoadBalancerRouteTypeProxy,
+			}}
+		}),
+	)
+
+	epIP := "10.180.0.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: epIP,
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	proto := strings.ToLower(string(v1.ProtocolTCP))
+	fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
+
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if hasJump(kubeSvcRules, fwChain, svcLBIP, svcPort) {
+		errorf(fmt.Sprintf("Found jump to firewall chain %v", fwChain), kubeSvcRules, t)
+	}
+}
+
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.
