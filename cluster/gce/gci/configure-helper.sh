@@ -1222,6 +1222,15 @@ current-context: service-account-context
 EOF
 }
 
+function create-kube-scheduler-config {
+  echo "Creating kube-scheduler config file"
+  mkdir -p /etc/srv/kubernetes/kube-scheduler
+  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/config
+${KUBE_SCHEDULER_CONFIG}
+EOF
+}
+
+# TODO(#92143): Remove legacy policy config creation once kube-scheduler config is GA.
 function create-kubescheduler-policy-config {
   echo "Creating kube-scheduler policy config file"
   mkdir -p /etc/srv/kubernetes/kube-scheduler
@@ -1901,17 +1910,24 @@ function start-kube-scheduler {
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
-  params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
-  if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
-    params+=" --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
-  fi
-  if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
-    create-kubescheduler-policy-config
-    params+=" --use-legacy-policy-config"
-    params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
+
+  # Scheduler Component Config takes precedence over some flags.
+  if [[ -n "${KUBE_SCHEDULER_CONFIG:-}" ]]; then
+    create-kube-scheduler-config
+    params+=" --config=/etc/srv/kubernetes/kube-scheduler/config"
+  else
+    params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
+    if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
+      params+=" --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
+    fi
+    if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
+      create-kubescheduler-policy-config
+      params+=" --use-legacy-policy-config"
+      params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
+    fi
   fi
 
   params="$(convert-manifest-params "${params}")"
