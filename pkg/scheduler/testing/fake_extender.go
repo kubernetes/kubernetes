@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -110,7 +111,7 @@ func Machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 type machine2PrioritizerPlugin struct{}
 
 // NewMachine2PrioritizerPlugin returns a factory function to build machine2PrioritizerPlugin.
-func NewMachine2PrioritizerPlugin() framework.PluginFactory {
+func NewMachine2PrioritizerPlugin() frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &machine2PrioritizerPlugin{}, nil
 	}

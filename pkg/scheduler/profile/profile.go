@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -33,7 +34,7 @@ import (
 type RecorderFactory func(string) events.EventRecorder
 
 // FrameworkFactory builds a Framework for a given profile configuration.
-type FrameworkFactory func(config.KubeSchedulerProfile, ...framework.Option) (framework.Framework, error)
+type FrameworkFactory func(config.KubeSchedulerProfile, ...frameworkruntime.Option) (framework.Framework, error)
 
 // Profile is a scheduling profile.
 type Profile struct {
@@ -43,9 +44,9 @@ type Profile struct {
 
 // NewProfile builds a Profile for the given configuration.
 func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
-	opts ...framework.Option) (*Profile, error) {
+	opts ...frameworkruntime.Option) (*Profile, error) {
 	r := recorderFact(cfg.SchedulerName)
-	f, err := frameworkFact(cfg, append(opts, framework.WithEventRecorder(r))...)
+	f, err := frameworkFact(cfg, append(opts, frameworkruntime.WithEventRecorder(r))...)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +61,7 @@ type Map map[string]*Profile
 
 // NewMap builds the profiles given by the configuration, indexed by name.
 func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
-	opts ...framework.Option) (Map, error) {
+	opts ...frameworkruntime.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
 

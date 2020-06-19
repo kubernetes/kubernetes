@@ -14,18 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package runtime
 
 import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"sigs.k8s.io/yaml"
 )
 
 // PluginFactory is a function that builds a plugin.
-type PluginFactory = func(configuration runtime.Object, f FrameworkHandle) (Plugin, error)
+type PluginFactory = func(configuration runtime.Object, f v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error)
 
 // DecodeInto decodes configuration whose type is *runtime.Unknown to the interface into.
 func DecodeInto(obj runtime.Object, into interface{}) error {

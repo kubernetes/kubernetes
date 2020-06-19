@@ -32,6 +32,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -269,7 +270,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			}
 			queue := internalqueue.NewSchedulingQueue(nil)
 
-			fwk, err := st.NewFramework(test.registerPlugins, framework.WithClientSet(client))
+			fwk, err := st.NewFramework(test.registerPlugins, runtime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}

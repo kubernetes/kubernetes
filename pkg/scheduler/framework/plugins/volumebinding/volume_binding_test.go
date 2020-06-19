@@ -29,6 +29,7 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/utils/pointer"
 )
@@ -231,11 +232,11 @@ func TestVolumeBinding(t *testing.T) {
 			ctx := context.Background()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			opts := []framework.Option{
-				framework.WithClientSet(client),
-				framework.WithInformerFactory(informerFactory),
+			opts := []runtime.Option{
+				runtime.WithClientSet(client),
+				runtime.WithInformerFactory(informerFactory),
 			}
-			fh, err := framework.NewFramework(nil, nil, nil, opts...)
+			fh, err := runtime.NewFramework(nil, nil, nil, opts...)
 			if err != nil {
 				t.Fatal(err)
 			}

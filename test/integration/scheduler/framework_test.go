@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -145,14 +146,14 @@ var _ framework.UnreservePlugin = &UnreservePlugin{}
 var _ framework.PermitPlugin = &PermitPlugin{}
 
 // newPlugin returns a plugin factory with specified Plugin.
-func newPlugin(plugin framework.Plugin) framework.PluginFactory {
+func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return plugin, nil
 	}
 }
 
 // newPlugin returns a plugin factory with specified Plugin.
-func newPostFilterPlugin(plugin *PostFilterPlugin) framework.PluginFactory {
+func newPostFilterPlugin(plugin *PostFilterPlugin) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		plugin.fh = fh
 		return plugin, nil
@@ -498,7 +499,7 @@ func (pp *PermitPlugin) reset() {
 }
 
 // newPermitPlugin returns a factory for permit plugin with specified PermitPlugin.
-func newPermitPlugin(permitPlugin *PermitPlugin) framework.PluginFactory {
+func newPermitPlugin(permitPlugin *PermitPlugin) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		permitPlugin.fh = fh
 		return permitPlugin, nil
@@ -509,7 +510,7 @@ func newPermitPlugin(permitPlugin *PermitPlugin) framework.PluginFactory {
 func TestPreFilterPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a pre-filter plugin.
 	preFilterPlugin := &PreFilterPlugin{}
-	registry := framework.Registry{prefilterPluginName: newPlugin(preFilterPlugin)}
+	registry := frameworkruntime.Registry{prefilterPluginName: newPlugin(preFilterPlugin)}
 
 	// Setup initial prefilter plugin for testing.
 	prof := schedulerconfig.KubeSchedulerProfile{
@@ -626,7 +627,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			)
 			filterPlugin.rejectFilter = tt.rejectFilter
 			postFilterPlugin.rejectPostFilter = tt.rejectPostFilter
-			registry := framework.Registry{
+			registry := frameworkruntime.Registry{
 				filterPluginName:     newPlugin(filterPlugin),
 				postfilterPluginName: newPostFilterPlugin(postFilterPlugin),
 			}
@@ -688,7 +689,7 @@ func TestPostFilterPlugin(t *testing.T) {
 func TestScorePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a score plugin.
 	scorePlugin := &ScorePlugin{}
-	registry := framework.Registry{
+	registry := frameworkruntime.Registry{
 		scorePluginName: newPlugin(scorePlugin),
 	}
 
@@ -763,7 +764,7 @@ func TestScorePlugin(t *testing.T) {
 func TestNormalizeScorePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a normalize score plugin.
 	scoreWithNormalizePlugin := &ScoreWithNormalizePlugin{}
-	registry := framework.Registry{
+	registry := frameworkruntime.Registry{
 		scoreWithNormalizePluginName: newPlugin(scoreWithNormalizePlugin),
 	}
 
@@ -809,7 +810,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 func TestReservePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a reserve plugin.
 	reservePlugin := &ReservePlugin{}
-	registry := framework.Registry{reservePluginName: newPlugin(reservePlugin)}
+	registry := frameworkruntime.Registry{reservePluginName: newPlugin(reservePlugin)}
 
 	// Setup initial reserve plugin for testing.
 	prof := schedulerconfig.KubeSchedulerProfile{
@@ -880,7 +881,7 @@ func TestReservePlugin(t *testing.T) {
 func TestPrebindPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a prebind plugin.
 	preBindPlugin := &PreBindPlugin{}
-	registry := framework.Registry{preBindPluginName: newPlugin(preBindPlugin)}
+	registry := frameworkruntime.Registry{preBindPluginName: newPlugin(preBindPlugin)}
 
 	// Setup initial prebind plugin for testing.
 	prof := schedulerconfig.KubeSchedulerProfile{
@@ -963,7 +964,7 @@ func TestUnreservePlugin(t *testing.T) {
 	// TODO: register more plugin which would trigger un-reserve plugin
 	preBindPlugin := &PreBindPlugin{}
 	unreservePlugin := &UnreservePlugin{name: unreservePluginName}
-	registry := framework.Registry{
+	registry := frameworkruntime.Registry{
 		unreservePluginName: newPlugin(unreservePlugin),
 		preBindPluginName:   newPlugin(preBindPlugin),
 	}
@@ -1055,7 +1056,7 @@ func TestBindPlugin(t *testing.T) {
 	unreservePlugin := &UnreservePlugin{name: "mock-unreserve-plugin"}
 	postBindPlugin := &PostBindPlugin{name: "mock-post-bind-plugin"}
 	// Create a plugin registry for testing. Register an unreserve, a bind plugin and a postBind plugin.
-	registry := framework.Registry{
+	registry := frameworkruntime.Registry{
 		unreservePlugin.Name(): func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return unreservePlugin, nil
 		},
@@ -1230,7 +1231,7 @@ func TestPostBindPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register a prebind and a postbind plugin.
 	preBindPlugin := &PreBindPlugin{}
 	postBindPlugin := &PostBindPlugin{name: postBindPluginName}
-	registry := framework.Registry{
+	registry := frameworkruntime.Registry{
 		preBindPluginName:  newPlugin(preBindPlugin),
 		postBindPluginName: newPlugin(postBindPlugin),
 	}
@@ -1594,7 +1595,7 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 func TestFilterPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a filter plugin.
 	filterPlugin := &FilterPlugin{}
-	registry := framework.Registry{filterPluginName: newPlugin(filterPlugin)}
+	registry := frameworkruntime.Registry{filterPluginName: newPlugin(filterPlugin)}
 
 	// Setup initial filter plugin for testing.
 	prof := schedulerconfig.KubeSchedulerProfile{
@@ -1664,7 +1665,7 @@ func TestFilterPlugin(t *testing.T) {
 func TestPreScorePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a pre-score plugin.
 	preScorePlugin := &PreScorePlugin{}
-	registry := framework.Registry{preScorePluginName: newPlugin(preScorePlugin)}
+	registry := frameworkruntime.Registry{preScorePluginName: newPlugin(preScorePlugin)}
 
 	// Setup initial pre-score plugin for testing.
 	prof := schedulerconfig.KubeSchedulerProfile{
@@ -1818,12 +1819,12 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 
 // initRegistryAndConfig returns registry and plugins config based on give plugins.
 // TODO: refactor it to a more generic functions that accepts all kinds of Plugins as arguments
-func initRegistryAndConfig(pp ...*PermitPlugin) (registry framework.Registry, prof schedulerconfig.KubeSchedulerProfile) {
+func initRegistryAndConfig(pp ...*PermitPlugin) (registry frameworkruntime.Registry, prof schedulerconfig.KubeSchedulerProfile) {
 	if len(pp) == 0 {
 		return
 	}
 
-	registry = framework.Registry{}
+	registry = frameworkruntime.Registry{}
 	var plugins []schedulerconfig.Plugin
 	for _, p := range pp {
 		registry.Register(p.Name(), newPermitPlugin(p))
