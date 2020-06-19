@@ -200,8 +200,19 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
-			return watchEvent.Type == watch.Added, nil
+		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Added:
+				if cm, ok := event.Object.(*v1.ConfigMap); ok {
+					found := cm.ObjectMeta.Name == testConfigMap.Name &&
+						cm.Labels["test-configmap-static"] == "true" &&
+						cm.Data["valueName"] == "value"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
+			}
+			return false, nil
 		})
 		framework.ExpectNoError(err, "failed to see a watch.Added event for the configmap we created")
 
@@ -223,8 +234,20 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		ginkgo.By("waiting for the ConfigMap to be modified")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
-			return watchEvent.Type == watch.Modified, nil
+		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Modified:
+				if cm, ok := event.Object.(*v1.ConfigMap); ok {
+					found := cm.ObjectMeta.Name == testConfigMap.Name &&
+						cm.Labels["test-configmap-static"] == "true" &&
+						cm.Labels["test-configmap"] == "patched" &&
+						cm.Data["valueName"] == "value1"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
+			}
+			return false, nil
 		})
 		framework.ExpectNoError(err, "failed to see a watch.Modified event for the configmap we patched")
 
@@ -260,8 +283,20 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		ginkgo.By("waiting for the ConfigMap to be deleted")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
-			return watchEvent.Type == watch.Deleted, nil
+		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Deleted:
+				if cm, ok := event.Object.(*v1.ConfigMap); ok {
+					found := cm.ObjectMeta.Name == testConfigMap.Name &&
+						cm.Labels["test-configmap-static"] == "true" &&
+						cm.Labels["test-configmap"] == "patched" &&
+						cm.Data["valueName"] == "value1"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
+			}
+			return false, nil
 		})
 		framework.ExpectNoError(err, "fasiled to observe a watch.Deleted event for the ConfigMap we deleted")
 	})
