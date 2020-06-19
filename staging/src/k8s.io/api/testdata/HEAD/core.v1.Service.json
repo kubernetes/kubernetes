@@ -97,16 +97,17 @@
               "protocol": "喂ƈ斎AO6",
               "error": "33"
             }
-          ]
+          ],
+          "ipMode": "C"
         }
       ]
     },
     "conditions": [
       {
         "type": "34",
-        "status": "C",
-        "observedGeneration": -2492120148461555858,
-        "lastTransitionTime": "2392-12-09T15:37:55Z",
+        "status": "Ű壝ž",
+        "observedGeneration": 8220339758940423692,
+        "lastTransitionTime": "2378-06-06T16:47:53Z",
         "reason": "35",
         "message": "36"
       }

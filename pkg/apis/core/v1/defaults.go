@@ -169,6 +169,17 @@ func SetDefaults_Service(obj *v1.Service) {
 			}
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) &&
+		obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+		ipMode := v1.LoadBalancerIPModeVIP
+
+		for i, ing := range obj.Status.LoadBalancer.Ingress {
+			if ing.IP != "" && ing.IPMode == nil {
+				obj.Status.LoadBalancer.Ingress[i].IPMode = &ipMode
+			}
+		}
+	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits

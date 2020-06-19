@@ -35,6 +35,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_Ingress(in *v1beta1.Ingress) {
+	SetDefaults_Ingress(in)
 	for i := range in.Spec.Rules {
 		a := &in.Spec.Rules[i]
 		if a.IngressRuleValue.HTTP != nil {

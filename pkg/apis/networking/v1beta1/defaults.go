@@ -17,8 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -29,5 +32,17 @@ func SetDefaults_HTTPIngressPath(obj *networkingv1beta1.HTTPIngressPath) {
 	var defaultPathType = networkingv1beta1.PathTypeImplementationSpecific
 	if obj.PathType == nil {
 		obj.PathType = &defaultPathType
+	}
+}
+
+func SetDefaults_Ingress(obj *networkingv1beta1.Ingress) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+		ipMode := v1.LoadBalancerIPModeVIP
+
+		for i, ing := range obj.Status.LoadBalancer.Ingress {
+			if ing.IP != "" && ing.IPMode == nil {
+				obj.Status.LoadBalancer.Ingress[i].IPMode = &ipMode
+			}
+		}
 	}
 }

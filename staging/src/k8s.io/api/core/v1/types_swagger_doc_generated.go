@@ -954,6 +954,7 @@ var map_LoadBalancerIngress = map[string]string{
 	"ip":       "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
 	"hostname": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
 	"ports":    "Ports is a list of records of service ports If used, every port defined in the service should have an entry in it",
+	"ipMode":   "IPMode specifies how the load-balancer's IP behaves. Setting this to \"VIP\" indicates that the traffic passing through this load-balancer is delivered with the destination IP and port set to the load-balancer's IP and port. Setting this to \"Proxy\" indicates that the load-balancer acts like a proxy, delivering traffic with the destination IP and port set to the node's IP and nodePort or to the pod's IP and targetPort. This field can only be set when the ip field is also set, and defaults to \"VIP\" if not specified.",
 }
 
 func (LoadBalancerIngress) SwaggerDoc() map[string]string {

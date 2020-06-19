@@ -29,9 +29,22 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v1.Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*v1.Ingress)) })
+	scheme.AddTypeDefaultingFunc(&v1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*v1.IngressList)) })
 	scheme.AddTypeDefaultingFunc(&v1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*v1.NetworkPolicy)) })
 	scheme.AddTypeDefaultingFunc(&v1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*v1.NetworkPolicyList)) })
 	return nil
+}
+
+func SetObjectDefaults_Ingress(in *v1.Ingress) {
+	SetDefaults_Ingress(in)
+}
+
+func SetObjectDefaults_IngressList(in *v1.IngressList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Ingress(a)
+	}
 }
 
 func SetObjectDefaults_NetworkPolicy(in *v1.NetworkPolicy) {

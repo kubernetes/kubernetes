@@ -199,6 +199,12 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			}
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
+		for _, ing := range newSvc.Status.LoadBalancer.Ingress {
+			ing.IPMode = nil
+		}
+	}
 }
 
 // returns true if svc.Spec.AllocateLoadBalancerNodePorts field is in use
@@ -245,6 +251,19 @@ func loadBalancerPortsInUse(svc *api.Service) bool {
 	}
 	for _, ing := range svc.Status.LoadBalancer.Ingress {
 		if ing.Ports != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// returns true when the LoadBalancer Ingress IPMode fields are in use.
+func loadbalancerIPModeInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	for _, ing := range svc.Status.LoadBalancer.Ingress {
+		if ing.IPMode != nil {
 			return true
 		}
 	}

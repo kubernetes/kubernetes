@@ -64,16 +64,17 @@ spec:
   type: 鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ
 status:
   conditions:
-  - lastTransitionTime: "2392-12-09T15:37:55Z"
+  - lastTransitionTime: "2378-06-06T16:47:53Z"
     message: "36"
-    observedGeneration: -2492120148461555858
+    observedGeneration: 8220339758940423692
     reason: "35"
-    status: C
+    status: Ű壝ž
     type: "34"
   loadBalancer:
     ingress:
     - hostname: "32"
       ip: "31"
+      ipMode: C
       ports:
       - error: "33"
         port: -907310967

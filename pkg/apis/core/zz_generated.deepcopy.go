@@ -2153,6 +2153,11 @@ func (in *LoadBalancerIngress) DeepCopyInto(out *LoadBalancerIngress) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.IPMode != nil {
+		in, out := &in.IPMode, &out.IPMode
+		*out = new(LoadBalancerIPMode)
+		**out = **in
+	}
 	return
 }
 

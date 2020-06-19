@@ -4302,6 +4302,7 @@ func autoConvert_v1_LoadBalancerIngress_To_core_LoadBalancerIngress(in *v1.LoadB
 	out.IP = in.IP
 	out.Hostname = in.Hostname
 	out.Ports = *(*[]core.PortStatus)(unsafe.Pointer(&in.Ports))
+	out.IPMode = (*core.LoadBalancerIPMode)(unsafe.Pointer(in.IPMode))
 	return nil
 }
 
@@ -4314,6 +4315,7 @@ func autoConvert_core_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *core.Loa
 	out.IP = in.IP
 	out.Hostname = in.Hostname
 	out.Ports = *(*[]v1.PortStatus)(unsafe.Pointer(&in.Ports))
+	out.IPMode = (*v1.LoadBalancerIPMode)(unsafe.Pointer(in.IPMode))
 	return nil
 }
 
