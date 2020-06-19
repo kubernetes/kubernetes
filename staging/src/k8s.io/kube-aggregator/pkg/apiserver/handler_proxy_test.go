@@ -578,29 +578,41 @@ func TestProxyRetriesIntegration(t *testing.T) {
 }
 
 func TestProxyRetries(t *testing.T) {
-	testCases := map[string]struct {
-		apiService *apiregistration.APIService
-		backendError error
-		expectedStatusCode int
-	}{
-		"single host: retry on connection reset by peer error: test (OK)-> proxy <-(ERROR) backend": {
-			apiService: &apiregistration.APIService{
-				Spec: apiregistration.APIServiceSpec{
-					CABundle: testCACrt,
-					Group:    "mygroup",
-					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
-				},
-				Status: apiregistration.APIServiceStatus{
-					Conditions: []apiregistration.APIServiceCondition{
-						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
-					},
+	defaultAPIService := func() *apiregistration.APIService {
+		return &apiregistration.APIService{
+			Spec: apiregistration.APIServiceSpec{
+				CABundle: testCACrt,
+				Group:    "mygroup",
+				Version:  "v1",
+				Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+			},
+			Status: apiregistration.APIServiceStatus{
+				Conditions: []apiregistration.APIServiceCondition{
+					{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
 				},
 			},
-			backendError: errors.New("connection reset by peer"),
-			expectedStatusCode: http.StatusServiceUnavailable,
+		}
+	}
+
+	testCases := map[string]struct {
+		apiService                  *apiregistration.APIService
+		backendError                error
+		expectedStatusCode          int
+		expectedServiceResolveCount int
+	}{
+		"single host: retry on connection reset by peer error": {
+			apiService:                  defaultAPIService(),
+			backendError:                errors.New("connection reset by peer"),
+			expectedStatusCode:          http.StatusServiceUnavailable,
+			expectedServiceResolveCount: 4,
 		},
-		// TODO: add more scenarios; i.e. test errors that are not retriable
+		"single host: do not retry on unknown error": {
+			apiService:                  defaultAPIService(),
+			backendError:                errors.New("unknown error from the backend"),
+			expectedStatusCode:          http.StatusInternalServerError,
+			expectedServiceResolveCount: 1,
+		},
+		// TODO: "single host: do not retry on connection refused error":
 	}
 
 	for name, testCase := range testCases {
@@ -665,14 +677,12 @@ func TestProxyRetries(t *testing.T) {
 			}
 
 			actualRetries := proxyHandler.serviceResolver.(*mockedRouterWithCounter).counter
-			if 4 != actualRetries {
-				t.Errorf("expected %d retries but got %d", 4, actualRetries)
+			if testCase.expectedServiceResolveCount != actualRetries {
+				t.Errorf("expected %d retries but got %d", testCase.expectedServiceResolveCount, actualRetries)
 			}
 		}()
 	}
 }
-
-
 
 // valid for localhost
 var aggregatorCrt = []byte(`-----BEGIN CERTIFICATE-----
