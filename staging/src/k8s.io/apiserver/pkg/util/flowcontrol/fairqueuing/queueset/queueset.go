@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -221,7 +222,7 @@ const (
 // executing at each point where there is a change in that quantity,
 // because the metrics --- and only the metrics --- track that
 // quantity per FlowSchema.
-func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
+func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
 	qs.lockAndSyncTime()
 	defer qs.lock.Unlock()
 	var req *request
@@ -235,7 +236,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName s
 			metrics.AddReject(qs.qCfg.Name, fsName, "concurrency-limit")
 			return nil, qs.isIdleLocked()
 		}
-		req = qs.dispatchSansQueueLocked(ctx, fsName, descr1, descr2)
+		req = qs.dispatchSansQueueLocked(ctx, flowDistinguisher, fsName, descr1, descr2)
 		return req, false
 	}
 
@@ -246,7 +247,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName s
 	// 3) Reject current request if there is not enough concurrency shares and
 	// we are at max queue length
 	// 4) If not rejected, create a request and enqueue
-	req = qs.timeoutOldRequestsAndRejectOrEnqueueLocked(ctx, hashValue, fsName, descr1, descr2)
+	req = qs.timeoutOldRequestsAndRejectOrEnqueueLocked(ctx, hashValue, flowDistinguisher, fsName, descr1, descr2)
 	// req == nil means that the request was rejected - no remaining
 	// concurrency shares and at max queue length already
 	if req == nil {
@@ -398,7 +399,7 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 // returns the enqueud request on a successful enqueue
 // returns nil in the case that there is no available concurrency or
 // the queuelengthlimit has been reached
-func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) *request {
+func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) *request {
 	//	Start with the shuffle sharding, to pick a queue.
 	queueIdx := qs.chooseQueueIndexLocked(hashValue, descr1, descr2)
 	queue := qs.queues[queueIdx]
@@ -410,14 +411,15 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 
 	// Create a request and enqueue
 	req := &request{
-		qs:          qs,
-		fsName:      fsName,
-		ctx:         ctx,
-		decision:    lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
-		arrivalTime: qs.clock.Now(),
-		queue:       queue,
-		descr1:      descr1,
-		descr2:      descr2,
+		qs:                qs,
+		fsName:            fsName,
+		flowDistinguisher: flowDistinguisher,
+		ctx:               ctx,
+		decision:          lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
+		arrivalTime:       qs.clock.Now(),
+		queue:             queue,
+		descr1:            descr1,
+		descr2:            descr2,
 	}
 	if ok := qs.rejectOrEnqueueLocked(req); !ok {
 		return nil
@@ -523,17 +525,18 @@ func (qs *queueSet) dispatchAsMuchAsPossibleLocked() {
 	}
 }
 
-func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, fsName string, descr1, descr2 interface{}) *request {
+func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, flowDistinguisher, fsName string, descr1, descr2 interface{}) *request {
 	now := qs.clock.Now()
 	req := &request{
-		qs:          qs,
-		fsName:      fsName,
-		ctx:         ctx,
-		startTime:   now,
-		decision:    lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
-		arrivalTime: now,
-		descr1:      descr1,
-		descr2:      descr2,
+		qs:                qs,
+		fsName:            fsName,
+		flowDistinguisher: flowDistinguisher,
+		ctx:               ctx,
+		startTime:         now,
+		decision:          lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
+		arrivalTime:       now,
+		descr1:            descr1,
+		descr2:            descr2,
 	}
 	req.decision.SetLocked(decisionExecute)
 	qs.totRequestsExecuting++
@@ -708,4 +711,18 @@ func (qs *queueSet) preCreateOrUnblockGoroutine() {
 // properly update the accounting used in testing.
 func (qs *queueSet) goroutineDoneOrBlocked() {
 	qs.counter.Add(-1)
+}
+
+func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
+	qs.lock.Lock()
+	defer qs.lock.Unlock()
+	d := debug.QueueSetDump{
+		Queues:    make([]debug.QueueDump, len(qs.queues)),
+		Waiting:   qs.totRequestsWaiting,
+		Executing: qs.totRequestsExecuting,
+	}
+	for i, q := range qs.queues {
+		d.Queues[i] = q.dump(includeRequestDetails)
+	}
+	return d
 }
