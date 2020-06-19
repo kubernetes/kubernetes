@@ -33,8 +33,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -721,4 +723,40 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 		framework.Logf("Skipping waiting for service account")
 	}
 	return namespace
+}
+
+// WaitForGVRDeletion waits until an object has been deleted
+func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+
+	if successful := WaitUntil(poll, timeout, func() bool {
+		_, err := c.Resource(gvr).Get(context.TODO(), objectName, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
+			return true
+		} else if err != nil {
+			framework.Logf("Get $s %v returned an error: %v", objectName, err.Error())
+		} else {
+			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
+		}
+
+		return false
+	}); successful {
+		return nil
+	}
+
+	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// WaitUntil runs checkDone until a timeout is reached
+func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		if checkDone() {
+			framework.Logf("WaitUntil finished successfully after %v", time.Since(start))
+			return true
+		}
+	}
+
+	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
+	return false
 }
