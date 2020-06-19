@@ -265,9 +265,9 @@ while true; do sleep 1; done
 
 		ginkgo.Context("when running a container with a new image", func() {
 
-			// Images used for ConformanceContainer are not added into NodeImageWhiteList, because this test is
+			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is v1.PullAlways, so it won't be blocked by framework image white list check.
+			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
 			imagePullTest := func(image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
 				command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 				if windowsImage {

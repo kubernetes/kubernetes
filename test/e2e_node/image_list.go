@@ -43,9 +43,9 @@ const (
 	imagePullRetryDelay = time.Second
 )
 
-// NodeImageWhiteList is a list of images used in node e2e test. These images will be prepulled
+// NodePrePullImageList is a list of images used in node e2e test. These images will be prepulled
 // before test running so that the image pulling won't fail in actual test.
-var NodeImageWhiteList = sets.NewString(
+var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	"google/cadvisor:latest",
 	"k8s.gcr.io/stress:v1",
@@ -66,8 +66,8 @@ var NodeImageWhiteList = sets.NewString(
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
 func updateImageWhiteList() {
-	// Union NodeImageWhiteList and CommonImageWhiteList into the framework image white list.
-	framework.ImageWhiteList = NodeImageWhiteList.Union(commontest.CommonImageWhiteList)
+	// Union NodePrePullImageList and CommonImageWhiteList into the framework image pre-pull list.
+	framework.ImageWhiteList = NodePrePullImageList.Union(commontest.CommonImageWhiteList)
 	// Images from extra envs
 	framework.ImageWhiteList.Insert(getNodeProblemDetectorImage())
 	framework.ImageWhiteList.Insert(getSRIOVDevicePluginImage())
