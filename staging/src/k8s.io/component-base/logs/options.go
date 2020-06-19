@@ -62,7 +62,7 @@ func (o *Options) Validate() []error {
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	unsupportedFlags := fmt.Sprintf("--%s", strings.Join(unsupportedLoggingFlags(), ", --"))
 	formats := fmt.Sprintf(`"%s"`, strings.Join(logRegistry.List(), `", "`))
-	fs.StringVar(&o.LogFormat, logFormatFlagName, defaultLogFormat, fmt.Sprintf("Set format of logs written by component. Options: %s. Non default formats don't support klog flags like: %s.", formats, unsupportedFlags))
+	fs.StringVar(&o.LogFormat, logFormatFlagName, defaultLogFormat, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 }
 
 // Apply set klog logger from LogFormat type
