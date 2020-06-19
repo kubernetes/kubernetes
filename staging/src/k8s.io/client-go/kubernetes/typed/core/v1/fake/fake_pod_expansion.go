@@ -89,3 +89,7 @@ func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
 	_, err := c.Fake.Invokes(action, eviction)
 	return err
 }
+
+func (c *FakePods) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
+	return c.Fake.InvokesProxy(core.NewProxyGetAction(podsResource, c.ns, scheme, name, port, path, params))
+}
