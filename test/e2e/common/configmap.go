@@ -192,7 +192,6 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		}
 		cml, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).List(context.TODO(), metav1.ListOptions{LabelSelector: "test-configmap-static=true"})
 		framework.ExpectNoError(err)
-		retryWatcher, err := watchtools.NewRetryWatcher(cml.ResourceVersion, w)
 
 		ginkgo.By("creating a ConfigMap")
 		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &testConfigMap, metav1.CreateOptions{})
@@ -200,7 +199,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, cml.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Added:
 				if cm, ok := event.Object.(*v1.ConfigMap); ok {
@@ -234,7 +233,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		ginkgo.By("waiting for the ConfigMap to be modified")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, cml.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified:
 				if cm, ok := event.Object.(*v1.ConfigMap); ok {
@@ -283,7 +282,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		ginkgo.By("waiting for the ConfigMap to be deleted")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, cml.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Deleted:
 				if cm, ok := event.Object.(*v1.ConfigMap); ok {
