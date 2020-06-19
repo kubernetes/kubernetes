@@ -30,10 +30,9 @@ cd "${KUBE_ROOT}"
 
 make --no-print-directory -C "${KUBE_ROOT}" generated_files
 
-# As of June, 2020 the typecheck tool is written in terms of go/types, but that
-# library doesn't work well with modules.  Guidance is to rewrite tools against
-# golang.org/x/tools/go/packages.  Until that is done, force this tooling to
-# run in a fake GOPATH.
+# As of June, 2020 the typecheck tool is written in terms of go/packages, but
+# that library doesn't work well with multiple modules.  Until that is done,
+# force this tooling to run in a fake GOPATH.
 ret=0
 hack/run-in-gopath.sh \
     go run test/typecheck/main.go "$@" || ret=$?
