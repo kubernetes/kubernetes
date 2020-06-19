@@ -255,7 +255,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-					cmd, config.HostTestContainerPod.Name, stdout, err)
+					cmd, config.TestContainerPod.Name, stdout, err)
 				continue
 			}
 
@@ -313,11 +313,11 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// we confirm unreachability.
 			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
-			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
+			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.TestContainerPod)
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-					cmd, config.HostTestContainerPod.Name, stdout, err)
+					cmd, config.TestContainerPod.Name, stdout, err)
 				continue
 			}
 
