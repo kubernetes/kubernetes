@@ -50,6 +50,7 @@ RUN clean-install \
     glusterfs-client \
     iptables \
     ipset \
+    iproute2 \
     jq \
     kmod \
     openssh-client \
