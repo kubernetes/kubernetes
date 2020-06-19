@@ -101,8 +101,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		filePathInSubpath string
 		filePathInVolume  string
 
-		intreeOps   opCounts
-		migratedOps opCounts
+		migrationCheck *migrationOpCheck
 	}
 	var l local
 
@@ -119,7 +118,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
@@ -183,7 +182,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 			l.hostExec.Cleanup()
 		}
 
-		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	driverName := driver.GetDriverInfo().Name

@@ -103,8 +103,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		sourcePVC *v1.PersistentVolumeClaim
 		sc        *storagev1.StorageClass
 
-		intreeOps   opCounts
-		migratedOps opCounts
+		migrationCheck *migrationOpCheck
 	}
 	var (
 		dInfo   = driver.GetDriverInfo()
@@ -139,7 +138,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
@@ -177,7 +176,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
-		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	ginkgo.It("should provision storage with mount options", func() {
