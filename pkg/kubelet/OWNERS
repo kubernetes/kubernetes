@@ -8,6 +8,7 @@ approvers:
 - yujuhong
 reviewers:
 - sig-node-reviewers
+- alejandrox1
 - tallclair
 labels:
 - area/kubelet
