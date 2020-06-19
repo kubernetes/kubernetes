@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
 
-# If we're building for another architecture than amd64, the CROSS_BUILD_ placeholder is removed so
-# e.g. CROSS_BUILD_COPY turns into COPY
-# If we're building normally, for amd64, CROSS_BUILD lines are removed
-CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
+FROM ${BASEIMAGE} as builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -86,3 +83,5 @@ RUN apt-get autoremove -y && \
         /usr/share/man/man3 /usr/share/man/man4 \
         /usr/share/man/man5 /usr/share/man/man6 \
         /usr/share/man/man7 /usr/share/man/man8
+
+CMD ["/bin/sh"]

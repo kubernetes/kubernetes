@@ -12,94 +12,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: all-build
+all: build
 
 REGISTRY ?= gcr.io/k8s-staging-build-image
 IMAGE ?= $(REGISTRY)/debian-base
-BUILD_IMAGE ?= debian-build
 
-TAG ?= v2.1.0
+TAG ?= v2.2.0
 
-TAR_FILE ?= rootfs.tar
-ARCH?=amd64
-ALL_ARCH = amd64 arm arm64 ppc64le s390x
+BASEIMAGE ?= debian:buster-slim
 
-TEMP_DIR:=$(shell mktemp -d)
-QEMUVERSION=v4.2.0-6
-
-SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
-
-# This option is for running docker manifest command
+# required to enable buildx
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=debian:buster-slim
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/debian:buster-slim
-	QEMUARCH=arm
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/debian:buster-slim
-	QEMUARCH=aarch64
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian:buster-slim
-	QEMUARCH=ppc64le
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian:buster-slim
-	QEMUARCH=s390x
-endif
+# build with buildx
+PLATFORMS?=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
+OUTPUT=
+PROGRESS=plain
 
-sub-build-%:
-	$(MAKE) ARCH=$* build
+# build multi-arch image
+build: ensure-buildx
+	docker buildx build \
+		--platform=${PLATFORMS} $(OUTPUT) \
+		--progress=$(PROGRESS) \
+		--build-arg BASEIMAGE="$(BASEIMAGE)" \
+		-t $(IMAGE):$(TAG) \
+		-f Dockerfile.build \
+		--pull .
 
-all-build: $(addprefix sub-build-,$(ALL_ARCH))
-
-sub-push-image-%:
-	$(MAKE) ARCH=$* push
-
-all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
-
-all-push: all-push-images push-manifest
-
-push-manifest:
-	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
-	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
-	docker manifest push --purge ${IMAGE}:${TAG}
-
-build: clean
-	cp ./* $(TEMP_DIR)
-	cat Dockerfile.build \
-		| sed "s|BASEIMAGE|$(BASEIMAGE)|g" \
-		| sed "s|ARCH|$(QEMUARCH)|g" \
-		> $(TEMP_DIR)/Dockerfile.build
-
-ifeq ($(ARCH),amd64)
-	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	sed "/CROSS_BUILD_/d" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
-else
-	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
-	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
-	# Ensure we don't get surprised by umask settings
-	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static
-	sed "s/CROSS_BUILD_//g" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
-endif
-	mv $(TEMP_DIR)/Dockerfile.build.tmp $(TEMP_DIR)/Dockerfile.build
-
-	docker build --pull -t $(BUILD_IMAGE) -f $(TEMP_DIR)/Dockerfile.build $(TEMP_DIR)
-	docker create --name $(BUILD_IMAGE) $(BUILD_IMAGE)
-	docker export $(BUILD_IMAGE) > $(TEMP_DIR)/$(TAR_FILE)
-	docker build -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
-	rm -rf $(TEMP_DIR)
-
+# push the cross built image
+push: OUTPUT=--push
 push: build
-	docker push $(IMAGE)-$(ARCH):$(TAG)
 
+# standard cleanup target
 clean:
-	docker rmi -f $(IMAGE)-$(ARCH):$(TAG) || true
-	docker rmi -f $(BUILD_IMAGE)   || true
-	docker rm  -f $(BUILD_IMAGE)   || true
+	docker rmi -f $(IMAGE):$(TAG) || true
+	docker rm  -f $(IMAGE):$(TAG) || true
+
+# enable buildx
+ensure-buildx:
+	./../../hack/init-buildx.sh
+
+.PHONY: build push clean ensure-buildx
