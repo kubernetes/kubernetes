@@ -4320,3 +4320,57 @@ func TestFilterCIDRs(t *testing.T) {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
 	}
 }
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	_, fp := buildFakeProxier()
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcLBIP := "1.2.3.4"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP:        svcLBIP,
+				RouteType: v1.LoadBalancerRouteTypeProxy,
+			}}
+		}),
+	)
+
+	epIP := "10.180.0.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: epIP,
+				}},
+				Ports: []v1.EndpointPort{{
+					Name: svcPortName.Port,
+					Port: int32(svcPort),
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	services, err := fp.ipvs.GetVirtualServers()
+	if err != nil {
+		t.Errorf("Failed to get ipvs services, err: %v", err)
+	}
+	if len(services) != 1 {
+		t.Errorf("Expect 1 ipvs services, got %d", len(services))
+	}
+}
