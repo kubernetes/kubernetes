@@ -117,6 +117,7 @@ go_test(
         "azure_controller_vmss_test.go",
         "azure_instances_test.go",
         "azure_loadbalancer_test.go",
+        "azure_managedDiskController_test.go",
         "azure_ratelimit_test.go",
         "azure_routes_test.go",
         "azure_standard_test.go",
@@ -133,6 +134,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
@@ -142,6 +144,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/cache:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
