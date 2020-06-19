@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a ConfigMap")
-		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &testConfigMap, metav1.CreateOptions{})
+		cm, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &testConfigMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -228,12 +228,12 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		framework.ExpectNoError(err, "failed to marshal patch data")
 
 		ginkgo.By("patching the ConfigMap")
-		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
+		cm2, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ConfigMap")
 		ginkgo.By("waiting for the ConfigMap to be modified")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = watchtools.Until(ctx, cml.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, cm.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified:
 				if cm, ok := event.Object.(*v1.ConfigMap); ok {
@@ -282,7 +282,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		ginkgo.By("waiting for the ConfigMap to be deleted")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = watchtools.Until(ctx, cml.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, cm2.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Deleted:
 				if cm, ok := event.Object.(*v1.ConfigMap); ok {
