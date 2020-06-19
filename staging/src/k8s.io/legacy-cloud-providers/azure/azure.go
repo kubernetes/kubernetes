@@ -63,6 +63,11 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	_ "k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient"
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	_ "k8s.io/legacy-cloud-providers/azure/clients/deploymentclient"
+
 	"sigs.k8s.io/yaml"
 )
 
