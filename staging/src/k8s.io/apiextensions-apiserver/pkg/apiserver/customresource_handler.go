@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -63,6 +64,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
@@ -78,6 +80,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
@@ -138,6 +141,9 @@ type crdInfo struct {
 	// the storage if one of these changes.
 	spec          *apiextensionsv1.CustomResourceDefinitionSpec
 	acceptedNames *apiextensionsv1.CustomResourceDefinitionNames
+
+	// Warnings per version
+	warnings map[string][]string
 
 	// Storage per version
 	storages map[string]customresource.CustomResourceStorage
@@ -321,6 +327,12 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !hasServedCRDVersion(crdInfo.spec, requestInfo.APIVersion) {
 		r.delegate.ServeHTTP(w, req)
 		return
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders) {
+		for _, w := range crdInfo.warnings[requestInfo.APIVersion] {
+			warning.AddWarning(req.Context(), "", w)
+		}
 	}
 
 	verb := strings.ToUpper(requestInfo.Verb)
@@ -610,6 +622,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	storages := map[string]customresource.CustomResourceStorage{}
 	statusScopes := map[string]*handlers.RequestScope{}
 	scaleScopes := map[string]*handlers.RequestScope{}
+	warnings := map[string][]string{}
 
 	equivalentResourceRegistry := runtime.NewEquivalentResourceRegistry()
 
@@ -868,6 +881,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			SelfLinkPathSuffix: "/status",
 		}
 		statusScopes[v.Name] = &statusScope
+
+		if v.Deprecated {
+			if v.DeprecationWarning != nil {
+				warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
+			} else {
+				warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
+			}
+		}
 	}
 
 	ret := &crdInfo{
@@ -877,6 +898,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		requestScopes:       requestScopes,
 		scaleRequestScopes:  scaleScopes,
 		statusRequestScopes: statusScopes,
+		warnings:            warnings,
 		storageVersion:      storageVersion,
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
@@ -889,6 +911,25 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	r.customStorage.Store(storageMap2)
 
 	return ret, nil
+}
+
+func defaultDeprecationWarning(deprecatedVersion string, crd apiextensionsv1.CustomResourceDefinitionSpec) string {
+	msg := fmt.Sprintf("%s/%s %s is deprecated", crd.Group, deprecatedVersion, crd.Names.Kind)
+
+	var servedNonDeprecatedVersions []string
+	for _, v := range crd.Versions {
+		if v.Served && !v.Deprecated && version.CompareKubeAwareVersionStrings(deprecatedVersion, v.Name) < 0 {
+			servedNonDeprecatedVersions = append(servedNonDeprecatedVersions, v.Name)
+		}
+	}
+	if len(servedNonDeprecatedVersions) == 0 {
+		return msg
+	}
+	sort.Slice(servedNonDeprecatedVersions, func(i, j int) bool {
+		return version.CompareKubeAwareVersionStrings(servedNonDeprecatedVersions[i], servedNonDeprecatedVersions[j]) > 0
+	})
+	msg += fmt.Sprintf("; use %s/%s %s", crd.Group, servedNonDeprecatedVersions[0], crd.Names.Kind)
+	return msg
 }
 
 type unstructuredNegotiatedSerializer struct {

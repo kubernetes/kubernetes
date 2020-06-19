@@ -177,6 +177,15 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
+	// deprecated indicates this version of the custom resource API is deprecated.
+	// When set to true, API requests to this version receive a warning header in the server response.
+	// Defaults to false.
+	Deprecated bool
+	// deprecationWarning overrides the default warning returned to API clients.
+	// May only be set when `deprecated` is true.
+	// The default warning indicates this version is deprecated and recommends use
+	// of the newest served version of equal or greater stability, if one exists.
+	DeprecationWarning *string
 	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
 	// Top-level and per-version schemas are mutually exclusive.
 	// Per-version schemas must not all be set to identical values (top-level validation schema should be used instead)

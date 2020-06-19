@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
@@ -166,12 +168,45 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 // validateCustomResourceDefinitionVersion statically validates.
 func validateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
+	}
 	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
 		allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("additionalPrinterColumns").Index(i))...)
 	}
 	return allErrs
+}
+
+func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []string {
+	if !deprecated && deprecationWarning != nil {
+		return []string{"can only be set for deprecated versions"}
+	}
+	if deprecationWarning == nil {
+		return nil
+	}
+	var errors []string
+	if len(*deprecationWarning) > 256 {
+		errors = append(errors, "must be <= 256 characters long")
+	}
+	if len(*deprecationWarning) == 0 {
+		errors = append(errors, "must not be an empty string")
+	}
+	for i, r := range *deprecationWarning {
+		if !unicode.IsPrint(r) {
+			errors = append(errors, fmt.Sprintf("must only contain printable UTF-8 characters; non-printable character found at index %d", i))
+			break
+		}
+		if unicode.IsControl(r) {
+			errors = append(errors, fmt.Sprintf("must only contain printable UTF-8 characters; control character found at index %d", i))
+			break
+		}
+	}
+	if !utf8.ValidString(*deprecationWarning) {
+		errors = append(errors, "must only contain printable UTF-8 characters")
+	}
+	return errors
 }
 
 func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
