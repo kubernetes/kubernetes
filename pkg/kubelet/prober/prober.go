@@ -54,7 +54,7 @@ type prober struct {
 	livenessHTTP  httpprobe.Prober
 	startupHTTP   httpprobe.Prober
 	tcp           tcpprobe.Prober
-	runner        kubecontainer.ContainerCommandRunner
+	runner        kubecontainer.CommandRunner
 
 	recorder record.EventRecorder
 }
@@ -62,7 +62,7 @@ type prober struct {
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
-	runner kubecontainer.ContainerCommandRunner,
+	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorder) *prober {
 
 	const followNonLocalRedirects = false

@@ -103,7 +103,7 @@ func NewManager(
 	statusManager status.Manager,
 	livenessManager results.Manager,
 	startupManager results.Manager,
-	runner kubecontainer.ContainerCommandRunner,
+	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorder) Manager {
 
 	prober := newProber(runner, recorder)

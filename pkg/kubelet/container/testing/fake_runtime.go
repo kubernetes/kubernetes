@@ -348,7 +348,7 @@ func (f *FakeRuntime) RemoveImage(image kubecontainer.ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (f *FakeRuntime) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -406,7 +406,7 @@ type FakeContainerCommandRunner struct {
 	Cmd         []string
 }
 
-var _ kubecontainer.ContainerCommandRunner = &FakeContainerCommandRunner{}
+var _ kubecontainer.CommandRunner = &FakeContainerCommandRunner{}
 
 func (f *FakeContainerCommandRunner) RunInContainer(containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
