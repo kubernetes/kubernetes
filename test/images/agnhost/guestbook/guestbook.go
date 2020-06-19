@@ -38,10 +38,10 @@ var CmdGuestbook = &cobra.Command{
 	Short: "Creates a HTTP server with various endpoints representing a guestbook app",
 	Long: `Starts a HTTP server on the given --http-port (default: 80), serving various endpoints representing a guestbook app. The endpoints and their purpose are:
 
-- /register: A guestbook replica will subscribe to a master, to its given --replicaof endpoint. The master will then push any updates it receives to its registered replicas through the --backend-port.
+- /register: A guestbook replica will subscribe to a primary, to its given --replicaof endpoint. The primary will then push any updates it receives to its registered replicas through the --backend-port.
 - /get: Returns '{"data": value}', where the value is the stored value for the given key if non-empty, or the entire store.
 - /set: Will set the given key-value pair in its own store and propagate it to its replicas, if any. Will return '{"data": "Updated"}' to the caller on success.
-- /guestbook: Will proxy the request to agnhost-master if the given cmd is 'set', or agnhost-replica if the given cmd is 'get'.`,
+- /guestbook: Will proxy the request to agnhost-primary if the given cmd is 'set', or agnhost-replica if the given cmd is 'get'.`,
 	Args: cobra.MaximumNArgs(0),
 	Run:  main,
 }
@@ -88,7 +88,7 @@ func registerNode(registerTo, port string) {
 		}
 
 		request := fmt.Sprintf("register?host=%s", host.String())
-		log.Printf("Registering to master: %s/%s", hostPort, request)
+		log.Printf("Registering to primary: %s/%s", hostPort, request)
 		_, err = net.ResolveTCPAddr("tcp", hostPort)
 		if err != nil {
 			log.Printf("unable to resolve %s, --replicaof param and/or --backend-port param are invalid: %v. Retrying in %s.", hostPort, err, sleep)
@@ -98,7 +98,7 @@ func registerNode(registerTo, port string) {
 
 		response, err := dialHTTP(request, hostPort)
 		if err != nil {
-			log.Printf("encountered error while registering to master: %v. Retrying in %s.", err, sleep)
+			log.Printf("encountered error while registering to primary: %v. Retrying in %s.", err, sleep)
 			time.Sleep(sleep)
 			continue
 		}
@@ -106,7 +106,7 @@ func registerNode(registerTo, port string) {
 		responseJSON := make(map[string]interface{})
 		err = json.Unmarshal([]byte(response), &responseJSON)
 		if err != nil {
-			log.Fatalf("Error while unmarshaling master's response: %v", err)
+			log.Fatalf("Error while unmarshaling primary's response: %v", err)
 		}
 
 		var ok bool
@@ -118,7 +118,7 @@ func registerNode(registerTo, port string) {
 		return
 	}
 
-	log.Fatal("Timed out while registering to master.")
+	log.Fatal("Timed out while registering to primary.")
 }
 
 func startHTTPServer(port string) {
@@ -226,7 +226,7 @@ func setHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// guestbookHandler will proxy the request to agnhost-master if the given cmd is
+// guestbookHandler will proxy the request to agnhost-primary if the given cmd is
 // 'set' or agnhost-replica if the given cmd is 'get'.
 func guestbookHandler(w http.ResponseWriter, r *http.Request) {
 	values, err := url.Parse(r.URL.RequestURI())
@@ -250,7 +250,7 @@ func guestbookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := "agnhost-master"
+	host := "agnhost-primary"
 	if cmd == "get" {
 		host = "agnhost-replica"
 	}
