@@ -57,11 +57,11 @@ var (
 // CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
-// CommonImageWhiteList is the list of images used in common test. These images should be prepulled
-// before a tests starts, so that the tests won't fail due image pulling flakes. Currently, this is
+// CommonImageList is the set of images used across tests in e2e/common. These images should be pre-pulled
+// before a test starts so that the test won't fail due image pulling errors. Currently, this is
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
-var CommonImageWhiteList = sets.NewString(
+var CommonImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
