@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -132,7 +132,12 @@ func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecor
 		pod := pods[i].DeepCopy()
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == v1.PodReady {
+				if cond.Status == v1.ConditionFalse {
+					continue
+				}
 				cond.Status = v1.ConditionFalse
+				cond.Reason = "NodeNotReady"
+				cond.Message = "Node is not ready"
 				if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
 					break
 				}
