@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -89,7 +90,7 @@ func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (frame
 
 type numericMapPlugin struct{}
 
-func newNumericMapPlugin() framework.PluginFactory {
+func newNumericMapPlugin() frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &numericMapPlugin{}, nil
 	}
@@ -113,7 +114,7 @@ func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 
 type reverseNumericMapPlugin struct{}
 
-func newReverseNumericMapPlugin() framework.PluginFactory {
+func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &reverseNumericMapPlugin{}, nil
 	}
@@ -154,7 +155,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framewor
 
 type trueMapPlugin struct{}
 
-func newTrueMapPlugin() framework.PluginFactory {
+func newTrueMapPlugin() frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &trueMapPlugin{}, nil
 	}
@@ -183,7 +184,7 @@ func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleSta
 
 type falseMapPlugin struct{}
 
-func newFalseMapPlugin() framework.PluginFactory {
+func newFalseMapPlugin() frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &falseMapPlugin{}, nil
 	}
@@ -705,7 +706,7 @@ func TestGenericScheduler(t *testing.T) {
 			}
 
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			fwk, err := st.NewFramework(test.registerPlugins, framework.WithSnapshotSharedLister(snapshot))
+			fwk, err := st.NewFramework(test.registerPlugins, frameworkruntime.WithSnapshotSharedLister(snapshot))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1026,9 +1027,9 @@ func TestZeroRequest(t *testing.T) {
 			}
 			fwk, err := st.NewFramework(
 				pluginRegistrations,
-				framework.WithInformerFactory(informerFactory),
-				framework.WithSnapshotSharedLister(snapshot),
-				framework.WithClientSet(client),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithClientSet(client),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
@@ -1538,7 +1539,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			registerPlugins := append([]st.RegisterPluginFunc{registerFakeFilterFunc}, test.registerPlugins...)
 			// Use a real snapshot since it's needed in some Filter Plugin (e.g., PodAffinity)
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			fwk, err := st.NewFramework(registerPlugins, framework.WithSnapshotSharedLister(snapshot))
+			fwk, err := st.NewFramework(registerPlugins, frameworkruntime.WithSnapshotSharedLister(snapshot))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1825,7 +1826,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 				nodes = append(nodes, makeNode(n, schedutil.DefaultMilliCPURequest*5, schedutil.DefaultMemoryRequest*5))
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			fwk, err := st.NewFramework(test.registerPlugins, framework.WithSnapshotSharedLister(snapshot))
+			fwk, err := st.NewFramework(test.registerPlugins, frameworkruntime.WithSnapshotSharedLister(snapshot))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2338,12 +2339,12 @@ func TestPreempt(t *testing.T) {
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
 				test.registerPlugins,
-				framework.WithClientSet(client),
-				framework.WithEventRecorder(&events.FakeRecorder{}),
-				framework.WithExtenders(extenders),
-				framework.WithPodNominator(podNominator),
-				framework.WithSnapshotSharedLister(snapshot),
-				framework.WithInformerFactory(informers.NewSharedInformerFactory(client, 0)),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithExtenders(extenders),
+				frameworkruntime.WithPodNominator(podNominator),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(client, 0)),
 			)
 			if err != nil {
 				t.Fatal(err)

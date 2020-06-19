@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
@@ -121,10 +122,10 @@ func (es mockScheduler) Extenders() []framework.Extender {
 }
 
 func TestSchedulerCreation(t *testing.T) {
-	invalidRegistry := map[string]framework.PluginFactory{
+	invalidRegistry := map[string]frameworkruntime.PluginFactory{
 		defaultbinder.Name: defaultbinder.New,
 	}
-	validRegistry := map[string]framework.PluginFactory{
+	validRegistry := map[string]frameworkruntime.PluginFactory{
 		"Foo": defaultbinder.New,
 	}
 	cases := []struct {
@@ -298,7 +299,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, framework.WithClientSet(client))
+			}, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -361,7 +362,7 @@ type fakeNodeSelector struct {
 
 func newFakeNodeSelector(args runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	pl := &fakeNodeSelector{}
-	if err := framework.DecodeInto(args, &pl.fakeNodeSelectorArgs); err != nil {
+	if err := frameworkruntime.DecodeInto(args, &pl.fakeNodeSelectorArgs); err != nil {
 		return nil, err
 	}
 	return pl, nil
@@ -444,7 +445,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 				},
 			},
 		),
-		WithFrameworkOutOfTreeRegistry(framework.Registry{
+		WithFrameworkOutOfTreeRegistry(frameworkruntime.Registry{
 			"FakeNodeSelector": newFakeNodeSelector,
 		}),
 	)
@@ -765,7 +766,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		return true, b, nil
 	})
 
-	fwk, _ := st.NewFramework(fns, framework.WithClientSet(client))
+	fwk, _ := st.NewFramework(fns, frameworkruntime.WithClientSet(client))
 	prof := &profile.Profile{
 		Framework: fwk,
 		Recorder:  &events.FakeRecorder{},
@@ -1118,7 +1119,7 @@ func TestSchedulerBinding(t *testing.T) {
 			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, framework.WithClientSet(client))
+			}, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}

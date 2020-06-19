@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -89,7 +90,7 @@ func (pl *FakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 }
 
 // NewFakeFilterPlugin initializes a fakeFilterPlugin and returns it.
-func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) framework.PluginFactory {
+func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &FakeFilterPlugin{
 			FailedNodeReturnCodeMap: failedNodeReturnCodeMap,

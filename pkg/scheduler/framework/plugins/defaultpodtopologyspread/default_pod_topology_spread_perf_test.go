@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -67,7 +68,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 					b.Errorf("error waiting for informer cache sync")
 				}
 			}
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot), framework.WithInformerFactory(informerFactory))
+			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
 			plugin := &DefaultPodTopologySpread{handle: fh}
 			b.ResetTimer()
 

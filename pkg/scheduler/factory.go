@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
@@ -86,23 +87,23 @@ type Configurator struct {
 	podMaxBackoffSeconds int64
 
 	profiles          []schedulerapi.KubeSchedulerProfile
-	registry          framework.Registry
+	registry          frameworkruntime.Registry
 	nodeInfoSnapshot  *internalcache.Snapshot
 	extenders         []schedulerapi.Extender
 	frameworkCapturer FrameworkCapturer
 }
 
-func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...framework.Option) (framework.Framework, error) {
+func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
 	if c.frameworkCapturer != nil {
 		c.frameworkCapturer(p)
 	}
-	opts = append([]framework.Option{
-		framework.WithClientSet(c.client),
-		framework.WithInformerFactory(c.informerFactory),
-		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
-		framework.WithRunAllFilters(c.alwaysCheckAllPredicates),
+	opts = append([]frameworkruntime.Option{
+		frameworkruntime.WithClientSet(c.client),
+		frameworkruntime.WithInformerFactory(c.informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
+		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 	}, opts...)
-	return framework.NewFramework(
+	return frameworkruntime.NewFramework(
 		c.registry,
 		p.Plugins,
 		p.PluginConfig,
@@ -158,7 +159,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
 	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory,
-		framework.WithPodNominator(nominator))
+		frameworkruntime.WithPodNominator(nominator))
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}

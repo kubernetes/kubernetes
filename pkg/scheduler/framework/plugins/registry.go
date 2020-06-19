@@ -36,14 +36,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 // NewInTreeRegistry builds the registry with all the in-tree plugins.
 // A scheduler that runs out of tree plugins can register additional plugins
 // through the WithFrameworkOutOfTreeRegistry option.
-func NewInTreeRegistry() framework.Registry {
-	return framework.Registry{
+func NewInTreeRegistry() runtime.Registry {
+	return runtime.Registry{
 		defaultpodtopologyspread.Name:              defaultpodtopologyspread.New,
 		imagelocality.Name:                         imagelocality.New,
 		tainttoleration.Name:                       tainttoleration.New,
