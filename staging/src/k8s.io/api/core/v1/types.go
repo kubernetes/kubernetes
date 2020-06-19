@@ -3971,11 +3971,26 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
+
+	// RouteType specifies the type of route to use for this ingress
+	// Defaults to `VIP`
+	// +optional
+	RouteType LoadBalancerRouteType `json:"routeType,omitempty" protobuf:"bytes,3,opt,name=routeType"`
 }
 
 const (
 	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
 	MaxServiceTopologyKeys = 16
+)
+
+// LoadBalancerRouteType represents the type of route available for a LoadBalancer ingress
+type LoadBalancerRouteType string
+
+const (
+	// LoadBalancerRouteTypeVIP is the type of route used by a LoadBalancer where dstIP = lbIP
+	LoadBalancerRouteTypeVIP LoadBalancerRouteType = "VIP"
+	// LoadBalancerRouteTypeProxy is the type of route used by a proxy like LoadBalancer
+	LoadBalancerRouteTypeProxy LoadBalancerRouteType = "Proxy"
 )
 
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
