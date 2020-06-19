@@ -94,7 +94,7 @@ type Runtime interface {
 	// If evictNonDeletedPods is set to true, containers and sandboxes belonging to pods
 	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
-	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -147,13 +147,13 @@ type ImageService interface {
 	ImageStats() (*ImageStats, error)
 }
 
-// ContainerAttacher interface allows to attach a container.
-type ContainerAttacher interface {
+// Attacher interface allows to attach a container.
+type Attacher interface {
 	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) (err error)
 }
 
-// ContainerCommandRunner interface allows to run command in a container.
-type ContainerCommandRunner interface {
+// CommandRunner interface allows to run command in a container.
+type CommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
 	// If the command completes with a non-0 exit code, a k8s.io/utils/exec.ExitError will be returned.
 	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
@@ -250,18 +250,18 @@ func (id DockerID) ContainerID() ContainerID {
 	}
 }
 
-// ContainerState represents the state of a container
-type ContainerState string
+// State represents the state of a container
+type State string
 
 const (
 	// ContainerStateCreated indicates a container that has been created (e.g. with docker create) but not started.
-	ContainerStateCreated ContainerState = "created"
+	ContainerStateCreated State = "created"
 	// ContainerStateRunning indicates a currently running container.
-	ContainerStateRunning ContainerState = "running"
+	ContainerStateRunning State = "running"
 	// ContainerStateExited indicates a container that ran and completed ("stopped" in other contexts, although a created container is technically also "stopped").
-	ContainerStateExited ContainerState = "exited"
+	ContainerStateExited State = "exited"
 	// ContainerStateUnknown encompasses all the states that we currently don't care about (like restarting, paused, dead).
-	ContainerStateUnknown ContainerState = "unknown"
+	ContainerStateUnknown State = "unknown"
 )
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -282,7 +282,7 @@ type Container struct {
 	// not managed by kubelet.
 	Hash uint64
 	// State is the state of the container.
-	State ContainerState
+	State State
 }
 
 // PodStatus represents the status of the pod and its containers.
@@ -297,20 +297,20 @@ type PodStatus struct {
 	// All IPs assigned to this pod
 	IPs []string
 	// Status of containers in the pod.
-	ContainerStatuses []*ContainerStatus
+	ContainerStatuses []*Status
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
 }
 
-// ContainerStatus represents the status of a container.
-type ContainerStatus struct {
+// Status represents the status of a container.
+type Status struct {
 	// ID of the container.
 	ID ContainerID
 	// Name of the container.
 	Name string
 	// Status of the container.
-	State ContainerState
+	State State
 	// Creation time of the container.
 	CreatedAt time.Time
 	// Start time of the container.
@@ -337,7 +337,7 @@ type ContainerStatus struct {
 
 // FindContainerStatusByName returns container status in the pod status with the given name.
 // When there are multiple containers' statuses with the same name, the first match will be returned.
-func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *ContainerStatus {
+func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Status {
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.Name == containerName {
 			return containerStatus
@@ -347,8 +347,8 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Con
 }
 
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
-func (podStatus *PodStatus) GetRunningContainerStatuses() []*ContainerStatus {
-	runningContainerStatuses := []*ContainerStatus{}
+func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
+	runningContainerStatuses := []*Status{}
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State == ContainerStateRunning {
 			runningContainerStatuses = append(runningContainerStatuses, containerStatus)
@@ -643,7 +643,7 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 type Option func(Runtime)
 
 // SortContainerStatusesByCreationTime sorts the container statuses by creation time.
-type SortContainerStatusesByCreationTime []*ContainerStatus
+type SortContainerStatusesByCreationTime []*Status
 
 func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }
 func (s SortContainerStatusesByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }

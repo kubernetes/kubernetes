@@ -107,9 +107,9 @@ func HashContainer(container *v1.Container) uint64 {
 	return uint64(hash.Sum32())
 }
 
-// EnvVarsToMap constructs a map of environment name to value from a slice
+// envVarsToMap constructs a map of environment name to value from a slice
 // of env vars.
-func EnvVarsToMap(envs []EnvVar) map[string]string {
+func envVarsToMap(envs []EnvVar) map[string]string {
 	result := map[string]string{}
 	for _, env := range envs {
 		result[env.Name] = env.Value
@@ -117,9 +117,9 @@ func EnvVarsToMap(envs []EnvVar) map[string]string {
 	return result
 }
 
-// V1EnvVarsToMap constructs a map of environment name to value from a slice
+// v1EnvVarsToMap constructs a map of environment name to value from a slice
 // of env vars.
-func V1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
+func v1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
 	result := map[string]string{}
 	for _, env := range envs {
 		result[env.Name] = env.Value
@@ -132,7 +132,7 @@ func V1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
 // container environment definitions. This does *not* include valueFrom substitutions.
 // TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.
 func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVar) (command []string) {
-	mapping := expansion.MappingFuncFor(V1EnvVarsToMap(envs))
+	mapping := expansion.MappingFuncFor(v1EnvVarsToMap(envs))
 	if len(containerCommand) != 0 {
 		for _, cmd := range containerCommand {
 			command = append(command, expansion.Expand(cmd, mapping))
@@ -144,7 +144,7 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 // ExpandContainerVolumeMounts expands the subpath of the given VolumeMount by replacing variable references with the values of given EnvVar.
 func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
 
-	envmap := EnvVarsToMap(envs)
+	envmap := envVarsToMap(envs)
 	missingKeys := sets.NewString()
 	expanded := expansion.Expand(mount.SubPathExpr, func(key string) string {
 		value, ok := envmap[key]
@@ -162,7 +162,7 @@ func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, e
 
 // ExpandContainerCommandAndArgs expands the given Container's command by replacing variable references `with the values of given EnvVar.
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
-	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
+	mapping := expansion.MappingFuncFor(envVarsToMap(envs))
 
 	if len(container.Command) != 0 {
 		for _, cmd := range container.Command {
@@ -262,11 +262,11 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 }
 
 // SandboxToContainerState converts runtimeapi.PodSandboxState to
-// kubecontainer.ContainerState.
+// kubecontainer.State.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
-func SandboxToContainerState(state runtimeapi.PodSandboxState) ContainerState {
+func SandboxToContainerState(state runtimeapi.PodSandboxState) State {
 	switch state {
 	case runtimeapi.PodSandboxState_SANDBOX_READY:
 		return ContainerStateRunning

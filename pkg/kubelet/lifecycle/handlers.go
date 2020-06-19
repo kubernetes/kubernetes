@@ -39,7 +39,7 @@ const (
 
 type HandlerRunner struct {
 	httpGetter       kubetypes.HTTPGetter
-	commandRunner    kubecontainer.ContainerCommandRunner
+	commandRunner    kubecontainer.CommandRunner
 	containerManager podStatusProvider
 }
 
@@ -47,7 +47,7 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,

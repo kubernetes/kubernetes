@@ -23,8 +23,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ContainerGCPolicy specifies a policy for garbage collecting containers.
-type ContainerGCPolicy struct {
+// GCPolicy specifies a policy for garbage collecting containers.
+type GCPolicy struct {
 	// Minimum age at which a container can be garbage collected, zero for no limit.
 	MinAge time.Duration
 
@@ -36,10 +36,10 @@ type ContainerGCPolicy struct {
 	MaxContainers int
 }
 
-// ContainerGC manages garbage collection of dead containers.
+// GC manages garbage collection of dead containers.
 //
 // Implementation is thread-compatible.
-type ContainerGC interface {
+type GC interface {
 	// Garbage collect containers.
 	GarbageCollect() error
 	// Deletes all unused containers, including containers belonging to pods that are terminated but not deleted
@@ -58,14 +58,14 @@ type realContainerGC struct {
 	runtime Runtime
 
 	// Policy for garbage collection.
-	policy ContainerGCPolicy
+	policy GCPolicy
 
 	// sourcesReadyProvider provides the readiness of kubelet configuration sources.
 	sourcesReadyProvider SourcesReadyProvider
 }
 
-// NewContainerGC creates a new instance of ContainerGC with the specified policy.
-func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider) (ContainerGC, error) {
+// NewContainerGC creates a new instance of GC with the specified policy.
+func NewContainerGC(runtime Runtime, policy GCPolicy, sourcesReadyProvider SourcesReadyProvider) (GC, error) {
 	if policy.MinAge < 0 {
 		return nil, fmt.Errorf("invalid minimum garbage collection age: %v", policy.MinAge)
 	}

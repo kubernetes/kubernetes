@@ -157,7 +157,7 @@ func TestRunOnce(t *testing.T) {
 	// because runonce is never used in kubernetes now, we should deprioritize the cleanup work.
 	// TODO(random-liu) Fix the test, make it meaningful.
 	fakeRuntime.PodStatus = kubecontainer.PodStatus{
-		ContainerStatuses: []*kubecontainer.ContainerStatus{
+		ContainerStatuses: []*kubecontainer.Status{
 			{
 				Name:  "bar",
 				State: kubecontainer.ContainerStateRunning,

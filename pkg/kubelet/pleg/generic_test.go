@@ -76,7 +76,7 @@ func getEventsFromChannel(ch <-chan *PodLifecycleEvent) []*PodLifecycleEvent {
 	return events
 }
 
-func createTestContainer(ID string, state kubecontainer.ContainerState) *kubecontainer.Container {
+func createTestContainer(ID string, state kubecontainer.State) *kubecontainer.Container {
 	return &kubecontainer.Container{
 		ID:    kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: ID},
 		State: state,
@@ -336,7 +336,7 @@ func createTestPodsStatusesAndEvents(num int) ([]*kubecontainer.Pod, []*kubecont
 		}
 		status := &kubecontainer.PodStatus{
 			ID:                id,
-			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+			ContainerStatuses: []*kubecontainer.Status{{ID: container.ID, State: cState}},
 		}
 		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
 		pods = append(pods, pod)
@@ -457,7 +457,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 	goodStatus := &kubecontainer.PodStatus{
 		ID:                podID,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: infraContainer.ID, State: infraContainer.State}},
+		ContainerStatuses: []*kubecontainer.Status{{ID: infraContainer.ID, State: infraContainer.State}},
 	}
 	runtimeMock.On("GetPodStatus", podID, "", "").Return(goodStatus, nil).Once()
 
@@ -482,7 +482,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 	badStatus := &kubecontainer.PodStatus{
 		ID:                podID,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{},
+		ContainerStatuses: []*kubecontainer.Status{},
 	}
 	runtimeMock.On("GetPodStatus", podID, "", "").Return(badStatus, errors.New("inspection error")).Once()
 
@@ -607,7 +607,7 @@ func TestRelistIPChange(t *testing.T) {
 		status := &kubecontainer.PodStatus{
 			ID:                id,
 			IPs:               tc.podIPs,
-			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+			ContainerStatuses: []*kubecontainer.Status{{ID: container.ID, State: cState}},
 		}
 		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
 
@@ -629,7 +629,7 @@ func TestRelistIPChange(t *testing.T) {
 		}
 		status = &kubecontainer.PodStatus{
 			ID:                id,
-			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
+			ContainerStatuses: []*kubecontainer.Status{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
 		}
 		event = &PodLifecycleEvent{ID: pod.ID, Type: ContainerDied, Data: container.ID.ID}
 		runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
