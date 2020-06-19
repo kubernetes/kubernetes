@@ -105,13 +105,9 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 	return info.externalIPs
 }
 
-// LoadBalancerIPStrings is part of ServicePort interface.
-func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
-	var ips []string
-	for _, ing := range info.loadBalancerStatus.Ingress {
-		ips = append(ips, ing.IP)
-	}
-	return ips
+// LoadBalancerIngress is part of ServicePort interface.
+func (info *BaseServiceInfo) LoadBalancerIngress() []v1.LoadBalancerIngress {
+	return info.loadBalancerStatus.Ingress
 }
 
 // OnlyNodeLocalEndpoints is part of ServicePort interface.
