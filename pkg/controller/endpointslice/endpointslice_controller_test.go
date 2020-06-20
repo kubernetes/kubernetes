@@ -274,6 +274,31 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	cmc.Check(t)
 }
 
+func TestOnEndpointSliceUpdate(t *testing.T) {
+	_, esController := newController([]string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}
+
+	epSlice2 := epSlice1.DeepCopy()
+	epSlice2.Labels[discovery.LabelManagedBy] = "something else"
+
+	assert.Equal(t, 0, esController.queue.Len())
+	esController.onEndpointSliceUpdate(epSlice1, epSlice2)
+	time.Sleep(1 * time.Second)
+	assert.Equal(t, 1, esController.queue.Len())
+}
+
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
 func TestSyncServiceFull(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
