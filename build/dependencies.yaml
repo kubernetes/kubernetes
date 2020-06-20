@@ -44,7 +44,7 @@ dependencies:
       match: latestValidatedDockerVersion
 
   - name: "etcd"
-    version: 3.4.7
+    version: 3.4.9
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
