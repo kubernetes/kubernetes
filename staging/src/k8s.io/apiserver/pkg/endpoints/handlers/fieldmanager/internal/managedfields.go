@@ -53,6 +53,11 @@ func (m *managedStruct) Times() map[string]*metav1.Time {
 	return m.times
 }
 
+// NewEmptyManaged creates an empty ManagedInterface.
+func NewEmptyManaged() ManagedInterface {
+	return NewManaged(fieldpath.ManagedFields{}, map[string]*metav1.Time{})
+}
+
 // NewManaged creates a ManagedInterface from a fieldpath.ManagedFields and the timestamps associated with each operation.
 func NewManaged(f fieldpath.ManagedFields, t map[string]*metav1.Time) ManagedInterface {
 	return &managedStruct{
@@ -73,16 +78,8 @@ func RemoveObjectManagedFields(obj runtime.Object) {
 }
 
 // DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.
-func DecodeObjectManagedFields(from runtime.Object) (ManagedInterface, error) {
-	if from == nil {
-		return &managedStruct{}, nil
-	}
-	accessor, err := meta.Accessor(from)
-	if err != nil {
-		panic(fmt.Sprintf("couldn't get accessor: %v", err))
-	}
-
-	managed, err := decodeManagedFields(accessor.GetManagedFields())
+func DecodeObjectManagedFields(from []metav1.ManagedFieldsEntry) (ManagedInterface, error) {
+	managed, err := decodeManagedFields(from)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert managed fields from API: %v", err)
 	}
@@ -110,7 +107,16 @@ func EncodeObjectManagedFields(obj runtime.Object, managed ManagedInterface) err
 func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (managed managedStruct, err error) {
 	managed.fields = make(fieldpath.ManagedFields, len(encodedManagedFields))
 	managed.times = make(map[string]*metav1.Time, len(encodedManagedFields))
-	for _, encodedVersionedSet := range encodedManagedFields {
+
+	for i, encodedVersionedSet := range encodedManagedFields {
+		switch encodedVersionedSet.FieldsType {
+		case "FieldsV1":
+			// Valid case.
+		case "":
+			return managedStruct{}, fmt.Errorf("missing fieldsType in managed fields entry %d", i)
+		default:
+			return managedStruct{}, fmt.Errorf("invalid fieldsType %q in managed fields entry %d", encodedVersionedSet.FieldsType, i)
+		}
 		manager, err := BuildManagerIdentifier(&encodedVersionedSet)
 		if err != nil {
 			return managedStruct{}, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
