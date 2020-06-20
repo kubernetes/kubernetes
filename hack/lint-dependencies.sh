@@ -76,8 +76,8 @@ for forbidden_repo in "${forbidden_repos[@]}"; do
 done
 
 outdated=$(go list -m -json all | jq -r "
-  select(.Replace.Version != null) | 
-  select(.Version != .Replace.Version) | 
+  select(.Replace.Version != null) |
+  select(.Version != .Replace.Version) |
   ${filter}
   select(.Path) |
   \"\(.Path)

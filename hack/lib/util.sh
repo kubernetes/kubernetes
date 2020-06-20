@@ -213,7 +213,7 @@ kube::util::find-binary-for-platform() {
     locations+=("$location");
   done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -perm -111 \
     \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
-  
+
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
