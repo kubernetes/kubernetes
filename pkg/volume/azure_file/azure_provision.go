@@ -47,7 +47,7 @@ var (
 // azure cloud provider should implement it
 type azureCloudProvider interface {
 	// create a file share
-	CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error)
+	CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, protocol storage.EnabledProtocols, requestGiB int) (string, string, error)
 	// delete a file share
 	DeleteFileShare(resourceGroup, accountName, shareName string) error
 	// resize a file share
@@ -204,7 +204,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	if strings.HasPrefix(strings.ToLower(sku), "premium") {
 		accountKind = string(storage.FileStorage)
 	}
-	account, key, err := a.azureProvider.CreateFileShare(shareName, account, sku, accountKind, resourceGroup, location, requestGiB)
+	account, key, err := a.azureProvider.CreateFileShare(shareName, account, sku, accountKind, resourceGroup, location, storage.SMB, requestGiB)
 	if err != nil {
 		return nil, err
 	}
