@@ -90,7 +90,7 @@ func (az *Cloud) GetStorageAccesskey(account, resourceGroup string) (string, err
 }
 
 // EnsureStorageAccount search storage account, create one storage account(with genAccountNamePrefix) if not found, return accountName, accountKey
-func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, genAccountNamePrefix string) (string, string, error) {
+func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, genAccountNamePrefix string, enableHTTPSTrafficOnly bool) (string, string, error) {
 	if len(accountName) == 0 {
 		// find a storage account that matches accountType
 		accounts, err := az.getStorageAccounts(accountType, accountKind, resourceGroup, location)
@@ -123,7 +123,7 @@ func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, res
 			cp := storage.AccountCreateParameters{
 				Sku:                               &storage.Sku{Name: storage.SkuName(accountType)},
 				Kind:                              kind,
-				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: to.BoolPtr(true)},
+				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: &enableHTTPSTrafficOnly},
 				Tags:                              map[string]*string{"created-by": to.StringPtr("azure")},
 				Location:                          &location}
 

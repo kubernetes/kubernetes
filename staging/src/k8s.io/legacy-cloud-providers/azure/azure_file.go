@@ -23,8 +23,8 @@ import (
 )
 
 // create file share
-func (az *Cloud) createFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
-	return az.FileClient.CreateFileShare(resourceGroupName, accountName, name, sizeGiB)
+func (az *Cloud) createFileShare(resourceGroupName, accountName, name string, protocol storage.EnabledProtocols, sizeGiB int) error {
+	return az.FileClient.CreateFileShare(resourceGroupName, accountName, name, protocol, sizeGiB)
 }
 
 func (az *Cloud) deleteFileShare(resourceGroupName, accountName, name string) error {
