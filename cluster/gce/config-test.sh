@@ -120,8 +120,8 @@ export GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 # if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION or KUBE_UBUNTU_INSTALL_RUNC_VERSION
 # is set to empty then we do not override the version(s) and just
 # use whatever is in the default installation of containerd package
-export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
-export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
+export UBUNTU_INSTALL_CONTAINERD_VERSION="v1.3.4"
+export UBUNTU_INSTALL_RUNC_VERSION="foo"
 
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 export MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
