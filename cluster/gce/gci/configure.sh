@@ -493,7 +493,9 @@ function install-containerd-ubuntu {
   if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
     curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.linux-amd64.tar.gz" | tar --overwrite -xzv -C /usr/
   fi
+  runc --version
   curl -fsSL "https://github.com/AkihiroSuda/moby-snapshot/releases/download/snapshot-20200619/moby-snapshot.tbz" | tar --overwrite -xjv -C /usr/sbin/ moby-snapshot/bin/runc
+  runc --version
   sudo systemctl start containerd
 }
 
