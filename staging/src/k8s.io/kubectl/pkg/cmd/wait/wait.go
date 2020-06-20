@@ -203,7 +203,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			conditionName:   conditionName,
 			conditionStatus: conditionValue,
 			errOut:          errOut,
-		}.IsPhaseConditionMet, nil
+		}.IsJSONConditionMet, nil
 	}
 	if strings.HasPrefix(condition, "condition=") {
 		conditionName := condition[len("condition="):]
@@ -349,7 +349,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 }
 
 // IsPhaseConditionMet is a conditionfunc for waiting on an API for phase condition to be met
-func (w ConditionalWait) IsPhaseConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+func (w ConditionalWait) IsJSONConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		if len(info.Name) == 0 {
@@ -370,7 +370,7 @@ func (w ConditionalWait) IsPhaseConditionMet(info *resource.Info, o *WaitOptions
 			resourceVersion = gottenObjList.GetResourceVersion()
 		default:
 			gottenObj = &gottenObjList.Items[0]
-			conditionMet, err := w.checkPhase(gottenObj)
+			conditionMet, err := w.checkJSON(gottenObj)
 			if conditionMet {
 				return gottenObj, true, nil
 			}
@@ -566,10 +566,10 @@ func (w ConditionalWait) isPhaseConditionMet(event watch.Event) (bool, error) {
 		return false, nil
 	}
 	obj := event.Object.(*unstructured.Unstructured)
-	return w.checkPhase(obj)
+	return w.checkJSON(obj)
 }
 
-func (w ConditionalWait) checkPhase(obj *unstructured.Unstructured) (bool, error) {
+func (w ConditionalWait) checkJSON(obj *unstructured.Unstructured) (bool, error) {
 
 	//phase := strings.Split(w.conditionName, ".")[2]
 	//conditions, found, err := unstructured.NestedMap(obj.Object, "status")
