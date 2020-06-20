@@ -267,7 +267,7 @@ func newTestKubeletWithImageList(
 		ImageGCManager:   imageGCManager,
 	}
 	kubelet.containerLogManager = logs.NewStubContainerLogManager()
-	containerGCPolicy := kubecontainer.ContainerGCPolicy{
+	containerGCPolicy := kubecontainer.GCPolicy{
 		MinAge:             time.Duration(0),
 		MaxPerPodContainer: 1,
 		MaxContainers:      -1,
@@ -1401,13 +1401,13 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	numContainers := 10
 	expectedOrder := []string{}
-	cStatuses := []*kubecontainer.ContainerStatus{}
+	cStatuses := []*kubecontainer.Status{}
 	specContainerList := []v1.Container{}
 	for i := 0; i < numContainers; i++ {
 		id := fmt.Sprintf("%v", i)
 		containerName := fmt.Sprintf("%vcontainer", id)
 		expectedOrder = append(expectedOrder, containerName)
-		cStatus := &kubecontainer.ContainerStatus{
+		cStatus := &kubecontainer.Status{
 			ID:   kubecontainer.BuildContainerID("test", id),
 			Name: containerName,
 		}
@@ -1415,7 +1415,7 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 		if i%2 == 0 {
 			cStatuses = append(cStatuses, cStatus)
 		} else {
-			cStatuses = append([]*kubecontainer.ContainerStatus{cStatus}, cStatuses...)
+			cStatuses = append([]*kubecontainer.Status{cStatus}, cStatuses...)
 		}
 		specContainerList = append(specContainerList, v1.Container{Name: containerName})
 	}
@@ -1468,7 +1468,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	}
 	tests := []struct {
 		containers    []v1.Container
-		statuses      []*kubecontainer.ContainerStatus
+		statuses      []*kubecontainer.Status
 		reasons       map[string]error
 		oldStatuses   []v1.ContainerStatus
 		expectedState map[string]v1.ContainerState
@@ -1480,7 +1480,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		// old status from apiserver.
 		{
 			containers: []v1.Container{{Name: "without-old-record"}, {Name: "with-old-record"}},
-			statuses:   []*kubecontainer.ContainerStatus{},
+			statuses:   []*kubecontainer.Status{},
 			reasons:    map[string]error{},
 			oldStatuses: []v1.ContainerStatus{{
 				Name:                 "with-old-record",
@@ -1509,7 +1509,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		// For running container, State should be Running, LastTerminationState should be retrieved from latest terminated status.
 		{
 			containers: []v1.Container{{Name: "running"}},
-			statuses: []*kubecontainer.ContainerStatus{
+			statuses: []*kubecontainer.Status{
 				{
 					Name:      "running",
 					State:     kubecontainer.ContainerStateRunning,
@@ -1545,7 +1545,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		// terminated status.
 		{
 			containers: []v1.Container{{Name: "without-reason"}, {Name: "with-reason"}},
-			statuses: []*kubecontainer.ContainerStatus{
+			statuses: []*kubecontainer.Status{
 				{
 					Name:     "without-reason",
 					State:    kubecontainer.ContainerStateExited,
@@ -1650,7 +1650,7 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 		ID:        pod.UID,
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{
+		ContainerStatuses: []*kubecontainer.Status{
 			{
 				Name:     "succeed",
 				State:    kubecontainer.ContainerStateExited,

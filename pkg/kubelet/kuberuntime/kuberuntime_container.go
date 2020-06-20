@@ -428,7 +428,7 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string)
 }
 
 // getPodContainerStatuses gets all containers' statuses for the pod.
-func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.ContainerStatus, error) {
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.Status, error) {
 	// Select all containers of the given pod.
 	containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
 		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
@@ -438,7 +438,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 		return nil, err
 	}
 
-	statuses := make([]*kubecontainer.ContainerStatus, len(containers))
+	statuses := make([]*kubecontainer.Status, len(containers))
 	// TODO: optimization: set maximum number of containers per container name to examine.
 	for i, c := range containers {
 		status, err := m.runtimeService.ContainerStatus(c.Id)
@@ -481,10 +481,10 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 	return statuses, nil
 }
 
-func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.ContainerStatus {
+func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	cStatus := &kubecontainer.ContainerStatus{
+	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,
@@ -737,7 +737,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 // index of next init container to start, or done if there are no further init containers.
 // Status is only returned if an init container is failed, in which case next will
 // point to the current container.
-func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.ContainerStatus, next *v1.Container, done bool) {
+func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, nil, true
 	}

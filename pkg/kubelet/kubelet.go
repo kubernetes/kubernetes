@@ -405,7 +405,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	containerGCPolicy := kubecontainer.ContainerGCPolicy{
+	containerGCPolicy := kubecontainer.GCPolicy{
 		MinAge:             minimumGCAge.Duration,
 		MaxPerPodContainer: int(maxPerPodContainerCount),
 		MaxContainers:      int(maxContainerCount),
@@ -870,7 +870,7 @@ type Kubelet struct {
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler
 	// Optional, defaults to simple Docker implementation
-	runner kubecontainer.ContainerCommandRunner
+	runner kubecontainer.CommandRunner
 
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface
@@ -921,7 +921,7 @@ type Kubelet struct {
 	recorder record.EventRecorder
 
 	// Policy for handling garbage collection of dead containers.
-	containerGC kubecontainer.ContainerGC
+	containerGC kubecontainer.GC
 
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager

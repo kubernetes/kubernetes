@@ -30,7 +30,7 @@ const (
 	containerDeletorBufferLimit = 50
 )
 
-type containerStatusbyCreatedList []*kubecontainer.ContainerStatus
+type containerStatusbyCreatedList []*kubecontainer.Status
 
 type podContainerDeletor struct {
 	worker           chan<- kubecontainer.ContainerID
@@ -63,7 +63,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 // getContainersToDeleteInPod returns the exited containers in a pod whose name matches the name inferred from filterContainerId (if not empty), ordered by the creation time from the latest to the earliest.
 // If filterContainerID is empty, all dead containers in the pod are returned.
 func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontainer.PodStatus, containersToKeep int) containerStatusbyCreatedList {
-	matchedContainer := func(filterContainerId string, podStatus *kubecontainer.PodStatus) *kubecontainer.ContainerStatus {
+	matchedContainer := func(filterContainerId string, podStatus *kubecontainer.PodStatus) *kubecontainer.Status {
 		if filterContainerId == "" {
 			return nil
 		}

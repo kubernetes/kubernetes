@@ -39,23 +39,12 @@ var (
 	ErrRunContainer = errors.New("RunContainerError")
 	// ErrKillContainer returned when runtime failed to kill any of pod's containers.
 	ErrKillContainer = errors.New("KillContainerError")
-	// ErrVerifyNonRoot returned if the container or image will run as the root user.
-	ErrVerifyNonRoot = errors.New("VerifyNonRootError")
-	// ErrRunInitContainer returned when container init failed.
-	ErrRunInitContainer = errors.New("RunInitContainerError")
 	// ErrCreatePodSandbox returned when runtime failed to create a sandbox for pod.
 	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
 	// ErrConfigPodSandbox returned when runetime failed to get pod sandbox config from pod.
 	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
 	// ErrKillPodSandbox returned when runtime failed to stop pod's sandbox.
 	ErrKillPodSandbox = errors.New("KillPodSandboxError")
-)
-
-var (
-	// ErrSetupNetwork returned when network setup failed.
-	ErrSetupNetwork = errors.New("SetupNetworkError")
-	// ErrTeardownNetwork returned when network tear down failed.
-	ErrTeardownNetwork = errors.New("TeardownNetworkError")
 )
 
 // SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions

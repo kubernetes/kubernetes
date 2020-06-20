@@ -67,7 +67,7 @@ type GenericPLEG struct {
 }
 
 // plegContainerState has a one-to-one mapping to the
-// kubecontainer.ContainerState except for the non-existent state. This state
+// kubecontainer.State except for the non-existent state. This state
 // is introduced here to complete the state transition scenarios.
 type plegContainerState string
 
@@ -83,7 +83,7 @@ const (
 	relistThreshold = 3 * time.Minute
 )
 
-func convertState(state kubecontainer.ContainerState) plegContainerState {
+func convertState(state kubecontainer.State) plegContainerState {
 	switch state {
 	case kubecontainer.ContainerStateCreated:
 		// kubelet doesn't use the "created" state yet, hence convert it to "unknown".
