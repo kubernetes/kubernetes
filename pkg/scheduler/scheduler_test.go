@@ -120,10 +120,6 @@ func (es mockScheduler) Extenders() []framework.Extender {
 	return nil
 }
 
-func (es mockScheduler) Preempt(ctx context.Context, profile *profile.Profile, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) (string, error) {
-	return "", nil
-}
-
 func TestSchedulerCreation(t *testing.T) {
 	invalidRegistry := map[string]framework.PluginFactory{
 		defaultbinder.Name: defaultbinder.New,
@@ -787,7 +783,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		internalcache.NewEmptySnapshot(),
 		[]framework.Extender{},
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
@@ -1139,7 +1134,6 @@ func TestSchedulerBinding(t *testing.T) {
 				nil,
 				nil,
 				test.extenders,
-				nil,
 				nil,
 				false,
 				0,

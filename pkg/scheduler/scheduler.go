@@ -486,7 +486,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			} else {
 				preemptionStartTime := time.Now()
 				// TODO(Huang-Wei): implement the preemption logic as a PostFilter plugin.
-				nominatedNode, _ = sched.Algorithm.Preempt(schedulingCycleCtx, prof, state, pod, fitError.FilteredNodesStatuses)
+				nominatedNode, _ = core.Preempt(schedulingCycleCtx, prof, state, pod, fitError.FilteredNodesStatuses)
 				metrics.PreemptionAttempts.Inc()
 				metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
 				metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
