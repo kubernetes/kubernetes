@@ -194,13 +194,13 @@ Usage:
 Starts a HTTP server on the given `--http-port` (default: 80), serving various endpoints representing a
 guestbook app. The endpoints and their purpose are:
 
-- `/register`: A guestbook replica will subscribe to a master, to its given `--replicaof` endpoint. The master
+- `/register`: A guestbook replica will subscribe to a primary, to its given `--replicaof` endpoint. The primary
   will then push any updates it receives to its registered replicas through the `--backend-port` (default: 6379).
 - `/get`: Returns `{"data": value}`, where the `value` is the stored value for the given `key` if non-empty,
   or the entire store.
 - `/set`: Will set the given key-value pair in its own store and propagate it to its replicas, if any.
   Will return `{"data": "Updated"}` to the caller on success.
-- `/guestbook`: Will proxy the request to `agnhost-master` if the given `cmd` is `set`, or `agnhost-replica`
+- `/guestbook`: Will proxy the request to `agnhost-primary` if the given `cmd` is `set`, or `agnhost-replica`
   if the given `cmd` is `get`.
 
 Usage:
@@ -211,13 +211,13 @@ sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnho
 
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
-kubectl create -f ${guestbook}/agnhost-master-service.yaml
-kubectl create -f ${guestbook}/agnhost-slave-service.yaml
+kubectl create -f ${guestbook}/agnhost-primary-service.yaml
+kubectl create -f ${guestbook}/agnhost-replica-service.yaml
 
 # create the deployments.
 cat ${guestbook}/frontend-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
-cat ${guestbook}/agnhost-master-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
-cat ${guestbook}/agnhost-slave-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-primary-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-replica-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
 ```
 
 

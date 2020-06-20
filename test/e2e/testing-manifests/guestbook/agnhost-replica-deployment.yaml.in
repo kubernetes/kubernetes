@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agnhost-slave
+  name: agnhost-replica
 spec:
   replicas: 2
   selector:
     matchLabels:
       app: agnhost
-      role: slave
+      role: replica
       tier: backend
   template:
     metadata:
       labels:
         app: agnhost
-        role: slave
+        role: replica
         tier: backend
     spec:
       containers:
-      - name: slave
+      - name: replica
         image: {{.AgnhostImage}}
-        args: [ "guestbook", "--slaveof", "agnhost-master", "--http-port", "6379" ]
+        args: [ "guestbook", "--replicaof", "agnhost-master", "--http-port", "6379" ]
         resources:
           requests:
             cpu: 100m

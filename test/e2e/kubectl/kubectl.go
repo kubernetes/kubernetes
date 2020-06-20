@@ -343,12 +343,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"agnhost-slave-service.yaml",
+				"agnhost-replica-service.yaml",
 				"agnhost-master-service.yaml",
 				"frontend-service.yaml",
 				"frontend-deployment.yaml.in",
 				"agnhost-master-deployment.yaml.in",
-				"agnhost-slave-deployment.yaml.in",
+				"agnhost-replica-deployment.yaml.in",
 			} {
 				contents := commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
@@ -358,7 +358,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, guestbook application
-			Description: Create Guestbook application that contains an agnhost master server, 2 agnhost slaves, frontend application, frontend service and agnhost master service and agnhost slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
+			Description: Create Guestbook application that contains an agnhost primary server, 2 agnhost replicas, frontend application, frontend service and agnhost primary service and agnhost replica service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
 		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
@@ -1230,7 +1230,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, create service, replication controller
-			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost master replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost master is listening. Using kubectl expose the agnhost master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost master is listening.
+			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost primary replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost primary is listening. Using kubectl expose the agnhost primary as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost primary is listening.
 		*/
 		framework.ConformanceIt("should create services for rc ", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))

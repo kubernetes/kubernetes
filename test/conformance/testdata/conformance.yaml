@@ -1355,12 +1355,12 @@
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application  [Conformance]'
-  description: Create Guestbook application that contains an agnhost master server,
-    2 agnhost slaves, frontend application, frontend service and agnhost master service
-    and agnhost slave service. Using frontend service, the test will write an entry
-    into the guestbook application which will store the entry into the backend agnhost
-    store. Application flow MUST work as expected and the data written MUST be available
-    to read.
+  description: Create Guestbook application that contains an agnhost primary server,
+    2 agnhost replicas, frontend application, frontend service and agnhost primary
+    service and agnhost replica service. Using frontend service, the test will write
+    an entry into the guestbook application which will store the entry into the backend
+    agnhost store. Application flow MUST work as expected and the data written MUST
+    be available to read.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, check version v1
@@ -1397,11 +1397,11 @@
 - testname: Kubectl, create service, replication controller
   codename: '[sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]'
   description: Create a Pod running agnhost listening to port 6379. Using kubectl
-    expose the agnhost master replication controllers at port 1234. Validate that
+    expose the agnhost primary replication controllers at port 1234. Validate that
     the replication controller is listening on port 1234 and the target port is set
-    to 6379, port that agnhost master is listening. Using kubectl expose the agnhost
-    master as a service at port 2345. The service MUST be listening on port 2345 and
-    the target port is set to 6379, port that agnhost master is listening.
+    to 6379, port that agnhost primary is listening. Using kubectl expose the agnhost
+    primary as a service at port 2345. The service MUST be listening on port 2345
+    and the target port is set to 6379, port that agnhost primary is listening.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, label update
