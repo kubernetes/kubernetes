@@ -560,6 +560,11 @@ func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
 	return vs, true
 }
 
+// InstancesV2 returns an implementation of InstancesV2 for vSphere.
+func (vs *VSphere) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 func getLocalIP() ([]v1.NodeAddress, error) {
 	// hashtable with VMware-allocated OUIs for MAC filtering
 	// List of official OUIs: http://standards-oui.ieee.org/oui.txt

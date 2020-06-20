@@ -1394,6 +1394,11 @@ func (c *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return c, true
 }
 
+// InstancesV2 returns an implementation of InstancesV2 for Amazon Web Services.
+func (c *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 // Zones returns an implementation of Zones for Amazon Web Services.
 func (c *Cloud) Zones() (cloudprovider.Zones, bool) {
 	return c, true
