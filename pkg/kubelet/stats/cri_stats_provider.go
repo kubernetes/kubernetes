@@ -412,7 +412,7 @@ func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo 
 	}
 	ephemeralStats := make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
 	copy(ephemeralStats, vstats.EphemeralVolumes)
-	s.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
+	s.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
 	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, true)
 }
 
