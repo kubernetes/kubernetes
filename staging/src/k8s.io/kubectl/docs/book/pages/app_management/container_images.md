@@ -40,7 +40,7 @@ tag.
 |-----------|--------------------------------------------------------------------------|----------| --- |
 | `name`    | Match images with this image name| `name: nginx`| |
 | `newTag`  | Override the image **tag** or **digest** for images whose image name matches `name`    | `newTag: new` | `nginx:old` -> `nginx:new` |
-| `newName` | Override the image **name** for images whose image name matches `name`   | `newImage: nginx-special` | `nginx:old` -> `nginx-special:old` |
+| `newName` | Override the image **name** for images whose image name matches `name`   | `newName: nginx-special` | `nginx:old` -> `nginx-special:old` |
 
 {% method %}
 
