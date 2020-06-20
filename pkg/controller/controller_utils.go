@@ -257,11 +257,6 @@ func (r *ControllerExpectations) DeletionObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 0, 1)
 }
 
-// Expectations are either fulfilled, or expire naturally.
-type Expectations interface {
-	Fulfilled() bool
-}
-
 // ControlleeExpectations track controllee creates/deletes.
 type ControlleeExpectations struct {
 	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
