@@ -99,6 +99,12 @@ build:
 		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
+	# Compile backup which is used by backup-before-start script
+	backup_tmp_dir=$(shell mktemp -d); \
+	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${backup_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+                /bin/bash -c "CGO_ENABLED=0 go build -o /build/backup k8s.io/kubernetes/cluster/images/etcd/backup"; \
+        $(BIN_INSTALL) $${backup_tmp_dir}/backup $(TEMP_DIR);
+
 ifeq ($(ARCH),amd64)
 
 	# Do not compile if we should make an image for amd64, use the official etcd binaries instead

@@ -32,4 +32,4 @@ EXPOSE 2379 2380 4001 7001
 COPY etcd* etcdctl* /usr/local/bin/
 COPY cp* /bin/
 COPY migrate-if-needed.sh migrate /usr/local/bin/
-COPY backup-before-start.sh /usr/local/bin/
+COPY backup-before-start.sh backup /usr/local/bin/
