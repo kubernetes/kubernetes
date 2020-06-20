@@ -465,13 +465,14 @@ func (env *testEnv) validateAssume(t *testing.T, pod *v1.Pod, bindings []*bindin
 	}
 }
 
-func (env *testEnv) validateFailedAssume(t *testing.T, pod *v1.Pod, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
+func (env *testEnv) validateCacheRestored(t *testing.T, pod *v1.Pod, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
 	// All PVs have been unmodified in cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
 		pv, _ := pvCache.GetPV(b.pv.Name)
+		apiPV, _ := pvCache.GetAPIPV(b.pv.Name)
 		// PV could be nil if it's missing from cache
-		if pv != nil && pv != b.pv {
+		if pv != nil && pv != apiPV {
 			t.Errorf("PV %q was modified in cache", b.pv.Name)
 		}
 	}
@@ -1237,7 +1238,7 @@ func TestAssumePodVolumes(t *testing.T) {
 			scenario.expectedProvisionings = scenario.provisionedPVCs
 		}
 		if scenario.shouldFail {
-			testEnv.validateFailedAssume(t, pod, scenario.expectedBindings, scenario.expectedProvisionings)
+			testEnv.validateCacheRestored(t, pod, scenario.bindings, scenario.provisionedPVCs)
 		} else {
 			testEnv.validateAssume(t, pod, scenario.expectedBindings, scenario.expectedProvisionings)
 		}
@@ -1247,6 +1248,34 @@ func TestAssumePodVolumes(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) { run(t, scenario) })
 	}
+}
+
+func TestRevertAssumedPodVolumes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	podPVCs := []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVC}
+	bindings := []*bindingInfo{makeBinding(unboundPVC, pvNode1a)}
+	pvs := []*v1.PersistentVolume{pvNode1a}
+	provisionedPVCs := []*v1.PersistentVolumeClaim{provisionedPVC}
+	expectedBindings := []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)}
+	expectedProvisionings := []*v1.PersistentVolumeClaim{selectedNodePVC}
+
+	// Setup
+	testEnv := newTestBinder(t, ctx.Done())
+	testEnv.initClaims(podPVCs, podPVCs)
+	pod := makePod(podPVCs)
+	testEnv.initPodCache(pod, "node1", bindings, provisionedPVCs)
+	testEnv.initVolumes(pvs, pvs)
+
+	allbound, err := testEnv.binder.AssumePodVolumes(pod, "node1")
+	if allbound || err != nil {
+		t.Errorf("No volumes are assumed")
+	}
+	testEnv.validateAssume(t, pod, expectedBindings, expectedProvisionings)
+
+	testEnv.binder.RevertAssumedPodVolumes(pod, "node1")
+	testEnv.validateCacheRestored(t, pod, bindings, provisionedPVCs)
 }
 
 func TestBindAPIUpdate(t *testing.T) {
