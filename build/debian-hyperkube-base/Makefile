@@ -19,12 +19,12 @@
 
 REGISTRY?=gcr.io/k8s-staging-build-image
 IMAGE?=$(REGISTRY)/debian-hyperkube-base
-TAG?=v1.0.0
+TAG?=v1.1.0
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 BASE_REGISTRY?=us.gcr.io/k8s-artifacts-prod/build-image
-BASEIMAGE?=$(BASE_REGISTRY)/debian-base-$(ARCH):v2.1.0
+BASEIMAGE?=$(BASE_REGISTRY)/debian-iptables-$(ARCH):v12.1.0
 CNI_VERSION?=v0.8.6
 
 TEMP_DIR:=$(shell mktemp -d)
