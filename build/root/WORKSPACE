@@ -56,3 +56,7 @@ release_dependencies()
 load("//build:workspace_mirror.bzl", "export_urls")
 
 export_urls("workspace_urls")
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
