@@ -1804,6 +1804,16 @@ function update-node-label() {
   done
 }
 
+# A helper function that sets file permissions for kube-controller-manager to
+# run as non root.
+function run-kube-controller-manager-as-non-root {
+  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER} ${KUBE_CONTROLLER_MANAGER_RUNASGROUP}
+  setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${CA_CERT_BUNDLE_PATH}"
+  setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_CERT_PATH}"
+  setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_KEY_PATH}"
+}
+
+
 # Starts kubernetes controller manager.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -1900,6 +1910,15 @@ function start-kube-controller-manager {
   sed -i -e "s@{{flexvolume_hostpath_mount}}@${FLEXVOLUME_HOSTPATH_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{flexvolume_hostpath}}@${FLEXVOLUME_HOSTPATH_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{cpurequest}}@${KUBE_CONTROLLER_MANAGER_CPU_REQUEST}@g" "${src_file}"
+
+  if [[ -n "${KUBE_CONTROLLER_MANAGER_RUNASUSER:-}" && -n "${KUBE_CONTROLLER_MANAGER_RUNASGROUP:-}" ]]; then
+    run-kube-controller-manager-as-non-root
+    sed -i -e "s@{{runAsUser}}@${KUBE_CONTROLLER_MANAGER_RUNASUSER}@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@${KUBE_CONTROLLER_MANAGER_RUNASGROUP}@g" "${src_file}"
+  else
+    sed -i -e "s@{{runAsUser}}@0@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@0@g" "${src_file}"
+  fi
 
   cp "${src_file}" /etc/kubernetes/manifests
 }
