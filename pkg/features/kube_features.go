@@ -575,6 +575,7 @@ const (
 
 	// owner: @bart0sh
 	// alpha: v1.18
+	// beta: v1.19
 	//
 	// Enables usage of HugePages-<size> in a volume medium,
 	// e.g. emptyDir:
@@ -687,7 +688,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
 	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
+	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA}, // remove in 1.20
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: false, PreRelease: featuregate.Alpha},
