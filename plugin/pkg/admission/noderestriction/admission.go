@@ -224,6 +224,9 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	if len(pod.OwnerReferences) > 1 {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a single owner reference set to itself", nodeName))
 	}
+	if len(pod.OwnerReferences) == 0 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with an owner reference set to itself", nodeName))
+	}
 	if len(pod.OwnerReferences) == 1 {
 		owner := pod.OwnerReferences[0]
 		if owner.APIVersion != v1.SchemeGroupVersion.String() ||

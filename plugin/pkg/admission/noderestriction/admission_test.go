@@ -1314,8 +1314,9 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 		expectErr   string
 	}{
 		{
-			name:   "no owner",
-			owners: nil,
+			name:      "no owner",
+			owners:    nil,
+			expectErr: "pods \"test\" is forbidden: node \"mynode\" can only create pods with an owner reference set to itself",
 		},
 		{
 			name:   "valid owner",
