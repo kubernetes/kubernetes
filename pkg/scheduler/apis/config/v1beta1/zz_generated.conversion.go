@@ -277,6 +277,7 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 		out.Profiles = nil
 	}
 	out.Extenders = *(*[]config.Extender)(unsafe.Pointer(&in.Extenders))
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 
@@ -321,6 +322,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfi
 		out.Profiles = nil
 	}
 	out.Extenders = *(*[]configv1.Extender)(unsafe.Pointer(&in.Extenders))
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 

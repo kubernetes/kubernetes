@@ -28,14 +28,18 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/featuregate"
+	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
 func TestSchedulerOptions(t *testing.T) {
@@ -254,6 +258,7 @@ profiles:
 	testcases := []struct {
 		name             string
 		options          *Options
+		flags            []string
 		expectedUsername string
 		expectedError    string
 		expectedConfig   kubeschedulerconfig.KubeSchedulerConfiguration
@@ -778,6 +783,142 @@ profiles:
 			}
 			if username != tc.expectedUsername {
 				t.Errorf("expected server call with user %q, got %q", tc.expectedUsername, username)
+			}
+		})
+	}
+}
+
+func TestSchedulerFeatureGates(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "scheduler-feature-gates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configFeatureGates := filepath.Join(tmpDir, "scheduler_feature_gates.yaml")
+	if err := ioutil.WriteFile(configFeatureGates, []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+featureGates:
+  NonPreemptingPriority: true
+  PodOverhead: true
+`), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	configUnknownFeatureGates := filepath.Join(tmpDir, "scheduler_unknown_feature_gates.yaml")
+	if err := ioutil.WriteFile(configUnknownFeatureGates, []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+featureGates:
+  NonExistingFeature: true
+  PodOverhead: true
+`), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name                 string
+		flags                []string
+		expectedFeatureGates map[string]bool
+		expectedError        string
+	}{
+		{
+			name:                 "by default no feature gates are set",
+			flags:                []string{},
+			expectedFeatureGates: nil,
+		},
+		{
+			name: "feature gates can be set in command-line flags",
+			flags: []string{
+				"--feature-gates", "NonPreemptingPriority=true,PodDisruptionBudget=true",
+			},
+			expectedFeatureGates: map[string]bool{
+				"NonPreemptingPriority": true,
+				"PodDisruptionBudget":   true,
+			},
+		},
+		{
+			name: "feature gates can be set in config file",
+			flags: []string{
+				"--config", configFeatureGates,
+			},
+			expectedFeatureGates: map[string]bool{
+				"NonPreemptingPriority": true,
+				"PodOverhead":           true,
+			},
+		},
+		{
+			name: "feature gates set in flags take precedence over config file",
+			flags: []string{
+				"--config", configFeatureGates,
+				"--feature-gates", "NonPreemptingPriority=false,PodDisruptionBudget=true",
+			},
+			expectedFeatureGates: map[string]bool{
+				"NonPreemptingPriority": false,
+				"PodOverhead":           true,
+				"PodDisruptionBudget":   true,
+			},
+		},
+		{
+			name: "unknown feature gates cannot be set in command-line flags",
+			flags: []string{
+				"--feature-gates", "NonExistingFeature=true",
+			},
+			expectedError: "unrecognized feature gate: NonExistingFeature",
+		},
+		{
+			name: "unknown feature gates cannot be set in config file",
+			flags: []string{
+				"--config", configUnknownFeatureGates,
+			},
+			expectedError: "unrecognized feature gate: NonExistingFeature",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := &schedulerappconfig.Config{}
+
+			options, err := NewOptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			fs := pflag.NewFlagSet("test", pflag.PanicOnError)
+			for _, f := range options.Flags().FlagSets {
+				fs.AddFlagSet(f)
+			}
+			if err := fs.Parse(tc.flags); err != nil {
+				t.Fatal(err)
+			}
+
+			// do not start listeners in this test
+			options.SecureServing = nil
+			options.CombinedInsecureServing = nil
+
+			gotErr := options.ApplyTo(config)
+
+			if tc.expectedError != "" {
+				if gotErr == nil {
+					t.Errorf("expected error to be: %s, got: nil", tc.expectedError)
+				}
+				if tc.expectedError != gotErr.Error() {
+					t.Errorf("expected error to be: %s, got: %v", tc.expectedError, gotErr)
+				}
+			} else {
+				if gotErr != nil {
+					t.Fatalf("expected no error, got: %v", gotErr)
+				}
+
+				if diff := cmp.Diff(tc.expectedFeatureGates, config.ComponentConfig.FeatureGates); diff != "" {
+					t.Errorf("incorrect feature gates in component config (-want,+got):\n%s", diff)
+				}
+
+				for gate, value := range tc.expectedFeatureGates {
+					if got := utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(gate)); got != value {
+						t.Errorf("expected global feature gate %s to be: %t, got: %t", gate, value, got)
+					}
+				}
 			}
 		})
 	}

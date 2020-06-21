@@ -96,6 +96,9 @@ type KubeSchedulerConfiguration struct {
 	// with the extender. These extenders are shared by all scheduler profiles.
 	// +listType=set
 	Extenders []v1.Extender `json:"extenders,omitempty"`
+
+	// FeatureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
 // DecodeNestedObjects decodes plugin args for known types.
