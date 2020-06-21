@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"reflect"
@@ -1840,13 +1839,13 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	}
 
 	// Test a non-existent name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "foo:q")
+	_, _, err = redirector.ResourceLocation(ctx, "foo:q")
 	if err == nil {
 		t.Errorf("Unexpected nil error")
 	}
 
 	// Test a non-existent name + port (using second ip).
-	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:q")
+	_, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:q")
 	if err == nil {
 		t.Errorf("Unexpected nil error")
 	}
@@ -3171,22 +3170,22 @@ func TestAllocGetters(t *testing.T) {
 
 			alloc := storage.getAllocatorByClusterIP(tc.svc)
 			if tc.expectClusterIPPrimary {
-				if !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
 					t.Fatalf("expected clusterIP primary allocator, but primary allocator was not selected")
 				}
 			} else {
-				if !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
 					t.Errorf("expected clusterIP secondary allocator, but secondary allocator was not selected")
 				}
 			}
 
 			alloc = storage.getAllocatorBySpec(tc.svc)
 			if tc.expectSpecPrimary {
-				if !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
 					t.Errorf("expected spec primary allocator, but primary allocator was not selected")
 				}
 			} else {
-				if !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
 					t.Errorf("expected spec secondary allocator, but secondary allocator was not selected")
 				}
 			}
