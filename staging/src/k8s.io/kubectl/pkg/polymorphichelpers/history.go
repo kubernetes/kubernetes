@@ -233,26 +233,50 @@ type StatefulSetHistoryViewer struct {
 
 // ViewHistory returns a list of the revision history of a statefulset
 // TODO: this should be a describer
-// TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	_, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
+	ss, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
 	if err != nil {
 		return "", err
 	}
-
-	if len(history) <= 0 {
+	historyInfo := make(map[int64]*appsv1.ControllerRevision)
+	for _, history := range history {
+		// TODO: for now we assume revisions don't overlap, we may need to handle it
+		historyInfo[history.Revision] = history
+	}
+	if len(historyInfo) == 0 {
 		return "No rollout history found.", nil
 	}
-	revisions := make([]int64, 0, len(history))
-	for _, revision := range history {
-		revisions = append(revisions, revision.Revision)
+
+	// Print details of a specific revision
+	if revision > 0 {
+		history, ok := historyInfo[revision]
+		if !ok {
+			return "", fmt.Errorf("unable to find the specified revision")
+		}
+		ssOfHistory, err := applyStatefulSetHistory(ss, history)
+		if err != nil {
+			return "", fmt.Errorf("unable to parse history %s", history.Name)
+		}
+		return printTemplate(&ssOfHistory.Spec.Template)
+	}
+
+	// Print an overview of all Revisions
+	// Sort the revisionToChangeCause map by revision
+	revisions := make([]int64, 0, len(historyInfo))
+	for r := range historyInfo {
+		revisions = append(revisions, r)
 	}
 	sliceutil.SortInts64(revisions)
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "REVISION\n")
+		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
 		for _, r := range revisions {
-			fmt.Fprintf(out, "%d\n", r)
+			// Find the change-cause of revision r
+			changeCause := historyInfo[r].Annotations[ChangeCauseAnnotation]
+			if len(changeCause) == 0 {
+				changeCause = "<none>"
+			}
+			fmt.Fprintf(out, "%d\t%s\n", r, changeCause)
 		}
 		return nil
 	})
@@ -358,6 +382,24 @@ func applyDaemonSetHistory(ds *appsv1.DaemonSet, history *appsv1.ControllerRevis
 		return nil, err
 	}
 	result := &appsv1.DaemonSet{}
+	err = json.Unmarshal(patched, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// applyStateSetHistory returns a specific revision of StatefulSet by applying the given history to a copy of the given StatefulSet
+func applyStatefulSetHistory(ds *appsv1.StatefulSet, history *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
+	dsBytes, err := json.Marshal(ds)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(dsBytes, history.Data.Raw, ds)
+	if err != nil {
+		return nil, err
+	}
+	result := &appsv1.StatefulSet{}
 	err = json.Unmarshal(patched, result)
 	if err != nil {
 		return nil, err
