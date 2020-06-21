@@ -123,7 +123,7 @@ func ExtractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	}
 }
 
-// PrintSample returns formated representation of metric Sample
+// PrintSample returns formatted representation of metric Sample
 func PrintSample(sample *model.Sample) string {
 	buf := make([]string, 0)
 	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
