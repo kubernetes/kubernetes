@@ -67,7 +67,7 @@ var NodePrePullImageList = sets.NewString(
 // So this function needs to be called after the extra envs are applied.
 func updateImageWhiteList() {
 	// Union NodePrePullImageList and CommonImageWhiteList into the framework image pre-pull list.
-	framework.ImageWhiteList = NodePrePullImageList.Union(commontest.CommonImageWhiteList)
+	framework.ImageWhiteList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
 	framework.ImageWhiteList.Insert(getNodeProblemDetectorImage())
 	framework.ImageWhiteList.Insert(getSRIOVDevicePluginImage())
