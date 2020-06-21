@@ -335,14 +335,14 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := NewCIDRRange(otherCidr)
+	_, err = NewCIDRRange(otherCidr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Restore(otherCidr, dst.Data); err != ErrMismatchedNetwork {
 		t.Fatal(err)
 	}
-	other, err = NewCIDRRange(network)
+	other, err := NewCIDRRange(network)
 	if err != nil {
 		t.Fatal(err)
 	}
