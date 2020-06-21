@@ -432,12 +432,7 @@ function install-docker {
     software-properties-common \
     lsb-release
 
-  # focal repo for docker is not yet available, so we use bonic for now
-  # https://github.com/kubernetes/kubernetes/issues/90709
   release=$(lsb_release -cs)
-  if [ "$release" == "focal" ]; then
-    release="bionic";
-  fi
 
   # Add the Docker apt-repository
   curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
@@ -478,12 +473,7 @@ function install-containerd-ubuntu {
     software-properties-common \
     lsb-release
 
-  # focal repo for docker is not yet available, so we use bonic for now
-  # https://github.com/kubernetes/kubernetes/issues/90709
   release=$(lsb_release -cs)
-  if [ "$release" == "focal" ]; then
-    release="bionic";
-  fi
 
   # Add the Docker apt-repository (as we install containerd from there)
   curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
