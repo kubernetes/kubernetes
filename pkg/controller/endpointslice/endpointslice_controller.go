@@ -404,7 +404,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // endpointSliceTracker or the managed-by value of the EndpointSlice has changed
 // from or to this controller.
 func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
-	prevEndpointSlice := obj.(*discovery.EndpointSlice)
+	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
