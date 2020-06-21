@@ -206,12 +206,12 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	}
 
 	// Open data file and separate sync handler for metadata writes.
-	db.path = path
 	var err error
-	if db.file, err = db.openFile(db.path, flag|os.O_CREATE, mode); err != nil {
+	if db.file, err = db.openFile(path, flag|os.O_CREATE, mode); err != nil {
 		_ = db.close()
 		return nil, err
 	}
+	db.path = db.file.Name()
 
 	// Lock file so that other processes using Bolt in read-write mode cannot
 	// use the database  at the same time. This would cause corruption since

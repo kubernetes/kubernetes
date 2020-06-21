@@ -28,6 +28,7 @@ go_library(
         "node.go",
         "page.go",
         "tx.go",
+        "unsafe.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/go.etcd.io/bbolt",
     importpath = "go.etcd.io/bbolt",
