@@ -2554,3 +2554,62 @@ func TestAzToRegion(t *testing.T) {
 		assert.Equal(t, testCase.region, result)
 	}
 }
+
+func TestCloud_sortELBSecurityGroupList(t *testing.T) {
+	type args struct {
+		securityGroupIDs []string
+		annotations      map[string]string
+	}
+	tests := []struct {
+		name                 string
+		args                 args
+		wantSecurityGroupIDs []string
+	}{
+		{
+			name: "with no annotation",
+			args: args{
+				securityGroupIDs: []string{"sg-1"},
+				annotations:      map[string]string{},
+			},
+			wantSecurityGroupIDs: []string{"sg-1"},
+		},
+		{
+			name: "with service.beta.kubernetes.io/aws-load-balancer-security-groups",
+			args: args{
+				securityGroupIDs: []string{"sg-2", "sg-1", "sg-3"},
+				annotations: map[string]string{
+					"service.beta.kubernetes.io/aws-load-balancer-security-groups": "sg-3,sg-2,sg-1",
+				},
+			},
+			wantSecurityGroupIDs: []string{"sg-3", "sg-2", "sg-1"},
+		},
+		{
+			name: "with service.beta.kubernetes.io/aws-load-balancer-extra-security-groups",
+			args: args{
+				securityGroupIDs: []string{"sg-2", "sg-1", "sg-3", "sg-4"},
+				annotations: map[string]string{
+					"service.beta.kubernetes.io/aws-load-balancer-extra-security-groups": "sg-3,sg-2,sg-1",
+				},
+			},
+			wantSecurityGroupIDs: []string{"sg-4", "sg-3", "sg-2", "sg-1"},
+		},
+		{
+			name: "with both annotation",
+			args: args{
+				securityGroupIDs: []string{"sg-2", "sg-1", "sg-3", "sg-4", "sg-5", "sg-6"},
+				annotations: map[string]string{
+					"service.beta.kubernetes.io/aws-load-balancer-security-groups":       "sg-3,sg-2,sg-1",
+					"service.beta.kubernetes.io/aws-load-balancer-extra-security-groups": "sg-6,sg-5",
+				},
+			},
+			wantSecurityGroupIDs: []string{"sg-3", "sg-2", "sg-1", "sg-4", "sg-6", "sg-5"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			c.sortELBSecurityGroupList(tt.args.securityGroupIDs, tt.args.annotations)
+			assert.Equal(t, tt.wantSecurityGroupIDs, tt.args.securityGroupIDs)
+		})
+	}
+}
