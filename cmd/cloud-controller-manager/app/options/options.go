@@ -41,7 +41,7 @@ import (
 	ccmconfigscheme "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme"
 	ccmconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	cmoptions "k8s.io/kubernetes/cmd/controller-manager/options"
 	"k8s.io/kubernetes/pkg/controller"
 
 	// add the kubernetes feature gates

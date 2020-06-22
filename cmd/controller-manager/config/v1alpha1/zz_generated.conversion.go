@@ -25,7 +25,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
-	config "k8s.io/kubernetes/pkg/controller/service/config"
+	service "k8s.io/kubernetes/cmd/controller-manager/service"
 )
 
 func init() {
@@ -45,13 +45,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.ServiceControllerConfiguration)(nil), (*v1alpha1.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(a.(*config.ServiceControllerConfiguration), b.(*v1alpha1.ServiceControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*service.ServiceControllerConfiguration)(nil), (*v1alpha1.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_service_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(a.(*service.ServiceControllerConfiguration), b.(*v1alpha1.ServiceControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1alpha1.ServiceControllerConfiguration)(nil), (*config.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(a.(*v1alpha1.ServiceControllerConfiguration), b.(*config.ServiceControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*v1alpha1.ServiceControllerConfiguration)(nil), (*service.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ServiceControllerConfiguration_To_service_ServiceControllerConfiguration(a.(*v1alpha1.ServiceControllerConfiguration), b.(*service.ServiceControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -80,12 +80,12 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 	return autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(in *v1alpha1.ServiceControllerConfiguration, out *config.ServiceControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_ServiceControllerConfiguration_To_service_ServiceControllerConfiguration(in *v1alpha1.ServiceControllerConfiguration, out *service.ServiceControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
 	return nil
 }
 
-func autoConvert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in *config.ServiceControllerConfiguration, out *v1alpha1.ServiceControllerConfiguration, s conversion.Scope) error {
+func autoConvert_service_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in *service.ServiceControllerConfiguration, out *v1alpha1.ServiceControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
 	return nil
 }

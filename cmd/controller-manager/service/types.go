@@ -14,6 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package
+package service
 
-package config // import "k8s.io/kubernetes/pkg/controller/service/config"
+// ServiceControllerConfiguration contains elements describing ServiceController.
+type ServiceControllerConfiguration struct {
+	// concurrentServiceSyncs is the number of services that are
+	// allowed to sync concurrently. Larger number = more responsive service
+	// management, but more CPU (and network) load.
+	ConcurrentServiceSyncs int32
+}

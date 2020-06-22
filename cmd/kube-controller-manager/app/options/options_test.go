@@ -24,13 +24,14 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/cmd/controller-manager/service"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/metrics"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	cmoptions "k8s.io/kubernetes/cmd/controller-manager/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -48,7 +49,6 @@ import (
 	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
-	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
@@ -200,7 +200,7 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
-			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
+			ServiceControllerConfiguration: &service.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 2,
 			},
 		},
@@ -448,7 +448,7 @@ func TestApplyTo(t *testing.T) {
 					CloudConfigFile: "/cloud-config",
 				},
 			},
-			ServiceController: serviceconfig.ServiceControllerConfiguration{
+			ServiceController: service.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 2,
 			},
 			AttachDetachController: attachdetachconfig.AttachDetachControllerConfiguration{

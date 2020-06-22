@@ -2,12 +2,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "types.go",
-        "zz_generated.deepcopy.go",
-    ],
-    importpath = "k8s.io/kubernetes/pkg/controller/service/config",
+    srcs = ["types.go"],
+    importpath = "k8s.io/kubernetes/cmd/controller-manager/service",
     visibility = ["//visibility:public"],
 )
 
@@ -20,10 +16,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/controller/service/config/v1alpha1:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

@@ -8,7 +8,10 @@ rules:
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app/config
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app/options
       - k8s.io/kubernetes/cmd/controller-manager/app
-      - k8s.io/kubernetes/cmd/controller-manager/app/options
+      - k8s.io/kubernetes/cmd/controller-manager/config
+      - k8s.io/kubernetes/cmd/controller-manager/config/v1alpha1
+      - k8s.io/kubernetes/cmd/controller-manager/options
+      - k8s.io/kubernetes/cmd/controller-manager/service
       - k8s.io/kubernetes/pkg/api/legacyscheme
       - k8s.io/kubernetes/pkg/api/service
       - k8s.io/kubernetes/pkg/api/v1/pod
@@ -30,7 +33,6 @@ rules:
       - k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/certificates/signer/config
       - k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1
-      - k8s.io/kubernetes/pkg/controller/cloud
       - k8s.io/kubernetes/pkg/controller/daemon/config
       - k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/deployment/config
@@ -59,10 +61,6 @@ rules:
       - k8s.io/kubernetes/pkg/controller/replication/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/resourcequota/config
       - k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1
-      - k8s.io/kubernetes/pkg/controller/route
-      - k8s.io/kubernetes/pkg/controller/service
-      - k8s.io/kubernetes/pkg/controller/service/config
-      - k8s.io/kubernetes/pkg/controller/service/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/serviceaccount/config
       - k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/statefulset/config

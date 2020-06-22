@@ -9,11 +9,11 @@ go_library(
         "kubecloudshared.go",
         "servicecontroller.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/controller-manager/app/options",
+    importpath = "k8s.io/kubernetes/cmd/controller-manager/options",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/controller-manager/service:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
-        "//pkg/controller/service/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",

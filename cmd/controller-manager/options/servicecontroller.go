@@ -18,13 +18,12 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-
-	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
+	"k8s.io/kubernetes/cmd/controller-manager/service"
 )
 
 // ServiceControllerOptions holds the ServiceController options.
 type ServiceControllerOptions struct {
-	*serviceconfig.ServiceControllerConfiguration
+	*service.ServiceControllerConfiguration
 }
 
 // AddFlags adds flags related to ServiceController for controller manager to the specified FlagSet.
@@ -37,7 +36,7 @@ func (o *ServiceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up ServiceController config with options.
-func (o *ServiceControllerOptions) ApplyTo(cfg *serviceconfig.ServiceControllerConfiguration) error {
+func (o *ServiceControllerOptions) ApplyTo(cfg *service.ServiceControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

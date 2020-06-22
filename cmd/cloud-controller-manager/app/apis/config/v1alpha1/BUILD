@@ -15,8 +15,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/cloud-controller-manager/app/apis/config:go_default_library",
+        "//cmd/controller-manager/config/v1alpha1:go_default_library",
         "//pkg/controller/apis/config/v1alpha1:go_default_library",
-        "//pkg/controller/service/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
