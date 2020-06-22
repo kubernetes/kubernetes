@@ -155,5 +155,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
-	return commonutils.SubstituteImageName(string(testfiles.ReadOrDie(from)))
+	data, err := testfiles.Read(from)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	return commonutils.SubstituteImageName(string(data))
 }

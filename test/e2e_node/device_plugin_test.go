@@ -80,7 +80,12 @@ func numberOfSampleResources(node *v1.Node) int64 {
 
 // getSampleDevicePluginPod returns the Device Plugin pod for sample resources in e2e tests.
 func getSampleDevicePluginPod() *v1.Pod {
-	ds := readDaemonSetV1OrDie(e2etestfiles.ReadOrDie(sampleDevicePluginDSYAML))
+	data, err := e2etestfiles.Read(sampleDevicePluginDSYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+
+	ds := readDaemonSetV1OrDie(data)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      sampleDevicePluginName,
