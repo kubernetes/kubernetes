@@ -214,18 +214,18 @@ func TestPlugin(t *testing.T) {
 	if len(term.MatchExpressions) != 2 {
 		t.Errorf("Unexpected number of NodeSelectorRequirements in volume NodeAffinity: %d", len(term.MatchExpressions))
 	}
-	r, _ := getNodeSelectorRequirementWithKey("fakepdmanager", term)
-	if r == nil || r.Values[0] != "yes" || r.Operator != v1.NodeSelectorOpIn {
+	rt, _ := getNodeSelectorRequirementWithKey("fakepdmanager", term)
+	if rt == nil || rt.Values[0] != "yes" || rt.Operator != v1.NodeSelectorOpIn {
 		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
 	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
-	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
-	if r == nil {
+	rk, _ := getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
+	if rk == nil {
 		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
 	}
-	sort.Strings(r.Values)
-	if !reflect.DeepEqual(r.Values, zones.List()) {
-		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+	sort.Strings(rk.Values)
+	if !reflect.DeepEqual(rk.Values, zones.List()) {
+		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", rk.Values, zones)
 	}
 
 	// Test Deleter

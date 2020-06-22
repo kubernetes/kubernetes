@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -67,7 +67,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	}
 	block := v1.PersistentVolumeBlock
 	specMode := spec.PersistentVolume.Spec.VolumeMode
-	if &specMode == nil {
+	if specMode == nil {
 		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v expected: %v", &specMode, block)
 	}
 	if *specMode != block {

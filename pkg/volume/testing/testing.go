@@ -401,8 +401,8 @@ var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
-	volumeList := *list
-	if list != nil && len(volumeList) > 0 {
+	if list != nil && len(*list) > 0 {
+		volumeList := *list
 		volume := volumeList[0]
 		volume.Lock()
 		defer volume.Unlock()
