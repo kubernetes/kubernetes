@@ -511,10 +511,11 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 //
 // The output goes to log files (when using --report-dir, as in the
 // CI) or the output stream (otherwise).
-func StartPodLogs(f *framework.Framework) func() {
+func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cs := f.ClientSet
-	ns := f.Namespace
+
+	ns := driverNamespace.Name
 
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,
@@ -532,13 +533,13 @@ func StartPodLogs(f *framework.Framework) func() {
 		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
 			reg.ReplaceAllString(test.FullTestText, "_") + "/"
 	}
-	podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
+	podlogs.CopyAllLogs(ctx, cs, ns, to)
 
 	// pod events are something that the framework already collects itself
 	// after a failed test. Logging them live is only useful for interactive
 	// debugging, not when we collect reports.
 	if framework.TestContext.ReportDir == "" {
-		podlogs.WatchPods(ctx, cs, ns.Name, ginkgo.GinkgoWriter)
+		podlogs.WatchPods(ctx, cs, ns, ginkgo.GinkgoWriter)
 	}
 
 	return cancel
