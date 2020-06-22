@@ -333,11 +333,14 @@ type ScorePlugin interface {
 type ReservePlugin interface {
 	Plugin
 	// Reserve is called by the scheduling framework when the scheduler cache is
-	// updated.
+	// updated. If this method returns a failed Status, the scheduler will call
+	// the Unreserve method for all enabled ReservePlugins.
 	Reserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
 	// Unreserve is called by the scheduling framework when a reserved pod was
 	// rejected, an error occurred during reservation of subsequent plugins, or
-	// in a later phase. The Unreserve method implementation must be idempotent.
+	// in a later phase. The Unreserve method implementation must be idempotent
+	// and may be called by the scheduler even if the corresponding Reserve
+	// method for the same plugin was not called.
 	Unreserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string)
 }
 
