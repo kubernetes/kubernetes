@@ -1867,6 +1867,8 @@ function update-node-label() {
 
 # A helper function that sets file permissions for kube-controller-manager to
 # run as non root.
+# (User- and groupnames not expected to contain characters that need quoting.)
+# shellcheck disable=SC2086
 function run-kube-controller-manager-as-non-root {
   prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER} ${KUBE_CONTROLLER_MANAGER_RUNASGROUP}
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${CA_CERT_BUNDLE_PATH}"
@@ -2143,22 +2145,10 @@ function get-metadata-value {
 function copy-manifests {
   local -r src_dir="$1"
   local -r dst_dir="$2"
-  if [[ ! -d "${dst_dir}" ]]; then
-    mkdir -p "${dst_dir}"
-  fi
-  local files
-  files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
-  if [[ -n "${files}" ]]; then
-    cp "${src_dir}/"*.yaml "${dst_dir}"
-  fi
-  files=$(find "${src_dir}" -maxdepth 1 -name "*.json")
-  if [[ -n "${files}" ]]; then
-    cp "${src_dir}/"*.json "${dst_dir}"
-  fi
-  files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml.in")
-  if [[ -n "${files}" ]]; then
-    cp "${src_dir}/"*.yaml.in "${dst_dir}"
-  fi
+  mkdir -p "${dst_dir}"
+
+  find "${src_dir}" -maxdepth 1 \( -name "*.yaml" -o -name "*.json" -o -name "*.yaml.in" \) -exec cp {} "$dst_dir" \;
+
   chown -R root:root "${dst_dir}"
   chmod 755 "${dst_dir}"
   chmod 644 "${dst_dir}"/*
