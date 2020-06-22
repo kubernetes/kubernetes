@@ -188,6 +188,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 		return false
 	}
 
+	// We do not need to check status during deletion
+	if w.pod.ObjectMeta.DeletionTimestamp != nil {
+		klog.V(3).Infof("Pod %v %v is being deleted, exiting probe worker",
+			format.Pod(w.pod), status.Phase)
+		return false
+	}
+
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.

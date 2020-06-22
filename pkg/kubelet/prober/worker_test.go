@@ -58,17 +58,22 @@ func TestDoProbe(t *testing.T) {
 		failedStatus.Phase = v1.PodFailed
 
 		tests := []struct {
-			probe          v1.Probe
-			podStatus      *v1.PodStatus
-			expectContinue bool
-			expectSet      bool
-			expectedResult results.Result
+			probe                v1.Probe
+			podStatus            *v1.PodStatus
+			setDeletionTimestamp bool
+			expectContinue       bool
+			expectSet            bool
+			expectedResult       results.Result
 		}{
 			{ // No status.
 				expectContinue: true,
 			},
 			{ // Pod failed
 				podStatus: &failedStatus,
+			},
+			{ // Pod deletion
+				podStatus:            &runningStatus,
+				setDeletionTimestamp: true,
 			},
 			{ // No container status
 				podStatus:      &otherStatus,
@@ -106,6 +111,10 @@ func TestDoProbe(t *testing.T) {
 			w := newTestWorker(m, probeType, test.probe)
 			if test.podStatus != nil {
 				m.statusManager.SetPodStatus(w.pod, *test.podStatus)
+			}
+			if test.setDeletionTimestamp {
+				now := metav1.Now()
+				w.pod.ObjectMeta.DeletionTimestamp = &now
 			}
 			if c := w.doProbe(); c != test.expectContinue {
 				t.Errorf("[%s-%d] Expected continue to be %v but got %v", probeType, i, test.expectContinue, c)
