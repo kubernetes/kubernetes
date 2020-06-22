@@ -187,6 +187,7 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources
       - k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1
+      - k8s.io/kubernetes/pkg/scheduler/framework/runtime
       - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
       - k8s.io/kubernetes/pkg/scheduler/listers
       - k8s.io/kubernetes/pkg/scheduler/metrics

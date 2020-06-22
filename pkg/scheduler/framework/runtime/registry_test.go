@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package runtime
 
 import (
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 func TestDecodeInto(t *testing.T) {
@@ -102,7 +103,7 @@ func (p *mockNoopPlugin) Name() string {
 }
 
 func NewMockNoopPluginFactory() PluginFactory {
-	return func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
+	return func(_ runtime.Object, _ v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error) {
 		return &mockNoopPlugin{}, nil
 	}
 }

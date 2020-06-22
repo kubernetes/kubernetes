@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package runtime
 
 import (
 	"time"
 
 	k8smetrics "k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -62,7 +63,7 @@ func newMetricsRecorder(bufferSize int, interval time.Duration) *metricsRecorder
 
 // observePluginDurationAsync observes the plugin_execution_duration_seconds metric.
 // The metric will be flushed to Prometheus asynchronously.
-func (r *metricsRecorder) observePluginDurationAsync(extensionPoint, pluginName string, status *Status, value float64) {
+func (r *metricsRecorder) observePluginDurationAsync(extensionPoint, pluginName string, status *v1alpha1.Status, value float64) {
 	newMetric := &frameworkMetric{
 		metric:      metrics.PluginExecutionDuration,
 		labelValues: []string{pluginName, extensionPoint, status.Code().String()},

@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -445,7 +446,7 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 
 func newConfigFactoryWithFrameworkRegistry(
 	client clientset.Interface, stopCh <-chan struct{},
-	registry framework.Registry) *Configurator {
+	registry frameworkruntime.Registry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	snapshot := internalcache.NewEmptySnapshot()
 	recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))

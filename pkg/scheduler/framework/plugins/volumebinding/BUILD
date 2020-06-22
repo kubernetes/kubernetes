@@ -39,6 +39,7 @@ go_test(
         "//pkg/controller/volume/persistentvolume/util:go_default_library",
         "//pkg/controller/volume/scheduling:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",

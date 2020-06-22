@@ -17,6 +17,7 @@ go_test(
     srcs = ["image_locality_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
