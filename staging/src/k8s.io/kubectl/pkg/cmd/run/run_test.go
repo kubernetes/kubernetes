@@ -442,16 +442,6 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "Invalid image name",
 		},
 		{
-			name: "test stdin replicas value",
-			args: []string{"test"},
-			flags: map[string]string{
-				"image":    "busybox",
-				"stdin":    "true",
-				"replicas": "2",
-			},
-			expectedErr: "stdin requires that replicas is 1",
-		},
-		{
 			name: "test rm errors when used on non-attached containers",
 			args: []string{"test"},
 			flags: map[string]string{
