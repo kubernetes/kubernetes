@@ -2278,3 +2278,72 @@ func TestRequestMaxRetries(t *testing.T) {
 		})
 	}
 }
+
+func TestBodyEnsureHTTPGetBodyIsSet(t *testing.T) {
+	f, err := ioutil.TempFile("", "test-body-")
+	if err != nil {
+		t.Fatalf("failed to create file for request body: %v", err)
+	}
+	defer os.Remove(f.Name())
+
+	if _, err := f.WriteString("foo"); err != nil {
+		t.Fatalf("failed to write to file: %v", err)
+	}
+	f.Close()
+
+	tests := []struct {
+		name  string
+		input interface{}
+	}{
+		{
+			name:  "WithRuntimeObject",
+			input: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			name:  "WithByteSlice",
+			input: []byte("foo"),
+		},
+		{
+			name:  "WithStringFromFile",
+			input: f.Name(),
+		},
+	}
+
+	base, _ := url.Parse("http://localhost")
+	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
+	client, err := NewRESTClient(base, versionedAPIPath, defaultContentConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create a client: %v", err)
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := Request{
+				c:          client,
+				pathPrefix: "/path",
+			}
+			r.Body(test.input)
+
+			request, err := http.NewRequest(r.verb, r.URL().String(), r.body)
+			if err != nil {
+				t.Errorf("failed to create http Request: %v", err)
+			}
+
+			// net/http2 retries a request if it receives a GOAWAY frame.
+			// GOAWAY frame has LastStreamID which represents the last stream identifier the server
+			// has processed or is aware of. On the client side, net/http2 will set an error for any
+			// stream that has an identifier higher than that of LastStreamID.
+			// However, if the request body is not empty then net/http2 will retry only when it can
+			// reset back the request body to its original state via the optional req.GetBody.
+			//
+			// This is where it happens in net/http2
+			// https://github.com/golang/go/blob/master/src/net/http/h2_bundle.go#L6991
+			//
+			// Let's ensure that body of rest.Request passed to http.NewRequest results in a
+			// new http.Request where GetBody is set.
+			if request.GetBody == nil {
+				t.Error("expected GetBody of HTTP Request to be set but got nil")
+			}
+		})
+	}
+}
