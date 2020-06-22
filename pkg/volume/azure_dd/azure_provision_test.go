@@ -20,10 +20,11 @@ package azure_dd
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestParseZoned(t *testing.T) {
@@ -93,6 +94,72 @@ func TestParseZoned(t *testing.T) {
 			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
 		} else {
 			assert.Equal(t, test.expected, real, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
+		}
+	}
+}
+
+func TestConvertTagsToMap(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		tags           string
+		expectedOutput map[string]string
+		expectedError  bool
+	}{
+		{
+			desc:           "should return empty map when tag is empty",
+			tags:           "",
+			expectedOutput: map[string]string{},
+			expectedError:  false,
+		},
+		{
+			desc: "sing valid tag should be converted",
+			tags: "key=value",
+			expectedOutput: map[string]string{
+				"key": "value",
+			},
+			expectedError: false,
+		},
+		{
+			desc: "multiple valid tags should be converted",
+			tags: "key1=value1,key2=value2",
+			expectedOutput: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			expectedError: false,
+		},
+		{
+			desc: "whitespaces should be trimmed",
+			tags: "key1=value1, key2=value2",
+			expectedOutput: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			expectedError: false,
+		},
+		{
+			desc:           "should return error for invalid format",
+			tags:           "foo,bar",
+			expectedOutput: nil,
+			expectedError:  true,
+		},
+		{
+			desc:           "should return error for when key is missed",
+			tags:           "key1=value1,=bar",
+			expectedOutput: nil,
+			expectedError:  true,
+		},
+	}
+
+	for i, c := range testCases {
+		m, err := ConvertTagsToMap(c.tags)
+		if c.expectedError {
+			assert.NotNil(t, err, "TestCase[%d]: %s", i, c.desc)
+		} else {
+			assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+			if !reflect.DeepEqual(m, c.expectedOutput) {
+				t.Errorf("got: %v, expected: %v, desc: %v", m, c.expectedOutput, c.desc)
+			}
 		}
 	}
 }
