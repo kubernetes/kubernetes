@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -272,6 +273,39 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 
 	// ensure cache mutation has not occurred
 	cmc.Check(t)
+}
+
+func TestOnEndpointSliceUpdate(t *testing.T) {
+	_, esController := newController([]string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}
+
+	epSlice2 := epSlice1.DeepCopy()
+	epSlice2.Labels[discovery.LabelManagedBy] = "something else"
+
+	assert.Equal(t, 0, esController.queue.Len())
+	esController.onEndpointSliceUpdate(epSlice1, epSlice2)
+	err := wait.PollImmediate(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+		if esController.queue.Len() > 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error waiting for add to queue")
+	}
+	assert.Equal(t, 1, esController.queue.Len())
 }
 
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
