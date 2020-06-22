@@ -24,8 +24,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -135,6 +137,9 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 //
 // For PVCs that are unbound, it tries to find available PVs that can satisfy the PVC requirements
 // and that the PV node affinity is satisfied by the given node.
+//
+// If storage capacity tracking is enabled, then enough space has to be available
+// for the node and volumes that still need to be created.
 //
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
@@ -254,7 +259,14 @@ func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin,
 	pvInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumes()
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
-	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	var capacityCheck *scheduling.CapacityCheck
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		capacityCheck = &scheduling.CapacityCheck{
+			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
+			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1alpha1().CSIStorageCapacities(),
+		}
+	}
+	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	return &VolumeBinding{
 		Binder: binder,
 	}, nil
