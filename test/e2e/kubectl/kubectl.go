@@ -344,10 +344,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
 				"agnhost-replica-service.yaml",
-				"agnhost-master-service.yaml",
+				"agnhost-primary-service.yaml",
 				"frontend-service.yaml",
 				"frontend-deployment.yaml.in",
-				"agnhost-master-deployment.yaml.in",
+				"agnhost-primary-deployment.yaml.in",
 				"agnhost-replica-deployment.yaml.in",
 			} {
 				contents := commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))

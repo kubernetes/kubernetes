@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agnhost-master
+  name: agnhost-primary
 spec:
   replicas: 1
   selector:
