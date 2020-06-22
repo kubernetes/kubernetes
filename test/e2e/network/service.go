@@ -3569,40 +3569,42 @@ func translatePodNameToUID(c clientset.Interface, ns string, expectedEndpoints p
 // validateEndpointsPorts validates that the given service exists and is served by the given expectedEndpoints.
 func validateEndpointsPorts(c clientset.Interface, namespace, serviceName string, expectedEndpoints portsByPodName) error {
 	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
-	i := 1
-	for start := time.Now(); time.Since(start) < framework.ServiceStartTimeout; time.Sleep(1 * time.Second) {
+	expectedPortsByPodUID, err := translatePodNameToUID(c, namespace, expectedEndpoints)
+	if err != nil {
+		return err
+	}
+
+	i := 0
+	if pollErr := wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
 		ep, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
-			continue
+			framework.Logf("Failed go get Endpoints object: %v", err)
+			// Retry the error
+			return false, nil
 		}
 		portsByPodUID := e2eendpoints.GetContainerPortsByPodUID(ep)
-		expectedPortsByPodUID, err := translatePodNameToUID(c, namespace, expectedEndpoints)
-		if err != nil {
-			return err
-		}
-		if len(portsByPodUID) == len(expectedEndpoints) {
-			err := validatePorts(portsByPodUID, expectedPortsByPodUID)
-			if err != nil {
-				return err
-			}
-			framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
-				serviceName, namespace, expectedEndpoints, time.Since(start))
-			return nil
-		}
-		if i%5 == 0 {
-			framework.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
-		}
+
 		i++
-	}
-	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
-		for _, pod := range pods.Items {
-			framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+		if err := validatePorts(portsByPodUID, expectedPortsByPodUID); err != nil {
+			if i%5 == 0 {
+				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByPodUID, expectedEndpoints)
+			}
+			return false, nil
 		}
-	} else {
-		framework.Logf("Can't list pod debug info: %v", err)
+		framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v",
+			serviceName, namespace, expectedEndpoints)
+		return true, nil
+	}); pollErr != nil {
+		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
+			for _, pod := range pods.Items {
+				framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			}
+		} else {
+			framework.Logf("Can't list pod debug info: %v", err)
+		}
+		return fmt.Errorf("error waithing for service %s in namespace %s to expose endpoints %v: %v", serviceName, namespace, expectedEndpoints, pollErr)
 	}
-	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
+	return nil
 }
 
 // restartApiserver restarts the kube-apiserver.
