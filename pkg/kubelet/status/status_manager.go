@@ -388,10 +388,7 @@ func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus
 // This method IS NOT THREAD SAFE and must be called from a locked function.
 func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUpdate bool) bool {
 	var oldStatus v1.PodStatus
-	cachedStatus, isCached := m.podStatuses[pod.UID]
-	if isCached {
-		oldStatus = cachedStatus.status
-	} else if mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod); ok {
+	if mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod); ok {
 		oldStatus = mirrorPod.Status
 	} else {
 		oldStatus = pod.Status
@@ -431,7 +428,8 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	normalizeStatus(pod, &status)
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
-	if isCached && isPodStatusByKubeletEqual(&cachedStatus.status, &status) && !forceUpdate {
+	cachedStatus, isCached := m.podStatuses[pod.UID]
+	if isCached && isPodStatusByKubeletEqual(&oldStatus, &status) && isPodStatusByKubeletEqual(&cachedStatus.status, &status) && !forceUpdate {
 		klog.V(3).Infof("Ignoring same status for pod %q, status: %+v", format.Pod(pod), status)
 		return false // No new status.
 	}
@@ -442,7 +440,6 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		podName:      pod.Name,
 		podNamespace: pod.Namespace,
 	}
-	m.podStatuses[pod.UID] = newStatus
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
@@ -579,6 +576,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		pod = newPod
 	}
 
+	m.podStatuses[pod.UID] = status
 	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
 
 	// We don't handle graceful deletion of mirror pods.

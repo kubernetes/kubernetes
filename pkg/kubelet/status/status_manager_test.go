@@ -1196,3 +1196,47 @@ func getPodStatus() v1.PodStatus {
 		Message: "Message",
 	}
 }
+
+func TestStatusCacheStale(t *testing.T) {
+	syncer := newTestManager(&fake.Clientset{})
+	testPod := getTestPod()
+	now := metav1.Now()
+	testPod.Status = v1.PodStatus{
+		Conditions: []v1.PodCondition{
+			{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionFalse,
+				LastTransitionTime: now,
+			},
+		},
+		StartTime: &now,
+	}
+	apiPodStatus := v1.PodStatus{
+		Conditions: []v1.PodCondition{
+			{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: now,
+			},
+		},
+		StartTime: &now,
+	}
+	syncer.podStatuses[testPod.UID] = versionedPodStatus{
+		status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:               v1.PodReady,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: now,
+				},
+			},
+			StartTime: &now,
+		},
+		version:      1,
+		podName:      testPod.Name,
+		podNamespace: testPod.Namespace,
+	}
+	syncer.kubeClient = fake.NewSimpleClientset(testPod)
+	syncer.SetPodStatus(testPod, apiPodStatus)
+	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
+}
