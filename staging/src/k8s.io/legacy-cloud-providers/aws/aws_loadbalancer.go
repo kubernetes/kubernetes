@@ -69,6 +69,13 @@ func isNLB(annotations map[string]string) bool {
 	return false
 }
 
+func isLBExternal(annotations map[string]string) bool {
+	if val := annotations[ServiceAnnotationLoadBalancerType]; val == "nlb-ip" || val == "external" {
+		return true
+	}
+	return false
+}
+
 type nlbPortMapping struct {
 	FrontendPort     int64
 	FrontendProtocol string
