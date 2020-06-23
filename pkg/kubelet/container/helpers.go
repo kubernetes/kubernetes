@@ -105,6 +105,9 @@ func HashContainer(container *v1.Container) uint64 {
 	// Omit nil or empty field when calculating hash value
 	// Please see https://github.com/kubernetes/kubernetes/issues/53644
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// In-Place Pod Vertical Scaling allows mutable ResourcesAllocated and
+		// Resources fields. Changes to these fields may not require container
+		// restarts, and are handled differently. So they is excluded from hash.
 		cResources := container.Resources
 		cResourcesAllocated := container.ResourcesAllocated
 		container.Resources = v1.ResourceRequirements{}
