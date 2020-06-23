@@ -5,10 +5,10 @@ load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
     name = "io_k8s_repo_infra",
-    sha256 = "55e56b332ead9c32e1d53c9834a5c918a4cecd6859b70645eba6cd10372fd68f",
-    strip_prefix = "repo-infra-0.0.5",
+    sha256 = "7da9e67cd291e2b3b0503649d1beaf82b10c2483f4061ebe05fb7d19f62442f0",
+    strip_prefix = "repo-infra-0.0.6",
     urls = [
-        "https://github.com/kubernetes/repo-infra/archive/v0.0.5.tar.gz",
+        "https://github.com/kubernetes/repo-infra/archive/v0.0.6.tar.gz",
     ],
 )
 
@@ -19,7 +19,7 @@ repo_infra_repositories()
 load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_infra_go_repositories = "go_repositories")
 
 repo_infra_configure(
-    go_version = "1.13.9",
+    go_version = "1.14.4",
     minimum_bazel_version = "2.2.0",
 )
 

@@ -69,9 +69,11 @@ dependencies:
       match: BUNDLED_VERSIONS=
 
   - name: "golang"
-    version: 1.13.9
+    version: 1.14.4
     refPaths:
     - path: build/build-image/cross/VERSION
+    - path: build/root/WORKSPACE
+      match: go_version = "\d+\.\d+\.\d+"
     - path: test/images/Makefile
       match: GOLANG_VERSION
 
@@ -132,7 +134,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.13.9-5
+    version: v1.14.4-2
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
@@ -197,7 +199,7 @@ dependencies:
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
 
   - name: "repo-infra"
-    version: 0.0.5
+    version: 0.0.6
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
