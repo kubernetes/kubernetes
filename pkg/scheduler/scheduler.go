@@ -481,17 +481,10 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// into the resources that were preempted, but this is harmless.
 		nominatedNode := ""
 		if fitError, ok := err.(*core.FitError); ok {
-			if sched.DisablePreemption {
+			if sched.DisablePreemption || !prof.HasPostFilterPlugins() {
 				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
 					" No preemption is performed.")
 			} else {
-				preemptionStartTime := time.Now()
-				// TODO(Huang-Wei): implement the preemption logic as a PostFilter plugin.
-				nominatedNode, _ = core.Preempt(schedulingCycleCtx, prof, state, pod, fitError.FilteredNodesStatuses)
-				metrics.PreemptionAttempts.Inc()
-				metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
-				metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
-
 				// Run PostFilter plugins to try to make the pod schedulable in a future scheduling cycle.
 				result, status := prof.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
 				if status.Code() == framework.Error {

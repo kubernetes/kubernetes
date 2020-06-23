@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -78,6 +79,11 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: volumezone.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
+			},
+		},
+		PostFilter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
+				{Name: defaultpreemption.Name},
 			},
 		},
 		PreScore: &schedulerapi.PluginSet{
@@ -177,6 +183,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 					},
 				},
+				PostFilter: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
+						{Name: defaultpreemption.Name},
+					},
+				},
 				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
@@ -260,6 +271,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: volumezone.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
+					},
+				},
+				PostFilter: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
+						{Name: defaultpreemption.Name},
 					},
 				},
 				PreScore: &schedulerapi.PluginSet{

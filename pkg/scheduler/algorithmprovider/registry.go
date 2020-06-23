@@ -26,6 +26,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -107,6 +108,11 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: volumezone.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
+			},
+		},
+		PostFilter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
+				{Name: defaultpreemption.Name},
 			},
 		},
 		PreScore: &schedulerapi.PluginSet{
