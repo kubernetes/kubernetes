@@ -1,14 +1,8 @@
 suite: network/service
 description: Base suite for services
 behaviors:
-- id: network/service/latency
-  description: Service endpoint latency must not exceed 20s for p50 and 50s for p90.
 - id: network/service/default/kubernetes
   description: Default kubernetes service must be running on every cluster in the default namespace.
-- id: network/service/update/podlabel/add
-  description: When a Pod is created or updated to have its label matching a Service's label selector, the Service's Endpoint object must show all ports exposed by the pod.
-- id: network/service/update/podlabel/remove
-  description: When a Pod is created or updated to have its label originally matching a Service's label selector removed, the Service's Endpoint object must not show the ports from the corresponding pod.
 - id: network/service/ports/multiple
   description: When a Service resource is created with multiple ports and pods exists to satisfy the port, the Service's endpoint resource should show all endpoints.
 - id: network/service/selector/present-during-create

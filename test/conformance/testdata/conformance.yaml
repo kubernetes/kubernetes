@@ -1506,6 +1506,8 @@
     entries such as kubernetes.default via /etc/hosts.
   release: v1.14
   file: test/e2e/network/dns.go
+  behaviors:
+  - network/dns/resolve/etchosts
 - testname: DNS, for ExternalName Services
   codename: '[sig-network] DNS should provide DNS for ExternalName services [Conformance]'
   description: Create a service with externalName. Pod MUST be able to resolve the
@@ -1539,8 +1541,6 @@
     names.
   release: v1.9
   file: test/e2e/network/dns.go
-  behaviors:
-  - network/dns/resolve/etchosts
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide DNS for the cluster  [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
@@ -1666,8 +1666,6 @@
     and 50s for the 90th percentile.
   release: v1.9
   file: test/e2e/network/service_latency.go
-  behaviors:
-  - network/service/latency
 - testname: Service, change type, ClusterIP to ExternalName
   codename: '[sig-network] Services should be able to change the type from ClusterIP
     to ExternalName [Conformance]'
@@ -1875,10 +1873,6 @@
     pods are deleted the endpoints from the service MUST be empty.
   release: v1.9
   file: test/e2e/network/service.go
-  behaviors:
-  - network/service/basic-create/selector
-  - network/service/update/podlabel/add
-  - network/service/update/podlabel/remove
 - testname: Service, endpoints with multiple ports
   codename: '[sig-network] Services should serve multiport endpoints from pods  [Conformance]'
   description: Create a service with two ports but no Pods are added to the service

@@ -112,6 +112,8 @@ var _ = SIGDescribe("DNS", func() {
 		Release : v1.14
 		Testname: DNS, cluster
 		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via /etc/hosts.
+		Behaviors:
+		- network/dns/resolve/etchosts
 	*/
 	framework.ConformanceIt("should provide /etc/hosts entries for the cluster [LinuxOnly]", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -132,8 +134,6 @@ var _ = SIGDescribe("DNS", func() {
 		Release : v1.9
 		Testname: DNS, services
 		Description: When a headless service is created, the service MUST be able to resolve all the required service endpoints. When the service is created, any pod in the same namespace must be able to resolve the service by all of the expected DNS names.
-		Behaviors:
-		- network/dns/resolve/etchosts
 	*/
 	framework.ConformanceIt("should provide DNS for services ", func() {
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
