@@ -193,7 +193,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 			cfg.FeatureGates[name] = value
 		}
 
-		// use the loaded config file only, with the exception of --address and --port. This means that
+		// use the loaded config file only, with the exception of --address, --port and --feature-gates. This means that
 		// none of the deprecated flags in o.Deprecated are taken into consideration. This is the old
 		// behaviour of the flags we have to keep.
 		c.ComponentConfig = *cfg
@@ -201,6 +201,10 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		if err := o.CombinedInsecureServing.ApplyToFromLoadedConfig(c, &c.ComponentConfig); err != nil {
 			return err
 		}
+	}
+
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(c.ComponentConfig.FeatureGates); err != nil {
+		return err
 	}
 
 	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
@@ -215,10 +219,6 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
-
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(c.ComponentConfig.FeatureGates); err != nil {
-		return err
-	}
 
 	return nil
 }
