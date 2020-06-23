@@ -379,7 +379,7 @@ function try-load-docker-image {
 
   if [[ "${CONTAINER_RUNTIME_NAME:-}" == "docker" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-docker load -i}
-  elif [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" ]]; then
+  elif [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
   else
     load_image_command="${LOAD_IMAGE_COMMAND:-}"
