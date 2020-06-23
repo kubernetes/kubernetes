@@ -1,7 +1,6 @@
 cluster/images/etcd/migrate
 pkg/controller/deployment
 pkg/controller/garbagecollector
-pkg/controller/nodeipam
 pkg/controller/podautoscaler
 pkg/controller/replicaset
 pkg/controller/resourcequota
