@@ -1414,6 +1414,9 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
 		},
+		"PostFilterPlugin": {
+			{Name: "DefaultPreemption"},
+		},
 		"PreScorePlugin": {
 			{Name: "InterPodAffinity"},
 			{Name: "PodTopologySpread"},
@@ -1482,6 +1485,9 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
+					{Name: "DefaultPreemption"},
 				},
 				"PreScorePlugin": {
 					{Name: "InterPodAffinity"},
@@ -1571,6 +1577,9 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			{Name: "VolumeZone"},
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
+		},
+		"PostFilterPlugin": {
+			{Name: "DefaultPreemption"},
 		},
 		"PreScorePlugin": {
 			{Name: "InterPodAffinity"},
@@ -1771,6 +1780,11 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "PodTopologySpread"},
 					},
 				},
+				PostFilter: &config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: "DefaultPreemption"},
+					},
+				},
 				PreScore: &config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "InterPodAffinity"},
@@ -1916,6 +1930,9 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 					{Name: "NodeName"},
 					{Name: "NodeResourcesFit"},
 					{Name: "NodeUnschedulable"},
+				},
+				"PostFilterPlugin": {
+					{Name: "DefaultPreemption"},
 				},
 				"PreScorePlugin": {
 					{Name: "TaintToleration"},

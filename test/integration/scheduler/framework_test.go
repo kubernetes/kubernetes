@@ -601,19 +601,17 @@ func TestPostFilterPlugin(t *testing.T) {
 			expectPostFilterNumCalled: 0,
 		},
 		{
-			name:             "Filter failed and PostFilter passed",
-			rejectFilter:     true,
-			rejectPostFilter: false,
-			// TODO: change to <numNodes * 2> when the hard-coded preemption logic is removed.
-			expectFilterNumCalled:     numNodes * 3,
+			name:                      "Filter failed and PostFilter passed",
+			rejectFilter:              true,
+			rejectPostFilter:          false,
+			expectFilterNumCalled:     numNodes * 2,
 			expectPostFilterNumCalled: 1,
 		},
 		{
-			name:             "Filter failed and PostFilter failed",
-			rejectFilter:     true,
-			rejectPostFilter: true,
-			// TODO: change to <numNodes * 2> when the hard-coded preemption logic is removed.
-			expectFilterNumCalled:     numNodes * 3,
+			name:                      "Filter failed and PostFilter failed",
+			rejectFilter:              true,
+			rejectPostFilter:          true,
+			expectFilterNumCalled:     numNodes * 2,
 			expectPostFilterNumCalled: 1,
 		},
 	}
@@ -644,6 +642,11 @@ func TestPostFilterPlugin(t *testing.T) {
 					PostFilter: &schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{Name: postfilterPluginName},
+						},
+						// Need to disable default in-tree PostFilter plugins, as they will
+						// call RunFilterPlugins and hence impact the "numFilterCalled".
+						Disabled: []schedulerconfig.Plugin{
+							{Name: "*"},
 						},
 					},
 				},
