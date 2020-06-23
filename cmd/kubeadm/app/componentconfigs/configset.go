@@ -239,6 +239,49 @@ func FetchFromDocumentMap(clusterCfg *kubeadmapi.ClusterConfiguration, docmap ku
 	return nil
 }
 
+// FetchFromClusterWithLocalOverwrites fetches component configs from a cluster and overwrites them locally with
+// the ones present in the supplied document map. If any UnsupportedConfigVersionError are not handled by the configs
+// in the document map, the function returns them all as a single UnsupportedConfigVersionsErrorMap.
+// This function is normally called only in some specific cases during upgrade.
+func FetchFromClusterWithLocalOverwrites(clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, docmap kubeadmapi.DocumentMap) error {
+	ensureInitializedComponentConfigs(clusterCfg)
+
+	oldVersionErrs := UnsupportedConfigVersionsErrorMap{}
+
+	for _, handler := range known {
+		componentCfg, err := handler.FromCluster(client, clusterCfg)
+		if err != nil {
+			if vererr, ok := err.(*UnsupportedConfigVersionError); ok {
+				oldVersionErrs[handler.GroupVersion.Group] = vererr
+			} else {
+				return err
+			}
+		} else if componentCfg != nil {
+			clusterCfg.ComponentConfigs[handler.GroupVersion.Group] = componentCfg
+		}
+	}
+
+	for _, handler := range known {
+		componentCfg, err := handler.FromDocumentMap(docmap)
+		if err != nil {
+			if vererr, ok := err.(*UnsupportedConfigVersionError); ok {
+				oldVersionErrs[handler.GroupVersion.Group] = vererr
+			} else {
+				return err
+			}
+		} else if componentCfg != nil {
+			clusterCfg.ComponentConfigs[handler.GroupVersion.Group] = componentCfg
+			delete(oldVersionErrs, handler.GroupVersion.Group)
+		}
+	}
+
+	if len(oldVersionErrs) != 0 {
+		return oldVersionErrs
+	}
+
+	return nil
+}
+
 // Validate is a placeholder for performing a validation on an already loaded component configs in a ClusterConfiguration
 // Currently it prints a warning that no validation was performed
 func Validate(clusterCfg *kubeadmapi.ClusterConfiguration) field.ErrorList {

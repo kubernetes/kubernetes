@@ -20,6 +20,7 @@ go_library(
         "//cmd/kubeadm/app/cmd/phases/upgrade/node:go_default_library",
         "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
+        "//cmd/kubeadm/app/componentconfigs:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
