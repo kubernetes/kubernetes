@@ -373,7 +373,7 @@ func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 	for i := range table.Rows {
 		parsedRow, err := findJSONPathResults(parser, table.Rows[i].Object.Object)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
+			return nil, fmt.Errorf("failed to get values for %#v using %s (%#v)", parsedRow, field, err)
 		}
 		parsedRows = append(parsedRows, parsedRow)
 		if len(parsedRow) > 0 && len(parsedRow[0]) > 0 {

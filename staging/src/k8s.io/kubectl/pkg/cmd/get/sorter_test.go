@@ -471,9 +471,7 @@ func TestSortingPrinter(t *testing.T) {
 }
 
 func TestRuntimeSortLess(t *testing.T) {
-	var testobj runtime.Object
-
-	testobj = &corev1.PodList{
+	testObj := &corev1.PodList{
 		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -493,13 +491,13 @@ func TestRuntimeSortLess(t *testing.T) {
 		},
 	}
 
-	testobjs, err := meta.ExtractList(testobj)
+	testObjs, err := meta.ExtractList(testObj)
 	if err != nil {
 		t.Fatalf("ExtractList testobj got unexpected error: %v", err)
 	}
 
-	testfield := "{.metadata.name}"
-	testruntimeSort := NewRuntimeSort(testfield, testobjs)
+	testField := "{.metadata.name}"
+	testRuntimeSort := NewRuntimeSort(testField, testObjs)
 	tests := []struct {
 		name         string
 		runtimeSort  *RuntimeSort
@@ -510,14 +508,14 @@ func TestRuntimeSortLess(t *testing.T) {
 	}{
 		{
 			name:         "test less true",
-			runtimeSort:  testruntimeSort,
+			runtimeSort:  testRuntimeSort,
 			i:            0,
 			j:            1,
 			expectResult: true,
 		},
 		{
 			name:         "test less false",
-			runtimeSort:  testruntimeSort,
+			runtimeSort:  testRuntimeSort,
 			i:            1,
 			j:            2,
 			expectResult: false,
