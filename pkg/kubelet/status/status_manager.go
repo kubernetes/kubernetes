@@ -32,8 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -353,7 +355,20 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 			},
 		}
 	}
-
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range status.EphemeralContainerStatuses {
+			if status.EphemeralContainerStatuses[i].State.Terminated != nil || status.EphemeralContainerStatuses[i].State.Waiting != nil {
+				continue
+			}
+			status.EphemeralContainerStatuses[i].State = v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{
+					Reason:   "ContainerStatusUnknown",
+					Message:  "The container could not be located when the pod was terminated",
+					ExitCode: 137,
+				},
+			}
+		}
+	}
 	m.updateStatusInternal(pod, status, true)
 }
 

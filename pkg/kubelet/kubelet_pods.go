@@ -895,7 +895,11 @@ func (kl *Kubelet) podAndContainersAreTerminal(pod *v1.Pod) (containersTerminal,
 	// fails) or due to external events like deletion or eviction. A terminal pod *should* have no running
 	// containers, but to know that the pod has completed its lifecycle you must wait for containers to also
 	// be terminal.
-	containersTerminal = notRunning(status.ContainerStatuses)
+	containersTerminal = notRunning(status.InitContainerStatuses) && notRunning(status.ContainerStatuses)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		containersTerminal = containersTerminal && notRunning(status.EphemeralContainerStatuses)
+	}
+
 	// The kubelet must accept config changes from the pod spec until it has reached a point where changes would
 	// have no effect on any running container.
 	podWorkerTerminal = status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && containersTerminal)
@@ -940,10 +944,22 @@ func (kl *Kubelet) IsPodDeleted(uid types.UID) bool {
 // PodResourcesAreReclaimed returns true if all required node-level resources that a pod was consuming have
 // been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
+	if !notRunning(status.InitContainerStatuses) {
+		// We shouldn't delete pods that still have running init containers
+		klog.V(3).Infof("Pod %q is terminated, but some init containers are still running", format.Pod(pod))
+		return false
+	}
 	if !notRunning(status.ContainerStatuses) {
 		// We shouldn't delete pods that still have running containers
 		klog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		if !notRunning(status.EphemeralContainerStatuses) {
+			// We shouldn't delete pods that still have running ephemeral containers
+			klog.V(3).Infof("Pod %q is terminated, but some ephemeral containers are still running", format.Pod(pod))
+			return false
+		}
 	}
 	// pod's containers should be deleted
 	runtimeStatus, err := kl.podCache.Get(pod.UID)
