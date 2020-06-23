@@ -252,6 +252,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
 			csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+			volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
 			if driverInfo != nil {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
@@ -263,6 +264,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				csiDriverInformer.Lister(),
+				volumeAttachmentInformer.Lister(),
 			)
 			plugMgr := host.GetPluginMgr()
 			csiClient := setupClient(t, true)

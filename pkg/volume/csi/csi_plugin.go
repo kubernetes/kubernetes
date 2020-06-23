@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
@@ -59,9 +60,10 @@ const (
 )
 
 type csiPlugin struct {
-	host            volume.VolumeHost
-	blockEnabled    bool
-	csiDriverLister storagelisters.CSIDriverLister
+	host                   volume.VolumeHost
+	blockEnabled           bool
+	csiDriverLister        storagelisters.CSIDriverLister
+	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -187,12 +189,16 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		if csiClient == nil {
 			klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
 		} else {
-			// set CSIDriverLister
+			// set CSIDriverLister and volumeAttachmentLister
 			adcHost, ok := host.(volume.AttachDetachVolumeHost)
 			if ok {
 				p.csiDriverLister = adcHost.CSIDriverLister()
 				if p.csiDriverLister == nil {
 					klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
+				}
+				p.volumeAttachmentLister = adcHost.VolumeAttachmentLister()
+				if p.volumeAttachmentLister == nil {
+					klog.Error(log("VolumeAttachmentLister not found on AttachDetachVolumeHost"))
 				}
 			}
 			kletHost, ok := host.(volume.KubeletVolumeHost)
@@ -201,6 +207,8 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 				if p.csiDriverLister == nil {
 					klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
 				}
+				// We don't run the volumeAttachmentLister in the kubelet context
+				p.volumeAttachmentLister = nil
 			}
 		}
 	}
