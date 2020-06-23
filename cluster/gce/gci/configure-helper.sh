@@ -2490,7 +2490,7 @@ EOF
   fi
   if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
       setup-addon-manifests "addons" "node-termination-handler"
-      setup-node-termination-handler-manifest '' ''
+      setup-node-termination-handler-manifest ''
   fi
   # Setting up the konnectivity-agent daemonset
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
@@ -2988,7 +2988,7 @@ function main() {
     start-kube-controller-manager
     start-kube-scheduler
     wait-till-apiserver-ready
-    start-kube-addons ''
+    start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
     update-legacy-addon-node-labels &
