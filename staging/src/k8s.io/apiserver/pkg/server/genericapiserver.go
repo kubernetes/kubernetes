@@ -694,7 +694,7 @@ func (l *terminationLoggingListener) Accept() (net.Conn, error) {
 	case <-l.lateStopCh:
 		klog.Warningf("Accepted new connection from %s very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", c.RemoteAddr().String())
 		if swapped := l.lateConnReceived.CAS(false, true); swapped {
-			l.Eventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections very late in the graceful termination process, possibly a sign for a broken load balancer setup.")
+			l.Eventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections (e.g. from %q) very late in the graceful termination process, possibly a sign for a broken load balancer setup.", c.RemoteAddr().String())
 		}
 	default:
 		select {
