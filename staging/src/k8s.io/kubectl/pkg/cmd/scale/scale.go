@@ -190,7 +190,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 func (o *ScaleOptions) Validate(cmd *cobra.Command) error {
 	if o.Replicas < 0 {
-		return fmt.Errorf("The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
+		return fmt.Errorf("the --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
 
 	return nil
@@ -213,12 +213,16 @@ func (o *ScaleOptions) RunScale() error {
 	}
 
 	infos := []*resource.Info{}
+
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err == nil {
 			infos = append(infos, info)
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	if len(o.ResourceVersion) != 0 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
