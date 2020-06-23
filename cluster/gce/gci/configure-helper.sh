@@ -2127,10 +2127,12 @@ function download-extra-addons {
 #
 # $1: URL path after /computeMetadata/v1/ (without heading slash).
 function get-metadata-value {
+    # We do not want quotes for CURL_RETRY_CONNREFUSED
+    # shellcheck disable=SC2086
     curl \
         --retry 5 \
         --retry-delay 3 \
-        "${CURL_RETRY_CONNREFUSED}" \
+        ${CURL_RETRY_CONNREFUSED} \
         --fail \
         --silent \
         -H 'Metadata-Flavor: Google' \
