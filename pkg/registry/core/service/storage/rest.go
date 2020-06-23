@@ -288,7 +288,7 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 		err := rs.serviceNodePorts.Release(nodePort)
 		if err != nil {
 			// these should be caught by an eventual reconciliation / restart
-			utilruntime.HandleError(fmt.Errorf("Error releasing service %s node port %d: %v", svc.Name, nodePort, err))
+			utilruntime.HandleError(fmt.Errorf("error releasing service %s node port %d: %v", svc.Name, nodePort, err))
 		}
 	}
 
@@ -298,7 +298,7 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 			err := rs.serviceNodePorts.Release(int(nodePort))
 			if err != nil {
 				// these should be caught by an eventual reconciliation / restart
-				utilruntime.HandleError(fmt.Errorf("Error releasing service %s health check node port %d: %v", svc.Name, nodePort, err))
+				utilruntime.HandleError(fmt.Errorf("error releasing service %s health check node port %d: %v", svc.Name, nodePort, err))
 			}
 		}
 	}
@@ -392,7 +392,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	service := obj.(*api.Service)
 
 	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
-		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("service.namespace does not match the provided context"))
 	}
 
 	// Copy over non-user fields
@@ -464,7 +464,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		el := nodePortOp.Commit()
 		if el != nil {
 			// problems should be fixed by an eventual reconciliation / restart
-			utilruntime.HandleError(fmt.Errorf("error(s) committing NodePorts changes: %v", el))
+			utilruntime.HandleError(fmt.Errorf("error(s) committing nodeports changes: %v", el))
 		}
 
 		releaseServiceIP = false
@@ -531,7 +531,7 @@ func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http
 				for try := 0; try < len(ss.Addresses); try++ {
 					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
 					if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
-						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
+						utilruntime.HandleError(fmt.Errorf("address %v isn't valid (%v)", addr, err))
 						continue
 					}
 					ip := addr.IP
@@ -541,7 +541,7 @@ func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http
 						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
 					}, rs.proxyTransport, nil
 				}
-				utilruntime.HandleError(fmt.Errorf("Failed to find a valid address, skipping subset: %v", ss))
+				utilruntime.HandleError(fmt.Errorf("failed to find a valid address, skipping subset: %v", ss))
 			}
 		}
 	}
@@ -583,10 +583,10 @@ func (r *REST) getAllocatorBySpec(service *api.Service) ipallocator.Interface {
 
 func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
 	if addr.TargetRef == nil {
-		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
+		return fmt.Errorf("address has no target ref, skipping: %v", addr)
 	}
 	if genericapirequest.NamespaceValue(ctx) != addr.TargetRef.Namespace {
-		return fmt.Errorf("Address namespace doesn't match context namespace")
+		return fmt.Errorf("address namespace doesn't match context namespace")
 	}
 	obj, err := pods.Get(ctx, addr.TargetRef.Name, &metav1.GetOptions{})
 	if err != nil {
@@ -648,7 +648,7 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 		// If the request has a health check nodePort in mind, attempt to reserve it.
 		err := nodePortOp.Allocate(int(healthCheckNodePort))
 		if err != nil {
-			return fmt.Errorf("failed to allocate requested HealthCheck NodePort %v: %v",
+			return fmt.Errorf("failed to allocate requested healthcheck nodeport %v: %v",
 				healthCheckNodePort, err)
 		}
 		klog.V(4).Infof("Reserved user requested healthCheckNodePort: %d", healthCheckNodePort)
@@ -656,7 +656,7 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 		// If the request has no health check nodePort specified, allocate any.
 		healthCheckNodePort, err := nodePortOp.AllocateNext()
 		if err != nil {
-			return fmt.Errorf("failed to allocate a HealthCheck NodePort %v: %v", healthCheckNodePort, err)
+			return fmt.Errorf("failed to allocate a healthCheck nodeport %v: %v", healthCheckNodePort, err)
 		}
 		service.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
 		klog.V(4).Infof("Reserved allocated healthCheckNodePort: %d", healthCheckNodePort)
@@ -674,7 +674,7 @@ func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool,
 			// TODO: what error should be returned here?  It's not a
 			// field-level validation failure (the field is valid), and it's
 			// not really an internal error.
-			return false, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
+			return false, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceip: %v", err))
 		}
 		service.Spec.ClusterIP = ip.String()
 		return true, nil
@@ -716,7 +716,7 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 					// TODO: what error should be returned here?  It's not a
 					// field-level validation failure (the field is valid), and it's
 					// not really an internal error.
-					return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+					return errors.NewInternalError(fmt.Errorf("failed to allocate a nodeport: %v", err))
 				}
 				servicePort.NodePort = int32(nodePort)
 				svcPortToNodePort[int(servicePort.Port)] = nodePort
@@ -763,13 +763,13 @@ func updateNodePorts(oldService, newService *api.Service, nodePortOp *portalloca
 				// TODO: what error should be returned here?  It's not a
 				// field-level validation failure (the field is valid), and it's
 				// not really an internal error.
-				return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+				return errors.NewInternalError(fmt.Errorf("failed to allocate a nodeport: %v", err))
 			}
 			servicePort.NodePort = int32(nodePortNumber)
 			nodePort.NodePort = servicePort.NodePort
 		}
 		if containsNodePort(newNodePorts, nodePort) {
-			return fmt.Errorf("duplicate nodePort: %v", nodePort)
+			return fmt.Errorf("duplicate nodeport: %v", nodePort)
 		}
 		newNodePorts = append(newNodePorts, nodePort)
 	}
