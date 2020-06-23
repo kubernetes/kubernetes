@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: agnhost-master
+  name: agnhost-primary
   labels:
     app: agnhost
-    role: master
+    role: primary
     tier: backend
 spec:
   ports:
@@ -12,5 +12,5 @@ spec:
     targetPort: 6379
   selector:
     app: agnhost
-    role: master
+    role: primary
     tier: backend
