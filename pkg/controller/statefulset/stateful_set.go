@@ -374,7 +374,7 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 	ssc.queue.Add(key)
@@ -389,7 +389,7 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 	}
 	defer ssc.queue.Done(key)
 	if err := ssc.sync(key.(string)); err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing StatefulSet %v, requeuing: %v", key.(string), err))
+		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %v", key.(string), err))
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)
