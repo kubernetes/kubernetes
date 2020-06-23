@@ -349,7 +349,7 @@ var (
 	RunningPodCount = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           "running_pod_count",
+			Name:           "running_pods",
 			Help:           "Number of pods currently running",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -358,7 +358,7 @@ var (
 	RunningContainerCount = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           "running_container_count",
+			Name:           "running_containers",
 			Help:           "Number of containers currently running",
 			StabilityLevel: metrics.ALPHA,
 		},
