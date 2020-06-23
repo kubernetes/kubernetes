@@ -1137,8 +1137,6 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *
 
 	workerLockAcquired := make(chan struct{})
 	go func() {
-		workerLock.Lock()
-		workerLock.Unlock()
 		close(workerLockAcquired)
 	}()
 	select {
@@ -1156,15 +1154,15 @@ type fakeServerResources struct {
 	InterfaceUsedCount int
 }
 
-func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 

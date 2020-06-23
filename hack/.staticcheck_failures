@@ -4,7 +4,6 @@ pkg/controller/garbagecollector
 pkg/controller/nodeipam
 pkg/controller/podautoscaler
 pkg/controller/replicaset
-pkg/controller/resourcequota
 pkg/controller/statefulset
 pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/core/namespace/storage
