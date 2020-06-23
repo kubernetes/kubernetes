@@ -1,12 +1,13 @@
 package imports
 
 import (
+	"context"
+	"fmt"
 	"sync"
+
+	"golang.org/x/tools/internal/gopathwalk"
 )
 
-// ModuleResolver implements Resolver for modules using the go command as little
-// as feasible.
-//
 // To find packages to import, the resolver needs to know about all of the
 // the packages that could be imported. This includes packages that are
 // already in modules that are in (1) the current module, (2) replace targets,
@@ -30,6 +31,8 @@ type directoryPackageStatus int
 const (
 	_ directoryPackageStatus = iota
 	directoryScanned
+	nameLoaded
+	exportsLoaded
 )
 
 type directoryPackageInfo struct {
@@ -38,21 +41,46 @@ type directoryPackageInfo struct {
 	// err is non-nil when there was an error trying to reach status.
 	err error
 
-	// Set when status > directoryScanned.
+	// Set when status >= directoryScanned.
 
 	// dir is the absolute directory of this package.
-	dir string
-	// nonCanonicalImportPath is the expected import path for this package.
-	// This may not be an import path that can be used to import this package.
+	dir      string
+	rootType gopathwalk.RootType
+	// nonCanonicalImportPath is the package's expected import path. It may
+	// not actually be importable at that path.
 	nonCanonicalImportPath string
 	// needsReplace is true if the nonCanonicalImportPath does not match the
-	// the modules declared path, making it impossible to import without a
+	// module's declared path, making it impossible to import without a
 	// replace directive.
 	needsReplace bool
+
+	// Module-related information.
+	moduleDir  string // The directory that is the module root of this dir.
+	moduleName string // The module name that contains this dir.
+
+	// Set when status >= nameLoaded.
+
+	packageName string // the package name, as declared in the source.
+
+	// Set when status >= exportsLoaded.
+
+	exports []string
 }
 
-// moduleCacheInfo is a concurrency safe map for storing information about
-// the directories in the module cache.
+// reachedStatus returns true when info has a status at least target and any error associated with
+// an attempt to reach target.
+func (info *directoryPackageInfo) reachedStatus(target directoryPackageStatus) (bool, error) {
+	if info.err == nil {
+		return info.status >= target, nil
+	}
+	if info.status == target {
+		return true, info.err
+	}
+	return true, nil
+}
+
+// dirInfoCache is a concurrency safe map for storing information about
+// directories that may contain packages.
 //
 // The information in this cache is built incrementally. Entries are initialized in scan.
 // No new keys should be added in any other functions, as all directories containing
@@ -61,39 +89,77 @@ type directoryPackageInfo struct {
 // Other functions, including loadExports and findPackage, may update entries in this cache
 // as they discover new things about the directory.
 //
-// We do not need to protect the data in the cache for multiple writes, because it only stores
-// module cache directories, which do not change. If two competing stores take place, there will be
-// one store that wins. Although this could result in a loss of information it will not be incorrect
-// and may just result in recomputing the same result later.
+// The information in the cache is not expected to change for the cache's
+// lifetime, so there is no protection against competing writes. Users should
+// take care not to hold the cache across changes to the underlying files.
 //
 // TODO(suzmue): consider other concurrency strategies and data structures (RWLocks, sync.Map, etc)
-type moduleCacheInfo struct {
+type dirInfoCache struct {
 	mu sync.Mutex
-	// modCacheDirInfo stores information about packages in
-	// module cache directories. Keyed by absolute directory.
-	modCacheDirInfo map[string]*directoryPackageInfo
+	// dirs stores information about packages in directories, keyed by absolute path.
+	dirs map[string]*directoryPackageInfo
 }
 
 // Store stores the package info for dir.
-func (d *moduleCacheInfo) Store(dir string, info directoryPackageInfo) {
+func (d *dirInfoCache) Store(dir string, info directoryPackageInfo) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.modCacheDirInfo[dir] = &directoryPackageInfo{
-		status:                 info.status,
-		err:                    info.err,
-		dir:                    info.dir,
-		nonCanonicalImportPath: info.nonCanonicalImportPath,
-		needsReplace:           info.needsReplace,
-	}
+	stored := info // defensive copy
+	d.dirs[dir] = &stored
 }
 
 // Load returns a copy of the directoryPackageInfo for absolute directory dir.
-func (d *moduleCacheInfo) Load(dir string) (directoryPackageInfo, bool) {
+func (d *dirInfoCache) Load(dir string) (directoryPackageInfo, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	info, ok := d.modCacheDirInfo[dir]
+	info, ok := d.dirs[dir]
 	if !ok {
 		return directoryPackageInfo{}, false
 	}
 	return *info, true
+}
+
+// Keys returns the keys currently present in d.
+func (d *dirInfoCache) Keys() (keys []string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for key := range d.dirs {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func (d *dirInfoCache) CachePackageName(info directoryPackageInfo) (directoryPackageInfo, error) {
+	if loaded, err := info.reachedStatus(nameLoaded); loaded {
+		return info, err
+	}
+	if scanned, err := info.reachedStatus(directoryScanned); !scanned || err != nil {
+		return info, fmt.Errorf("cannot read package name, scan error: %v", err)
+	}
+	info.packageName, info.err = packageDirToName(info.dir)
+	info.status = nameLoaded
+	d.Store(info.dir, info)
+	return info, info.err
+}
+
+func (d *dirInfoCache) CacheExports(ctx context.Context, env *ProcessEnv, info directoryPackageInfo) (string, []string, error) {
+	if reached, _ := info.reachedStatus(exportsLoaded); reached {
+		return info.packageName, info.exports, info.err
+	}
+	if reached, err := info.reachedStatus(nameLoaded); reached && err != nil {
+		return "", nil, err
+	}
+	info.packageName, info.exports, info.err = loadExportsFromFiles(ctx, env, info.dir)
+	if info.err == context.Canceled {
+		return info.packageName, info.exports, info.err
+	}
+	// The cache structure wants things to proceed linearly. We can skip a
+	// step here, but only if we succeed.
+	if info.status == nameLoaded || info.err == nil {
+		info.status = exportsLoaded
+	} else {
+		info.status = nameLoaded
+	}
+	d.Store(info.dir, info)
+	return info.packageName, info.exports, info.err
 }

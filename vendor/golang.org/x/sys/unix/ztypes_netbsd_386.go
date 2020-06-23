@@ -411,7 +411,6 @@ type Ptmget struct {
 
 const (
 	AT_FDCWD            = -0x64
-	AT_SYMLINK_FOLLOW   = 0x400
 	AT_SYMLINK_NOFOLLOW = 0x200
 )
 

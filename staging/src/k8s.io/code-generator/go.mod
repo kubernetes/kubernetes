@@ -2,7 +2,7 @@
 
 module k8s.io/code-generator
 
-go 1.13
+go 1.14
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
@@ -14,7 +14,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0 // indirect
 	golang.org/x/text v0.3.3 // indirect
-	golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4 // indirect
+	golang.org/x/tools v0.0.0-20200602230032-c00d67ef29d0 // indirect
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/klog/v2 v2.1.0
 	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
@@ -22,7 +22,6 @@ require (
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20200201011859-915c9c3d4ccf // pinned to release-branch.go1.14-std
 	k8s.io/code-generator => ../code-generator
 )
