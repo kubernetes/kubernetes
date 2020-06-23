@@ -299,6 +299,10 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
+	cpuLimitsQuantity := container.Resources.Limits[v1.ResourceCPU]
+	if cpuQuantity.Value() != cpuLimitsQuantity.Value() {
+		return 0
+	}
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
 		return 0
 	}
