@@ -6,13 +6,6 @@ pkg/controller/podautoscaler
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/registry/autoscaling/horizontalpodautoscaler/storage
-pkg/registry/core/namespace/storage
-pkg/registry/core/persistentvolumeclaim/storage
-pkg/registry/core/resourcequota/storage
-pkg/registry/core/service/ipallocator
-pkg/registry/core/service/portallocator
-pkg/registry/core/service/storage
 pkg/util/coverage
 test/e2e/apps
 test/e2e/autoscaling
