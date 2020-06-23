@@ -495,7 +495,7 @@ function install-containerd-ubuntu {
   fi
   runc --version
   echo "runc sha256: $(sha256sum "$(which runc)")"
-  curl -fsSL "https://github.com/AkihiroSuda/moby-snapshot/releases/download/snapshot-20200619/moby-snapshot.tbz" | tar --overwrite -xjv -C /usr/sbin/ moby-snapshot/bin/runc
+  curl -fsSL "https://github.com/AkihiroSuda/moby-snapshot/releases/download/snapshot-20200619/moby-snapshot.tbz" | tar --overwrite -xjv -C /usr/sbin/ --strip-components=2 moby-snapshot/bin/runc
   runc --version
   echo "runc sha256: $(sha256sum "$(which runc)")"
   sudo systemctl start containerd
