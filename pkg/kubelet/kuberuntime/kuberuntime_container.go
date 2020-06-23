@@ -861,10 +861,6 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	path := status.GetLogPath()
-	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove container %q log %q: %v", containerID, path, err)
-	}
 
 	// Remove the legacy container log symlink.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.

@@ -90,15 +90,20 @@ func TestRotateLogs(t *testing.T) {
 			MaxSize:  testMaxSize,
 			MaxFiles: testMaxFiles,
 		},
-		clock: clock.NewFakeClock(now),
+		clock:              clock.NewFakeClock(now),
+		containersByName:   make(map[string][]containerWithLog),
+		maxPerPodContainer: 3,
 	}
 	testLogs := []string{
-		"test-log-1",
-		"test-log-2",
-		"test-log-3",
-		"test-log-4",
-		"test-log-3.00000000-000001",
-		"test-log-3.00000000-000000.gz",
+		"test-log-1.log",
+		"test-log-2.log",
+		"test-log-3.log",
+		"test-log-4.log",
+		"test-log-3.log.00000000-000001",
+		"test-log-3.log.00000000-000000.gz",
+		"test-log-5.log",
+		"test-log-5.log.00000000-000001",
+		"test-log-5.log.00000000-000000.gz",
 	}
 	testContent := []string{
 		"short",
@@ -107,6 +112,9 @@ func TestRotateLogs(t *testing.T) {
 		"longer than 10 bytes",
 		"the length doesn't matter",
 		"the length doesn't matter",
+		"the length doesn't matter",
+		"the content doesn't matter",
+		"the content doesn't matter",
 	}
 	for i := range testLogs {
 		f, err := os.Create(filepath.Join(dir, testLogs[i]))
@@ -115,15 +123,22 @@ func TestRotateLogs(t *testing.T) {
 		require.NoError(t, err)
 		f.Close()
 	}
+	contName := "not-need-rotate"
+	toBeCleaned := "container-log-is-to-be-cleaned"
+	sandbox1 := "sandbox1"
+	containerGone := "gone"
 	testContainers := []*critest.FakeContainer{
 		{
+			SandboxID: sandbox1,
 			ContainerStatus: runtimeapi.ContainerStatus{
-				Id:      "container-not-need-rotate",
-				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
-				LogPath: filepath.Join(dir, testLogs[0]),
+				Id:       "container-not-need-rotate",
+				State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath:  filepath.Join(dir, testLogs[0]),
+				Metadata: &runtimeapi.ContainerMetadata{Name: contName},
 			},
 		},
 		{
+			SandboxID: sandbox1,
 			ContainerStatus: runtimeapi.ContainerStatus{
 				Id:      "container-need-rotate",
 				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
@@ -131,6 +146,7 @@ func TestRotateLogs(t *testing.T) {
 			},
 		},
 		{
+			SandboxID: sandbox1,
 			ContainerStatus: runtimeapi.ContainerStatus{
 				Id:      "container-has-excess-log",
 				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
@@ -138,10 +154,43 @@ func TestRotateLogs(t *testing.T) {
 			},
 		},
 		{
+			SandboxID: sandbox1,
 			ContainerStatus: runtimeapi.ContainerStatus{
-				Id:      "container-is-not-running",
-				State:   runtimeapi.ContainerState_CONTAINER_EXITED,
-				LogPath: filepath.Join(dir, testLogs[3]),
+				Id:        toBeCleaned,
+				State:     runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath:   filepath.Join(dir, testLogs[6]),
+				Metadata:  &runtimeapi.ContainerMetadata{Name: containerGone},
+				CreatedAt: now.UnixNano(),
+			},
+		},
+		{
+			SandboxID: sandbox1,
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:        "container-is-not-running",
+				State:     runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath:   filepath.Join(dir, testLogs[3]),
+				Metadata:  &runtimeapi.ContainerMetadata{Name: containerGone},
+				CreatedAt: now.UnixNano() + 1,
+			},
+		},
+		{
+			SandboxID: sandbox1,
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:        "container-not-running",
+				State:     runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath:   filepath.Join(dir, testLogs[3]),
+				Metadata:  &runtimeapi.ContainerMetadata{Name: containerGone},
+				CreatedAt: now.UnixNano() + 2,
+			},
+		},
+		{
+			SandboxID: sandbox1,
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:        "container-exited",
+				State:     runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath:   filepath.Join(dir, testLogs[3]),
+				Metadata:  &runtimeapi.ContainerMetadata{Name: containerGone},
+				CreatedAt: now.UnixNano() + 3,
 			},
 		},
 	}
@@ -151,7 +200,6 @@ func TestRotateLogs(t *testing.T) {
 	timestamp := now.Format(timestampFormat)
 	logs, err := ioutil.ReadDir(dir)
 	require.NoError(t, err)
-	assert.Len(t, logs, 5)
 	assert.Equal(t, testLogs[0], logs[0].Name())
 	assert.Equal(t, testLogs[1]+"."+timestamp, logs[1].Name())
 	assert.Equal(t, testLogs[4]+compressSuffix, logs[2].Name())
@@ -224,7 +272,7 @@ func TestRemoveExcessLog(t *testing.T) {
 		}
 
 		c := &containerLogManager{policy: LogRotatePolicy{MaxFiles: test.max}}
-		got, err := c.removeExcessLogs(testLogs)
+		got, err := c.removeExcessLogs(testLogs, true)
 		require.NoError(t, err)
 		require.Len(t, got, len(test.expect))
 		for i, name := range test.expect {

@@ -141,13 +141,15 @@ func parseMaxSize(size string) (int64, error) {
 }
 
 type containerLogManager struct {
-	runtimeService internalapi.RuntimeService
-	policy         LogRotatePolicy
-	clock          clock.Clock
+	runtimeService     internalapi.RuntimeService
+	policy             LogRotatePolicy
+	clock              clock.Clock
+	containersByName   map[string][]containerWithLog
+	maxPerPodContainer int
 }
 
 // NewContainerLogManager creates a new container log manager.
-func NewContainerLogManager(runtimeService internalapi.RuntimeService, maxSize string, maxFiles int) (ContainerLogManager, error) {
+func NewContainerLogManager(runtimeService internalapi.RuntimeService, maxSize string, maxFiles int, maxPerPodContainer int) (ContainerLogManager, error) {
 	if maxFiles <= 1 {
 		return nil, fmt.Errorf("invalid MaxFiles %d, must be > 1", maxFiles)
 	}
@@ -162,7 +164,9 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, maxSize s
 			MaxSize:  parsedMaxSize,
 			MaxFiles: maxFiles,
 		},
-		clock: clock.RealClock{},
+		clock:              clock.RealClock{},
+		containersByName:   make(map[string][]containerWithLog),
+		maxPerPodContainer: maxPerPodContainer,
 	}, nil
 }
 
@@ -176,6 +180,93 @@ func (c *containerLogManager) Start() {
 	}, logMonitorPeriod)
 }
 
+type containerWithLog struct {
+	ID        string
+	State     runtimeapi.ContainerState
+	CreatedAt int64
+	logPath   string
+}
+
+// compositeKey returns key for accessing containersByName
+func (c *containerLogManager) compositeKey(containerName, sandbox string) string {
+	return containerName + "_" + sandbox
+}
+
+func (c *containerLogManager) addContainerToMap(container *runtimeapi.Container, path string) {
+	if container.Metadata != nil {
+		key := c.compositeKey(container.Metadata.Name, container.PodSandboxId)
+		for i := range c.containersByName[key] {
+			if c.containersByName[key][i].ID == container.Id {
+				c.containersByName[key][i].State = container.State
+				c.containersByName[key][i].CreatedAt = container.CreatedAt
+				return
+			}
+		}
+		c.containersByName[key] = append(c.containersByName[key],
+			containerWithLog{
+				ID:        container.Id,
+				State:     container.State,
+				CreatedAt: container.CreatedAt,
+				logPath:   path,
+			})
+	}
+}
+
+func (c *containerLogManager) pruneDeadContainerLogs() {
+	deadSandboxes := make(map[string]bool)
+	for k, containers := range c.containersByName {
+		sort.Sort(containersByCreation(containers))
+		remaining := []containerWithLog{}
+		for i := range containers {
+			parts := strings.Split(k, "_")
+			if len(parts) != 2 {
+				klog.V(4).Infof("couldn't parse key: %q", k)
+				continue
+			}
+			var sandboxSeen bool
+			if dead, sandboxSeen := deadSandboxes[parts[1]]; sandboxSeen && dead {
+				klog.V(4).Infof("sandbox is known gone: %q", parts[1])
+				continue
+			}
+			if !sandboxSeen {
+				if stat, err := c.runtimeService.PodSandboxStatus(parts[1]); err != nil {
+					klog.V(4).Infof("couldn't retrieve sandbox status: %v", err)
+					deadSandboxes[parts[1]] = true
+					// log cleanup is taken care of by containerGC
+					continue
+				} else if stat.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+					deadSandboxes[parts[1]] = false
+				}
+			}
+			if containers[i].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+				klog.V(4).Infof("skipping %s (%s) since it is running", k, containers[i].ID)
+				remaining = append(remaining, containers[i])
+				continue
+			}
+			if i < c.maxPerPodContainer {
+				klog.V(4).Infof("handling container %s (%s) with %s later", k, containers[i].ID, containers[i].logPath)
+				remaining = append(remaining, containers[i])
+				continue
+			}
+			id := containers[i].ID
+			klog.V(4).Infof("cleaning log for %s (%s), path %s", k, containers[i].ID, containers[i].logPath)
+			if err := c.rotateLog(id, containers[i].logPath, false); err != nil {
+				klog.Errorf("Failed to clean log %q for container %q: %v", containers[i].logPath, id, err)
+				remaining = append(remaining, containers[i])
+				continue
+			}
+		}
+		if len(remaining) > 0 {
+			// store remaining containerWithLog
+			c.containersByName[k] = remaining
+		} else {
+			// all logs for the given key have been cleaned. remove map entry
+			delete(c.containersByName, k)
+			klog.V(4).Infof("removing key %q", k)
+		}
+	}
+}
+
 func (c *containerLogManager) rotateLogs() error {
 	// TODO(#59998): Use kubelet pod cache.
 	containers, err := c.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
@@ -184,11 +275,6 @@ func (c *containerLogManager) rotateLogs() error {
 	}
 	// NOTE(random-liu): Figure out whether we need to rotate container logs in parallel.
 	for _, container := range containers {
-		// Only rotate logs for running containers. Non-running containers won't
-		// generate new output, it doesn't make sense to keep an empty latest log.
-		if container.GetState() != runtimeapi.ContainerState_CONTAINER_RUNNING {
-			continue
-		}
 		id := container.GetId()
 		// Note that we should not block log rotate for an error of a single container.
 		status, err := c.runtimeService.ContainerStatus(id)
@@ -197,6 +283,12 @@ func (c *containerLogManager) rotateLogs() error {
 			continue
 		}
 		path := status.GetLogPath()
+		// Rotate logs for running containers. Non-running containers won't
+		// generate new output, we need to remove excess logs.
+		c.addContainerToMap(container, path)
+		if container.GetState() != runtimeapi.ContainerState_CONTAINER_RUNNING {
+			continue
+		}
 		info, err := os.Stat(path)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -221,30 +313,51 @@ func (c *containerLogManager) rotateLogs() error {
 			continue
 		}
 		// Perform log rotation.
-		if err := c.rotateLog(id, path); err != nil {
+		if err := c.rotateLog(id, path, container.GetState() == runtimeapi.ContainerState_CONTAINER_RUNNING); err != nil {
 			klog.Errorf("Failed to rotate log %q for container %q: %v", path, id, err)
 			continue
 		}
 	}
+	c.pruneDeadContainerLogs()
 	return nil
 }
 
-func (c *containerLogManager) rotateLog(id, log string) error {
-	// pattern is used to match all rotated files.
-	pattern := fmt.Sprintf("%s.*", log)
+type containersByCreation []containerWithLog
+
+func (bc containersByCreation) Len() int      { return len(bc) }
+func (bc containersByCreation) Swap(i, j int) { bc[i], bc[j] = bc[j], bc[i] }
+func (bc containersByCreation) Less(i, j int) bool {
+	// newer container first
+	return bc[i].CreatedAt > bc[j].CreatedAt
+}
+
+func (c *containerLogManager) rotateLog(id, log string, runningContainer bool) error {
+	// pattern is used to match all rotated files for running container.
+	prefix := "%s.*"
+	if !runningContainer {
+		// for dead containers, we clean up all its log files, including all rotated files
+		prefix = "%s*"
+	}
+	pattern := fmt.Sprintf(prefix, log)
 	logs, err := filepath.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to list all log files with pattern %q: %v", pattern, err)
 	}
 
-	logs, err = c.cleanupUnusedLogs(logs)
-	if err != nil {
-		return fmt.Errorf("failed to cleanup logs: %v", err)
+	if runningContainer {
+		logs, err = c.cleanupUnusedLogs(logs)
+		if err != nil {
+			return fmt.Errorf("failed to cleanup logs: %v", err)
+		}
 	}
 
-	logs, err = c.removeExcessLogs(logs)
+	logs, err = c.removeExcessLogs(logs, runningContainer)
 	if err != nil {
 		return fmt.Errorf("failed to remove excess logs: %v", err)
+	}
+
+	if !runningContainer {
+		return nil
 	}
 
 	// Compress uncompressed log files.
@@ -309,22 +422,30 @@ func isInUse(l string, logs []string) bool {
 }
 
 // removeExcessLogs removes old logs to make sure there are only at most MaxFiles log files.
-func (c *containerLogManager) removeExcessLogs(logs []string) ([]string, error) {
-	// Sort log files in oldest to newest order.
-	sort.Strings(logs)
-	// Container will create a new log file, and we'll rotate the latest log file.
-	// Other than those 2 files, we can have at most MaxFiles-2 rotated log files.
-	// Keep MaxFiles-2 files by removing old files.
-	// We should remove from oldest to newest, so as not to break ongoing `kubectl logs`.
-	maxRotatedFiles := c.policy.MaxFiles - 2
-	if maxRotatedFiles < 0 {
-		maxRotatedFiles = 0
+func (c *containerLogManager) removeExcessLogs(logs []string, runningContainer bool) ([]string, error) {
+	maxRotatedFiles := 0
+	if runningContainer {
+		// Sort log files in oldest to newest order.
+		sort.Strings(logs)
+		// Container will create a new log file, and we'll rotate the latest log file.
+		// Other than those 2 files, we can have at most MaxFiles-2 rotated log files.
+		// Keep MaxFiles-2 files by removing old files.
+		// We should remove from oldest to newest, so as not to break ongoing `kubectl logs`.
+		maxRotatedFiles = c.policy.MaxFiles - 2
+		if maxRotatedFiles < 0 {
+			maxRotatedFiles = 0
+		}
+	}
+	upper := len(logs) - maxRotatedFiles
+	if upper < 0 {
+		upper = 0
 	}
 	i := 0
-	for ; i < len(logs)-maxRotatedFiles; i++ {
+	for ; i < upper; i++ {
 		if err := os.Remove(logs[i]); err != nil {
 			return nil, fmt.Errorf("failed to remove old log %q: %v", logs[i], err)
 		}
+		klog.V(4).Infof("removed %q", logs[i])
 	}
 	logs = logs[i:]
 	return logs, nil
