@@ -37,8 +37,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/klog/v2"
 )
 
 func TestEnsureNodeExistsByProviderID(t *testing.T) {
@@ -692,7 +690,7 @@ func Test_AddCloudNode(t *testing.T) {
 				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 				nodeStatusUpdateFrequency: 1 * time.Second,
 			}
-			eventBroadcaster.StartLogging(klog.Infof)
+			eventBroadcaster.StartLogging(t.Logf)
 
 			cloudNodeController.AddCloudNode(context.TODO(), test.existingNode)
 
@@ -770,7 +768,7 @@ func TestGCECondition(t *testing.T) {
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(t.Logf)
 
 	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
 

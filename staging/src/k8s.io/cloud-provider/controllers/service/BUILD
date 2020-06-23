@@ -53,7 +53,6 @@ go_test(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/cloud-provider/fake:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
-        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

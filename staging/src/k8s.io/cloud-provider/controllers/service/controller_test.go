@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/klog/v2"
 )
 
 const region = "us-central"
@@ -79,7 +78,7 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 

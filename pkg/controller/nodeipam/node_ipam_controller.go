@@ -89,7 +89,7 @@ func NewNodeIpamController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 
 	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(
