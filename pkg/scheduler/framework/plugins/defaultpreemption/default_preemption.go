@@ -18,11 +18,15 @@ package defaultpreemption
 
 import (
 	"context"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 const (
@@ -45,11 +49,22 @@ func (pl *DefaultPreemption) Name() string {
 // New initializes a new plugin and returns it.
 func New(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 	pl := DefaultPreemption{fh}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+		// A hack to initialize pdbLister in sharedInformerFactory.
+		fh.SharedInformerFactory().Policy().V1beta1().PodDisruptionBudgets().Lister()
+	}
 	return &pl, nil
 }
 
 // PostFilter invoked at the postFilter extension point.
 func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+	preemptionStartTime := time.Now()
+	defer func() {
+		metrics.PreemptionAttempts.Inc()
+		metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
+		metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+	}()
+
 	nnn, err := core.Preempt(ctx, pl.fh, state, pod, m)
 	if err != nil {
 		return nil, framework.NewStatus(framework.Error, err.Error())

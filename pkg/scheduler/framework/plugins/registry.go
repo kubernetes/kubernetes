@@ -19,6 +19,7 @@ package plugins
 import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -71,5 +72,6 @@ func NewInTreeRegistry() runtime.Registry {
 		serviceaffinity.Name:                       serviceaffinity.New,
 		queuesort.Name:                             queuesort.New,
 		defaultbinder.Name:                         defaultbinder.New,
+		defaultpreemption.Name:                     defaultpreemption.New,
 	}
 }

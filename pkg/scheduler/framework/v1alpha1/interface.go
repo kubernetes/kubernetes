@@ -481,6 +481,9 @@ type Framework interface {
 	// HasFilterPlugins returns true if at least one filter plugin is defined.
 	HasFilterPlugins() bool
 
+	// HasPostFilterPlugins returns true if at least one postFilter plugin is defined.
+	HasPostFilterPlugins() bool
+
 	// HasScorePlugins returns true if at least one score plugin is defined.
 	HasScorePlugins() bool
 

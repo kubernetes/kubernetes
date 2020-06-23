@@ -525,7 +525,12 @@ func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.Filter
 
 // RunPostFilterPlugins runs the set of configured PostFilter plugins until the first
 // Success or Error is met, otherwise continues to execute all plugins.
-func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
 	statuses := make(framework.PluginToStatus)
 	for _, pl := range f.postFilterPlugins {
 		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
@@ -537,6 +542,7 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 		}
 		statuses[pl.Name()] = s
 	}
+
 	return nil, statuses.Merge()
 }
 
@@ -934,6 +940,11 @@ func (f *frameworkImpl) RejectWaitingPod(uid types.UID) {
 // HasFilterPlugins returns true if at least one filter plugin is defined.
 func (f *frameworkImpl) HasFilterPlugins() bool {
 	return len(f.filterPlugins) > 0
+}
+
+// HasPostFilterPlugins returns true if at least one postFilter plugin is defined.
+func (f *frameworkImpl) HasPostFilterPlugins() bool {
+	return len(f.postFilterPlugins) > 0
 }
 
 // HasScorePlugins returns true if at least one score plugin is defined.
