@@ -793,7 +793,7 @@ kube::golang::build_binaries() {
 
     # extract tags if any specified in GOFLAGS
     # shellcheck disable=SC2001
-    gotags="selinux,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
+    gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
 
     local -a targets=()
     local arg
