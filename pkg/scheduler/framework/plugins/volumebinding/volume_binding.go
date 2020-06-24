@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,9 +49,6 @@ type stateData struct {
 	// phase for each node
 	// it's initialized in the PreFilter phase
 	podVolumesByNode map[string]*scheduling.PodVolumes
-	// guards podVolumesByNode in the Filter phase, as the method may be called
-	// in parallel
-	podVolumesByNodeMutex sync.Mutex
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -172,9 +168,9 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return status
 	}
 
-	state.podVolumesByNodeMutex.Lock()
+	cs.Lock()
 	state.podVolumesByNode[node.Name] = podVolumes
-	state.podVolumesByNodeMutex.Unlock()
+	cs.Unlock()
 	return nil
 }
 
