@@ -372,6 +372,41 @@ function install-kube-manifests {
   rm -f "${KUBE_HOME}/${manifests_tar}.sha512"
 }
 
+# Installs hurl to ${KUBE_HOME}/bin/hurl if not already installed.
+function install-hurl {
+  if [[ -f "${KUBE_HOME}/bin/hurl" ]]; then
+    echo "install-hurl: hurl already installed"
+    return
+  fi
+
+  local -r hurl_gcs_att="instance/attributes/hurl-gcs-url"
+  local -r hurl_gcs_url=$(curl \
+    --retry 5 \
+    --retry-delay 3 \
+    ${CURL_RETRY_CONNREFUSED} \
+    --fail \
+    --silent \
+    -H 'Metadata-Flavor: Google' \
+    "http://metadata/computeMetadata/v1/${hurl_gcs_att}")
+
+  if [[ -z "${hurl_gcs_url}" ]]; then
+    # URL not present in GCE Instance Metadata
+    echo "install-hurl: Unable to find GCE metadata ${hurl_gcs_att}"
+    return
+  fi
+
+  # Download hurl binary from a GCS bucket.
+  local -r hurl_bin="hurl"
+  echo "install-hurl: Installing hurl from ${hurl_gcs_url} ... "
+  download-or-bust "" "${hurl_gcs_url}"
+  if [[ -f "${KUBE_HOME}/${hurl_bin}" ]]; then
+    chmod a+x ${KUBE_HOME}/${hurl_bin}
+    mv "${KUBE_HOME}/${hurl_bin}" "${KUBE_BIN}/${hurl_bin}"
+    echo "install-hurl: hurl installed to ${KUBE_BIN}/${hurl_bin}"
+    return
+  fi
+}
+
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -675,5 +710,9 @@ ensure-container-runtime
 
 # binaries and kube-system manifests
 install-kube-binary-config
+
+if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+  install-hurl
+fi
 
 echo "Done for installing kubernetes files"
