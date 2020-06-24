@@ -118,6 +118,8 @@ function gce-metadata-fw-helper {
       ;;
   esac
 
+  # Deliberately allow word split here
+  # shellcheck disable=SC2086
   iptables ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
@@ -171,6 +173,8 @@ function config-ip-firewall {
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
+    # We do not want to add quotes for METADATA_SERVER_IP
+    # shellcheck disable=SC2086
     iptables -w -t nat -I PREROUTING -p tcp -d ${METADATA_SERVER_IP} --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
   fi
 
@@ -300,7 +304,7 @@ function unique-uuid-bind-mount(){
   udevadm trigger
   udevadm settle
 
-  # grep the exact match of actual device, prevents substring matching
+  # find uuid for actual_device
   local myuuid
   myuuid=$(find -L /dev/disk/by-uuid -maxdepth 1 -samefile /dev/"${actual_device}" -printf '%P\n')
   # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
@@ -2147,10 +2151,18 @@ function get-metadata-value {
 function copy-manifests {
   local -r src_dir="$1"
   local -r dst_dir="$2"
-  mkdir -p "${dst_dir}"
-
-  find "${src_dir}" -maxdepth 1 \( -name "*.yaml" -o -name "*.json" -o -name "*.yaml.in" \) -exec cp {} "$dst_dir" \;
-
+  if [[ ! -d "${dst_dir}" ]]; then
+    mkdir -p "${dst_dir}"
+  fi
+  if [[ -n "$(ls "${src_dir}"/*.yaml 2>/dev/null)" ]]; then
+    cp "${src_dir}/"*.yaml "${dst_dir}"
+  fi
+  if [[ -n "$(ls "${src_dir}"/*.json 2>/dev/null)" ]]; then
+    cp "${src_dir}/"*.json "${dst_dir}"
+  fi
+  if [[ -n "$(ls "${src_dir}"/*.yaml.in 2>/dev/null)" ]]; then
+    cp "${src_dir}/"*.yaml.in "${dst_dir}"
+  fi
   chown -R root:root "${dst_dir}"
   chmod 755 "${dst_dir}"
   chmod 644 "${dst_dir}"/*
