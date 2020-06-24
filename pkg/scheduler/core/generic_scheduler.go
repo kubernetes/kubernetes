@@ -936,11 +936,15 @@ func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudg
 				if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 					continue
 				}
+
+				// Existing in DisruptedPods means it has been processed in API server,
+				// we don't treat it as a violating case.
+				if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
+					continue
+				}
 				// Only decrement the matched pdb when it's not in its <DisruptedPods>;
 				// otherwise we may over-decrement the budget number.
-				if _, exist := pdb.Status.DisruptedPods[pod.Name]; !exist {
-					pdbsAllowed[i]--
-				}
+				pdbsAllowed[i]--
 				// We have found a matching PDB.
 				if pdbsAllowed[i] < 0 {
 					pdbForPodIsViolated = true
