@@ -2336,6 +2336,45 @@ function download-extra-addons {
   "${curl_cmd[@]}"
 }
 
+# A function that returns "true" if hurl should be used, "false" otherwise.
+function use-hurl {
+  local -r enable_hms_read=$(get-metadata-value "instance/attributes/enable_hms_read")
+  local result="false"
+
+  if [[ -f "${KUBE_HOME}/bin/hurl" && "${enable_hms_read}" == "true" ]]; then
+    result="true"
+  fi
+  echo $result
+}
+
+# A function to download CRP components stored in google-container-manifest
+# and extra-addons master metadata attributes.
+function download-component-data {
+  if [[ $(use-hurl) == "false" ]]; then
+    return
+  fi
+
+  echo "download-component-data: using hurl to download components in google-container-manifests and extra-addons"
+
+  local -r endpoint=$(get-metadata-value "instance/attributes/gke-api-endpoint")
+  local -r attribute_config="${KUBE_HOME}/hurl_attribute_config.yaml"
+
+  cat > $attribute_config <<EOF
+attributes:
+- attributePath: $(get-metadata-value "instance/attributes/google-container-manifest-path")
+  localPath: $(python3 -c "import sys, yaml; print(yaml.load(open(sys.argv[1]))['staticPodPath'])" "${KUBE_HOME}/kubelet-config.yaml")
+  processKind: split-pod-list
+- attributePath: $(get-metadata-value "instance/attributes/extra-addons-path")
+  localPath: ${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gce-extras/extras.json
+  processKind: none
+EOF
+
+  ${KUBE_HOME}/bin/hurl --hms_address $endpoint --attribute_config $attribute_config
+  # setup addons
+  setup-addon-manifests "addons" "gce-extras"
+}
+
+
 # A function that fetches a GCE metadata value and echoes it out.
 # Args:
 #   $1 : URL path after /computeMetadata/v1/ (without heading slash).
@@ -2826,7 +2865,7 @@ EOF
       fi
     fi
   fi
-  if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
+  if [[ -n "${EXTRA_ADDONS_URL:-}" && $(use-hurl) == "false" ]]; then
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"
   fi
@@ -3365,6 +3404,8 @@ function main() {
     log-wrap 'CreateNodePKI' create-node-pki
     log-wrap 'CreateMasterPKI' create-master-pki
     log-wrap 'CreateMasterAuth' create-master-auth
+    # must be called before 'start-kube-addons'
+    log-wrap 'DownloadComponentData' download-component-data
     log-wrap 'EnsureMasterBootstrapKubectlAuth' ensure-master-bootstrap-kubectl-auth
     log-wrap 'CreateMasterKubeletAuth' create-master-kubelet-auth
     log-wrap 'CreateMasterEtcdAuth' create-master-etcd-auth
