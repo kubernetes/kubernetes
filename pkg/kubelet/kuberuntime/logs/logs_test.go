@@ -67,7 +67,7 @@ func TestLogOptions(t *testing.T) {
 }
 
 func TestParseLog(t *testing.T) {
-	timestamp, err := time.Parse(timeFormat, "2016-10-20T18:39:20.57606443Z")
+	timestamp, err := time.Parse(timeFormatIn, "2016-10-20T18:39:20.57606443Z")
 	assert.NoError(t, err)
 	msg := &logMessage{}
 	for c, test := range []struct {
@@ -143,7 +143,7 @@ func TestParseLog(t *testing.T) {
 }
 
 func TestWriteLogs(t *testing.T) {
-	timestamp := time.Unix(1234, 4321)
+	timestamp := time.Unix(1234, 43210)
 	log := "abcdefg\n"
 
 	for c, test := range []struct {
@@ -168,7 +168,7 @@ func TestWriteLogs(t *testing.T) {
 		{ // timestamp enabled
 			stream:       runtimeapi.Stderr,
 			timestamp:    true,
-			expectStderr: timestamp.Format(timeFormat) + " " + log,
+			expectStderr: timestamp.Format(timeFormatOut) + " " + log,
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -189,7 +189,7 @@ func TestWriteLogs(t *testing.T) {
 
 func TestWriteLogsWithBytesLimit(t *testing.T) {
 	timestamp := time.Unix(1234, 4321)
-	timestampStr := timestamp.Format(timeFormat)
+	timestampStr := timestamp.Format(timeFormatOut)
 	log := "abcdefg\n"
 
 	for c, test := range []struct {
