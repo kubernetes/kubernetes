@@ -158,50 +158,17 @@ const (
 	WAIT_OBJECT_0  = 0x00000000
 	WAIT_FAILED    = 0xFFFFFFFF
 
-	// Standard access rights.
-	DELETE       = 0x00010000
-	READ_CONTROL = 0x00020000
-	SYNCHRONIZE  = 0x00100000
-	WRITE_DAC    = 0x00040000
-	WRITE_OWNER  = 0x00080000
-
-	// Access rights for process.
-	PROCESS_CREATE_PROCESS            = 0x0080
-	PROCESS_CREATE_THREAD             = 0x0002
-	PROCESS_DUP_HANDLE                = 0x0040
-	PROCESS_QUERY_INFORMATION         = 0x0400
-	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-	PROCESS_SET_INFORMATION           = 0x0200
-	PROCESS_SET_QUOTA                 = 0x0100
-	PROCESS_SUSPEND_RESUME            = 0x0800
-	PROCESS_TERMINATE                 = 0x0001
-	PROCESS_VM_OPERATION              = 0x0008
-	PROCESS_VM_READ                   = 0x0010
-	PROCESS_VM_WRITE                  = 0x0020
-
-	// Access rights for thread.
-	THREAD_DIRECT_IMPERSONATION      = 0x0200
-	THREAD_GET_CONTEXT               = 0x0008
-	THREAD_IMPERSONATE               = 0x0100
-	THREAD_QUERY_INFORMATION         = 0x0040
-	THREAD_QUERY_LIMITED_INFORMATION = 0x0800
-	THREAD_SET_CONTEXT               = 0x0010
-	THREAD_SET_INFORMATION           = 0x0020
-	THREAD_SET_LIMITED_INFORMATION   = 0x0400
-	THREAD_SET_THREAD_TOKEN          = 0x0080
-	THREAD_SUSPEND_RESUME            = 0x0002
-	THREAD_TERMINATE                 = 0x0001
+	PROCESS_TERMINATE         = 1
+	PROCESS_QUERY_INFORMATION = 0x00000400
+	SYNCHRONIZE               = 0x00100000
 
 	FILE_MAP_COPY    = 0x01
 	FILE_MAP_WRITE   = 0x02
 	FILE_MAP_READ    = 0x04
 	FILE_MAP_EXECUTE = 0x20
 
-	CTRL_C_EVENT        = 0
-	CTRL_BREAK_EVENT    = 1
-	CTRL_CLOSE_EVENT    = 2
-	CTRL_LOGOFF_EVENT   = 5
-	CTRL_SHUTDOWN_EVENT = 6
+	CTRL_C_EVENT     = 0
+	CTRL_BREAK_EVENT = 1
 
 	// Windows reserves errors >= 1<<29 for application use.
 	APPLICATION_ERROR = 1 << 29
@@ -660,16 +627,6 @@ type ProcessEntry32 struct {
 	PriClassBase    int32
 	Flags           uint32
 	ExeFile         [MAX_PATH]uint16
-}
-
-type ThreadEntry32 struct {
-	Size           uint32
-	Usage          uint32
-	ThreadID       uint32
-	OwnerProcessID uint32
-	BasePri        int32
-	DeltaPri       int32
-	Flags          uint32
 }
 
 type Systemtime struct {
@@ -1633,36 +1590,3 @@ const (
 	JobObjectNotificationLimitInformation2      = 34
 	JobObjectSecurityLimitInformation           = 5
 )
-
-const (
-	KF_FLAG_DEFAULT                          = 0x00000000
-	KF_FLAG_FORCE_APP_DATA_REDIRECTION       = 0x00080000
-	KF_FLAG_RETURN_FILTER_REDIRECTION_TARGET = 0x00040000
-	KF_FLAG_FORCE_PACKAGE_REDIRECTION        = 0x00020000
-	KF_FLAG_NO_PACKAGE_REDIRECTION           = 0x00010000
-	KF_FLAG_FORCE_APPCONTAINER_REDIRECTION   = 0x00020000
-	KF_FLAG_NO_APPCONTAINER_REDIRECTION      = 0x00010000
-	KF_FLAG_CREATE                           = 0x00008000
-	KF_FLAG_DONT_VERIFY                      = 0x00004000
-	KF_FLAG_DONT_UNEXPAND                    = 0x00002000
-	KF_FLAG_NO_ALIAS                         = 0x00001000
-	KF_FLAG_INIT                             = 0x00000800
-	KF_FLAG_DEFAULT_PATH                     = 0x00000400
-	KF_FLAG_NOT_PARENT_RELATIVE              = 0x00000200
-	KF_FLAG_SIMPLE_IDLIST                    = 0x00000100
-	KF_FLAG_ALIAS_ONLY                       = 0x80000000
-)
-
-type OsVersionInfoEx struct {
-	osVersionInfoSize uint32
-	MajorVersion      uint32
-	MinorVersion      uint32
-	BuildNumber       uint32
-	PlatformId        uint32
-	CsdVersion        [128]uint16
-	ServicePackMajor  uint16
-	ServicePackMinor  uint16
-	SuiteMask         uint16
-	ProductType       byte
-	_                 byte
-}

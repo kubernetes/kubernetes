@@ -177,7 +177,7 @@ var _ = SIGDescribe("Network", func() {
 
 		// The server should be listening before spawning the client pod
 		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, serverPodSpec.Name, 0); readyErr != nil {
-			framework.Failf("error waiting for server pod %s to be ready: %w", serverPodSpec.Name, readyErr)
+			framework.Failf("error waiting for server pod %s to be ready: %v", serverPodSpec.Name, readyErr)
 		}
 		// Connect to the server and leak the connection
 		ginkgo.By(fmt.Sprintf(

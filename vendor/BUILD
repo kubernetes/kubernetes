@@ -382,6 +382,7 @@ filegroup(
         "//vendor/golang.org/x/tools/internal/imports:all-srcs",
         "//vendor/golang.org/x/tools/internal/module:all-srcs",
         "//vendor/golang.org/x/tools/internal/semver:all-srcs",
+        "//vendor/golang.org/x/tools/internal/span:all-srcs",
         "//vendor/golang.org/x/xerrors:all-srcs",
         "//vendor/gonum.org/v1/gonum/blas:all-srcs",
         "//vendor/gonum.org/v1/gonum/floats:all-srcs",

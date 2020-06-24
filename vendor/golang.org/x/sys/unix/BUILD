@@ -53,8 +53,6 @@ go_library(
         "pledge_openbsd.go",
         "race.go",
         "race0.go",
-        "readdirent_getdents.go",
-        "readdirent_getdirentries.go",
         "sockcmsg_linux.go",
         "sockcmsg_unix.go",
         "str.go",

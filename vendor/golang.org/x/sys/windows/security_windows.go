@@ -603,22 +603,12 @@ type Tokenprimarygroup struct {
 
 type Tokengroups struct {
 	GroupCount uint32
-	Groups     [1]SIDAndAttributes // Use AllGroups() for iterating.
-}
-
-// AllGroups returns a slice that can be used to iterate over the groups in g.
-func (g *Tokengroups) AllGroups() []SIDAndAttributes {
-	return (*[(1 << 28) - 1]SIDAndAttributes)(unsafe.Pointer(&g.Groups[0]))[:g.GroupCount:g.GroupCount]
+	Groups     [1]SIDAndAttributes
 }
 
 type Tokenprivileges struct {
 	PrivilegeCount uint32
-	Privileges     [1]LUIDAndAttributes // Use AllPrivileges() for iterating.
-}
-
-// AllPrivileges returns a slice that can be used to iterate over the privileges in p.
-func (p *Tokenprivileges) AllPrivileges() []LUIDAndAttributes {
-	return (*[(1 << 27) - 1]LUIDAndAttributes)(unsafe.Pointer(&p.Privileges[0]))[:p.PrivilegeCount:p.PrivilegeCount]
+	Privileges     [1]LUIDAndAttributes
 }
 
 type Tokenmandatorylabel struct {

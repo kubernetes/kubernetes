@@ -22,7 +22,6 @@ go_library(
         "types_windows_386.go",
         "types_windows_amd64.go",
         "zerrors_windows.go",
-        "zknownfolderids_windows.go",
         "zsyscall_windows.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/sys/windows",

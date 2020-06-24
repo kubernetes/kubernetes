@@ -183,7 +183,6 @@ struct ltchars {
 #include <sys/socket.h>
 #include <sys/xattr.h>
 #include <linux/bpf.h>
-#include <linux/capability.h>
 #include <linux/errqueue.h>
 #include <linux/if.h>
 #include <linux/if_alg.h>
@@ -199,7 +198,6 @@ struct ltchars {
 #include <linux/fs.h>
 #include <linux/kexec.h>
 #include <linux/keyctl.h>
-#include <linux/loop.h>
 #include <linux/magic.h>
 #include <linux/memfd.h>
 #include <linux/module.h>
@@ -436,8 +434,6 @@ ccflags="$@"
 		$2 ~ /^TC[IO](ON|OFF)$/ ||
 		$2 ~ /^IN_/ ||
 		$2 ~ /^LOCK_(SH|EX|NB|UN)$/ ||
-		$2 ~ /^LO_(KEY|NAME)_SIZE$/ ||
-		$2 ~ /^LOOP_(CLR|CTL|GET|SET)_/ ||
 		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|ICMP6|TCP|MCAST|EVFILT|NOTE|EV|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR)_/ ||
 		$2 ~ /^TP_STATUS_/ ||
 		$2 ~ /^FALLOC_/ ||

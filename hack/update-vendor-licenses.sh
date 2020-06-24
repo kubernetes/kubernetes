@@ -134,7 +134,9 @@ process_content () {
 # MAIN
 #############################################################################
 
+# use modules, and use module info rather than the vendor dir for computing dependencies
 export GO111MODULE=on
+export GOFLAGS=-mod=mod
 
 # Check bash version
 if (( BASH_VERSINFO[0] < 4 )); then

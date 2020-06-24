@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"go/parser"
 	"go/token"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -38,10 +37,10 @@ func processGolistOverlay(cfg *Config, response *responseDeduper, rootDirs func(
 	for opath, contents := range cfg.Overlay {
 		base := filepath.Base(opath)
 		dir := filepath.Dir(opath)
-		var pkg *Package
+		var pkg *Package           // if opath belongs to both a package and its test variant, this will be the test variant
 		var testVariantOf *Package // if opath is a test file, this is the package it is testing
 		var fileExists bool
-		isTest := strings.HasSuffix(opath, "_test.go")
+		isTestFile := strings.HasSuffix(opath, "_test.go")
 		pkgName, ok := extractPackageName(opath, contents)
 		if !ok {
 			// Don't bother adding a file that doesn't even have a parsable package statement
@@ -57,12 +56,25 @@ func processGolistOverlay(cfg *Config, response *responseDeduper, rootDirs func(
 				if !sameFile(filepath.Dir(f), dir) {
 					continue
 				}
-				if isTest && !hasTestFiles(p) {
+				// Make sure to capture information on the package's test variant, if needed.
+				if isTestFile && !hasTestFiles(p) {
 					// TODO(matloob): Are there packages other than the 'production' variant
 					// of a package that this can match? This shouldn't match the test main package
 					// because the file is generated in another directory.
 					testVariantOf = p
 					continue nextPackage
+				}
+				if pkg != nil && p != pkg && pkg.PkgPath == p.PkgPath {
+					// If we've already seen the test variant,
+					// make sure to label which package it is a test variant of.
+					if hasTestFiles(pkg) {
+						testVariantOf = p
+						continue nextPackage
+					}
+					// If we have already seen the package of which this is a test variant.
+					if hasTestFiles(p) {
+						testVariantOf = pkg
+					}
 				}
 				pkg = p
 				if filepath.Base(f) == base {
@@ -74,32 +86,16 @@ func processGolistOverlay(cfg *Config, response *responseDeduper, rootDirs func(
 		if pkg == nil {
 			// Try to find the module or gopath dir the file is contained in.
 			// Then for modules, add the module opath to the beginning.
-			var pkgPath string
-			for rdir, rpath := range rootDirs().rootDirs {
-				// TODO(matloob): This doesn't properly handle symlinks.
-				r, err := filepath.Rel(rdir, dir)
-				if err != nil {
-					continue
-				}
-				pkgPath = filepath.ToSlash(r)
-				if rpath != "" {
-					pkgPath = path.Join(rpath, pkgPath)
-				}
-				// We only create one new package even it can belong in multiple modules or GOPATH entries.
-				// This is okay because tools (such as the LSP) that use overlays will recompute the overlay
-				// once the file is saved, and golist will do the right thing.
-				// TODO(matloob): Implement module tiebreaking?
+			pkgPath, ok := getPkgPath(cfg, dir, rootDirs)
+			if !ok {
 				break
-			}
-			if pkgPath == "" {
-				continue
 			}
 			isXTest := strings.HasSuffix(pkgName, "_test")
 			if isXTest {
 				pkgPath += "_test"
 			}
 			id := pkgPath
-			if isTest && !isXTest {
+			if isTestFile && !isXTest {
 				id = fmt.Sprintf("%s [%s.test]", pkgPath, pkgPath)
 			}
 			// Try to reclaim a package with the same id if it exists in the response.
@@ -115,7 +111,7 @@ func processGolistOverlay(cfg *Config, response *responseDeduper, rootDirs func(
 				response.addPackage(pkg)
 				havePkgs[pkg.PkgPath] = id
 				// Add the production package's sources for a test variant.
-				if isTest && !isXTest && testVariantOf != nil {
+				if isTestFile && !isXTest && testVariantOf != nil {
 					pkg.GoFiles = append(pkg.GoFiles, testVariantOf.GoFiles...)
 					pkg.CompiledGoFiles = append(pkg.CompiledGoFiles, testVariantOf.CompiledGoFiles...)
 				}
@@ -138,12 +134,16 @@ func processGolistOverlay(cfg *Config, response *responseDeduper, rootDirs func(
 			if !found {
 				overlayAddsImports = true
 				// TODO(matloob): Handle cases when the following block isn't correct.
-				// These include imports of test variants, imports of vendored packages, etc.
+				// These include imports of vendored packages, etc.
 				id, ok := havePkgs[imp]
 				if !ok {
 					id = imp
 				}
 				pkg.Imports[imp] = &Package{ID: id}
+				// Add dependencies to the non-test variant version of this package as wel.
+				if testVariantOf != nil {
+					testVariantOf.Imports[imp] = &Package{ID: id}
+				}
 			}
 		}
 		continue
