@@ -516,6 +516,12 @@ const (
 	// Enable Endpoint Slice consumption by kube-proxy for improved scalability.
 	EndpointSliceProxying featuregate.Feature = "EndpointSliceProxying"
 
+	// owner: @jeremyot
+	// alpha: v1.20
+	//
+	// Enable Multi Cluster Services
+	MultiClusterServices featuregate.Feature = "MultiClusterServices"
+
 	// owner: @Huang-Wei
 	// beta: v1.18
 	//
@@ -666,6 +672,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceProxying:                          {Default: false, PreRelease: featuregate.Alpha},
+	MultiClusterServices:                           {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: true, PreRelease: featuregate.Beta},
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.Beta},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
