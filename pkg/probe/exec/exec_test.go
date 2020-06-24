@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -120,12 +122,14 @@ func TestExec(t *testing.T) {
 		{probe.Success, false, elevenKilobyte, tenKilobyte, nil},
 		// Run returns error
 		{probe.Unknown, true, "", "", fmt.Errorf("test error")},
+		// Run returns DeadlineExceeded
+		{probe.Failure, false, "", "rpc error: code = DeadlineExceeded desc = timeout error", status.Error(codes.DeadlineExceeded, "timeout error")},
 		// Unhealthy
-		{probe.Failure, false, "Fail", "", &fakeExitError{true, 1}},
+		{probe.Failure, false, "Fail", "Fail", &fakeExitError{true, 1}},
 	}
 	for i, test := range tests {
 		fake := FakeCmd{
-			out: []byte(test.output),
+			out: []byte(test.input),
 			err: test.err,
 		}
 		status, output, err := prober.Probe(&fake)

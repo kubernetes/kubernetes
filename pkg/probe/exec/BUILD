@@ -15,6 +15,8 @@ go_library(
         "//pkg/probe:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 
@@ -22,7 +24,11 @@ go_test(
     name = "go_default_test",
     srcs = ["exec_test.go"],
     embed = [":go_default_library"],
-    deps = ["//pkg/probe:go_default_library"],
+    deps = [
+        "//pkg/probe:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
+    ],
 )
 
 filegroup(
