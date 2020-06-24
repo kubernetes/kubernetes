@@ -42,7 +42,7 @@ import (
 )
 
 var (
-	testSupportedVersions = MustParseSupportedVersions("3.0.17, 3.1.12")
+	testSupportedVersions = MustParseSupportedVersions([]string{"3.0.17", "3.1.12"})
 	testVersionPrevious   = &EtcdVersion{semver.MustParse("3.0.17")}
 	testVersionLatest     = &EtcdVersion{semver.MustParse("3.1.12")}
 )
