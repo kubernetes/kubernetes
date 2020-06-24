@@ -4,7 +4,6 @@ rules:
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme
-      - k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app/config
       - k8s.io/kubernetes/cmd/cloud-controller-manager/app/options
       - k8s.io/kubernetes/cmd/controller-manager/app
