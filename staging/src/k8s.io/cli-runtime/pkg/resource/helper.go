@@ -87,6 +87,12 @@ func (m *Helper) List(namespace, apiVersion string, options *metav1.ListOptions)
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(options, metav1.ParameterCodec)
+
+	if len(options.Continue) > 0 {
+		// If this is a continuation request, don't throttle it, so that performance is not affected while listing a large number of resources
+		req = req.Throttle(nil)
+	}
+
 	return req.Do(context.TODO()).Get()
 }
 
