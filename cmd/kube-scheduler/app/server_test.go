@@ -202,7 +202,6 @@ profiles:
 		"ReservePlugin":   {{Name: "VolumeBinding"}},
 		"UnreservePlugin": {{Name: "VolumeBinding"}},
 		"PreBindPlugin":   {{Name: "VolumeBinding"}},
-		"PostBindPlugin":  {{Name: "VolumeBinding"}},
 	}
 
 	testcases := []struct {
@@ -237,7 +236,6 @@ profiles:
 					"ReservePlugin":    {{Name: "VolumeBinding"}},
 					"UnreservePlugin":  {{Name: "VolumeBinding"}},
 					"PreBindPlugin":    {{Name: "VolumeBinding"}},
-					"PostBindPlugin":   {{Name: "VolumeBinding"}},
 				},
 			},
 		},
@@ -255,7 +253,6 @@ profiles:
 					"ReservePlugin":   {{Name: "VolumeBinding"}},
 					"UnreservePlugin": {{Name: "VolumeBinding"}},
 					"PreBindPlugin":   {{Name: "VolumeBinding"}},
-					"PostBindPlugin":  {{Name: "VolumeBinding"}},
 				},
 			},
 		},
@@ -338,7 +335,6 @@ profiles:
 					"ReservePlugin":   {{Name: "VolumeBinding"}},
 					"UnreservePlugin": {{Name: "VolumeBinding"}},
 					"PreBindPlugin":   {{Name: "VolumeBinding"}},
-					"PostBindPlugin":  {{Name: "VolumeBinding"}},
 				},
 			},
 		},

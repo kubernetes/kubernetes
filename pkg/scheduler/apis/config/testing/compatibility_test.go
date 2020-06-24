@@ -706,7 +706,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ReservePlugin":   {{Name: "VolumeBinding"}},
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -814,7 +813,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ReservePlugin":   {{Name: "VolumeBinding"}},
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -935,7 +933,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ReservePlugin":   {{Name: "VolumeBinding"}},
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1058,7 +1055,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ReservePlugin":   {{Name: "VolumeBinding"}},
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1181,7 +1177,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ReservePlugin":   {{Name: "VolumeBinding"}},
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1308,7 +1303,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ReservePlugin":   {{Name: "VolumeBinding"}},
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1438,7 +1432,6 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 		"ReservePlugin":   {{Name: "VolumeBinding"}},
 		"UnreservePlugin": {{Name: "VolumeBinding"}},
 		"PreBindPlugin":   {{Name: "VolumeBinding"}},
-		"PostBindPlugin":  {{Name: "VolumeBinding"}},
 	}
 
 	testcases := []struct {
@@ -1510,7 +1503,6 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
 				"BindPlugin":      {{Name: "DefaultBinder"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 		},
 	}
@@ -1602,7 +1594,6 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 		"UnreservePlugin": {{Name: "VolumeBinding"}},
 		"PreBindPlugin":   {{Name: "VolumeBinding"}},
 		"BindPlugin":      {{Name: "DefaultBinder"}},
-		"PostBindPlugin":  {{Name: "VolumeBinding"}},
 	}
 
 	testcases := []struct {
@@ -1953,7 +1944,6 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				"UnreservePlugin": {{Name: "VolumeBinding"}},
 				"PreBindPlugin":   {{Name: "VolumeBinding"}},
 				"BindPlugin":      {{Name: "DefaultBinder"}},
-				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 			wantPluginConfig: nil,
 		},
