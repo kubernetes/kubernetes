@@ -4142,7 +4142,7 @@ type PodLogOptions struct {
 	// If this value is in the future, no logs will be returned.
 	// Only one of sinceSeconds or sinceTime may be specified.
 	SinceTime *metav1.Time
-	// If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
+	// If true, add an RFC 3339 timestamp with 9 digits of fractional seconds at the beginning of every line
 	// of log output.
 	Timestamps bool
 	// If set, the number of lines from the end of the logs to show. If not specified,
