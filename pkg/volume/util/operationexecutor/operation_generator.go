@@ -835,8 +835,15 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		deviceMountPath, err :=
 			volumeDeviceMounter.GetDeviceMountPath(deviceToDetach.VolumeSpec)
 		if err != nil {
-			// On failure, return error. Caller will log and retry.
-			return deviceToDetach.GenerateError("GetDeviceMountPath failed", err)
+			// On failure other than "does not exist", return error. Caller will log and retry.
+			if !strings.Contains(err.Error(), "does not exist") {
+				return deviceToDetach.GenerateError("GetDeviceMountPath failed", err)
+			}
+			// If the mount path could not be found, don't fail the unmount, but instead log a warning and proceed,
+			// using the value from deviceToDetach.DeviceMountPath, so that the device can be marked as unmounted
+			deviceMountPath = deviceToDetach.DeviceMountPath
+			klog.Warningf(deviceToDetach.GenerateMsg(fmt.Sprintf(
+				"GetDeviceMountPath failed, but unmount operation will proceed using deviceMountPath=%s: %v", deviceMountPath, err), ""))
 		}
 		refs, err := deviceMountableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
 
