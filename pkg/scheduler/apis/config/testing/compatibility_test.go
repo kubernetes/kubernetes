@@ -513,7 +513,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 			}},
 		},
@@ -611,7 +611,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 			}},
 		},
@@ -716,7 +716,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 			}},
 		},
@@ -824,7 +824,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.10 was case-insensitive and tolerated "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
@@ -945,7 +945,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
@@ -1068,7 +1068,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
@@ -1191,7 +1191,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
@@ -1318,7 +1318,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
 				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
-				HTTPTimeout:      1,
+				HTTPTimeout:      metav1.Duration{Duration: 1},
 				NodeCacheCapable: true,
 				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,

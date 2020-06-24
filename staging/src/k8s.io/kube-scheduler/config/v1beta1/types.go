@@ -95,7 +95,7 @@ type KubeSchedulerConfiguration struct {
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	// +listType=set
-	Extenders []v1.Extender `json:"extenders,omitempty"`
+	Extenders []Extender `json:"extenders,omitempty"`
 }
 
 // DecodeNestedObjects decodes plugin args for known types.
@@ -263,4 +263,49 @@ func (c *PluginConfig) encodeNestedObjects(e runtime.Encoder) error {
 	}
 	c.Args.Raw = json
 	return nil
+}
+
+// Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// it is assumed that the extender chose not to provide that extension.
+type Extender struct {
+	// URLPrefix at which the extender is available
+	URLPrefix string `json:"urlPrefix"`
+	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
+	FilterVerb string `json:"filterVerb,omitempty"`
+	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	PreemptVerb string `json:"preemptVerb,omitempty"`
+	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
+	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
+	// The numeric multiplier for the node scores that the prioritize call generates.
+	// The weight should be a positive integer
+	Weight int64 `json:"weight,omitempty"`
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
+	// can implement this function.
+	BindVerb string `json:"bindVerb,omitempty"`
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool `json:"enableHTTPS,omitempty"`
+	// TLSConfig specifies the transport layer security config
+	TLSConfig *v1.ExtenderTLSConfig `json:"tlsConfig,omitempty"`
+	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
+	// timeout is ignored, k8s/other extenders priorities are used to select the node.
+	HTTPTimeout metav1.Duration `json:"httpTimeout,omitempty"`
+	// NodeCacheCapable specifies that the extender is capable of caching node information,
+	// so the scheduler should only send minimal information about the eligible nodes
+	// assuming that the extender already cached full details of all nodes in the cluster
+	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	// +listType=atomic
+	ManagedResources []v1.ExtenderManagedResource `json:"managedResources,omitempty"`
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool `json:"ignorable,omitempty"`
 }

@@ -33,6 +33,7 @@ func (in *Extender) DeepCopyInto(out *Extender) {
 		*out = new(ExtenderTLSConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	out.HTTPTimeout = in.HTTPTimeout
 	if in.ManagedResources != nil {
 		in, out := &in.ManagedResources, &out.ManagedResources
 		*out = make([]ExtenderManagedResource, len(*in))
