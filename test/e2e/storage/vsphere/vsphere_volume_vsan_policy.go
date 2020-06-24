@@ -94,7 +94,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters = make(map[string]string)
 		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
-		masternodes, _, err := e2enode.GetMasterAndWorkerNodes(client)
+		masternodes, _, err := e2enode.DeprecatedGetMasterAndWorkerNodes(client)
 		framework.ExpectNoError(err)
 		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
 		masterNode = masternodes.List()[0]
