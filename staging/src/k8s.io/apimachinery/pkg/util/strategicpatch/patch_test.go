@@ -1642,8 +1642,8 @@ mergingList:
     other: b
 `),
 		},
-  },
-{
+	},
+	{
 		Description: "de-duplicate field in merging list",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
@@ -1680,34 +1680,34 @@ mergingList:
 `),
 		},
 	},
-{
-  Description: "delete duplicate field in merging list",
-  StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
-    Original: []byte(`
+	{
+		Description: "delete duplicate field in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
 mergingList:
 - name: 1
 - name: 1
 `),
-    TwoWay: []byte(`
+			TwoWay: []byte(`
 mergingList: {}
 `),
-    Modified: []byte(`
+			Modified: []byte(`
 mergingList: {}
 `),
-    Current: []byte(`
+			Current: []byte(`
 mergingList:
 - name: 1
 - name: 1
 `),
-    ThreeWay: []byte(`
+			ThreeWay: []byte(`
 mergingList: {}
 `),
-    Result: []byte(`
+			Result: []byte(`
 mergingList: {}
 `),
-  },
-},
-{
+		},
+	},
+	{
 		Description: "add an item that already exists in current object in merging list",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
