@@ -1005,12 +1005,12 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		}
 	}
 
-	tlsCipherSuites, insecureCipherNames, err := cliflag.TLSCipherSuites(kc.TLSCipherSuites)
+	tlsCipherSuites, err := cliflag.TLSCipherSuites(kc.TLSCipherSuites)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, cipherName := range insecureCipherNames {
+	for _, cipherName := range cliflag.InsecureTLSCipherNamesUsed(kc.TLSCipherSuites) {
 		klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
 	}
 

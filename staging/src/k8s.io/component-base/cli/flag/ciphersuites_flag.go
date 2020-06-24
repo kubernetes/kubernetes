@@ -58,16 +58,6 @@ var insecureCiphers = map[string]uint16{
 	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
 }
 
-// InsecureTLSCiphers returns the cipher suites implemented by crypto/tls which have
-// security issues.
-func InsecureTLSCiphers() map[string]uint16 {
-	cipherKeys := make(map[string]uint16, len(insecureCiphers))
-	for k, v := range insecureCiphers {
-		cipherKeys[k] = v
-	}
-	return cipherKeys
-}
-
 // InsecureTLSCipherNames returns a list of cipher suite names implemented by crypto/tls
 // which have security issues.
 func InsecureTLSCipherNames() []string {
@@ -111,25 +101,36 @@ func TLSCipherPossibleValues() []string {
 
 // TLSCipherSuites returns a list of cipher suite IDs from the cipher suite names passed
 // and returns insecure cipher names matched.
-func TLSCipherSuites(cipherNames []string) ([]uint16, []string, error) {
+func TLSCipherSuites(cipherNames []string) ([]uint16, error) {
 	if len(cipherNames) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	ciphersIntSlice := make([]uint16, 0)
-	insecureCipherNamesMatched := make([]string, 0)
+
 	possibleCiphers := allCiphers()
 	for _, cipher := range cipherNames {
 		intValue, ok := possibleCiphers[cipher]
 		if !ok {
-			return nil, nil, fmt.Errorf("Cipher suite %s not supported or doesn't exist", cipher)
+			return nil, fmt.Errorf("cipher suite %s not supported or doesn't exist", cipher)
 		}
 		ciphersIntSlice = append(ciphersIntSlice, intValue)
 
-		if _, ok := insecureCiphers[cipher]; ok {
-			insecureCipherNamesMatched = append(insecureCipherNamesMatched, cipher)
+	}
+	return ciphersIntSlice, nil
+}
+
+// InsecureTLSCipherNamesUsed returns the cipher suites names implemented by crypto/tls which have
+// security issues.
+func InsecureTLSCipherNamesUsed(cipherNames []string) []string {
+	insecureCipherNamesMatched := make([]string, 0)
+
+	for _, cipherName := range cipherNames {
+		if _, ok := insecureCiphers[cipherName]; ok {
+			insecureCipherNamesMatched = append(insecureCipherNamesMatched, cipherName)
 		}
 	}
-	return ciphersIntSlice, insecureCipherNamesMatched, nil
+
+	return insecureCipherNamesMatched
 }
 
 var versions = map[string]uint16{
