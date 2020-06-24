@@ -349,8 +349,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	}
 
 	resyncerrc := make(chan error, 1)
-	cancelCh := make(chan struct{})
-	defer close(cancelCh)
 	go func() {
 		resyncCh, cleanup := r.resyncChan()
 		defer func() {
@@ -360,8 +358,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			select {
 			case <-resyncCh:
 			case <-stopCh:
-				return
-			case <-cancelCh:
 				return
 			}
 			if r.ShouldResync == nil || r.ShouldResync() {
