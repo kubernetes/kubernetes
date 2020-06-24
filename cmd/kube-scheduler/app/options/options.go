@@ -188,10 +188,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 			return err
 		}
 
-		// flag feature gates take precedence over feature gates in config file
-		for name, value := range o.ComponentConfig.FeatureGates {
-			cfg.FeatureGates[name] = value
-		}
+		flagFeatureGates := o.ComponentConfig.FeatureGates
 
 		// use the loaded config file only, with the exception of --address, --port and --feature-gates. This means that
 		// none of the deprecated flags in o.Deprecated are taken into consideration. This is the old
@@ -200,6 +197,10 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 
 		if err := o.CombinedInsecureServing.ApplyToFromLoadedConfig(c, &c.ComponentConfig); err != nil {
 			return err
+		}
+
+		for name, value := range flagFeatureGates {
+			c.ComponentConfig.FeatureGates[name] = value
 		}
 	}
 
