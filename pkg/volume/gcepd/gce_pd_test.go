@@ -220,7 +220,7 @@ func TestPlugin(t *testing.T) {
 	}
 	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
 	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
-	if r == nil {
+	if r == nil || r.Values == nil {
 		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
 	}
 	sort.Strings(r.Values)
