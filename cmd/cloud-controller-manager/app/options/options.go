@@ -39,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	ccmconfigscheme "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme"
-	ccmconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller"
@@ -115,7 +114,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
 func NewDefaultComponentConfig(insecurePort int32) (*ccmconfig.CloudControllerManagerConfiguration, error) {
-	versioned := &ccmconfigv1alpha1.CloudControllerManagerConfiguration{}
+	versioned := &ccmconfig.CloudControllerManagerConfiguration{}
 	ccmconfigscheme.Scheme.Default(versioned)
 
 	internal := &ccmconfig.CloudControllerManagerConfiguration{}
