@@ -23,12 +23,13 @@ import (
 )
 
 type event struct {
-	key       string
-	value     []byte
-	prevValue []byte
-	rev       int64
-	isDeleted bool
-	isCreated bool
+	key              string
+	value            []byte
+	prevValue        []byte
+	rev              int64
+	isDeleted        bool
+	isCreated        bool
+	isProgressNotify bool
 }
 
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
@@ -60,4 +61,11 @@ func parseEvent(e *clientv3.Event) (*event, error) {
 		ret.prevValue = e.PrevKv.Value
 	}
 	return ret, nil
+}
+
+func progressNotifyEvent(rev int64) *event {
+	return &event{
+		rev:              rev,
+		isProgressNotify: true,
+	}
 }

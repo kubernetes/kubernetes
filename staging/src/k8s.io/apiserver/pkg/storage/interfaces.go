@@ -262,4 +262,7 @@ type ListOptions struct {
 	ResourceVersion string
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
+
+	// FIXME
+	ProgressNotify bool
 }

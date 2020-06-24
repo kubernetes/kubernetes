@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -322,6 +323,8 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	// Avoid calling event handler under lock.
 	// This is safe as long as there is at most one call to processEvent in flight
 	// at any point in time.
+
+	// FIXME:
 	if w.eventHandler != nil {
 		w.eventHandler(wcEvent)
 	}
@@ -379,6 +382,29 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 	w.cache = newCache
 	recordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
 	w.capacity = capacity
+}
+
+
+// FIXME: Implement resourceVersionUpdater
+func (w *watchCache) UpdateResourceVersion(version string) {
+	resourceVersion, err := strconv.ParseUint(version, 10, 64)
+	if err != nil {
+		// FIXME:
+		return
+	}
+	func() {
+		w.Lock()
+		defer w.Unlock()
+		w.resourceVersion = resourceVersion
+	}()
+
+	wcEvent := &watchCacheEvent{
+		Type:            watch.Bookmark,
+		ResourceVersion: resourceVersion,
+	}
+	if w.eventHandler != nil {
+		w.eventHandler(wcEvent)
+	}
 }
 
 // List returns list of pointers to <storeElement> objects.

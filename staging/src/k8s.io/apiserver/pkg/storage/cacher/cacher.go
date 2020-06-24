@@ -793,7 +793,11 @@ func (c *Cacher) dispatchEvents() {
 			if !ok {
 				return
 			}
-			c.dispatchEvent(&event)
+			if event.Type != watch.Bookmark {
+				c.dispatchEvent(&event)
+			} else {
+				// klog.Errorf("BBB: %s %d", c.objectType.String(), event.ResourceVersion)
+			}
 			lastProcessedResourceVersion = event.ResourceVersion
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
@@ -1098,7 +1102,7 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, storage.ListOptions{ResourceVersion: options.ResourceVersion, Predicate: storage.Everything})
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, storage.ListOptions{ResourceVersion: options.ResourceVersion, Predicate: storage.Everything, ProgressNotify: true})
 }
 
 // errWatcher implements watch.Interface to return a single error

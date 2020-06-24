@@ -437,6 +437,10 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 	return r.store.Replace(found, resourceVersion)
 }
 
+type resourceVersionUpdater interface {
+	UpdateResourceVersion(resourceVersion string)
+}
+
 // watchHandler watches w and keeps *resourceVersion up to date.
 func (r *Reflector) watchHandler(start time.Time, w watch.Interface, resourceVersion *string, errc chan error, stopCh <-chan struct{}) error {
 	eventCount := 0
@@ -459,7 +463,8 @@ loop:
 			if event.Type == watch.Error {
 				return apierrors.FromObject(event.Object)
 			}
-			if r.expectedType != nil {
+			// FIXME:
+/*			if r.expectedType != nil {
 				if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
 					utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", r.name, e, a))
 					continue
@@ -470,7 +475,7 @@ loop:
 					utilruntime.HandleError(fmt.Errorf("%s: expected gvk %v, but watch event object had gvk %v", r.name, e, a))
 					continue
 				}
-			}
+			}*/
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
@@ -498,6 +503,9 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
+				if rvu, ok := r.store.(resourceVersionUpdater); ok {
+					rvu.UpdateResourceVersion(newResourceVersion)
+				}
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 			}
