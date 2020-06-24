@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,14 @@ package storageversion
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"k8s.io/api/apiserverinternal/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1"
-	"k8s.io/klog"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
 
 // Client has the methods required to update the storage version.
@@ -33,33 +35,32 @@ type Client interface {
 	Get(context.Context, string, metav1.GetOptions) (*v1alpha1.StorageVersion, error)
 }
 
-func setAgreedEncodingVersion(sv *v1alpha1.StorageVersion) {
-	if len(sv.Status.ServerStorageVersions) == 0 {
+func setCommonEncodingVersion(sv *v1alpha1.StorageVersion) {
+	if len(sv.Status.StorageVersions) == 0 {
 		return
 	}
-	firstVersion := sv.Status.ServerStorageVersions[0].EncodingVersion
+	firstVersion := sv.Status.StorageVersions[0].EncodingVersion
 	agreed := true
-	for _, ssv := range sv.Status.ServerStorageVersions {
+	for _, ssv := range sv.Status.StorageVersions {
 		if ssv.EncodingVersion != firstVersion {
 			agreed = false
+			break
 		}
 	}
 	if agreed {
-		sv.Status.AgreedEncodingVersion = &firstVersion
+		sv.Status.CommonEncodingVersion = &firstVersion
 	} else {
-		sv.Status.AgreedEncodingVersion = nil
+		sv.Status.CommonEncodingVersion = nil
 	}
 }
 
 // updateStorageVersionFor updates the storage version object for the resource.
-// resource is of the format "<group>.<resource>".
-// TODO: split the resource parameter to two.
-func updateStorageVersionFor(c Client, apiserverID string, resource string, encodingVersion string, decodableVersions []string) error {
+func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string) error {
 	retries := 3
 	var retry int
 	var err error
 	for retry < retries {
-		err = singleUpdate(c, apiserverID, resource, encodingVersion, decodableVersions)
+		err = singleUpdate(c, apiserverID, gr, encodingVersion, decodableVersions)
 		if err == nil {
 			return nil
 		}
@@ -68,7 +69,7 @@ func updateStorageVersionFor(c Client, apiserverID string, resource string, enco
 			continue
 		}
 		if err != nil {
-			klog.Errorf("retry %d, failed to update storage version for %s: %v", retry, resource, err)
+			klog.Errorf("retry %d, failed to update storage version for %v: %v", retry, gr, err)
 			retry++
 			time.Sleep(1 * time.Second)
 		}
@@ -76,41 +77,46 @@ func updateStorageVersionFor(c Client, apiserverID string, resource string, enco
 	return err
 }
 
-func singleUpdate(c Client, apiserverID, resource, encodingVersion string, decodableVersions []string) error {
+func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string) error {
 	shouldCreate := false
-	sv, err := c.Get(context.TODO(), resource, metav1.GetOptions{})
+	name := fmt.Sprintf("%s.%s", gr.Group, gr.Resource)
+	sv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	if err != nil && apierrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		shouldCreate = true
 		sv = &v1alpha1.StorageVersion{}
-		sv.ObjectMeta.Name = resource
+		sv.ObjectMeta.Name = name
 	}
-	localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions)
+	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions)
 	if shouldCreate {
-		_, err := c.Create(context.TODO(), sv, metav1.CreateOptions{})
+		_, err := c.Create(context.TODO(), updatedSV, metav1.CreateOptions{})
 		return err
 	}
-	_, err = c.Update(context.TODO(), sv, metav1.UpdateOptions{})
+	_, err = c.Update(context.TODO(), updatedSV, metav1.UpdateOptions{})
 	return err
 }
 
-func localUpdateStorageVersion(sv *v1alpha1.StorageVersion, apiserverID, encodingVersion string, decodableVersions []string) {
+// localUpdateStorageVersion updates the input storageversion with given server storageversion info.
+// The function updates the input storageversion in place.
+func localUpdateStorageVersion(sv *v1alpha1.StorageVersion, apiserverID, encodingVersion string, decodableVersions []string) *v1alpha1.StorageVersion {
 	newSSV := v1alpha1.ServerStorageVersion{
 		APIServerID:       apiserverID,
 		EncodingVersion:   encodingVersion,
 		DecodableVersions: decodableVersions,
 	}
 	foundSSV := false
-	for i, ssv := range sv.Status.ServerStorageVersions {
+	for i, ssv := range sv.Status.StorageVersions {
 		if ssv.APIServerID == apiserverID {
-			sv.Status.ServerStorageVersions[i] = newSSV
+			sv.Status.StorageVersions[i] = newSSV
 			foundSSV = true
+			break
 		}
 	}
 	if !foundSSV {
-		sv.Status.ServerStorageVersions = append(sv.Status.ServerStorageVersions, newSSV)
+		sv.Status.StorageVersions = append(sv.Status.StorageVersions, newSSV)
 	}
-	setAgreedEncodingVersion(sv)
+	setCommonEncodingVersion(sv)
+	return sv
 }

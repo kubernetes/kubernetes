@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1"
+	"k8s.io/api/apiserverinternal/v1alpha1"
 )
 
 func TestLocalUpdateStorageVersion(t *testing.T) {
@@ -56,46 +56,46 @@ func TestLocalUpdateStorageVersion(t *testing.T) {
 			old:    v1alpha1.StorageVersionStatus{},
 			newSSV: ssv1,
 			expected: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1},
-				AgreedEncodingVersion: &v1,
+				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1},
+				CommonEncodingVersion: &v1,
 			},
 		},
 		{
 			old: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				AgreedEncodingVersion: &v1,
+				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
+				CommonEncodingVersion: &v1,
 			},
 			newSSV: ssv3,
 			expected: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3},
+				StorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3},
 			},
 		},
 		{
 			old: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				AgreedEncodingVersion: &v1,
+				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
+				CommonEncodingVersion: &v1,
 			},
 			newSSV: ssv4,
 			expected: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv4},
-				AgreedEncodingVersion: &v1,
+				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv4},
+				CommonEncodingVersion: &v1,
 			},
 		},
 		{
 			old: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3},
+				StorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3},
 			},
 			newSSV: ssv4,
 			expected: v1alpha1.StorageVersionStatus{
-				ServerStorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3, ssv4},
+				StorageVersions: []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3, ssv4},
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		sv := &v1alpha1.StorageVersion{Status: tc.old}
-		localUpdateStorageVersion(sv, tc.newSSV.APIServerID, tc.newSSV.EncodingVersion, tc.newSSV.DecodableVersions)
-		if e, a := tc.expected, sv.Status; !reflect.DeepEqual(e, a) {
+		updated := localUpdateStorageVersion(sv, tc.newSSV.APIServerID, tc.newSSV.EncodingVersion, tc.newSSV.DecodableVersions)
+		if e, a := tc.expected, updated.Status; !reflect.DeepEqual(e, a) {
 			t.Errorf("unexpected: %v", cmp.Diff(e, a))
 		}
 	}
