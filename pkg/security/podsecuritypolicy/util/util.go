@@ -242,3 +242,28 @@ func EqualStringSlices(a, b []string) bool {
 	}
 	return true
 }
+
+func IsOnlyServiceAccountTokenSources(v *api.ProjectedVolumeSource) bool {
+	for _, s := range v.Sources {
+		// reject any projected source that does not match any of our expected source types
+		if s.ServiceAccountToken == nil && s.ConfigMap == nil && s.DownwardAPI == nil {
+			return false
+		}
+		if t := s.ServiceAccountToken; t != nil && (t.Path != "token" || t.Audience != "") {
+			return false
+		}
+
+		if s.ConfigMap != nil && s.ConfigMap.LocalObjectReference.Name != "kube-root-ca.crt" {
+			return false
+		}
+
+		if s.DownwardAPI != nil {
+			for _, d := range s.DownwardAPI.Items {
+				if d.Path != "namespace" || d.FieldRef == nil || d.FieldRef.APIVersion != "v1" || d.FieldRef.FieldPath != "metadata.namespace" {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
