@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -1130,7 +1131,7 @@ func TestBindPlugin(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	// Add a few nodes.
-	_, err := createNodes(testCtx.ClientSet, "test-node", nil, 2)
+	_, err := createNodes(testCtx.ClientSet, "test-node", st.MakeNode(), 2)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -1776,12 +1777,12 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	// Add one node.
-	nodeRes := &v1.ResourceList{
-		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
 	}
-	_, err := createNodes(testCtx.ClientSet, "test-node", nodeRes, 1)
+	_, err := createNodes(testCtx.ClientSet, "test-node", st.MakeNode().Capacity(nodeRes), 1)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -1841,7 +1842,7 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	if nodeCount > 0 {
-		_, err := createNodes(testCtx.ClientSet, "test-node", nil, nodeCount)
+		_, err := createNodes(testCtx.ClientSet, "test-node", st.MakeNode(), nodeCount)
 		if err != nil {
 			t.Fatalf("Cannot create nodes: %v", err)
 		}
