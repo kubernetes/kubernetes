@@ -22,11 +22,9 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -37,10 +35,7 @@ import (
 func TestUploadConfiguration(t *testing.T) {
 	tests := []struct {
 		name           string
-		errOnCreate    error
-		errOnUpdate    error
 		updateExisting bool
-		errExpected    bool
 		verifyResult   bool
 	}{
 		{
@@ -51,17 +46,6 @@ func TestUploadConfiguration(t *testing.T) {
 			name:           "update existing should report no error",
 			updateExisting: true,
 			verifyResult:   true,
-		},
-		{
-			name:        "unexpected errors for create should be returned",
-			errOnCreate: apierrors.NewUnauthorized(""),
-			errExpected: true,
-		},
-		{
-			name:           "update existing show report error if unexpected error for update is returned",
-			errOnUpdate:    apierrors.NewUnauthorized(""),
-			updateExisting: true,
-			errExpected:    true,
 		},
 	}
 	for _, tt := range tests {
@@ -101,22 +85,12 @@ func TestUploadConfiguration(t *testing.T) {
 			}
 
 			client := clientsetfake.NewSimpleClientset()
-			if tt.errOnCreate != nil {
-				client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-					return true, nil, tt.errOnCreate
-				})
-			}
 			// For idempotent test, we check the result of the second call.
-			if err := UploadConfiguration(cfg, client); !tt.updateExisting && (err != nil) != tt.errExpected {
-				t2.Fatalf("UploadConfiguration() error = %v, wantErr %v", err, tt.errExpected)
+			if err := UploadConfiguration(cfg, client); err != nil {
+				t2.Fatalf("UploadConfiguration() error = %v", err)
 			}
 			if tt.updateExisting {
-				if tt.errOnUpdate != nil {
-					client.PrependReactor("update", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-						return true, nil, tt.errOnUpdate
-					})
-				}
-				if err := UploadConfiguration(cfg, client); (err != nil) != tt.errExpected {
+				if err := UploadConfiguration(cfg, client); err != nil {
 					t2.Fatalf("UploadConfiguration() error = %v", err)
 				}
 			}
