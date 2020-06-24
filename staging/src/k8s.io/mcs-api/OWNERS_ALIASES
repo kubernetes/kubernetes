@@ -1,0 +1,15 @@
+# See the OWNERS docs at https://go.k8s.io/owners#owners_aliases
+
+aliases:
+  # TODO: remove this alias, it will go stale in your repo, and in your repo
+  # you should have your own set of approvers (see OWNERS)
+  # in the original template repo, we must maintain this list to approve changes
+  # to the template itself
+  steering-committee:
+    - cblecker
+    - derekwaynecarr
+    - dims
+    - lachie83
+    - nikhita
+    - parispittman
+    - spiffxp

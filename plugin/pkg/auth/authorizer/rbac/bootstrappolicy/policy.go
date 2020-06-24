@@ -43,6 +43,7 @@ var (
 
 const (
 	legacyGroup         = ""
+	apiExtensionsGroup  = "apiextensions.k8s.io"
 	appsGroup           = "apps"
 	authenticationGroup = "authentication.k8s.io"
 	authorizationGroup  = "authorization.k8s.io"
@@ -52,6 +53,7 @@ const (
 	coordinationGroup   = "coordination.k8s.io"
 	discoveryGroup      = "discovery.k8s.io"
 	extensionsGroup     = "extensions"
+	multiClusterGroup   = "multicluster.k8s.io"
 	policyGroup         = "policy"
 	rbacGroup           = "rbac.authorization.k8s.io"
 	storageGroup        = "storage.k8s.io"
@@ -507,6 +509,11 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
 		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiClusterServices) {
+		nodeProxierRules = append(nodeProxierRules,
+			rbacv1helpers.NewRule("list", "watch").Groups(apiExtensionsGroup).Resources("customresourcedefinitions").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch").Groups(multiClusterGroup).Resources("serviceimports").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},

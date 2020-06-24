@@ -1130,6 +1130,20 @@ items:
     verbs:
     - list
     - watch
+  - apiGroups:
+    - apiextensions.k8s.io
+    resources:
+    - customresourcedefinitions
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - multicluster.k8s.io
+    resources:
+    - serviceimports
+    verbs:
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

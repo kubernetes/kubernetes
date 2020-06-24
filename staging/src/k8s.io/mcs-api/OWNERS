@@ -1,0 +1,6 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  # TODO: in your repo created from this template, you should replace the
+  # steering-committee with a list of project owners, see the doc linked above.
+  - steering-committee

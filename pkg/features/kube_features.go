@@ -544,6 +544,12 @@ const (
 	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
 	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
 
+	// owner: @jeremyot
+	// alpha: v1.20
+	//
+	// Enable Multi Cluster Services
+	MultiClusterServices featuregate.Feature = "MultiClusterServices"
+
 	// owner: @Huang-Wei
 	// alpha: v1.16
 	// beta: v1.18
@@ -722,6 +728,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.Beta},
 	WindowsEndpointSliceProxying:                   {Default: false, PreRelease: featuregate.Alpha},
+	MultiClusterServices:                           {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.Beta},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},

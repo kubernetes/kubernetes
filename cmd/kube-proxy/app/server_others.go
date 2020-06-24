@@ -96,7 +96,7 @@ func newProxyServer(
 		return nil, err
 	}
 
-	client, eventClient, err := createClients(config.ClientConnection, master)
+	client, eventClient, dynamicClient, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
@@ -363,6 +363,7 @@ func newProxyServer(
 	return &ProxyServer{
 		Client:                 client,
 		EventClient:            eventClient,
+		DynamicClient:          dynamicClient,
 		IptInterface:           iptInterface,
 		IpvsInterface:          ipvsInterface,
 		IpsetInterface:         ipsetInterface,

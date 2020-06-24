@@ -23,10 +23,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // ServiceHandler is an abstract interface of objects which receive
@@ -366,6 +368,119 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 			return
 		}
 	}
+	for i := range c.eventHandlers {
+		klog.V(4).Info("Calling handler.OnServiceDelete")
+		c.eventHandlers[i].OnServiceDelete(service)
+	}
+}
+
+// ServiceImportConfig tracks a set of service configurations.
+//
+// ServiceImports with type SuperclusterIP behave exactly like ClusterIP
+// services once imported. Passing a common representation of a service
+// to the proxy implementation avoids the need to plumb both types
+// through with nearly identical code for little gain. The properties
+// currently used for ServiceImport proxy programming are a strict subset
+// of those used from v1.Service so for now we use the existing
+// v1.Service as the common representation as it's already supported by
+// each proxy mode. In the future, if ServiceImport and Service diverge,
+// we would want to switch to a purpose-built common representation.
+//
+// When converted to standard Services, ServiceImports are assigned a
+// prefix that is not a valid service name to avoid conflicting with
+// any same-named services that may exist.
+type ServiceImportConfig struct {
+	listerSynced  cache.InformerSynced
+	eventHandlers []ServiceHandler
+}
+
+// NewServiceImportConfig creates a new ServiceImportConfig.
+func NewServiceImportConfig(serviceInformer informers.GenericInformer, resyncPeriod time.Duration) *ServiceImportConfig {
+	result := &ServiceImportConfig{
+		listerSynced: serviceInformer.Informer().HasSynced,
+	}
+
+	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    result.handleAddServiceImport,
+			UpdateFunc: result.handleUpdateServiceImport,
+			DeleteFunc: result.handleDeleteServiceImport,
+		},
+		resyncPeriod,
+	)
+
+	return result
+}
+
+// RegisterEventHandler registers a handler which is called on every service change.
+//
+// Because we use Service as a common representation for both traditional Services
+// and ServiceImports, ServiceImportConfig uses instances of ServiceHandler.
+func (c *ServiceImportConfig) RegisterEventHandler(handler ServiceHandler) {
+	c.eventHandlers = append(c.eventHandlers, handler)
+}
+
+// Run waits for cache synced and invokes handlers after syncing.
+func (c *ServiceImportConfig) Run(stopCh <-chan struct{}) {
+	klog.Info("Starting serviceimport config controller")
+
+	if !cache.WaitForNamedCacheSync("serviceimport config", stopCh, c.listerSynced) {
+		return
+	}
+
+	for i := range c.eventHandlers {
+		klog.V(3).Info("Calling handler.OnServiceSynced()")
+		c.eventHandlers[i].OnServiceSynced()
+	}
+}
+
+func (c *ServiceImportConfig) handleAddServiceImport(obj interface{}) {
+	serviceImport, err := util.ServiceImportFromInformer(obj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	service := util.ServiceFromImport(serviceImport)
+	for i := range c.eventHandlers {
+		klog.V(4).Info("Calling handler.OnServiceAdd")
+		c.eventHandlers[i].OnServiceAdd(service)
+	}
+}
+
+func (c *ServiceImportConfig) handleUpdateServiceImport(oldObj, newObj interface{}) {
+	oldServiceImport, err := util.ServiceImportFromInformer(oldObj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	serviceImport, err := util.ServiceImportFromInformer(newObj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	oldService := util.ServiceFromImport(oldServiceImport)
+	service := util.ServiceFromImport(serviceImport)
+	for i := range c.eventHandlers {
+		klog.V(4).Info("Calling handler.OnServiceUpdate")
+		c.eventHandlers[i].OnServiceUpdate(oldService, service)
+	}
+}
+
+func (c *ServiceImportConfig) handleDeleteServiceImport(obj interface{}) {
+	serviceImport, err := util.ServiceImportFromInformer(obj)
+	if err != nil {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
+		serviceImport, err = util.ServiceImportFromInformer(tombstone.Obj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+	}
+	service := util.ServiceFromImport(serviceImport)
 	for i := range c.eventHandlers {
 		klog.V(4).Info("Calling handler.OnServiceDelete")
 		c.eventHandlers[i].OnServiceDelete(service)

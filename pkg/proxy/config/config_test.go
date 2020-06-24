@@ -23,14 +23,20 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/proxy/util"
+	mcsv1alpha1 "k8s.io/mcs-api/pkg/apis/multicluster/v1alpha1"
 )
 
 type sortedServices []*v1.Service
@@ -221,6 +227,14 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 			return
 		}
 	}
+}
+
+func unstructuredServiceImport(t *testing.T, serviceImport *mcsv1alpha1.ServiceImport) *unstructured.Unstructured {
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(serviceImport)
+	if err != nil {
+		t.Fatalf("Failed to convert service import to unstrcutured: %v", err)
+	}
+	return &unstructured.Unstructured{Object: obj}
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
@@ -427,6 +441,190 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	endpoints = []*v1.Endpoints{endpoints1v2, endpoints3}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
+}
+
+func TestNewServiceImportAddedAndNotified(t *testing.T) {
+	scheme := runtime.NewScheme()
+	v1.AddToScheme(scheme)
+	mcsv1alpha1.AddToScheme(scheme)
+	client := dynamicfake.NewSimpleDynamicClient(scheme)
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("serviceimports", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, time.Minute, metav1.NamespaceAll,
+		func(options *metav1.ListOptions) {})
+	config := NewServiceImportConfig(informerFactory.ForResource(mcsv1alpha1.SchemeGroupVersion.WithResource("serviceimports")), time.Minute)
+	handler := NewServiceHandlerMock()
+
+	config.RegisterEventHandler(handler)
+	go config.Run(stopCh)
+	go informerFactory.Start(stopCh)
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: util.ServiceImportName("foo")},
+		Spec: v1.ServiceSpec{
+			Type:  v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	serviceImport := &mcsv1alpha1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec: mcsv1alpha1.ServiceImportSpec{
+			Ports: []mcsv1alpha1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	fakeWatch.Add(unstructuredServiceImport(t, serviceImport))
+	handler.ValidateServices(t, []*v1.Service{service})
+}
+
+func TestServiceImportAddedRemovedAndNotified(t *testing.T) {
+	scheme := runtime.NewScheme()
+	v1.AddToScheme(scheme)
+	mcsv1alpha1.AddToScheme(scheme)
+	client := dynamicfake.NewSimpleDynamicClient(scheme)
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("serviceimports", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, time.Minute, metav1.NamespaceAll,
+		func(options *metav1.ListOptions) {})
+	config := NewServiceImportConfig(informerFactory.ForResource(mcsv1alpha1.SchemeGroupVersion.WithResource("serviceimports")), time.Minute)
+	handler := NewServiceHandlerMock()
+
+	config.RegisterEventHandler(handler)
+	go config.Run(stopCh)
+	go informerFactory.Start(stopCh)
+
+	service1 := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: util.ServiceImportName("foo")},
+		Spec: v1.ServiceSpec{
+			Type:  v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	serviceImport1 := &mcsv1alpha1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec: mcsv1alpha1.ServiceImportSpec{
+			Ports: []mcsv1alpha1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	fakeWatch.Add(unstructuredServiceImport(t, serviceImport1))
+	handler.ValidateServices(t, []*v1.Service{service1})
+
+	service2 := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: util.ServiceImportName("bar")},
+		Spec: v1.ServiceSpec{
+			Type:  v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	serviceImport2 := &mcsv1alpha1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Spec: mcsv1alpha1.ServiceImportSpec{
+			Ports: []mcsv1alpha1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	fakeWatch.Add(unstructuredServiceImport(t, serviceImport2))
+	handler.ValidateServices(t, []*v1.Service{service2, service1})
+
+	fakeWatch.Delete(unstructuredServiceImport(t, serviceImport1))
+	handler.ValidateServices(t, []*v1.Service{service2})
+}
+
+func TestServiceImportAddedUpdatedAndNotified(t *testing.T) {
+	scheme := runtime.NewScheme()
+	v1.AddToScheme(scheme)
+	mcsv1alpha1.AddToScheme(scheme)
+	client := dynamicfake.NewSimpleDynamicClient(scheme)
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("serviceimports", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, time.Minute, metav1.NamespaceAll,
+		func(options *metav1.ListOptions) {})
+	config := NewServiceImportConfig(informerFactory.ForResource(mcsv1alpha1.SchemeGroupVersion.WithResource("serviceimports")), time.Minute)
+	handler := NewServiceHandlerMock()
+
+	config.RegisterEventHandler(handler)
+	go config.Run(stopCh)
+	go informerFactory.Start(stopCh)
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: util.ServiceImportName("foo")},
+		Spec: v1.ServiceSpec{
+			Type:  v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	serviceImport := &mcsv1alpha1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec: mcsv1alpha1.ServiceImportSpec{
+			Ports: []mcsv1alpha1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	fakeWatch.Add(unstructuredServiceImport(t, serviceImport))
+	handler.ValidateServices(t, []*v1.Service{service})
+
+	service = &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: util.ServiceImportName("foo")},
+		Spec: v1.ServiceSpec{
+			Type:      v1.ServiceTypeClusterIP,
+			ClusterIP: "10.42.42.42",
+			Ports:     []v1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	serviceImport = &mcsv1alpha1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec: mcsv1alpha1.ServiceImportSpec{
+			IP:    "10.42.42.42",
+			Ports: []mcsv1alpha1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	fakeWatch.Modify(unstructuredServiceImport(t, serviceImport))
+	handler.ValidateServices(t, []*v1.Service{service})
+}
+
+func TestNewServiceImportsMultipleHandlersAddedAndNotified(t *testing.T) {
+	scheme := runtime.NewScheme()
+	v1.AddToScheme(scheme)
+	mcsv1alpha1.AddToScheme(scheme)
+	client := dynamicfake.NewSimpleDynamicClient(scheme)
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("serviceimports", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, time.Minute, metav1.NamespaceAll,
+		func(options *metav1.ListOptions) {})
+	config := NewServiceImportConfig(informerFactory.ForResource(mcsv1alpha1.SchemeGroupVersion.WithResource("serviceimports")), time.Minute)
+	handler := NewServiceHandlerMock()
+	handler2 := NewServiceHandlerMock()
+
+	config.RegisterEventHandler(handler)
+	config.RegisterEventHandler(handler2)
+	go config.Run(stopCh)
+	go informerFactory.Start(stopCh)
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: util.ServiceImportName("foo")},
+		Spec: v1.ServiceSpec{
+			Type:  v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	serviceImport := &mcsv1alpha1.ServiceImport{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec: mcsv1alpha1.ServiceImportSpec{
+			Ports: []mcsv1alpha1.ServicePort{{Protocol: "TCP", Port: 10}},
+		},
+	}
+	fakeWatch.Add(unstructuredServiceImport(t, serviceImport))
+	handler.ValidateServices(t, []*v1.Service{service})
+	handler2.ValidateServices(t, []*v1.Service{service})
 }
 
 // TODO: Add a unittest for interrupts getting processed in a timely manner.

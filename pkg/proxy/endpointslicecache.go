@@ -23,12 +23,16 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/proxy/util"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	mcsv1alpha1 "k8s.io/mcs-api/pkg/apis/multicluster/v1alpha1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -337,14 +341,21 @@ func formatEndpointsList(endpoints []Endpoint) []string {
 
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.
 func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string, error) {
-	var err error
-	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
-	if !ok || serviceName == "" {
-		err = fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
-	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
-		err = fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
+	if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
+		return types.NamespacedName{}, "", fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
 	}
-	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
+	serviceName := endpointSlice.Labels[discovery.LabelServiceName]
+	if serviceName != "" {
+		return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, nil
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiClusterServices) {
+		mcServiceName := endpointSlice.Labels[mcsv1alpha1.LabelServiceName]
+		if mcServiceName != "" {
+			return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: util.ServiceImportName(mcServiceName)}, endpointSlice.Name, nil
+		}
+		return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, fmt.Errorf("No %s or %s label set on endpoint slice: %s", discovery.LabelServiceName, mcsv1alpha1.LabelServiceName, endpointSlice.Name)
+	}
+	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
 }
 
 // byAddress helps sort endpointInfo
