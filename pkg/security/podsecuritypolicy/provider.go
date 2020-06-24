@@ -239,7 +239,7 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
 	}
 
-	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, p *field.Path) bool {
+	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
 		allErrs = append(allErrs, s.validateContainer(pod, c, p)...)
 		return true
 	})
@@ -276,7 +276,7 @@ func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
 						fmt.Sprintf("is not allowed to be used")))
 				} else if mustBeReadOnly {
 					// Ensure all the VolumeMounts that use this volume are read-only
-					pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, p *field.Path) bool {
+					pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
 						for i, cv := range c.VolumeMounts {
 							if cv.Name == v.Name && !cv.ReadOnly {
 								allErrs = append(allErrs, field.Invalid(p.Child("volumeMounts").Index(i).Child("readOnly"), cv.ReadOnly, "must be read-only"))

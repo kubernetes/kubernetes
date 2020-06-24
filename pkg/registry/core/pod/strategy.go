@@ -94,6 +94,7 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	}
 	allErrs := validation.ValidatePodCreate(pod, opts)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
+
 	return allErrs
 }
 

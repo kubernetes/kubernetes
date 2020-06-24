@@ -2897,7 +2897,35 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
 	Sysctls []Sysctl
+	// The seccomp options to use by the containers in this pod.
+	// +optional
+	SeccompProfile *SeccompProfile
 }
+
+// SeccompProfile defines a pod/container's seccomp profile settings.
+// Only one profile source may be set.
+// +union
+type SeccompProfile struct {
+	// +unionDiscriminator
+	Type SeccompProfileType
+	// Load a profile defined in static file on the node.
+	// The profile must be preconfigured on the node to work.
+	// LocalhostProfile cannot be an absolute nor a descending path.
+	// +optional
+	LocalhostProfile *string
+}
+
+// SeccompProfileType defines the supported seccomp profile types.
+type SeccompProfileType string
+
+const (
+	// SeccompProfileTypeUnconfined is when no seccomp profile is applied (A.K.A. unconfined).
+	SeccompProfileTypeUnconfined SeccompProfileType = "Unconfined"
+	// SeccompProfileTypeRuntimeDefault represents the default container runtime seccomp profile.
+	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
+	// SeccompProfileTypeLocalhost represents custom made profiles stored on the node's disk.
+	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+)
 
 // PodQOSClass defines the supported qos classes of Pods.
 type PodQOSClass string
@@ -5085,6 +5113,11 @@ type SecurityContext struct {
 	// readonly paths and masked paths.
 	// +optional
 	ProcMount *ProcMountType
+	// The seccomp options to use by this container. If seccomp options are
+	// provided at both the pod & container level, the container options
+	// override the pod options.
+	// +optional
+	SeccompProfile *SeccompProfile
 }
 
 // ProcMountType defines the type of proc mount

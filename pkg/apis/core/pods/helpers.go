@@ -34,23 +34,23 @@ type ContainerVisitorWithPath func(container *api.Container, path *field.Path) b
 // of every container in the given pod spec and the field.Path to that container.
 // If visitor returns false, visiting is short-circuited. VisitContainersWithPath returns true if visiting completes,
 // false if visiting was short-circuited.
-func VisitContainersWithPath(podSpec *api.PodSpec, visitor ContainerVisitorWithPath) bool {
-	path := field.NewPath("spec", "initContainers")
+func VisitContainersWithPath(podSpec *api.PodSpec, specPath *field.Path, visitor ContainerVisitorWithPath) bool {
+	fldPath := specPath.Child("initContainers")
 	for i := range podSpec.InitContainers {
-		if !visitor(&podSpec.InitContainers[i], path.Index(i)) {
+		if !visitor(&podSpec.InitContainers[i], fldPath.Index(i)) {
 			return false
 		}
 	}
-	path = field.NewPath("spec", "containers")
+	fldPath = specPath.Child("containers")
 	for i := range podSpec.Containers {
-		if !visitor(&podSpec.Containers[i], path.Index(i)) {
+		if !visitor(&podSpec.Containers[i], fldPath.Index(i)) {
 			return false
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		path = field.NewPath("spec", "ephemeralContainers")
+		fldPath = specPath.Child("ephemeralContainers")
 		for i := range podSpec.EphemeralContainers {
-			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), path.Index(i)) {
+			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), fldPath.Index(i)) {
 				return false
 			}
 		}
