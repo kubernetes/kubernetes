@@ -99,22 +99,19 @@ func TLSCipherPossibleValues() []string {
 	return cipherKeys.List()
 }
 
-// TLSCipherSuites returns a list of cipher suite IDs from the cipher suite names passed
-// and returns insecure cipher names matched.
+// TLSCipherSuites returns a list of cipher suite IDs from the cipher suite names passed.
 func TLSCipherSuites(cipherNames []string) ([]uint16, error) {
 	if len(cipherNames) == 0 {
 		return nil, nil
 	}
 	ciphersIntSlice := make([]uint16, 0)
-
 	possibleCiphers := allCiphers()
 	for _, cipher := range cipherNames {
 		intValue, ok := possibleCiphers[cipher]
 		if !ok {
-			return nil, fmt.Errorf("cipher suite %s not supported or doesn't exist", cipher)
+			return nil, fmt.Errorf("Cipher suite %s not supported or doesn't exist", cipher)
 		}
 		ciphersIntSlice = append(ciphersIntSlice, intValue)
-
 	}
 	return ciphersIntSlice, nil
 }
