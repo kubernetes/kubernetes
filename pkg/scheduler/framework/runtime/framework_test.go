@@ -48,6 +48,8 @@ const (
 	testPlugin                        = "test-plugin"
 	permitPlugin                      = "permit-plugin"
 	bindPlugin                        = "bind-plugin"
+
+	testProfileName = "test-profile"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -1719,7 +1721,7 @@ func TestRecordingMetrics(t *testing.T) {
 				Unreserve: pluginSet,
 			}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
-			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder))
+			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder), WithProfileName(testProfileName))
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -1824,7 +1826,7 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
-			fwk, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder))
+			fwk, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder), WithProfileName(testProfileName))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2073,16 +2075,17 @@ func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, 
 	t.Helper()
 	m := collectHistogramMetric(metrics.FrameworkExtensionPointDuration)
 
-	if len(m.Label) != 2 {
-		t.Fatalf("Unexpected number of label pairs, got: %v, want: 2", len(m.Label))
+	gotLabels := make(map[string]string, len(m.Label))
+	for _, p := range m.Label {
+		gotLabels[p.GetName()] = p.GetValue()
 	}
-
-	if *m.Label[0].Value != wantExtensionPoint {
-		t.Errorf("Unexpected extension point label, got: %q, want %q", *m.Label[0].Value, wantExtensionPoint)
+	wantLabels := map[string]string{
+		"extension_point": wantExtensionPoint,
+		"status":          wantStatus.String(),
+		"profile":         testProfileName,
 	}
-
-	if *m.Label[1].Value != wantStatus.String() {
-		t.Errorf("Unexpected status code label, got: %q, want %q", *m.Label[1].Value, wantStatus)
+	if diff := cmp.Diff(wantLabels, gotLabels); diff != "" {
+		t.Errorf("unexpected labels (-want,+got):\n%s", diff)
 	}
 
 	if *m.Histogram.SampleCount != 1 {

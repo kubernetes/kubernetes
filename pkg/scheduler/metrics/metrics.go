@@ -182,7 +182,7 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"extension_point", "status"})
+		[]string{"extension_point", "status", "profile"})
 
 	PluginExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
