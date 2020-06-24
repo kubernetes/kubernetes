@@ -294,7 +294,7 @@ func (o *CreateRoleOptions) Validate() error {
 
 	for _, v := range o.Verbs {
 		if !arrayContains(validResourceVerbs, v) {
-			return fmt.Errorf("invalid verb: '%s'", v)
+			fmt.Fprintf(o.ErrOut, "Warning: '%s' is not a standard resource verb\n", v)
 		}
 	}
 
