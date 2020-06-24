@@ -85,7 +85,9 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 		rl := newLogged(req, w).StacktraceWhen(pred)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
 
-		defer func() { klog.V(3).InfoS("Received HTTP request", rl.LogArgs()...) }()
+		if klog.V(3).Enabled() {
+			defer func() { klog.InfoS("HTTP", rl.LogArgs()...) }()
+		}
 		handler.ServeHTTP(rl, req)
 	})
 }
@@ -155,24 +157,30 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 
 func (rl *respLogger) LogArgs() []interface{} {
 	latency := time.Since(rl.startTime)
+	if rl.hijacked {
+		return []interface{}{
+			"verb", rl.req.Method,
+			"URI", rl.req.RequestURI,
+			"latency", latency,
+			"userAgent", rl.req.UserAgent(),
+			"srcIP", rl.req.RemoteAddr,
+			"hijacked", true,
+		}
+	}
 	args := []interface{}{
 		"verb", rl.req.Method,
 		"URI", rl.req.RequestURI,
 		"latency", latency,
 		"userAgent", rl.req.UserAgent(),
 		"srcIP", rl.req.RemoteAddr,
+		"resp", rl.status,
 	}
-	if rl.hijacked {
-		args = append(args, "hijacked", true)
-	} else {
-		args = append(args, "resp", rl.status)
-		if len(rl.statusStack) > 0 {
-			args = append(args, "statusStack", rl.statusStack)
-		}
+	if len(rl.statusStack) > 0 {
+		args = append(args, "statusStack", rl.statusStack)
+	}
 
-		if len(rl.addedInfo) > 0 {
-			args = append(args, "addedInfo", rl.addedInfo)
-		}
+	if len(rl.addedInfo) > 0 {
+		args = append(args, "addedInfo", rl.addedInfo)
 	}
 	return args
 }
