@@ -41,19 +41,13 @@ RUN clean-install \
     ca-certificates \
     ceph-common \
     cifs-utils \
-    conntrack \
     e2fsprogs \
     xfsprogs \
-    ebtables \
     ethtool \
     git \
     glusterfs-client \
-    iptables \
-    ipset \
     jq \
-    kmod \
     openssh-client \
-    netbase \
     nfs-common \
     socat \
     udev \
