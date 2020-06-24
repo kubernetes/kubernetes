@@ -53,9 +53,8 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 	}
 
 	// ba.score favors nodes with balanced resource usage rate.
-	// It should **NOT** be used alone, and **MUST** be used together
-	// with NodeResourcesLeastAllocated plugin. It calculates the difference between the cpu and memory fraction
-	// of capacity, and prioritizes the host based on how close the two metrics are to each other.
+	// It calculates the difference between the cpu and memory fraction of capacity,
+	// and prioritizes the host based on how close the two metrics are to each other.
 	// Detail: score = (1 - variance(cpuFraction,memoryFraction,volumeFraction)) * MaxNodeScore. The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced
 	// Resource Utilization"
