@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc/codes"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,6 +90,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		lateBinding         bool
 		enableTopology      bool
 		podInfo             *bool
+		storageCapacity     *bool
 		scName              string
 		enableResizing      bool // enable resizing for both CSI mock driver and storageClass.
 		enableNodeExpansion bool // enable node expansion for CSI mock driver
@@ -124,6 +126,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		driverOpts := drivers.CSIMockDriverOpts{
 			RegisterDriver:      tp.registerDriver,
 			PodInfo:             tp.podInfo,
+			StorageCapacity:     tp.storageCapacity,
 			EnableTopology:      tp.enableTopology,
 			AttachLimit:         tp.attachLimit,
 			DisableAttach:       tp.disableAttach,
@@ -218,10 +221,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.By(fmt.Sprintf("Deleting claim %s", claim.Name))
 			claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 			if err == nil {
-				cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
-				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				if err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{}); err != nil {
+					errs = append(errs, err)
+				}
+				if claim.Spec.VolumeName != "" {
+					errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				}
 			}
-
 		}
 
 		for _, sc := range m.sc {
@@ -941,6 +947,94 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						gomega.Expect(nodeAnnotationReset).To(gomega.BeFalse(), "selected-node should not have been reset")
 					}
 				}
+			})
+		}
+	})
+
+	// These tests *only* work on a cluster which has the CSIStorageCapacity feature enabled.
+	ginkgo.Context("CSIStorageCapacity [Feature:CSIStorageCapacity]", func() {
+		var (
+			err error
+			yes = true
+			no  = false
+		)
+		// Tests that expect a failure are slow because we have to wait for a while
+		// to be sure that the volume isn't getting created.
+		// TODO: stop waiting as soon as we see the "node(s) did not have enough free storage" pod event?
+		tests := []struct {
+			name            string
+			storageCapacity *bool
+			capacities      []string
+			expectFailure   bool
+		}{
+			{
+				name: "CSIStorageCapacity unused",
+			},
+			{
+				name:            "CSIStorageCapacity disabled",
+				storageCapacity: &no,
+			},
+			{
+				name:            "CSIStorageCapacity used, no capacity [Slow]",
+				storageCapacity: &yes,
+				expectFailure:   true,
+			},
+			{
+				name:            "CSIStorageCapacity used, have capacity",
+				storageCapacity: &yes,
+				capacities:      []string{"100Gi"},
+			},
+			// We could add more test cases here for
+			// various situations, but covering those via
+			// the scheduler binder unit tests is faster.
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(t.name, func() {
+				init(testParameters{
+					registerDriver:  true,
+					scName:          "csi-mock-sc-" + f.UniqueName,
+					storageCapacity: test.storageCapacity,
+					lateBinding:     true,
+				})
+
+				defer cleanup()
+
+				// kube-scheduler may need some time before it gets the CSIDriver object.
+				// Without it, scheduling will happen without considering capacity, which
+				// is not what we want to test.
+				time.Sleep(5 * time.Second)
+
+				sc, _, pod := createPod(false /* persistent volume, late binding as specified above */)
+
+				for _, capacityStr := range test.capacities {
+					capacityQuantity := resource.MustParse(capacityStr)
+					capacity := &storagev1alpha1.CSIStorageCapacity{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: "fake-capacity-",
+						},
+						// Empty topology, usable by any node.
+						StorageClassName: sc.Name,
+						NodeTopology:     &metav1.LabelSelector{},
+						Capacity:         &capacityQuantity,
+					}
+					createdCapacity, err := f.ClientSet.StorageV1alpha1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
+					m.testCleanups = append(m.testCleanups, func() {
+						f.ClientSet.StorageV1alpha1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
+					})
+				}
+
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				if test.expectFailure {
+					framework.ExpectError(err, "pod unexpectedly started to run")
+				} else {
+					framework.ExpectNoError(err, "failed to start pod")
+				}
+
+				ginkgo.By("Deleting the previously created pod")
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting")
 			})
 		}
 	})
