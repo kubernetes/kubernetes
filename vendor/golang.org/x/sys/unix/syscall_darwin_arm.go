@@ -8,23 +8,16 @@ import (
 	"syscall"
 )
 
+func ptrace(request int, pid int, addr uintptr, data uintptr) error {
+	return ENOTSUP
+}
+
 func setTimespec(sec, nsec int64) Timespec {
 	return Timespec{Sec: int32(sec), Nsec: int32(nsec)}
 }
 
 func setTimeval(sec, usec int64) Timeval {
 	return Timeval{Sec: int32(sec), Usec: int32(usec)}
-}
-
-//sysnb	gettimeofday(tp *Timeval) (sec int32, usec int32, err error)
-func Gettimeofday(tv *Timeval) (err error) {
-	// The tv passed to gettimeofday must be non-nil
-	// but is otherwise unused. The answers come back
-	// in the two registers.
-	sec, usec, err := gettimeofday(tv)
-	tv.Sec = int32(sec)
-	tv.Usec = int32(usec)
-	return err
 }
 
 func SetKevent(k *Kevent_t, fd, mode, flags int) {
@@ -39,6 +32,10 @@ func (iov *Iovec) SetLen(length int) {
 
 func (msghdr *Msghdr) SetControllen(length int) {
 	msghdr.Controllen = uint32(length)
+}
+
+func (msghdr *Msghdr) SetIovlen(length int) {
+	msghdr.Iovlen = int32(length)
 }
 
 func (cmsg *Cmsghdr) SetLen(length int) {
@@ -58,7 +55,3 @@ const SYS___SYSCTL = SYS_SYSCTL
 //sys	Lstat(path string, stat *Stat_t) (err error)
 //sys	Stat(path string, stat *Stat_t) (err error)
 //sys	Statfs(path string, stat *Statfs_t) (err error)
-
-func Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error) {
-	return 0, ENOSYS
-}

@@ -16,6 +16,7 @@ package sysinfo
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -219,15 +220,16 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 				return nil, 0, err
 			}
 			node.Cores = cores
+			for _, core := range cores {
+				allLogicalCoresCount += len(core.Threads)
+			}
 		}
-
-		allLogicalCoresCount += len(cpuDirs)
 
 		// On some Linux platforms(such as Arm64 guest kernel), cache info may not exist.
 		// So, we should ignore error here.
 		err = addCacheInfo(sysFs, &node)
 		if err != nil {
-			klog.Warningf("Found node without cache information, nodeDir: %s", nodeDir)
+			klog.V(1).Infof("Found node without cache information, nodeDir: %s", nodeDir)
 		}
 
 		node.Memory, err = getNodeMemInfo(sysFs, nodeDir)
@@ -265,6 +267,11 @@ func getCPUTopology(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 		return nil, 0, err
 	}
 
+	if len(cpusByPhysicalPackageID) == 0 {
+		klog.Warningf("Cannot read any physical package id for any CPU")
+		return nil, cpusCount, nil
+	}
+
 	for physicalPackageID, cpus := range cpusByPhysicalPackageID {
 		node := info.Node{Id: physicalPackageID}
 
@@ -278,7 +285,7 @@ func getCPUTopology(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 		// So, we should ignore error here.
 		err = addCacheInfo(sysFs, &node)
 		if err != nil {
-			klog.Warningf("Found cpu without cache information, cpuPath: %s", cpus)
+			klog.V(1).Infof("Found cpu without cache information, cpuPath: %s", cpus)
 		}
 		nodes = append(nodes, node)
 	}
@@ -290,7 +297,10 @@ func getCpusByPhysicalPackageID(sysFs sysfs.SysFs, cpusPaths []string) (map[int]
 	for _, cpuPath := range cpusPaths {
 
 		rawPhysicalPackageID, err := sysFs.GetCPUPhysicalPackageID(cpuPath)
-		if err != nil {
+		if os.IsNotExist(err) {
+			klog.Warningf("Cannot read physical package id for %s, physical_package_id file does not exist, err: %s", cpuPath, err)
+			continue
+		} else if err != nil {
 			return nil, err
 		}
 
@@ -375,9 +385,15 @@ func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Unexpected format of CPU directory, cpuDirRegExp %s, cpuDir: %s", cpuDirRegExp, cpuDir)
 		}
+		if !sysFs.IsCPUOnline(cpuDir) {
+			continue
+		}
 
 		rawPhysicalID, err := sysFs.GetCoreID(cpuDir)
-		if err != nil {
+		if os.IsNotExist(err) {
+			klog.Warningf("Cannot read core id for %s, core_id file does not exist, err: %s", cpuDir, err)
+			continue
+		} else if err != nil {
 			return nil, err
 		}
 		physicalID, err := strconv.Atoi(rawPhysicalID)
@@ -403,6 +419,20 @@ func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 		} else {
 			desiredCore.Threads = append(desiredCore.Threads, cpuID)
 		}
+
+		rawPhysicalPackageID, err := sysFs.GetCPUPhysicalPackageID(cpuDir)
+		if os.IsNotExist(err) {
+			klog.Warningf("Cannot read physical package id for %s, physical_package_id file does not exist, err: %s", cpuDir, err)
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+
+		physicalPackageID, err := strconv.Atoi(rawPhysicalPackageID)
+		if err != nil {
+			return nil, err
+		}
+		desiredCore.SocketID = physicalPackageID
 	}
 	return cores, nil
 }
@@ -481,4 +511,15 @@ func getMatchedInt(rgx *regexp.Regexp, str string) (int, error) {
 		return 0, err
 	}
 	return valInt, nil
+}
+
+// GetSocketFromCPU returns Socket ID of passed CPU. If is not present, returns -1.
+func GetSocketFromCPU(topology []info.Node, cpu int) int {
+	for _, node := range topology {
+		found, coreID := node.FindCoreByThread(cpu)
+		if found {
+			return node.Cores[coreID].SocketID
+		}
+	}
+	return -1
 }

@@ -18,6 +18,7 @@ package manager
 import (
 	"flag"
 	"fmt"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"net/http"
 	"os"
 	"path"
@@ -39,6 +40,7 @@ import (
 	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/nvm"
 	"github.com/google/cadvisor/perf"
+	"github.com/google/cadvisor/resctrl"
 	"github.com/google/cadvisor/stats"
 	"github.com/google/cadvisor/utils/oomparser"
 	"github.com/google/cadvisor/utils/sysfs"
@@ -46,6 +48,8 @@ import (
 	"github.com/google/cadvisor/watcher"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/intelrdt"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -148,11 +152,18 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	}
 
 	// Detect the container we are running on.
-	selfContainer, err := cgroups.GetOwnCgroupPath("cpu")
-	if err != nil {
-		return nil, err
+	selfContainer := "/"
+	var err error
+	// Avoid using GetOwnCgroupPath on cgroup v2 as it is not supported by libcontainer
+	if cgroups.IsCgroup2UnifiedMode() {
+		klog.Warningf("Cannot detect current cgroup on cgroup v2")
+	} else {
+		selfContainer, err := cgroups.GetOwnCgroupPath("cpu")
+		if err != nil {
+			return nil, err
+		}
+		klog.V(2).Infof("cAdvisor running in container: %q", selfContainer)
 	}
-	klog.V(2).Infof("cAdvisor running in container: %q", selfContainer)
 
 	context := fs.Context{}
 
@@ -190,7 +201,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 		containerWatchers:                     []watcher.ContainerWatcher{},
 		eventsChannel:                         eventsChannel,
 		collectorHTTPClient:                   collectorHTTPClient,
-		nvidiaManager:                         accelerators.NewNvidiaManager(),
+		nvidiaManager:                         accelerators.NewNvidiaManager(includedMetricsSet),
 		rawContainerCgroupPathPrefixWhiteList: rawContainerCgroupPathPrefixWhiteList,
 	}
 
@@ -201,9 +212,14 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	newManager.machineInfo = *machineInfo
 	klog.V(1).Infof("Machine: %+v", newManager.machineInfo)
 
-	newManager.perfManager, err = perf.NewManager(perfEventsFile, machineInfo.NumCores)
+	newManager.perfManager, err = perf.NewManager(perfEventsFile, machineInfo.NumCores, machineInfo.Topology)
 	if err != nil {
 		return nil, err
+	}
+
+	newManager.resctrlManager, err = resctrl.NewManager(selfContainer)
+	if err != nil {
+		klog.V(4).Infof("Cannot gather resctrl metrics: %v", err)
 	}
 
 	versionInfo, err := getVersionInfo()
@@ -246,6 +262,7 @@ type manager struct {
 	collectorHTTPClient      *http.Client
 	nvidiaManager            stats.Manager
 	perfManager              stats.Manager
+	resctrlManager           stats.Manager
 	// List of raw container cgroup path prefix whitelist.
 	rawContainerCgroupPathPrefixWhiteList []string
 }
@@ -545,6 +562,9 @@ func (m *manager) getSubcontainers(containerName string) map[string]*containerDa
 	// Get all the unique subcontainers of the specified container
 	matchedName := path.Join(containerName, "/")
 	for i := range m.containers {
+		if m.containers[i] == nil {
+			continue
+		}
 		name := m.containers[i].info.Name
 		if name == containerName || strings.HasPrefix(name, matchedName) {
 			containersMap[m.containers[i].info.Name] = m.containers[i]
@@ -650,6 +670,7 @@ func (m *manager) containerDataSliceToContainerInfoSlice(containers []*container
 		cinfo, err := m.containerDataToContainerInfo(containers[i], query)
 		if err != nil {
 			// Skip containers with errors, we try to degrade gracefully.
+			klog.V(4).Infof("convert container data to container info failed with error %s", err.Error())
 			continue
 		}
 		output = append(output, cinfo)
@@ -906,7 +927,14 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	if err != nil {
 		return err
 	}
-	if !cgroups.IsCgroup2UnifiedMode() {
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		perfCgroupPath := path.Join(fs2.UnifiedMountpoint, containerName)
+		cont.perfCollector, err = m.perfManager.GetCollector(perfCgroupPath)
+		if err != nil {
+			klog.Infof("perf_event metrics will not be available for container %s: %s", containerName, err)
+		}
+	} else {
 		devicesCgroupPath, err := handler.GetCgroupPath("devices")
 		if err != nil {
 			klog.Warningf("Error getting devices cgroup path: %v", err)
@@ -916,15 +944,24 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 				klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %s: %s", cont.info.Name, err)
 			}
 		}
-
 		perfCgroupPath, err := handler.GetCgroupPath("perf_event")
 		if err != nil {
 			klog.Warningf("Error getting perf_event cgroup path: %q", err)
 		} else {
 			cont.perfCollector, err = m.perfManager.GetCollector(perfCgroupPath)
 			if err != nil {
-				klog.Infof("perf_event metrics will not be available for container %s: %s", cont.info.Name, err)
+				klog.Infof("perf_event metrics will not be available for container %s: %s", containerName, err)
 			}
+		}
+	}
+
+	resctrlPath, err := intelrdt.GetIntelRdtPath(containerName)
+	if err != nil {
+		klog.Warningf("Error getting resctrl path: %q", err)
+	} else {
+		cont.resctrlCollector, err = m.resctrlManager.GetCollector(resctrlPath)
+		if err != nil {
+			klog.Infof("resctrl metrics will not be available for container %s: %s", cont.info.Name, err)
 		}
 	}
 

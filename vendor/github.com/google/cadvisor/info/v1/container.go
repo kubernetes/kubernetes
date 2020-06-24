@@ -848,6 +848,58 @@ type PerfStat struct {
 	Cpu int `json:"cpu"`
 }
 
+// MemoryBandwidthStats corresponds to MBM (Memory Bandwidth Monitoring).
+// See: https://01.org/cache-monitoring-technology
+// See: https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
+type MemoryBandwidthStats struct {
+	// The 'mbm_total_bytes'.
+	TotalBytes uint64 `json:"mbm_total_bytes,omitempty"`
+
+	// The 'mbm_local_bytes'.
+	LocalBytes uint64 `json:"mbm_local_bytes,omitempty"`
+}
+
+// CacheStats corresponds to CMT (Cache Monitoring Technology).
+// See: https://01.org/cache-monitoring-technology
+// See: https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
+type CacheStats struct {
+	// The 'llc_occupancy'.
+	LLCOccupancy uint64 `json:"llc_occupancy,omitempty"`
+}
+
+// ResctrlStats corresponds to statistics from Resource Control.
+type ResctrlStats struct {
+	// Each NUMA Node statistics corresponds to one element in the array.
+	MemoryBandwidth []MemoryBandwidthStats `json:"memory_bandwidth,omitempty"`
+	Cache           []CacheStats           `json:"cache,omitempty"`
+}
+
+// PerfUncoreStat represents value of a single monitored perf uncore event.
+type PerfUncoreStat struct {
+	// Indicates scaling ratio for an event: time_running/time_enabled
+	// (amount of time that event was being measured divided by
+	// amount of time that event was enabled for).
+	// value 1.0 indicates that no multiplexing occurred. Value close
+	// to 0 indicates that event was measured for short time and event's
+	// value might be inaccurate.
+	// See: https://lwn.net/Articles/324756/
+	ScalingRatio float64 `json:"scaling_ratio"`
+
+	// Value represents value of perf event retrieved from OS. It is
+	// normalized against ScalingRatio and takes multiplexing into
+	// consideration.
+	Value uint64 `json:"value"`
+
+	// Name is human readable name of an event.
+	Name string `json:"name"`
+
+	// Socket that perf event was measured on.
+	Socket int `json:"socket"`
+
+	// PMU is Performance Monitoring Unit which collected these stats.
+	PMU string `json:"pmu"`
+}
+
 type UlimitSpec struct {
 	Name      string `json:"name"`
 	SoftLimit int64  `json:"soft_limit"`
@@ -900,8 +952,15 @@ type ContainerStats struct {
 	// Statistics originating from perf events
 	PerfStats []PerfStat `json:"perf_stats,omitempty"`
 
+	// Statistics originating from perf uncore events.
+	// Applies only for root container.
+	PerfUncoreStats []PerfUncoreStat `json:"perf_uncore_stats,omitempty"`
+
 	// Referenced memory
 	ReferencedMemory uint64 `json:"referenced_memory,omitempty"`
+
+	// Resource Control (resctrl) statistics
+	Resctrl ResctrlStats `json:"resctrl,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {

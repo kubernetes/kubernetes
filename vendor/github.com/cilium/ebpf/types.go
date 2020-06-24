@@ -57,6 +57,30 @@ const (
 	// HashOfMaps - Each item in the hash map is another map. The inner map mustn't be a map of maps
 	// itself.
 	HashOfMaps
+	// DevMap - Specialized map to store references to network devices.
+	DevMap
+	// SockMap - Specialized map to store references to sockets.
+	SockMap
+	// CPUMap - Specialized map to store references to CPUs.
+	CPUMap
+	// XSKMap - Specialized map for XDP programs to store references to open sockets.
+	XSKMap
+	// SockHash - Specialized hash to store references to sockets.
+	SockHash
+	// CGroupStorage - Special map for CGroups.
+	CGroupStorage
+	// ReusePortSockArray - Specialized map to store references to sockets that can be reused.
+	ReusePortSockArray
+	// PerCPUCGroupStorage - Special per CPU map for CGroups.
+	PerCPUCGroupStorage
+	// Queue - FIFO storage for BPF programs.
+	Queue
+	// Stack - LIFO storage for BPF programs.
+	Stack
+	// SkStorage - Specialized map for local storage at SK for BPF programs.
+	SkStorage
+	// DevMapHash - Hash-based indexing scheme for references to network devices.
+	DevMapHash
 )
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
@@ -84,12 +108,14 @@ const (
 	_ProgGetFDByID
 	_MapGetFDByID
 	_ObjGetInfoByFD
-)
-
-const (
-	_Any = iota
-	_NoExist
-	_Exist
+	_ProgQuery
+	_RawTracepointOpen
+	_BTFLoad
+	_BTFGetFDByID
+	_TaskFDQuery
+	_MapLookupAndDeleteElem
+	_MapFreeze
+	_BTFGetNextID
 )
 
 // ProgramType of the eBPF program
@@ -149,6 +175,8 @@ const (
 	RawTracepointWritable
 	// CGroupSockopt program
 	CGroupSockopt
+	// Tracing program
+	Tracing
 )
 
 // AttachType of the eBPF program, needed to differentiate allowed context accesses in
@@ -183,6 +211,9 @@ const (
 	AttachCGroupUDP6Recvmsg
 	AttachCGroupGetsockopt
 	AttachCGroupSetsockopt
+	AttachTraceRawTp
+	AttachTraceFEntry
+	AttachTraceFExit
 )
 
 // AttachFlags of the eBPF program used in BPF_PROG_ATTACH command

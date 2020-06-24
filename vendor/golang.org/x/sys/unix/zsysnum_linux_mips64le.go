@@ -338,4 +338,14 @@ const (
 	SYS_IO_URING_SETUP         = 5425
 	SYS_IO_URING_ENTER         = 5426
 	SYS_IO_URING_REGISTER      = 5427
+	SYS_OPEN_TREE              = 5428
+	SYS_MOVE_MOUNT             = 5429
+	SYS_FSOPEN                 = 5430
+	SYS_FSCONFIG               = 5431
+	SYS_FSMOUNT                = 5432
+	SYS_FSPICK                 = 5433
+	SYS_PIDFD_OPEN             = 5434
+	SYS_CLONE3                 = 5435
+	SYS_OPENAT2                = 5437
+	SYS_PIDFD_GETFD            = 5438
 )

@@ -20,6 +20,12 @@ type CpuUsage struct {
 	// Total CPU time consumed per core.
 	// Units: nanoseconds.
 	PercpuUsage []uint64 `json:"percpu_usage,omitempty"`
+	// CPU time consumed per core in kernel mode
+	// Units: nanoseconds.
+	PercpuUsageInKernelmode []uint64 `json:"percpu_usage_in_kernelmode"`
+	// CPU time consumed per core in user mode
+	// Units: nanoseconds.
+	PercpuUsageInUsermode []uint64 `json:"percpu_usage_in_usermode"`
 	// Time spent by tasks of the cgroup in kernel mode.
 	// Units: nanoseconds.
 	UsageInKernelmode uint64 `json:"usage_in_kernelmode"`
@@ -51,10 +57,31 @@ type MemoryStats struct {
 	KernelUsage MemoryData `json:"kernel_usage,omitempty"`
 	// usage of kernel TCP memory
 	KernelTCPUsage MemoryData `json:"kernel_tcp_usage,omitempty"`
+	// usage of memory pages by NUMA node
+	// see chapter 5.6 of memory controller documentation
+	PageUsageByNUMA PageUsageByNUMA `json:"page_usage_by_numa,omitempty"`
 	// if true, memory usage is accounted for throughout a hierarchy of cgroups.
 	UseHierarchy bool `json:"use_hierarchy"`
 
 	Stats map[string]uint64 `json:"stats,omitempty"`
+}
+
+type PageUsageByNUMA struct {
+	// Embedding is used as types can't be recursive.
+	PageUsageByNUMAInner
+	Hierarchical PageUsageByNUMAInner `json:"hierarchical,omitempty"`
+}
+
+type PageUsageByNUMAInner struct {
+	Total       PageStats `json:"total,omitempty"`
+	File        PageStats `json:"file,omitempty"`
+	Anon        PageStats `json:"anon,omitempty"`
+	Unevictable PageStats `json:"unevictable,omitempty"`
+}
+
+type PageStats struct {
+	Total uint64           `json:"total,omitempty"`
+	Nodes map[uint8]uint64 `json:"nodes,omitempty"`
 }
 
 type PidsStats struct {

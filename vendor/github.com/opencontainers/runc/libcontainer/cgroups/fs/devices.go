@@ -3,13 +3,19 @@
 package fs
 
 import (
+	"bytes"
+	"errors"
+	"reflect"
+
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
 )
 
 type DevicesGroup struct {
+	testingSkipFinalCheck bool
 }
 
 func (s *DevicesGroup) Name() string {
@@ -26,49 +32,74 @@ func (s *DevicesGroup) Apply(d *cgroupData) error {
 	return nil
 }
 
+func loadEmulator(path string) (*devices.Emulator, error) {
+	list, err := fscommon.ReadFile(path, "devices.list")
+	if err != nil {
+		return nil, err
+	}
+	return devices.EmulatorFromList(bytes.NewBufferString(list))
+}
+
+func buildEmulator(rules []*configs.DeviceRule) (*devices.Emulator, error) {
+	// This defaults to a white-list -- which is what we want!
+	emu := &devices.Emulator{}
+	for _, rule := range rules {
+		if err := emu.Apply(*rule); err != nil {
+			return nil, err
+		}
+	}
+	return emu, nil
+}
+
 func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if system.RunningInUserNS() {
 		return nil
 	}
 
-	devices := cgroup.Resources.Devices
-	if len(devices) > 0 {
-		for _, dev := range devices {
-			file := "devices.deny"
-			if dev.Allow {
-				file = "devices.allow"
-			}
-			if err := fscommon.WriteFile(path, file, dev.CgroupString()); err != nil {
-				return err
-			}
-		}
-		return nil
+	// Generate two emulators, one for the current state of the cgroup and one
+	// for the requested state by the user.
+	current, err := loadEmulator(path)
+	if err != nil {
+		return err
 	}
-	if cgroup.Resources.AllowAllDevices != nil {
-		if *cgroup.Resources.AllowAllDevices == false {
-			if err := fscommon.WriteFile(path, "devices.deny", "a"); err != nil {
-				return err
-			}
+	target, err := buildEmulator(cgroup.Resources.Devices)
+	if err != nil {
+		return err
+	}
 
-			for _, dev := range cgroup.Resources.AllowedDevices {
-				if err := fscommon.WriteFile(path, "devices.allow", dev.CgroupString()); err != nil {
-					return err
-				}
-			}
-			return nil
+	// Compute the minimal set of transition rules needed to achieve the
+	// requested state.
+	transitionRules, err := current.Transition(target)
+	if err != nil {
+		return err
+	}
+	for _, rule := range transitionRules {
+		file := "devices.deny"
+		if rule.Allow {
+			file = "devices.allow"
 		}
-
-		if err := fscommon.WriteFile(path, "devices.allow", "a"); err != nil {
+		if err := fscommon.WriteFile(path, file, rule.CgroupString()); err != nil {
 			return err
 		}
 	}
 
-	for _, dev := range cgroup.Resources.DeniedDevices {
-		if err := fscommon.WriteFile(path, "devices.deny", dev.CgroupString()); err != nil {
+	// Final safety check -- ensure that the resulting state is what was
+	// requested. This is only really correct for white-lists, but for
+	// black-lists we can at least check that the cgroup is in the right mode.
+	//
+	// This safety-check is skipped for the unit tests because we cannot
+	// currently mock devices.list correctly.
+	if !s.testingSkipFinalCheck {
+		currentAfter, err := loadEmulator(path)
+		if err != nil {
 			return err
 		}
+		if !target.IsBlacklist() && !reflect.DeepEqual(currentAfter, target) {
+			return errors.New("resulting devices cgroup doesn't precisely match target")
+		} else if target.IsBlacklist() != currentAfter.IsBlacklist() {
+			return errors.New("resulting devices cgroup doesn't match target mode")
+		}
 	}
-
 	return nil
 }
 
