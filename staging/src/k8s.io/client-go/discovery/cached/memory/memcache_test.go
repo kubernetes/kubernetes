@@ -46,6 +46,9 @@ func (c *fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if rl, ok := c.resourceMap[groupVersion]; ok {
+		if len(rl.list.APIResources) == 0 {
+			return nil,nil
+		}
 		return rl.list, rl.err
 	}
 	return nil, errors.New("doesn't exist")
@@ -220,6 +223,13 @@ func TestPartialPermanentFailure(t *testing.T) {
 						Version:      "v8beta1",
 					}},
 				},
+				{
+					Name: "astronomy3",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy3/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
 			},
 		},
 		resourceMap: map[string]*resourceMapEntry{
@@ -236,6 +246,12 @@ func TestPartialPermanentFailure(t *testing.T) {
 						Kind:         "DwarfPlanet",
 						ShortNames:   []string{"dp"},
 					}},
+				},
+			},
+			"astronomy3/v8beta1": {
+				list: &metav1.APIResourceList{
+					GroupVersion: "astronomy3/v8beta1",
+					APIResources: []metav1.APIResource{},
 				},
 			},
 		},
@@ -255,6 +271,14 @@ func TestPartialPermanentFailure(t *testing.T) {
 	_, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
 	if err == nil {
 		t.Errorf("Expected error, got nil")
+	}
+
+	r, err = c.ServerResourcesForGroupVersion("astronomy3/v8beta1")
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+	if r == nil {
+		t.Errorf("Expected list, got nil")
 	}
 
 	fake.lock.Lock()
