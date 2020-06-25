@@ -18,8 +18,57 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"sync"
 )
+
+// CGroupPods records the relationship between Pod UID and its cgroup name
+type CGroupPods struct {
+	Lock *sync.RWMutex
+	Pods map[types.UID]CgroupName
+}
+
+// Remove deletes all the Pod UIDs which map to the given cgroup name
+func (cgp CGroupPods) Remove(cgroupName CgroupName) {
+	cgp.Lock.Lock()
+	defer cgp.Lock.Unlock()
+
+	for uid, v := range cgp.Pods {
+		if len(v) != len(cgroupName) {
+			continue
+		}
+		found := true
+		for i := range v {
+			if v[i] != cgroupName[i] {
+				found = false
+				break
+			}
+		}
+		if found {
+			delete(cgp.Pods, uid)
+		}
+	}
+}
+
+// GetAllPodsFromCgroups returns map of Pod UID to the cgroup name
+func (cgp CGroupPods) GetAllPodsFromCgroups() map[types.UID]CgroupName {
+	cgp.Lock.RLock()
+	defer cgp.Lock.RUnlock()
+
+	cgroupPods := make(map[types.UID]CgroupName)
+	for k, v := range cgp.Pods {
+		cgroupPods[k] = v
+	}
+	return cgroupPods
+}
+
+// GetCgroupName retrieves cgroup name for the given Pod UID
+func (cgp CGroupPods) GetCgroupName(uid types.UID) CgroupName {
+	cgp.Lock.RLock()
+	defer cgp.Lock.RUnlock()
+	return cgp.Pods[uid]
+}
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {

@@ -35,6 +35,8 @@ import (
 
 type containerManagerStub struct {
 	shouldResetExtendedResourceCapacity bool
+	podContainerManager                 *podContainerManagerStub
+	cgroupPods                          *CGroupPods
 }
 
 var _ ContainerManager = &containerManagerStub{}
@@ -90,7 +92,11 @@ func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceLi
 }
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
-	return &podContainerManagerStub{}
+	if cm.podContainerManager != nil {
+		return cm.podContainerManager
+	}
+	cm.podContainerManager = &podContainerManagerStub{cgroupPods: cm.cgroupPods}
+	return cm.podContainerManager
 }
 
 func (cm *containerManagerStub) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
@@ -127,6 +133,10 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
+}
+
+func NewStubContainerManagerWithCGroupPods(cgroupPods *CGroupPods) ContainerManager {
+	return &containerManagerStub{shouldResetExtendedResourceCapacity: false, cgroupPods: cgroupPods}
 }
 
 func NewStubContainerManagerWithExtendedResource(shouldResetExtendedResourceCapacity bool) ContainerManager {

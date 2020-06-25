@@ -22,6 +22,7 @@ import (
 )
 
 type podContainerManagerStub struct {
+	cgroupPods *CGroupPods
 }
 
 var _ PodContainerManager = &podContainerManagerStub{}
@@ -38,7 +39,8 @@ func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, st
 	return nil, ""
 }
 
-func (m *podContainerManagerStub) Destroy(_ CgroupName) error {
+func (m *podContainerManagerStub) Destroy(cgroupName CgroupName) error {
+	m.cgroupPods.Remove(cgroupName)
 	return nil
 }
 
@@ -47,7 +49,7 @@ func (m *podContainerManagerStub) ReduceCPULimits(_ CgroupName) error {
 }
 
 func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
-	return nil, nil
+	return m.cgroupPods.GetAllPodsFromCgroups(), nil
 }
 
 func (m *podContainerManagerStub) IsPodCgroup(cgroupfs string) (bool, types.UID) {

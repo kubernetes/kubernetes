@@ -18,10 +18,12 @@ package pod
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -64,6 +66,9 @@ type Manager interface {
 	// GetMirrorPodByPod returns the mirror pod for the given static pod and
 	// whether it was known to the pod manager.
 	GetMirrorPodByPod(*v1.Pod) (*v1.Pod, bool)
+	// GetMirrorPodByFullname returns the mirror pod for the given full pod name and
+	// whether it was known to the pod manager.
+	GetMirrorPodByFullname(fullName string) (*v1.Pod, bool)
 	// GetPodsAndMirrorPods returns the both regular and mirror pods.
 	GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod)
 	// SetPods replaces the internal pods with the new pods.
@@ -77,10 +82,10 @@ type Manager interface {
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
 	DeletePod(pod *v1.Pod)
-	// DeleteOrphanedMirrorPods deletes all mirror pods which do not have
-	// associated static pods. This method sends deletion requests to the API
-	// server, but does NOT modify the internal pod storage in basicManager.
-	DeleteOrphanedMirrorPods()
+	// GetOrphanedMirrorPodNames returns names of orphaned mirror pods
+	GetOrphanedMirrorPodNames() []string
+	// IsPodPendingTermination checks whether the UID belongs to pod which is pending termination
+	IsPodPendingTermination(uid types.UID) bool
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
 	// original UID.
@@ -127,6 +132,11 @@ type basicManager struct {
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
+
+const (
+	// PodUIDLabelKey is the key in mirror pod Labels where the UID of corresponding (static) pod is stored
+	PodUIDLabelKey = "-uid-pending-termination-"
+)
 
 // NewBasicPodManager returns a functional Manager.
 func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager) Manager {
@@ -177,6 +187,7 @@ func isPodInTerminatedState(pod *v1.Pod) bool {
 // lock.
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
+		podFullName := kubecontainer.GetPodFullName(pod)
 		if pm.secretManager != nil {
 			if isPodInTerminatedState(pod) {
 				// Pods that are in terminated state and no longer running can be
@@ -203,7 +214,6 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 				pm.configMapManager.RegisterPod(pod)
 			}
 		}
-		podFullName := kubecontainer.GetPodFullName(pod)
 		// This logic relies on a static pod and its mirror to have the same name.
 		// It is safe to type convert here due to the IsMirrorPod guard.
 		if kubetypes.IsMirrorPod(pod) {
@@ -241,6 +251,21 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 		delete(pm.mirrorPodByFullName, podFullName)
 		delete(pm.translationByUID, mirrorPodUID)
 	} else {
+		m, ok := pm.mirrorPodByFullName[podFullName]
+		if ok {
+			var gracePeriod int64
+			if pod.DeletionGracePeriodSeconds != nil {
+				gracePeriod = *pod.DeletionGracePeriodSeconds
+			} else if pod.Spec.TerminationGracePeriodSeconds != nil {
+				gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+			}
+			m.DeletionTimestamp = &metav1.Time{Time: time.Now().Add(time.Duration(gracePeriod) * time.Second)}
+			if m.Labels == nil {
+				m.Labels = make(map[string]string)
+			}
+			m.Labels[PodUIDLabelKey] = string(pod.UID)
+			klog.V(3).Infof("terminating pod with grace period %v for %q : expires at %v", gracePeriod, podFullName, m.DeletionTimestamp.Time)
+		}
 		delete(pm.podByUID, kubetypes.ResolvedPodUID(pod.UID))
 		delete(pm.podByFullName, podFullName)
 	}
@@ -323,7 +348,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	return podToMirror, mirrorToPod
 }
 
-func (pm *basicManager) getOrphanedMirrorPodNames() []string {
+func (pm *basicManager) GetOrphanedMirrorPodNames() []string {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	var podFullNames []string
@@ -335,11 +360,15 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 	return podFullNames
 }
 
-func (pm *basicManager) DeleteOrphanedMirrorPods() {
-	podFullNames := pm.getOrphanedMirrorPodNames()
-	for _, podFullName := range podFullNames {
-		pm.MirrorClient.DeleteMirrorPod(podFullName, nil)
+func (pm *basicManager) IsPodPendingTermination(uid types.UID) bool {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	for _, m := range pm.mirrorPodByFullName {
+		if kubetypes.ResolvedPodUID(m.Labels[PodUIDLabelKey]) == kubetypes.ResolvedPodUID(uid) {
+			return true
+		}
 	}
+	return false
 }
 
 func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
@@ -374,6 +403,13 @@ func (pm *basicManager) GetMirrorPodByPod(pod *v1.Pod) (*v1.Pod, bool) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	mirrorPod, ok := pm.mirrorPodByFullName[kubecontainer.GetPodFullName(pod)]
+	return mirrorPod, ok
+}
+
+func (pm *basicManager) GetMirrorPodByFullname(fullName string) (*v1.Pod, bool) {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	mirrorPod, ok := pm.mirrorPodByFullName[fullName]
 	return mirrorPod, ok
 }
 
