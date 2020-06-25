@@ -1761,6 +1761,36 @@ func Test_shouldSyncNode(t *testing.T) {
 			},
 			shouldSync: false,
 		},
+		{
+			name: "node IP changed",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "192.168.0.1",
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "192.168.0.2",
+						},
+					},
+				},
+			},
+			shouldSync: true,
+		},
 	}
 
 	for _, testcase := range testcases {

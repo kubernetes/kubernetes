@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -693,6 +694,10 @@ func shouldSyncNode(oldNode, newNode *v1.Node) bool {
 	}
 
 	if !reflect.DeepEqual(oldNode.Labels, newNode.Labels) {
+		return true
+	}
+
+	if !equality.Semantic.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses) {
 		return true
 	}
 
