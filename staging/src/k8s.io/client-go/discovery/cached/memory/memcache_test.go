@@ -46,9 +46,6 @@ func (c *fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if rl, ok := c.resourceMap[groupVersion]; ok {
-		if len(rl.list.APIResources) == 0 {
-			return nil,nil
-		}
 		return rl.list, rl.err
 	}
 	return nil, errors.New("doesn't exist")
@@ -276,9 +273,6 @@ func TestPartialPermanentFailure(t *testing.T) {
 	r, err = c.ServerResourcesForGroupVersion("astronomy3/v8beta1")
 	if err == nil {
 		t.Errorf("Expected error, got nil")
-	}
-	if r == nil {
-		t.Errorf("Expected list, got nil")
 	}
 
 	fake.lock.Lock()
