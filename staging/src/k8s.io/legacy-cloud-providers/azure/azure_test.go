@@ -3324,8 +3324,8 @@ func TestInitializeCloudFromConfig(t *testing.T) {
 		AzureAuthConfig: auth.AzureAuthConfig{
 			Cloud: "AZUREPUBLICCLOUD",
 		},
+		CloudConfigType: cloudConfigTypeFile,
 	}
-	az.Config.CloudConfigType = cloudConfigTypeFile
 	err = az.InitializeCloudFromConfig(&config, false)
 	expectedErr = fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 	assert.Equal(t, expectedErr, err)
