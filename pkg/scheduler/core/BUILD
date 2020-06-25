@@ -39,10 +39,10 @@ go_test(
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
-        "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
         "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
+        "//pkg/scheduler/framework/plugins/selectorspread:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/framework/v1alpha1/fake:go_default_library",

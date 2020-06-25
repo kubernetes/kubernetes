@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package defaultpodtopologyspread
+package selectorspread
 
 import (
 	"context"
@@ -28,18 +28,18 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
-// DefaultPodTopologySpread is a plugin that calculates selector spread priority.
-type DefaultPodTopologySpread struct {
+// SelectorSpread is a plugin that calculates selector spread priority.
+type SelectorSpread struct {
 	handle framework.FrameworkHandle
 }
 
-var _ framework.PreScorePlugin = &DefaultPodTopologySpread{}
-var _ framework.ScorePlugin = &DefaultPodTopologySpread{}
+var _ framework.PreScorePlugin = &SelectorSpread{}
+var _ framework.ScorePlugin = &SelectorSpread{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "DefaultPodTopologySpread"
-	// preScoreStateKey is the key in CycleState to DefaultPodTopologySpread pre-computed data for Scoring.
+	Name = "SelectorSpread"
+	// preScoreStateKey is the key in CycleState to SelectorSpread pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
 
 	// When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading
@@ -48,7 +48,7 @@ const (
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (pl *DefaultPodTopologySpread) Name() string {
+func (pl *SelectorSpread) Name() string {
 	return Name
 }
 
@@ -63,18 +63,18 @@ func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
-// skipDefaultPodTopologySpread returns true if the pod's TopologySpreadConstraints are specified.
+// skipSelectorSpread returns true if the pod's TopologySpreadConstraints are specified.
 // Note that this doesn't take into account default constraints defined for
 // the PodTopologySpread plugin.
-func skipDefaultPodTopologySpread(pod *v1.Pod) bool {
+func skipSelectorSpread(pod *v1.Pod) bool {
 	return len(pod.Spec.TopologySpreadConstraints) != 0
 }
 
 // Score invoked at the Score extension point.
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
-func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	if skipDefaultPodTopologySpread(pod) {
+func (pl *SelectorSpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	if skipSelectorSpread(pod) {
 		return 0, nil
 	}
 
@@ -102,8 +102,8 @@ func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.
 // based on the number of existing matching pods on the node
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
-func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	if skipDefaultPodTopologySpread(pod) {
+func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	if skipSelectorSpread(pod) {
 		return nil
 	}
 
@@ -166,13 +166,13 @@ func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *f
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *DefaultPodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
+func (pl *SelectorSpread) ScoreExtensions() framework.ScoreExtensions {
 	return pl
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *DefaultPodTopologySpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
-	if skipDefaultPodTopologySpread(pod) {
+func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	if skipSelectorSpread(pod) {
 		return nil
 	}
 	var selector labels.Selector
@@ -193,7 +193,7 @@ func (pl *DefaultPodTopologySpread) PreScore(ctx context.Context, cycleState *fr
 
 // New initializes a new plugin and returns it.
 func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	return &DefaultPodTopologySpread{
+	return &SelectorSpread{
 		handle: handle,
 	}, nil
 }

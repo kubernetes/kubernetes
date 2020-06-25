@@ -2,8 +2,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["default_pod_topology_spread.go"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread",
+    srcs = ["selector_spread.go"],
+    importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/scheduler/framework/plugins/helper:go_default_library",
@@ -18,8 +18,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "default_pod_topology_spread_perf_test.go",
-        "default_pod_topology_spread_test.go",
+        "selector_spread_perf_test.go",
+        "selector_spread_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

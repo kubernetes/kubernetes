@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
-        "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
@@ -25,6 +24,7 @@ go_library(
         "//pkg/scheduler/framework/plugins/nodevolumelimits:go_default_library",
         "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
+        "//pkg/scheduler/framework/plugins/selectorspread:go_default_library",
         "//pkg/scheduler/framework/plugins/serviceaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
@@ -48,7 +48,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/defaultbinder:all-srcs",
-        "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:all-srcs",
         "//pkg/scheduler/framework/plugins/defaultpreemption:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
         "//pkg/scheduler/framework/plugins/helper:all-srcs",
@@ -64,6 +63,7 @@ filegroup(
         "//pkg/scheduler/framework/plugins/nodevolumelimits:all-srcs",
         "//pkg/scheduler/framework/plugins/podtopologyspread:all-srcs",
         "//pkg/scheduler/framework/plugins/queuesort:all-srcs",
+        "//pkg/scheduler/framework/plugins/selectorspread:all-srcs",
         "//pkg/scheduler/framework/plugins/serviceaffinity:all-srcs",
         "//pkg/scheduler/framework/plugins/tainttoleration:all-srcs",
         "//pkg/scheduler/framework/plugins/volumebinding:all-srcs",
