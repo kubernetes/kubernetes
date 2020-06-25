@@ -278,7 +278,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/apis:all-srcs",
+        "//pkg/kubelet/apis/config:all-srcs",
+        "//pkg/kubelet/apis/podresources:all-srcs",
+        "//pkg/kubelet/apis/resourcemetrics/v1alpha1:all-srcs",
+        "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
         "//pkg/kubelet/cadvisor:all-srcs",
         "//pkg/kubelet/certificate:all-srcs",
         "//pkg/kubelet/checkpoint:all-srcs",

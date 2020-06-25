@@ -11,7 +11,8 @@ go_library(
         "well_known_annotations_windows.go",
         "well_known_labels.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubelet/pkg/apis",
+    importpath = "k8s.io/kubelet/pkg/apis",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -35,10 +36,11 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/apis/config:all-srcs",
-        "//pkg/kubelet/apis/podresources:all-srcs",
-        "//pkg/kubelet/apis/resourcemetrics/v1alpha1:all-srcs",
-        "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha:all-srcs",
+        "//staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1:all-srcs",
+        "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:all-srcs",
+        "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
 )

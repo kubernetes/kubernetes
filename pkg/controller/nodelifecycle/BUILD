@@ -13,7 +13,6 @@ go_library(
         "//pkg/controller/nodelifecycle/scheduler:go_default_library",
         "//pkg/controller/util/node:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1:go_default_library",
@@ -41,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
@@ -55,7 +55,6 @@ go_test(
         "//pkg/controller/testutil:go_default_library",
         "//pkg/controller/util/node:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -77,6 +76,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
