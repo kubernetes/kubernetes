@@ -393,7 +393,7 @@ function ensure-local-ssds() {
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
       local devicenum
-      devicenum="${ssd##*google-local-ssd-}"
+      devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/')
       if [[ "${i}" -lt "${scsiblocknum}" ]]; then
         mount-ext "${ssd}" "${devicenum}" "scsi" "block"
       else
@@ -424,7 +424,7 @@ function ensure-local-ssds() {
       # the existing Google images does not expose NVMe devices in /dev/disk/by-id
       if [[ $(udevadm info --query=property --name="${ssd}" | grep DEVTYPE | sed "s/DEVTYPE=//") == "disk" ]]; then
         local devicenum
-        devicenum="${ssd##*nvme0n}"
+        devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/')
         if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
           mount-ext "${ssd}" "${devicenum}" "nvme" "block"
         else
@@ -1816,7 +1816,7 @@ function compute-master-manifest-variables {
     FLEXVOLUME_HOSTPATH_VOLUME="{ \"name\": \"flexvolumedir\", \"hostPath\": {\"path\": \"${VOLUME_PLUGIN_DIR}\"}},"
   fi
 
-  INSECURE_PORT_MAPPING=''
+  INSECURE_PORT_MAPPING=""
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
     # INSECURE_PORT_MAPPING is used by sed
     # shellcheck disable=SC2089
@@ -2679,7 +2679,7 @@ function reset-motd {
   # or the git hash that's in the build info.
   local gitref
   gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
-  local devel=''
+  local devel=""
   if [[ "${gitref}" != "${version}" ]]; then
     devel="
 Note: This looks like a development version, which might not be present on GitHub.
