@@ -20,61 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
-
-// determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username string) *runtimeapi.LinuxContainerSecurityContext {
-	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	synthesized := convertToRuntimeSecurityContext(effectiveSc)
-	if synthesized == nil {
-		synthesized = &runtimeapi.LinuxContainerSecurityContext{
-			MaskedPaths:   securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount),
-			ReadonlyPaths: securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount),
-		}
-	}
-
-	// set SeccompProfilePath.
-	synthesized.SeccompProfilePath = m.getSeccompProfileFromAnnotations(pod.Annotations, container.Name)
-
-	// set ApparmorProfile.
-	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
-
-	// set RunAsUser.
-	if synthesized.RunAsUser == nil {
-		if uid != nil {
-			synthesized.RunAsUser = &runtimeapi.Int64Value{Value: *uid}
-		}
-		synthesized.RunAsUsername = username
-	}
-
-	// set namespace options and supplemental groups.
-	synthesized.NamespaceOptions = namespacesForPod(pod)
-	podSc := pod.Spec.SecurityContext
-	if podSc != nil {
-		if podSc.FSGroup != nil {
-			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, int64(*podSc.FSGroup))
-		}
-
-		if podSc.SupplementalGroups != nil {
-			for _, sg := range podSc.SupplementalGroups {
-				synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, int64(sg))
-			}
-		}
-	}
-	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
-		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, groups...)
-	}
-
-	synthesized.NoNewPrivs = securitycontext.AddNoNewPrivileges(effectiveSc)
-
-	synthesized.MaskedPaths = securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount)
-	synthesized.ReadonlyPaths = securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount)
-
-	return synthesized
-}
 
 // verifyRunAsNonRoot verifies RunAsNonRoot.
 func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
@@ -99,64 +46,4 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 	default:
 		return nil
 	}
-}
-
-// convertToRuntimeSecurityContext converts v1.SecurityContext to runtimeapi.SecurityContext.
-func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runtimeapi.LinuxContainerSecurityContext {
-	if securityContext == nil {
-		return nil
-	}
-
-	sc := &runtimeapi.LinuxContainerSecurityContext{
-		Capabilities:   convertToRuntimeCapabilities(securityContext.Capabilities),
-		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
-	}
-	if securityContext.RunAsUser != nil {
-		sc.RunAsUser = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsUser)}
-	}
-	if securityContext.RunAsGroup != nil {
-		sc.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsGroup)}
-	}
-	if securityContext.Privileged != nil {
-		sc.Privileged = *securityContext.Privileged
-	}
-	if securityContext.ReadOnlyRootFilesystem != nil {
-		sc.ReadonlyRootfs = *securityContext.ReadOnlyRootFilesystem
-	}
-
-	return sc
-}
-
-// convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.
-func convertToRuntimeSELinuxOption(opts *v1.SELinuxOptions) *runtimeapi.SELinuxOption {
-	if opts == nil {
-		return nil
-	}
-
-	return &runtimeapi.SELinuxOption{
-		User:  opts.User,
-		Role:  opts.Role,
-		Type:  opts.Type,
-		Level: opts.Level,
-	}
-}
-
-// convertToRuntimeCapabilities converts v1.Capabilities to runtimeapi.Capability.
-func convertToRuntimeCapabilities(opts *v1.Capabilities) *runtimeapi.Capability {
-	if opts == nil {
-		return nil
-	}
-
-	capabilities := &runtimeapi.Capability{
-		AddCapabilities:  make([]string, len(opts.Add)),
-		DropCapabilities: make([]string, len(opts.Drop)),
-	}
-	for index, value := range opts.Add {
-		capabilities.AddCapabilities[index] = string(value)
-	}
-	for index, value := range opts.Drop {
-		capabilities.DropCapabilities[index] = string(value)
-	}
-
-	return capabilities
 }

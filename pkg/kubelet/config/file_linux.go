@@ -21,8 +21,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -97,33 +95,6 @@ func (s *sourceFile) doWatch() error {
 			return fmt.Errorf("error while watching %q: %v", s.path, err)
 		}
 	}
-}
-
-func (s *sourceFile) produceWatchEvent(e *fsnotify.Event) error {
-	// Ignore file start with dots
-	if strings.HasPrefix(filepath.Base(e.Name), ".") {
-		klog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
-		return nil
-	}
-	var eventType podEventType
-	switch {
-	case (e.Op & fsnotify.Create) > 0:
-		eventType = podAdd
-	case (e.Op & fsnotify.Write) > 0:
-		eventType = podModify
-	case (e.Op & fsnotify.Chmod) > 0:
-		eventType = podModify
-	case (e.Op & fsnotify.Remove) > 0:
-		eventType = podDelete
-	case (e.Op & fsnotify.Rename) > 0:
-		eventType = podDelete
-	default:
-		// Ignore rest events
-		return nil
-	}
-
-	s.watchEvents <- &watchEvent{e.Name, eventType}
-	return nil
 }
 
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
