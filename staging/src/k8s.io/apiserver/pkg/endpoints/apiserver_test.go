@@ -352,11 +352,6 @@ type SimpleRESTStorage struct {
 	requestedFieldSelector     fields.Selector
 	requestedResourceVersion   string
 	requestedResourceNamespace string
-
-	// The id requested, and location to return for ResourceLocation
-	requestedResourceLocationID string
-	resourceLocation            *url.URL
-	resourceLocationTransport   http.RoundTripper
 	expectedResourceNamespace   string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.

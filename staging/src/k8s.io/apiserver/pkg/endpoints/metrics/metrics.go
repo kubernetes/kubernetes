@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
@@ -185,7 +183,6 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
-	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
