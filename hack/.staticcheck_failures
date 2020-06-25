@@ -6,7 +6,6 @@ pkg/controller/podautoscaler
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/util/coverage
 pkg/volume/azure_dd
 pkg/volume/gcepd
 pkg/volume/rbd
