@@ -129,7 +129,7 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 	if patchObjMeta.GetManagedFields() != nil {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("metadata.managedFields must be nil"))
+		return nil, nil, errors.NewBadRequest("metadata.managedFields must be nil")
 	}
 
 	liveObjVersioned, err := f.toVersioned(liveObj)
