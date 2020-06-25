@@ -3,14 +3,14 @@ kind: Pod
 metadata:
   labels:
     name: agnhost
-    role: master
-  name: agnhost-master
+    role: primary
+  name: agnhost-primary
 spec:
   containers:
-    - name: master
+    - name: primary
       image: gcr.io/kubernetes-e2e-test-images/agnhost:1.0
       env:
-        - name: MASTER
+        - name: PRIMARY
           value: "true"
       ports:
         - containerPort: 6379
@@ -18,7 +18,7 @@ spec:
         limits:
           cpu: "0.1"
       volumeMounts:
-        - mountPath: /agnhost-master-data
+        - mountPath: /agnhost-primary-data
           name: data
     - name: sentinel
       image: gcr.io/kubernetes-e2e-test-images/agnhost:1.0

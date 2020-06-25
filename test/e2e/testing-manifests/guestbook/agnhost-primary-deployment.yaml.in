@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agnhost-master
+  name: agnhost-primary
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: agnhost
-      role: master
+      role: primary
       tier: backend
   template:
     metadata:
       labels:
         app: agnhost
-        role: master
+        role: primary
         tier: backend
     spec:
       containers:
-      - name: master
+      - name: primary
         image: {{.AgnhostImage}}
         args: [ "guestbook", "--http-port", "6379" ]
         resources:
