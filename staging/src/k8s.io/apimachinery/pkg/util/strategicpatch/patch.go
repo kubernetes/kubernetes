@@ -1321,9 +1321,7 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		// Preserving the null value is useful when we want to send an explicit
 		// delete to the API server.
 		if patchV == nil {
-			if _, ok := original[k]; ok {
-				delete(original, k)
-			}
+			delete(original, k)
 			if mergeOptions.IgnoreUnmatchedNulls {
 				continue
 			}
