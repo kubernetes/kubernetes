@@ -139,7 +139,7 @@ func TestWatchCacheBasic(t *testing.T) {
 			"prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
 			"prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
 		}
-		items := make(map[string]storeElement, 0)
+		items := make(map[string]storeElement)
 		for _, item := range store.List() {
 			elem := item.(*storeElement)
 			items[elem.Key] = *elem
