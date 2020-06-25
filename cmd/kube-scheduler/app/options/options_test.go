@@ -974,6 +974,16 @@ plugins:
 			},
 		},
 		{
+			name: "Attempting to set Component Config Profiles and Policy config",
+			options: &Options{
+				ConfigFile: pluginConfigFile,
+				Deprecated: &DeprecatedOptions{
+					PolicyConfigMapName: "bar",
+				},
+			},
+			expectedError: "cannot set a Plugin config and Policy config",
+		},
+		{
 			name: "duplicate fields",
 			options: &Options{
 				ConfigFile: duplicateFieldConfig,
