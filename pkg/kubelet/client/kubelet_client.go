@@ -44,9 +44,6 @@ type KubeletClientConfig struct {
 	// HealthzPort specifies the Port for Healthz communications.
 	HealthzPort uint
 
-	// EnableHTTPs specifies if traffic should be encrypted.
-	EnableHTTPS bool
-
 	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
 	PreferredAddressTypes []string
 
