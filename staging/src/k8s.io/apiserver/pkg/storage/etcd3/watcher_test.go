@@ -301,8 +301,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 
 	e := <-w.ResultChan()
 	watchedDeleteObj := e.Object.(*example.Pod)
-	var wres clientv3.WatchResponse
-	wres = <-etcdW
+	wres := <-etcdW
 
 	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
 	if err != nil {
