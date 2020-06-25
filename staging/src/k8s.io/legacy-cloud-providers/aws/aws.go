@@ -3691,9 +3691,10 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	sslPorts := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
-		if port.Protocol != v1.ProtocolTCP {
-			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+		if err := checkProtocol(port, annotations); err != nil {
+			return nil, err
 		}
+
 		if port.NodePort == 0 {
 			klog.Errorf("Ignoring port without NodePort defined: %v", port)
 			continue
@@ -3713,7 +3714,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			}
 
 			certificateARN := annotations[ServiceAnnotationLoadBalancerCertificate]
-			if certificateARN != "" && (sslPorts == nil || sslPorts.numbers.Has(int64(port.Port)) || sslPorts.names.Has(port.Name)) {
+			if port.Protocol != v1.ProtocolUDP && certificateARN != "" && (sslPorts == nil || sslPorts.numbers.Has(int64(port.Port)) || sslPorts.names.Has(port.Name)) {
 				portMapping.FrontendProtocol = elbv2.ProtocolEnumTls
 				portMapping.SSLCertificateARN = certificateARN
 				portMapping.SSLPolicy = annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]
@@ -3724,12 +3725,13 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			}
 
 			v2Mappings = append(v2Mappings, portMapping)
+		} else {
+			listener, err := buildListener(port, annotations, sslPorts)
+			if err != nil {
+				return nil, err
+			}
+			listeners = append(listeners, listener)
 		}
-		listener, err := buildListener(port, annotations, sslPorts)
-		if err != nil {
-			return nil, err
-		}
-		listeners = append(listeners, listener)
 	}
 
 	if apiService.Spec.LoadBalancerIP != "" {
@@ -4760,6 +4762,18 @@ func (c *Cloud) nodeNameToProviderID(nodeName types.NodeName) (InstanceID, error
 	}
 
 	return KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
+}
+
+func checkProtocol(port v1.ServicePort, annotations map[string]string) error {
+	// nlb supports tcp, udp
+	if isNLB(annotations) && (port.Protocol == v1.ProtocolTCP || port.Protocol == v1.ProtocolUDP) {
+		return nil
+	}
+	// elb only supports tcp
+	if !isNLB(annotations) && port.Protocol == v1.ProtocolTCP {
+		return nil
+	}
+	return fmt.Errorf("Protocol %s not supported by LoadBalancer", port.Protocol)
 }
 
 func setNodeDisk(
