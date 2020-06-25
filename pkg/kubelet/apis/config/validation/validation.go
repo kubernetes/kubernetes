@@ -161,8 +161,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
 
 	logOption := logs.NewOptions()
-	if kc.LoggingConfig.LoggingFormat != "" {
-		logOption.LogFormat = kc.LoggingConfig.LoggingFormat
+	if kc.Logging.Format != "" {
+		logOption.LogFormat = kc.Logging.Format
 	}
 	allErrors = append(allErrors, logOption.Validate()...)
 

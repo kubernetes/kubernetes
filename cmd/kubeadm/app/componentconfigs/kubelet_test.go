@@ -76,7 +76,7 @@ var kubeletMarshalCases = []struct {
 			httpCheckFrequency: 0s
 			imageMinimumGCAge: 0s
 			kind: KubeletConfiguration
-			loggingConfig: {}
+			logging: {}
 			nodeStatusReportFrequency: 0s
 			nodeStatusUpdateFrequency: 0s
 			runtimeRequestTimeout: 0s
@@ -119,7 +119,7 @@ var kubeletMarshalCases = []struct {
 			httpCheckFrequency: 0s
 			imageMinimumGCAge: 0s
 			kind: KubeletConfiguration
-			loggingConfig: {}
+			logging: {}
 			nodeStatusReportFrequency: 0s
 			nodeStatusUpdateFrequency: 0s
 			port: 12345

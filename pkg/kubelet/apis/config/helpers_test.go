@@ -182,7 +182,7 @@ var (
 		"HairpinMode",
 		"HealthzBindAddress",
 		"HealthzPort",
-		"LoggingConfig.LoggingFormat",
+		"Logging.Format",
 		"TLSCipherSuites[*]",
 		"TLSMinVersion",
 		"IPTablesDropBit",
