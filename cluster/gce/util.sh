@@ -891,7 +891,7 @@ function construct-windows-kubelet-flags {
   flags+=" --cgroups-per-qos=false --enforce-node-allocatable="
 
   # Turn off kernel memory cgroup notification.
-  flags+=" --experimental-kernel-memcg-notification=false"
+  flags+=" --kernel-memcg-notification=false"
 
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.

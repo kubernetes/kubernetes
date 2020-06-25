@@ -321,6 +321,9 @@ type KubeletConfiguration struct {
 	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
 	// +optional
 	AllowedUnsafeSysctls []string
+	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
+	// notification to determine if memory eviction thresholds are crossed rather than polling.
+	KernelMemcgNotification bool
 
 	/* the following fields are meant for Node Allocatable */
 

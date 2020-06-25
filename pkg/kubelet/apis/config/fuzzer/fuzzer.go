@@ -59,6 +59,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 			obj.ImageGCHighThresholdPercent = 85
 			obj.ImageGCLowThresholdPercent = 80
+			obj.KernelMemcgNotification = false
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
 			obj.PodPidsLimit = -1
