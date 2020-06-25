@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
+	"k8s.io/legacy-cloud-providers/azure/auth"
 	"k8s.io/legacy-cloud-providers/azure/clients/subnetclient/mocksubnetclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -2830,4 +2831,31 @@ func TestGetNodeResourceGroup(t *testing.T) {
 		assert.Nil(t, err, test.name)
 		assert.Equal(t, test.expected, actual, test.name)
 	}
+}
+
+func TestInitializeCloudFromConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	err := az.InitializeCloudFromConfig(nil, false)
+	assert.NoError(t, err)
+
+	config := Config{
+		DisableAvailabilitySetNodes: true,
+		VMType:                      vmTypeStandard,
+	}
+	err = az.InitializeCloudFromConfig(&config, false)
+	expectedErr := fmt.Errorf("disableAvailabilitySetNodes true is only supported when vmType is 'vmss'")
+	assert.Equal(t, expectedErr, err)
+
+	config = Config{
+		AzureAuthConfig: auth.AzureAuthConfig{
+			Cloud: "AZUREPUBLICCLOUD",
+		},
+		CloudConfigType: cloudConfigTypeFile,
+	}
+	err = az.InitializeCloudFromConfig(&config, false)
+	expectedErr = fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
+	assert.Equal(t, expectedErr, err)
 }
