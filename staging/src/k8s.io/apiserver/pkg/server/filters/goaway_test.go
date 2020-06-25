@@ -132,13 +132,11 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 	mux.Handle(urlNormal, WithProbabilisticGoaway(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hello"))
-		return
 	}), 0))
 	mux.Handle(urlWatch, WithProbabilisticGoaway(watchHandler, 0))
 	mux.Handle(urlGoaway, WithProbabilisticGoaway(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hello"))
-		return
 	}), 1))
 	mux.Handle(urlWatchWithGoaway, WithProbabilisticGoaway(watchHandler, 1))
 
@@ -274,7 +272,6 @@ func TestHTTP1Requests(t *testing.T) {
 	s := httptest.NewUnstartedServer(WithProbabilisticGoaway(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hello"))
-		return
 	}), 1))
 
 	http2Options := &http2.Server{}
