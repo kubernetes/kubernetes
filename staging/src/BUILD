@@ -25,6 +25,7 @@ filegroup(
         "//staging/src/k8s.io/cluster-bootstrap:all-srcs",
         "//staging/src/k8s.io/code-generator:all-srcs",
         "//staging/src/k8s.io/component-base:all-srcs",
+        "//staging/src/k8s.io/component-helpers:all-srcs",
         "//staging/src/k8s.io/controller-manager:all-srcs",
         "//staging/src/k8s.io/cri-api:all-srcs",
         "//staging/src/k8s.io/csi-translation-lib:all-srcs",
