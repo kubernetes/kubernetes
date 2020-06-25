@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1beta1
 
 import (
 	"net"
@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	"k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 
@@ -36,9 +36,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
-func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfiguration) {
+func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
 	if len(obj.Profiles) == 0 {
-		obj.Profiles = append(obj.Profiles, v1alpha2.KubeSchedulerProfile{})
+		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
 	}
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
@@ -110,10 +110,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 		obj.LeaderElection.ResourceLock = "endpointsleases"
 	}
 	if len(obj.LeaderElection.ResourceNamespace) == 0 {
-		obj.LeaderElection.ResourceNamespace = v1alpha2.SchedulerDefaultLockObjectNamespace
+		obj.LeaderElection.ResourceNamespace = v1beta1.SchedulerDefaultLockObjectNamespace
 	}
 	if len(obj.LeaderElection.ResourceName) == 0 {
-		obj.LeaderElection.ResourceName = v1alpha2.SchedulerDefaultLockObjectName
+		obj.LeaderElection.ResourceName = v1beta1.SchedulerDefaultLockObjectName
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {

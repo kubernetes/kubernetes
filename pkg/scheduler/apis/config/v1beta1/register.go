@@ -14,30 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1beta1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-scheduler/config/v1beta1"
 )
 
 // GroupName is the group name used in this package
-const GroupName = "kubescheduler.config.k8s.io"
+const GroupName = v1beta1.GroupName
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha2"}
+var SchemeGroupVersion = v1beta1.SchemeGroupVersion
 
 var (
-	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	// localSchemeBuilder extends the SchemeBuilder instance with the external types. In this package,
+	// defaulting and conversion init funcs are registered as well.
+	localSchemeBuilder = &v1beta1.SchemeBuilder
 	// AddToScheme is a global function that registers this API group & version to a scheme
-	AddToScheme = SchemeBuilder.AddToScheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
-// addKnownTypes registers known types to the given scheme
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeSchedulerConfiguration{},
-	)
-	return nil
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }

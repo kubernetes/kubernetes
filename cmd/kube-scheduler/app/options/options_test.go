@@ -72,7 +72,7 @@ func TestSchedulerOptions(t *testing.T) {
 	configFile := filepath.Join(tmpDir, "scheduler.yaml")
 	configKubeconfig := filepath.Join(tmpDir, "config.kubeconfig")
 	if err := ioutil.WriteFile(configFile, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha2
+apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -161,7 +161,7 @@ foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
 
 	unknownFieldConfig := filepath.Join(tmpDir, "scheduler_invalid_unknown_field.yaml")
 	if err := ioutil.WriteFile(unknownFieldConfig, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha2
+apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -185,7 +185,7 @@ leaderElection:
 
 	duplicateFieldConfig := filepath.Join(tmpDir, "scheduler_invalid_duplicate_fields.yaml")
 	if err := ioutil.WriteFile(duplicateFieldConfig, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha2
+apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -222,7 +222,7 @@ users:
 	// plugin config
 	pluginConfigFile := filepath.Join(tmpDir, "plugin.yaml")
 	if err := ioutil.WriteFile(pluginConfigFile, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha2
+apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -248,7 +248,7 @@ profiles:
 	// multiple profiles config
 	multiProfilesConfig := filepath.Join(tmpDir, "multi-profiles.yaml")
 	if err := ioutil.WriteFile(multiProfilesConfig, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha2
+apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
