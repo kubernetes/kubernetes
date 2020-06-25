@@ -254,7 +254,6 @@ func TestUniformDistribution(t *testing.T) {
 			t.Errorf("Only %v percent of the hands got a central count", goodPct)
 		}
 	}
-	return
 }
 
 func TestDealer_DealIntoHand(t *testing.T) {

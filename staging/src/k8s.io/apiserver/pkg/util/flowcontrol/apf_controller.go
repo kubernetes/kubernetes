@@ -636,7 +636,6 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, re
 	if proto.Spec.Limited != nil {
 		meal.shareSum += float64(proto.Spec.Limited.AssuredConcurrencyShares)
 	}
-	return
 }
 
 type immediateRequest struct{}
