@@ -34,11 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
-
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/client-go/tools/cache"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
