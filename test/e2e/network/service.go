@@ -1866,7 +1866,7 @@ var _ = SIGDescribe("Services", func() {
 		})
 
 		defer func() {
-			waitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
+			WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
 		ginkgo.By("Wait for load balancer to serve traffic")
@@ -1894,7 +1894,7 @@ var _ = SIGDescribe("Services", func() {
 		})
 
 		defer func() {
-			waitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
+			WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
 		ginkgo.By("Wait for load balancer to serve traffic")
@@ -1913,7 +1913,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 })
 
-func waitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
+func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
 	ginkgo.By("Delete service with finalizer")
 	if err := cs.CoreV1().Services(namespace).Delete(name, nil); err != nil {
 		framework.Failf("Failed to delete service %s/%s", namespace, name)
