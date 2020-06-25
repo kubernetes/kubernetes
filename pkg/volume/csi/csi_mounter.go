@@ -82,7 +82,7 @@ type csiMountMgr struct {
 var _ volume.Volume = &csiMountMgr{}
 
 func (c *csiMountMgr) GetPath() string {
-	dir := filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
+	dir := GetCSIMounterPath(filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host)))
 	klog.V(4).Info(log("mounter.GetPath generated [%s]", dir))
 	return dir
 }
