@@ -25,8 +25,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/klog/v2"
+
+	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 )
 
 // EventFunc does some work that needs to be done at or after the
@@ -51,10 +52,8 @@ type RealEventClock struct {
 func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 	ch := time.After(d)
 	go func() {
-		select {
-		case t := <-ch:
-			f(t)
-		}
+		t := <-ch
+		f(t)
 	}()
 }
 
