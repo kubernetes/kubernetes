@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -45,7 +47,6 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
 )
@@ -683,10 +684,7 @@ func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// Get default orphan policy from this REST object type if it exists
-	if defaultGCPolicy == rest.OrphanDependents {
-		return true
-	}
-	return false
+	return defaultGCPolicy == rest.OrphanDependents
 }
 
 // shouldDeleteDependents returns true if the finalizer for foreground deletion should be set
