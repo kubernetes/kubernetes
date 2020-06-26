@@ -82,9 +82,9 @@ type Reflector struct {
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
 	lastSyncResourceVersion string
-	// isLastSyncResourceVersionGone is true if the previous list or watch request with lastSyncResourceVersion
-	// failed with an HTTP 410 (Gone) status code.
-	isLastSyncResourceVersionGone bool
+	// isLastSyncResourceVersionUnavailable is true if the previous list or watch request with
+	// lastSyncResourceVersion failed with an "expired" or "too large resource version" error.
+	isLastSyncResourceVersionUnavailable bool
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
@@ -256,13 +256,14 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 
 			list, paginatedResult, err = pager.List(context.Background(), options)
-			if isExpiredError(err) {
-				r.setIsLastSyncResourceVersionExpired(true)
-				// Retry immediately if the resource version used to list is expired.
+			if isExpiredError(err) || isTooLargeResourceVersionError(err) {
+				r.setIsLastSyncResourceVersionUnavailable(true)
+				// Retry immediately if the resource version used to list is unavailable.
 				// The pager already falls back to full list if paginated list calls fail due to an "Expired" error on
-				// continuation pages, but the pager might not be enabled, or the full list might fail because the
-				// resource version it is listing at is expired, so we need to fallback to resourceVersion="" in all
-				// to recover and ensure the reflector makes forward progress.
+				// continuation pages, but the pager might not be enabled, the full list might fail because the
+				// resource version it is listing at is expired or the cache may not yet be synced to the provided
+				// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
+				// the reflector makes forward progress.
 				list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 			}
 			close(listCh)
@@ -292,7 +293,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			r.paginatedResult = true
 		}
 
-		r.setIsLastSyncResourceVersionExpired(false) // list was successful
+		r.setIsLastSyncResourceVersionUnavailable(false) // list was successful
 		initTrace.Step("Objects listed")
 		listMetaInterface, err := meta.ListAccessor(list)
 		if err != nil {
@@ -396,7 +397,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			if err != errorStopRequested {
 				switch {
 				case isExpiredError(err):
-					// Don't set LastSyncResourceVersionExpired - LIST call with ResourceVersion=RV already
+					// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 					// has a semantic that it returns data at least as fresh as provided RV.
 					// So first try to LIST with setting RV to resource version of last observed object.
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
@@ -519,9 +520,9 @@ func (r *Reflector) relistResourceVersion() string {
 	r.lastSyncResourceVersionMutex.RLock()
 	defer r.lastSyncResourceVersionMutex.RUnlock()
 
-	if r.isLastSyncResourceVersionGone {
+	if r.isLastSyncResourceVersionUnavailable {
 		// Since this reflector makes paginated list requests, and all paginated list requests skip the watch cache
-		// if the lastSyncResourceVersion is expired, we set ResourceVersion="" and list again to re-establish reflector
+		// if the lastSyncResourceVersion is unavailable, we set ResourceVersion="" and list again to re-establish reflector
 		// to the latest available ResourceVersion, using a consistent read from etcd.
 		return ""
 	}
@@ -533,12 +534,12 @@ func (r *Reflector) relistResourceVersion() string {
 	return r.lastSyncResourceVersion
 }
 
-// setIsLastSyncResourceVersionExpired sets if the last list or watch request with lastSyncResourceVersion returned a
-// expired error: HTTP 410 (Gone) Status Code.
-func (r *Reflector) setIsLastSyncResourceVersionExpired(isExpired bool) {
+// setIsLastSyncResourceVersionUnavailable sets if the last list or watch request with lastSyncResourceVersion returned
+// "expired" or "too large resource version" error.
+func (r *Reflector) setIsLastSyncResourceVersionUnavailable(isUnavailable bool) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
-	r.isLastSyncResourceVersionGone = isExpired
+	r.isLastSyncResourceVersionUnavailable = isUnavailable
 }
 
 func isExpiredError(err error) bool {
@@ -547,4 +548,8 @@ func isExpiredError(err error) bool {
 	// and always returns apierrors.StatusReasonExpired. For backward compatibility we can only remove the apierrors.IsGone
 	// check when we fully drop support for Kubernetes 1.17 servers from reflectors.
 	return apierrors.IsResourceExpired(err) || apierrors.IsGone(err)
+}
+
+func isTooLargeResourceVersionError(err error) bool {
+	return apierrors.HasStatusCause(err, metav1.CauseTypeResourceVersionTooLarge)
 }
