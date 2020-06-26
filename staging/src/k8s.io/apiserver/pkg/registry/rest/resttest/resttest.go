@@ -1115,7 +1115,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if wasDeleted != true {
+	if !wasDeleted {
 		t.Errorf("unexpected, object %s should have been deleted immediately", objectMeta.GetName())
 	}
 	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.GetName(), &metav1.GetOptions{})

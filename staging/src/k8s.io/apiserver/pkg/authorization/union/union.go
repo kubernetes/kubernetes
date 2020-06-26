@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
@@ -88,7 +89,7 @@ func (authzHandler unionAuthzRulesHandler) RulesFor(user user.Info, namespace st
 	for _, currAuthzHandler := range authzHandler {
 		resourceRules, nonResourceRules, incomplete, err := currAuthzHandler.RulesFor(user, namespace)
 
-		if incomplete == true {
+		if incomplete {
 			incompleteStatus = true
 		}
 		if err != nil {
