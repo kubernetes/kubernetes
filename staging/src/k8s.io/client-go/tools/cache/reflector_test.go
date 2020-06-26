@@ -714,6 +714,62 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 	}
 }
 
+func TestReflectorFullListIfTooLarge(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+	listCallRVs := []string{}
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			listCallRVs = append(listCallRVs, options.ResourceVersion)
+
+			switch options.ResourceVersion {
+			// initial list
+			case "0":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "20"}}, nil
+			// relist after the initial list
+			case "20":
+				err := apierrors.NewTimeoutError("too large resource version", 1)
+				err.ErrStatus.Details.Causes = []metav1.StatusCause{{Type: metav1.CauseTypeResourceVersionTooLarge}}
+				return nil, err
+			// relist from etcd after "too large" error
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
+			default:
+				return nil, fmt.Errorf("unexpected List call: %s", options.ResourceVersion)
+			}
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should use RV=0
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	// Relist from the future version.
+	// This may happen, as watchcache is initialized from "current global etcd resource version"
+	// when kube-apiserver is starting and if no objects are changing after that each kube-apiserver
+	// may be synced to a different version and they will never converge.
+	// TODO: We should use etcd progress-notify feature to avoid this behavior but until this is
+	// done we simply try to relist from now to avoid continuous errors on relists.
+	stopCh = make(chan struct{})
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedRVs := []string{"0", "20", ""}
+	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
+		t.Errorf("Expected series of list calls with resource version of %#v but got: %#v", expectedRVs, listCallRVs)
+	}
+}
+
 func TestReflectorSetExpectedType(t *testing.T) {
 	obj := &unstructured.Unstructured{}
 	gvk := schema.GroupVersionKind{
