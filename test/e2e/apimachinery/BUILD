@@ -21,6 +21,7 @@ go_library(
         "framework.go",
         "garbage_collector.go",
         "generated_clientset.go",
+        "get_code_version.go",
         "namespace.go",
         "protocol.go",
         "resource_quota.go",
