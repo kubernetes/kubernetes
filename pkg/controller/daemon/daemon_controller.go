@@ -170,17 +170,8 @@ func NewDaemonSetsController(
 	}
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			ds := obj.(*apps.DaemonSet)
-			klog.V(4).Infof("Adding daemon set %s", ds.Name)
-			dsc.enqueueDaemonSet(ds)
-		},
-		UpdateFunc: func(old, cur interface{}) {
-			oldDS := old.(*apps.DaemonSet)
-			curDS := cur.(*apps.DaemonSet)
-			klog.V(4).Infof("Updating daemon set %s", oldDS.Name)
-			dsc.enqueueDaemonSet(curDS)
-		},
+		AddFunc:    dsc.addDaemonset,
+		UpdateFunc: dsc.updateDaemonset,
 		DeleteFunc: dsc.deleteDaemonset,
 	})
 	dsc.dsLister = daemonSetInformer.Lister()
@@ -238,22 +229,59 @@ func indexByPodNodeName(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
+func (dsc *DaemonSetsController) addDaemonset(obj interface{}) {
+	ds := obj.(*apps.DaemonSet)
+	klog.V(4).Infof("Adding daemon set %s", ds.Name)
+	dsc.enqueueDaemonSet(ds)
+}
+
+func (dsc *DaemonSetsController) updateDaemonset(cur, old interface{}) {
+	oldDS := old.(*apps.DaemonSet)
+	curDS := cur.(*apps.DaemonSet)
+
+	// TODO: make a KEP and fix informers to always call the delete event handler on re-create
+	if curDS.UID != oldDS.UID {
+		key, err := controller.KeyFunc(oldDS)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", oldDS, err))
+			return
+		}
+		dsc.deleteDaemonset(cache.DeletedFinalStateUnknown{
+			Key: key,
+			Obj: oldDS,
+		})
+	}
+
+	klog.V(4).Infof("Updating daemon set %s", oldDS.Name)
+	dsc.enqueueDaemonSet(curDS)
+}
+
 func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 	ds, ok := obj.(*apps.DaemonSet)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj))
 			return
 		}
 	}
 	klog.V(4).Infof("Deleting daemon set %s", ds.Name)
-	dsc.enqueueDaemonSet(ds)
+
+	key, err := controller.KeyFunc(ds)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ds, err))
+		return
+	}
+
+	// Delete expectations for the DaemonSet so if we create a new one with the same name it starts clean
+	dsc.expectations.DeleteExpectations(key)
+
+	dsc.queue.Add(key)
 }
 
 // Run begins watching and syncing daemon sets.
