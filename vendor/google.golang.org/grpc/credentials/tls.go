@@ -33,6 +33,7 @@ import (
 // It implements the AuthInfo interface.
 type TLSInfo struct {
 	State tls.ConnectionState
+	CommonAuthInfo
 }
 
 // AuthType returns the type of TLSInfo as a string.
@@ -81,24 +82,28 @@ func (c *tlsCreds) ClientHandshake(ctx context.Context, authority string, rawCon
 	errChannel := make(chan error, 1)
 	go func() {
 		errChannel <- conn.Handshake()
+		close(errChannel)
 	}()
 	select {
 	case err := <-errChannel:
 		if err != nil {
+			conn.Close()
 			return nil, nil, err
 		}
 	case <-ctx.Done():
+		conn.Close()
 		return nil, nil, ctx.Err()
 	}
-	return internal.WrapSyscallConn(rawConn, conn), TLSInfo{conn.ConnectionState()}, nil
+	return internal.WrapSyscallConn(rawConn, conn), TLSInfo{conn.ConnectionState(), CommonAuthInfo{PrivacyAndIntegrity}}, nil
 }
 
 func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error) {
 	conn := tls.Server(rawConn, c.config)
 	if err := conn.Handshake(); err != nil {
+		conn.Close()
 		return nil, nil, err
 	}
-	return internal.WrapSyscallConn(rawConn, conn), TLSInfo{conn.ConnectionState()}, nil
+	return internal.WrapSyscallConn(rawConn, conn), TLSInfo{conn.ConnectionState(), CommonAuthInfo{PrivacyAndIntegrity}}, nil
 }
 
 func (c *tlsCreds) Clone() TransportCredentials {

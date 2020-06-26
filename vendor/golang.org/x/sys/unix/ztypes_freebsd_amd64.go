@@ -123,9 +123,9 @@ type Statfs_t struct {
 	Owner       uint32
 	Fsid        Fsid
 	Charspare   [80]int8
-	Fstypename  [16]int8
-	Mntfromname [1024]int8
-	Mntonname   [1024]int8
+	Fstypename  [16]byte
+	Mntfromname [1024]byte
+	Mntonname   [1024]byte
 }
 
 type statfs_freebsd11_t struct {
@@ -148,9 +148,9 @@ type statfs_freebsd11_t struct {
 	Owner       uint32
 	Fsid        Fsid
 	Charspare   [80]int8
-	Fstypename  [16]int8
-	Mntfromname [88]int8
-	Mntonname   [88]int8
+	Fstypename  [16]byte
+	Mntfromname [88]byte
+	Mntonname   [88]byte
 }
 
 type Flock_t struct {
@@ -275,10 +275,8 @@ type IPv6Mreq struct {
 type Msghdr struct {
 	Name       *byte
 	Namelen    uint32
-	_          [4]byte
 	Iov        *Iovec
 	Iovlen     int32
-	_          [4]byte
 	Control    *byte
 	Controllen uint32
 	Flags      int32
@@ -322,10 +320,114 @@ const (
 )
 
 const (
-	PTRACE_TRACEME = 0x0
-	PTRACE_CONT    = 0x7
-	PTRACE_KILL    = 0x8
+	PTRACE_ATTACH     = 0xa
+	PTRACE_CONT       = 0x7
+	PTRACE_DETACH     = 0xb
+	PTRACE_GETFPREGS  = 0x23
+	PTRACE_GETFSBASE  = 0x47
+	PTRACE_GETLWPLIST = 0xf
+	PTRACE_GETNUMLWPS = 0xe
+	PTRACE_GETREGS    = 0x21
+	PTRACE_GETXSTATE  = 0x45
+	PTRACE_IO         = 0xc
+	PTRACE_KILL       = 0x8
+	PTRACE_LWPEVENTS  = 0x18
+	PTRACE_LWPINFO    = 0xd
+	PTRACE_SETFPREGS  = 0x24
+	PTRACE_SETREGS    = 0x22
+	PTRACE_SINGLESTEP = 0x9
+	PTRACE_TRACEME    = 0x0
 )
+
+const (
+	PIOD_READ_D  = 0x1
+	PIOD_WRITE_D = 0x2
+	PIOD_READ_I  = 0x3
+	PIOD_WRITE_I = 0x4
+)
+
+const (
+	PL_FLAG_BORN   = 0x100
+	PL_FLAG_EXITED = 0x200
+	PL_FLAG_SI     = 0x20
+)
+
+const (
+	TRAP_BRKPT = 0x1
+	TRAP_TRACE = 0x2
+)
+
+type PtraceLwpInfoStruct struct {
+	Lwpid        int32
+	Event        int32
+	Flags        int32
+	Sigmask      Sigset_t
+	Siglist      Sigset_t
+	Siginfo      __Siginfo
+	Tdname       [20]int8
+	Child_pid    int32
+	Syscall_code uint32
+	Syscall_narg uint32
+}
+
+type __Siginfo struct {
+	Signo  int32
+	Errno  int32
+	Code   int32
+	Pid    int32
+	Uid    uint32
+	Status int32
+	Addr   *byte
+	Value  [8]byte
+	_      [40]byte
+}
+
+type Sigset_t struct {
+	Val [4]uint32
+}
+
+type Reg struct {
+	R15    int64
+	R14    int64
+	R13    int64
+	R12    int64
+	R11    int64
+	R10    int64
+	R9     int64
+	R8     int64
+	Rdi    int64
+	Rsi    int64
+	Rbp    int64
+	Rbx    int64
+	Rdx    int64
+	Rcx    int64
+	Rax    int64
+	Trapno uint32
+	Fs     uint16
+	Gs     uint16
+	Err    uint32
+	Es     uint16
+	Ds     uint16
+	Rip    int64
+	Cs     int64
+	Rflags int64
+	Rsp    int64
+	Ss     int64
+}
+
+type FpReg struct {
+	Env   [4]uint64
+	Acc   [8][16]uint8
+	Xacc  [16][16]uint8
+	Spare [12]uint64
+}
+
+type PtraceIoDesc struct {
+	Op   int32
+	Offs *byte
+	Addr *byte
+	Len  uint64
+}
 
 type Kevent_t struct {
 	Ident  uint64
@@ -359,7 +461,7 @@ type ifMsghdr struct {
 	Addrs   int32
 	Flags   int32
 	Index   uint16
-	_       [2]byte
+	_       uint16
 	Data    ifData
 }
 
@@ -370,7 +472,6 @@ type IfMsghdr struct {
 	Addrs   int32
 	Flags   int32
 	Index   uint16
-	_       [2]byte
 	Data    IfData
 }
 
@@ -437,7 +538,7 @@ type IfaMsghdr struct {
 	Addrs   int32
 	Flags   int32
 	Index   uint16
-	_       [2]byte
+	_       uint16
 	Metric  int32
 }
 
@@ -448,7 +549,7 @@ type IfmaMsghdr struct {
 	Addrs   int32
 	Flags   int32
 	Index   uint16
-	_       [2]byte
+	_       uint16
 }
 
 type IfAnnounceMsghdr struct {
@@ -465,7 +566,7 @@ type RtMsghdr struct {
 	Version uint8
 	Type    uint8
 	Index   uint16
-	_       [2]byte
+	_       uint16
 	Flags   int32
 	Addrs   int32
 	Pid     int32
@@ -519,7 +620,6 @@ type BpfZbuf struct {
 
 type BpfProgram struct {
 	Len   uint32
-	_     [4]byte
 	Insns *BpfInsn
 }
 
@@ -599,4 +699,14 @@ type Utsname struct {
 	Release  [256]byte
 	Version  [256]byte
 	Machine  [256]byte
+}
+
+const SizeofClockinfo = 0x14
+
+type Clockinfo struct {
+	Hz     int32
+	Tick   int32
+	Spare  int32
+	Stathz int32
+	Profhz int32
 }

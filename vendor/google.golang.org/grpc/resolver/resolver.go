@@ -124,11 +124,6 @@ type Address struct {
 	Metadata interface{}
 }
 
-// BuildOption is a type alias of BuildOptions for legacy reasons.
-//
-// Deprecated: use BuildOptions instead.
-type BuildOption = BuildOptions
-
 // BuildOptions includes additional information for the builder to create
 // the resolver.
 type BuildOptions struct {
@@ -234,11 +229,6 @@ type Builder interface {
 	// Scheme is defined at https://github.com/grpc/grpc/blob/master/doc/naming.md.
 	Scheme() string
 }
-
-// ResolveNowOption is a type alias of ResolveNowOptions for legacy reasons.
-//
-// Deprecated: use ResolveNowOptions instead.
-type ResolveNowOption = ResolveNowOptions
 
 // ResolveNowOptions includes additional information for ResolveNow.
 type ResolveNowOptions struct{}

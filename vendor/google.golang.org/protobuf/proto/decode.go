@@ -63,12 +63,15 @@ func (o UnmarshalOptions) UnmarshalState(in protoiface.UnmarshalInput) (protoifa
 	return o.unmarshal(in.Buf, in.Message)
 }
 
+// unmarshal is a centralized function that all unmarshal operations go through.
+// For profiling purposes, avoid changing the name of this function or
+// introducing other code paths for unmarshal that do not go through this.
 func (o UnmarshalOptions) unmarshal(b []byte, m protoreflect.Message) (out protoiface.UnmarshalOutput, err error) {
 	if o.Resolver == nil {
 		o.Resolver = protoregistry.GlobalTypes
 	}
 	if !o.Merge {
-		Reset(m.Interface()) // TODO
+		Reset(m.Interface())
 	}
 	allowPartial := o.AllowPartial
 	o.Merge = true
@@ -105,7 +108,7 @@ func (o UnmarshalOptions) unmarshalMessage(b []byte, m protoreflect.Message) err
 func (o UnmarshalOptions) unmarshalMessageSlow(b []byte, m protoreflect.Message) error {
 	md := m.Descriptor()
 	if messageset.IsMessageSet(md) {
-		return unmarshalMessageSet(b, m, o)
+		return o.unmarshalMessageSet(b, m)
 	}
 	fields := md.Fields()
 	for len(b) > 0 {

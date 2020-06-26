@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/nvm"
@@ -30,8 +32,6 @@ import (
 	"github.com/google/cadvisor/utils/sysinfo"
 
 	"k8s.io/klog/v2"
-
-	"golang.org/x/sys/unix"
 )
 
 const hugepagesDirectory = "/sys/kernel/mm/hugepages/"

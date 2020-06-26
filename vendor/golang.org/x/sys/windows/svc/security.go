@@ -7,8 +7,6 @@
 package svc
 
 import (
-	"unsafe"
-
 	"golang.org/x/sys/windows"
 )
 
@@ -48,9 +46,8 @@ func IsAnInteractiveSession() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	p := unsafe.Pointer(&gs.Groups[0])
-	groups := (*[2 << 20]windows.SIDAndAttributes)(p)[:gs.GroupCount]
-	for _, g := range groups {
+
+	for _, g := range gs.AllGroups() {
 		if windows.EqualSid(g.Sid, interSid) {
 			return true, nil
 		}

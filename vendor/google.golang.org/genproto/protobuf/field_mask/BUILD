@@ -2,11 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["field_mask.pb.go"],
+    srcs = ["field_mask.go"],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/genproto/protobuf/field_mask",
     importpath = "google.golang.org/genproto/protobuf/field_mask",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = ["//vendor/google.golang.org/protobuf/types/known/fieldmaskpb:go_default_library"],
 )
 
 filegroup(

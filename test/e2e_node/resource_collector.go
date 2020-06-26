@@ -518,6 +518,14 @@ func getContainer(pid int) (string, error) {
 		return "", err
 	}
 
+	if cgroups.IsCgroup2UnifiedMode() {
+		unified, found := cgs[""]
+		if !found {
+			return "", cgroups.NewNotFoundError("unified")
+		}
+		return unified, nil
+	}
+
 	cpu, found := cgs["cpu"]
 	if !found {
 		return "", cgroups.NewNotFoundError("cpu")

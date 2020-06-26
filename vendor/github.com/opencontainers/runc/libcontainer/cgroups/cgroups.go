@@ -3,8 +3,6 @@
 package cgroups
 
 import (
-	"fmt"
-
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
@@ -27,48 +25,27 @@ type Manager interface {
 	// Destroys the cgroup set
 	Destroy() error
 
-	// The option func SystemdCgroups() and Cgroupfs() require following attributes:
-	// 	Paths   map[string]string
-	// 	Cgroups *configs.Cgroup
-	// Paths maps cgroup subsystem to path at which it is mounted.
-	// Cgroups specifies specific cgroup settings for the various subsystems
-
-	// Returns cgroup paths to save in a state file and to be able to
-	// restore the object later.
-	GetPaths() map[string]string
-
-	// GetUnifiedPath returns the unified path when running in unified mode.
-	// The value corresponds to the all values of GetPaths() map.
-	//
-	// GetUnifiedPath returns error when running in hybrid mode as well as
-	// in legacy mode.
-	GetUnifiedPath() (string, error)
+	// Path returns a cgroup path to the specified controller/subsystem.
+	// For cgroupv2, the argument is unused and can be empty.
+	Path(string) string
 
 	// Sets the cgroup as configured.
 	Set(container *configs.Config) error
 
-	// Gets the cgroup as configured.
+	// GetPaths returns cgroup path(s) to save in a state file in order to restore later.
+	//
+	// For cgroup v1, a key is cgroup subsystem name, and the value is the path
+	// to the cgroup for this subsystem.
+	//
+	// For cgroup v2 unified hierarchy, a key is "", and the value is the unified path.
+	GetPaths() map[string]string
+
+	// GetCgroups returns the cgroup data as configured.
 	GetCgroups() (*configs.Cgroup, error)
-}
 
-type NotFoundError struct {
-	Subsystem string
-}
+	// GetFreezerState retrieves the current FreezerState of the cgroup.
+	GetFreezerState() (configs.FreezerState, error)
 
-func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("mountpoint for %s not found", e.Subsystem)
-}
-
-func NewNotFoundError(sub string) error {
-	return &NotFoundError{
-		Subsystem: sub,
-	}
-}
-
-func IsNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*NotFoundError)
-	return ok
+	// Whether the cgroup path exists or not
+	Exists() bool
 }
