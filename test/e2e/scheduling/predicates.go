@@ -1045,23 +1045,20 @@ func translateIPv4ToIPv6(ip string) string {
 // GetPodsScheduled returns a number of currently scheduled and not scheduled Pods on worker nodes.
 func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
 	for _, pod := range pods.Items {
-		if workerNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				framework.ExpectEqual(scheduledCondition != nil, true)
-				if scheduledCondition != nil {
-					framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
-					scheduledPods = append(scheduledPods, pod)
-				}
-			} else {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				framework.ExpectEqual(scheduledCondition != nil, true)
-				if scheduledCondition != nil {
-					framework.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
-					if scheduledCondition.Reason == "Unschedulable" {
-
-						notScheduledPods = append(notScheduledPods, pod)
-					}
+		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
+			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+			framework.ExpectEqual(scheduledCondition != nil, true)
+			if scheduledCondition != nil {
+				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
+				scheduledPods = append(scheduledPods, pod)
+			}
+		} else {
+			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+			framework.ExpectEqual(scheduledCondition != nil, true)
+			if scheduledCondition != nil {
+				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
+				if scheduledCondition.Reason == "Unschedulable" {
+					notScheduledPods = append(notScheduledPods, pod)
 				}
 			}
 		}
