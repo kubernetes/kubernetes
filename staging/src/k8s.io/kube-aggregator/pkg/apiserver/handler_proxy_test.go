@@ -284,7 +284,7 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusInternalServerError,
+			expectedStatusCode: http.StatusServiceUnavailable,
 		},
 	}
 
@@ -609,7 +609,7 @@ func TestProxyRetries(t *testing.T) {
 		"single host: do not retry on unknown error": {
 			apiService:                  defaultAPIService(),
 			backendError:                errors.New("unknown error from the backend"),
-			expectedStatusCode:          http.StatusInternalServerError,
+			expectedStatusCode:          http.StatusServiceUnavailable,
 			expectedServiceResolveCount: 1,
 		},
 		// TODO: "single host: do not retry on connection refused error":
@@ -832,7 +832,7 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusInternalServerError {
+	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Error(err)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
