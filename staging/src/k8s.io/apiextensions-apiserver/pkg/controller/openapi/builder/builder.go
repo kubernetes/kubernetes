@@ -50,6 +50,7 @@ import (
 const (
 	// Reference and Go types for built-in metadata
 	objectMetaSchemaRef = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+	listMetaSchemaRef   = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
 	listMetaType        = "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"
 	typeMetaType        = "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"
 
@@ -57,7 +58,8 @@ const (
 )
 
 var (
-	swaggerPartialObjectMetadataDescriptions = metav1beta1.PartialObjectMetadata{}.SwaggerDoc()
+	swaggerPartialObjectMetadataDescriptions     = metav1beta1.PartialObjectMetadata{}.SwaggerDoc()
+	swaggerPartialObjectMetadataListDescriptions = metav1beta1.PartialObjectMetadataList{}.SwaggerDoc()
 
 	nameToken      = "{name}"
 	namespaceToken = "{namespace}"
@@ -457,7 +459,8 @@ func (b *builder) buildListSchema() *spec.Schema {
 	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
 		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(name)).WithDescription(doc)).
-		SetProperty("metadata", getDefinition(listMetaType))
+		SetProperty("metadata", *spec.RefSchema(listMetaSchemaRef).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
+
 	addTypeMetaProperties(s)
 	s.AddExtension(endpoints.ROUTE_META_GVK, []map[string]string{
 		{
