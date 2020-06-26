@@ -52,8 +52,8 @@ const (
 
 var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
-// variable set in BeforeEach, never modified afterwards
-var workerNodes sets.String
+// variable populated in BeforeEach, never modified afterwards
+var workerNodes = sets.String{}
 
 type pausePodConfig struct {
 	Name                              string
