@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
@@ -31,8 +32,14 @@ import (
 
 func TestReconcileEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	om := func(name string) metav1.ObjectMeta {
-		return metav1.ObjectMeta{Namespace: ns, Name: name}
+	om := func(name string, skipMirrorLabel bool) metav1.ObjectMeta {
+		o := metav1.ObjectMeta{Namespace: ns, Name: name}
+		if skipMirrorLabel {
+			o.Labels = map[string]string{
+				discoveryv1beta1.LabelSkipMirror: "true",
+			}
+		}
+		return o
 	}
 	reconcileTests := []struct {
 		testName          string
@@ -51,7 +58,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints:     nil,
 			expectCreate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -65,7 +72,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -80,7 +87,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -88,7 +95,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -103,7 +110,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
 							{IP: "1.2.3.4"},
@@ -117,7 +124,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
 						{IP: "1.2.3.4"},
@@ -137,7 +144,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
 							{IP: "1.2.3.4"},
@@ -151,7 +158,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
 						{IP: "4.3.2.1"},
@@ -171,7 +178,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
 							{IP: "4.3.2.1"},
@@ -191,7 +198,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
 							{IP: "4.3.2.1"},
@@ -201,7 +208,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
 						{IP: "4.3.2.1"},
@@ -218,7 +225,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("bar"),
+					ObjectMeta: om("bar", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -226,7 +233,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectCreate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -240,7 +247,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -248,7 +255,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -262,7 +269,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}},
@@ -270,7 +277,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -284,7 +291,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}},
@@ -292,7 +299,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -306,7 +313,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -314,7 +321,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
@@ -332,7 +339,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports: []corev1.EndpointPort{
@@ -354,7 +361,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -362,7 +369,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports: []corev1.EndpointPort{
@@ -379,7 +386,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
 			endpoints:     nil,
 			expectCreate: &corev1.Endpoints{
-				ObjectMeta: om("boo"),
+				ObjectMeta: om("boo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
@@ -457,7 +464,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -476,7 +483,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo"),
+					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -484,7 +491,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -498,7 +505,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints:     nil,
 			expectCreate: &corev1.Endpoints{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
