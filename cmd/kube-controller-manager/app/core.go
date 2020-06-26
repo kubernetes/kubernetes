@@ -331,6 +331,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			csiNodeInformer,
 			csiDriverInformer,
+			ctx.InformerFactory.Storage().V1().VolumeAttachments(),
 			ctx.Cloud,
 			plugins,
 			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
