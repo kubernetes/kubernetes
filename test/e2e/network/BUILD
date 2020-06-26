@@ -16,6 +16,7 @@ go_library(
         "doc.go",
         "dual_stack.go",
         "endpointslice.go",
+        "endpointslicemirroring.go",
         "example_cluster_dns.go",
         "firewall.go",
         "fixture.go",
