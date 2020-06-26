@@ -95,9 +95,8 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamily == nil {
-		family := strategy.ipFamilies[0]
-		service.Spec.IPFamily = &family
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamilies == nil {
+		service.Spec.IPFamilies = strategy.ipFamilies[:1]
 	}
 
 	dropServiceDisabledFields(service, nil)
@@ -109,12 +108,11 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && newService.Spec.IPFamily == nil {
-		if oldService.Spec.IPFamily != nil {
-			newService.Spec.IPFamily = oldService.Spec.IPFamily
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && newService.Spec.IPFamilies == nil {
+		if oldService.Spec.IPFamilies != nil {
+			newService.Spec.IPFamilies = oldService.Spec.IPFamilies
 		} else {
-			family := strategy.ipFamilies[0]
-			newService.Spec.IPFamily = &family
+			newService.Spec.IPFamilies = strategy.ipFamilies[:1]
 		}
 	}
 
@@ -175,9 +173,9 @@ func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) e
 //         newSvc.Spec.MyFeature = nil
 //     }
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	// Drop IPFamily if DualStack is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceIPFamilyInUse(oldSvc) {
-		newSvc.Spec.IPFamily = nil
+	// Drop IPFamilies if DualStack is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceIPFamiliesInUse(oldSvc) {
+		newSvc.Spec.IPFamilies = nil
 	}
 
 	// Drop TopologyKeys if ServiceTopology is not enabled
@@ -186,12 +184,12 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	}
 }
 
-// returns true if svc.Spec.ServiceIPFamily field is in use
-func serviceIPFamilyInUse(svc *api.Service) bool {
+// returns true if svc.Spec.ServiceIPFamilies field is in use
+func serviceIPFamiliesInUse(svc *api.Service) bool {
 	if svc == nil {
 		return false
 	}
-	if svc.Spec.IPFamily != nil {
+	if svc.Spec.IPFamilies != nil {
 		return true
 	}
 	return false

@@ -146,7 +146,6 @@ func TestCheckGeneratedNameError(t *testing.T) {
 }
 
 func makeValidService() api.Service {
-	defaultServiceIPFamily := api.IPv4Protocol
 	return api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
@@ -160,22 +159,22 @@ func makeValidService() api.Service {
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
-			IPFamily:        &defaultServiceIPFamily,
+			IPFamilies:      []api.IPFamily{api.IPv4Protocol},
 		},
 	}
 }
 
 // TODO: This should be done on types that are not part of our API
 func TestBeforeCreate(t *testing.T) {
-	withIP := func(family *api.IPFamily, ip string) *api.Service {
+	withIP := func(families []api.IPFamily, ip string) *api.Service {
 		svc := makeValidService()
-		svc.Spec.IPFamily = family
+		svc.Spec.IPFamilies = families
 		svc.Spec.ClusterIP = ip
 		return &svc
 	}
 
-	ipv4 := api.IPv4Protocol
-	ipv6 := api.IPv6Protocol
+	ipv4 := []api.IPFamily{api.IPv4Protocol}
+	ipv6 := []api.IPFamily{api.IPv6Protocol}
 	testCases := []struct {
 		name               string
 		cidr               string
@@ -186,73 +185,73 @@ func TestBeforeCreate(t *testing.T) {
 		expectErr          bool
 	}{
 		{
-			name:   "does not set ipfamily when dual stack gate is disabled",
+			name:   "does not set ipFamilies when dual stack gate is disabled",
 			cidr:   "10.0.0.0/16",
 			in:     withIP(nil, ""),
 			expect: withIP(nil, ""),
 		},
 
 		{
-			name:   "clears ipfamily when dual stack gate is disabled",
+			name:   "clears ipFamilies when dual stack gate is disabled",
 			cidr:   "10.0.0.0/16",
-			in:     withIP(&ipv4, ""),
+			in:     withIP(ipv4, ""),
 			expect: withIP(nil, ""),
 		},
 
 		{
-			name:            "allows ipfamily to configured ipv4 value",
+			name:            "allows ipFamilies to configured ipv4 value",
 			cidr:            "10.0.0.0/16",
 			enableDualStack: true,
 			in:              withIP(nil, ""),
-			expect:          withIP(&ipv4, ""),
+			expect:          withIP(ipv4, ""),
 		},
 		{
-			name:               "allows ipfamily to configured ipv4 value when dual stack is in use",
+			name:               "allows ipFamilies to configured ipv4 value when dual stack is in use",
 			cidr:               "10.0.0.0/16",
 			enableDualStack:    true,
 			configureDualStack: true,
 			in:                 withIP(nil, ""),
-			expect:             withIP(&ipv4, ""),
+			expect:             withIP(ipv4, ""),
 		},
 		{
-			name:            "allows ipfamily to configured ipv6 value",
+			name:            "allows ipFamilies to configured ipv6 value",
 			cidr:            "fd00::/64",
 			enableDualStack: true,
 			in:              withIP(nil, ""),
-			expect:          withIP(&ipv6, ""),
+			expect:          withIP(ipv6, ""),
 		},
 		{
-			name:               "allows ipfamily to configured ipv6 value when dual stack is in use",
+			name:               "allows ipFamilies to configured ipv6 value when dual stack is in use",
 			cidr:               "fd00::/64",
 			enableDualStack:    true,
 			configureDualStack: true,
 			in:                 withIP(nil, ""),
-			expect:             withIP(&ipv6, ""),
+			expect:             withIP(ipv6, ""),
 		},
 
 		{
-			name:            "rejects ipv6 ipfamily when single-stack ipv4",
+			name:            "rejects ipv6 ipFamilies when single-stack ipv4",
 			enableDualStack: true,
 			cidr:            "10.0.0.0/16",
-			in:              withIP(&ipv6, ""),
+			in:              withIP(ipv6, ""),
 			expectErr:       true,
 		},
 		{
-			name:            "rejects ipv4 ipfamily when single-stack ipv6",
+			name:            "rejects ipv4 ipFamilies when single-stack ipv6",
 			enableDualStack: true,
 			cidr:            "fd00::/64",
-			in:              withIP(&ipv4, ""),
+			in:              withIP(ipv4, ""),
 			expectErr:       true,
 		},
 		{
-			name:            "rejects implicit ipv4 ipfamily when single-stack ipv6",
+			name:            "rejects implicit ipv4 ipFamilies when single-stack ipv6",
 			enableDualStack: true,
 			cidr:            "fd00::/64",
 			in:              withIP(nil, "10.0.1.0"),
 			expectErr:       true,
 		},
 		{
-			name:            "rejects implicit ipv6 ipfamily when single-stack ipv4",
+			name:            "rejects implicit ipv6 ipFamilies when single-stack ipv4",
 			enableDualStack: true,
 			cidr:            "10.0.0.0/16",
 			in:              withIP(nil, "fd00::1"),
@@ -332,12 +331,12 @@ func TestBeforeUpdate(t *testing.T) {
 			name:            "clear IP family is allowed (defaulted back by before update)",
 			enableDualStack: true,
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.IPFamily = nil
+				oldSvc.Spec.IPFamilies = nil
 			},
 			expectErr: false,
 			expectObj: func(t *testing.T, svc *api.Service) {
-				if svc.Spec.IPFamily == nil {
-					t.Errorf("ipfamily was not defaulted")
+				if svc.Spec.IPFamilies == nil {
+					t.Errorf("ipFamilies was not defaulted")
 				}
 			},
 		},
@@ -408,16 +407,16 @@ func TestServiceStatusStrategy(t *testing.T) {
 	}
 }
 
-func makeServiceWithIPFamily(ipFamily *api.IPFamily) *api.Service {
+func makeServiceWithIPFamilies(ipFamilies []api.IPFamily) *api.Service {
 	return &api.Service{
 		Spec: api.ServiceSpec{
-			IPFamily: ipFamily,
+			IPFamilies: ipFamilies,
 		},
 	}
 }
 func TestDropDisabledField(t *testing.T) {
-	ipv4Service := api.IPv4Protocol
-	ipv6Service := api.IPv6Protocol
+	ipv4Service := []api.IPFamily{api.IPv4Protocol}
+	ipv6Service := []api.IPFamily{api.IPv6Protocol}
 	testCases := []struct {
 		name            string
 		enableDualStack bool
@@ -428,44 +427,44 @@ func TestDropDisabledField(t *testing.T) {
 		{
 			name:            "not dual stack, field not used",
 			enableDualStack: false,
-			svc:             makeServiceWithIPFamily(nil),
+			svc:             makeServiceWithIPFamilies(nil),
 			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamily(nil),
+			compareSvc:      makeServiceWithIPFamilies(nil),
 		},
 		{
 			name:            "not dual stack, field used in new, not in old",
 			enableDualStack: false,
-			svc:             makeServiceWithIPFamily(&ipv4Service),
+			svc:             makeServiceWithIPFamilies(ipv4Service),
 			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamily(nil),
+			compareSvc:      makeServiceWithIPFamilies(nil),
 		},
 		{
 			name:            "not dual stack, field used in old and new",
 			enableDualStack: false,
-			svc:             makeServiceWithIPFamily(&ipv4Service),
-			oldSvc:          makeServiceWithIPFamily(&ipv4Service),
-			compareSvc:      makeServiceWithIPFamily(&ipv4Service),
+			svc:             makeServiceWithIPFamilies(ipv4Service),
+			oldSvc:          makeServiceWithIPFamilies(ipv4Service),
+			compareSvc:      makeServiceWithIPFamilies(ipv4Service),
 		},
 		{
 			name:            "dualstack, field used",
 			enableDualStack: true,
-			svc:             makeServiceWithIPFamily(&ipv6Service),
+			svc:             makeServiceWithIPFamilies(ipv6Service),
 			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamily(&ipv6Service),
+			compareSvc:      makeServiceWithIPFamilies(ipv6Service),
 		},
 		{
 			name:            "dualstack, field used, changed",
 			enableDualStack: true,
-			svc:             makeServiceWithIPFamily(&ipv6Service),
-			oldSvc:          makeServiceWithIPFamily(&ipv4Service),
-			compareSvc:      makeServiceWithIPFamily(&ipv6Service),
+			svc:             makeServiceWithIPFamilies(ipv6Service),
+			oldSvc:          makeServiceWithIPFamilies(ipv4Service),
+			compareSvc:      makeServiceWithIPFamilies(ipv6Service),
 		},
 		{
 			name:            "dualstack, field used, not changed",
 			enableDualStack: true,
-			svc:             makeServiceWithIPFamily(&ipv6Service),
-			oldSvc:          makeServiceWithIPFamily(&ipv6Service),
-			compareSvc:      makeServiceWithIPFamily(&ipv6Service),
+			svc:             makeServiceWithIPFamilies(ipv6Service),
+			oldSvc:          makeServiceWithIPFamilies(ipv6Service),
+			compareSvc:      makeServiceWithIPFamilies(ipv6Service),
 		},
 
 		/* add more tests for other dropped fields as needed */

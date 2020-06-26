@@ -62,7 +62,7 @@ func (proxier *metaProxier) SyncLoop() {
 
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
+	if service.Spec.IPFamilies[0] == v1.IPv4Protocol {
 		proxier.ipv4Proxier.OnServiceAdd(service)
 		return
 	}
@@ -73,7 +73,7 @@ func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
 // service object is observed.
 func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 	// IPFamily is immutable, hence we only need to check on the new service
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
+	if service.Spec.IPFamilies[0] == v1.IPv4Protocol {
 		proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
 		return
 	}
@@ -84,7 +84,7 @@ func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
 func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
+	if service.Spec.IPFamilies[0] == v1.IPv4Protocol {
 		proxier.ipv4Proxier.OnServiceDelete(service)
 		return
 	}

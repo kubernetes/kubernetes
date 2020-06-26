@@ -134,28 +134,26 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 
 	// if dualstack feature gate is on then we need to default
-	// Spec.IPFamily correctly. This is to cover the case
+	// Spec.IPFamilies correctly. This is to cover the case
 	// when an existing cluster have been converted to dualstack
-	// i.e. it already contain services with Spec.IPFamily==nil
+	// i.e. it already contain services with Spec.IPFamilies==nil
 	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
 		obj.Spec.Type != v1.ServiceTypeExternalName &&
 		obj.Spec.ClusterIP != "" && /*has an ip already set*/
 		obj.Spec.ClusterIP != "None" && /* not converting from ExternalName to other */
-		obj.Spec.IPFamily == nil /* family was not previously set */ {
+		obj.Spec.IPFamilies == nil /* family was not previously set */ {
 
-		// there is a change that the ClusterIP (set by user) is unparsable.
+		// there is a chance that the ClusterIP (set by user) is unparsable.
 		// in this case, the family will be set mistakenly to ipv4 (because
 		// the util function does not parse errors *sigh*). The error
 		// will be caught in validation which asserts the validity of the
 		// IP and the service object will not be persisted with the wrong IP
 		// family
 
-		ipv6 := v1.IPv6Protocol
-		ipv4 := v1.IPv4Protocol
 		if utilnet.IsIPv6String(obj.Spec.ClusterIP) {
-			obj.Spec.IPFamily = &ipv6
+			obj.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol}
 		} else {
-			obj.Spec.IPFamily = &ipv4
+			obj.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
 		}
 	}
 

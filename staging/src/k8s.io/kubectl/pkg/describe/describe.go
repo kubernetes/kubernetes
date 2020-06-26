@@ -2675,8 +2675,8 @@ func describeService(service *corev1.Service, endpoints *corev1.Endpoints, event
 		w.Write(LEVEL_0, "Type:\t%s\n", service.Spec.Type)
 		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
 
-		if service.Spec.IPFamily != nil {
-			w.Write(LEVEL_0, "IPFamily:\t%s\n", *(service.Spec.IPFamily))
+		if len(service.Spec.IPFamilies) > 0 {
+			w.Write(LEVEL_0, "IPFamilies:\t%s\n", service.Spec.IPFamilies[0])
 		}
 
 		if len(service.Spec.ExternalIPs) > 0 {

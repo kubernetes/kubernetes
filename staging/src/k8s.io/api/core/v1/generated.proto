@@ -4808,15 +4808,17 @@ message ServiceSpec {
   // +optional
   optional SessionAffinityConfig sessionAffinityConfig = 14;
 
-  // ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+  // ipFamilies specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
   // IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
   // available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
   // Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
   // allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
-  // this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+  // this family.  This field is immutable after creation. Assigning an IPFamily not available in the
   // cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+  // In Kubernetes 1.19 this field can only contain a single value. It is expected that dual-stack Services
+  // will be allowed in Kubernetes 1.20.
   // +optional
-  optional string ipFamily = 15;
+  repeated string ipFamilies = 15;
 
   // topologyKeys is a preference-order list of topology keys which
   // implementations of services should use to preferentially sort endpoints

@@ -9235,7 +9235,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 }
 
 func makeValidService() core.Service {
-	serviceIPFamily := core.IPv4Protocol
 	return core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
@@ -9249,7 +9248,7 @@ func makeValidService() core.Service {
 			SessionAffinity: "None",
 			Type:            core.ServiceTypeClusterIP,
 			Ports:           []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
-			IPFamily:        &serviceIPFamily,
+			IPFamilies:      []core.IPFamily{core.IPv4Protocol},
 		},
 	}
 }
@@ -10178,25 +10177,23 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "valid, nil service IPFamily",
+			name: "valid, nil service IPFamilies",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.IPFamily = nil
+				s.Spec.IPFamilies = nil
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid, service with valid IPFamily",
+			name: "valid, service with valid IPFamilies",
 			tweakSvc: func(s *core.Service) {
-				ipv4Service := core.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "allowed valid, service with invalid IPFamily is ignored (tested in conditional validation)",
+			name: "allowed valid, service with invalid IPFamilies is ignored (tested in conditional validation)",
 			tweakSvc: func(s *core.Service) {
-				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
-				s.Spec.IPFamily = &invalidServiceIPFamily
+				s.Spec.IPFamilies = []core.IPFamily{core.IPFamily("not-a-valid-ip-family")}
 			},
 			numErrs: 0,
 		},
@@ -12155,75 +12152,67 @@ func TestValidateServiceUpdate(t *testing.T) {
 		},
 		/* Service IP Family */
 		{
-			name: "same ServiceIPFamily",
+			name: "same ipFamilies",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv4Service := core.IPv4Protocol
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamily = &ipv4Service
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamily = &ipv4Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "ExternalName while changing Service IPFamily",
+			name: "ExternalName while changing Service ipFamilies",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv4Service := core.IPv4Protocol
 				oldSvc.Spec.ExternalName = "somename"
 				oldSvc.Spec.Type = core.ServiceTypeExternalName
-				oldSvc.Spec.IPFamily = &ipv4Service
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 
-				ipv6Service := core.IPv6Protocol
 				newSvc.Spec.ExternalName = "somename"
 				newSvc.Spec.Type = core.ServiceTypeExternalName
-				newSvc.Spec.IPFamily = &ipv6Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "setting ipfamily from nil to v4",
+			name: "setting ipFamilies from nil to v4",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.IPFamily = nil
+				oldSvc.Spec.IPFamilies = nil
 
-				ipv4Service := core.IPv4Protocol
 				newSvc.Spec.ExternalName = "somename"
-				newSvc.Spec.IPFamily = &ipv4Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "setting ipfamily from nil to v6",
+			name: "setting ipFamilies from nil to v6",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.IPFamily = nil
+				oldSvc.Spec.IPFamilies = nil
 
-				ipv6Service := core.IPv6Protocol
 				newSvc.Spec.ExternalName = "somename"
-				newSvc.Spec.IPFamily = &ipv6Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "remove ipfamily (covered by conditional validation)",
+			name: "remove ipFamilies (covered by conditional validation)",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv6Service := core.IPv6Protocol
-				oldSvc.Spec.IPFamily = &ipv6Service
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
 
-				newSvc.Spec.IPFamily = nil
+				newSvc.Spec.IPFamilies = nil
 			},
 			numErrs: 0,
 		},
 
 		{
-			name: "change ServiceIPFamily (covered by conditional validation)",
+			name: "change ipFamilies (covered by conditional validation)",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv4Service := core.IPv4Protocol
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamily = &ipv4Service
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 
-				ipv6Service := core.IPv6Protocol
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamily = &ipv6Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
 			},
 			numErrs: 0,
 		},

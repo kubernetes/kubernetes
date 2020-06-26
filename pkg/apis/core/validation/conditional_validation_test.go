@@ -253,10 +253,7 @@ func TestValidateEndpointsSCTP(t *testing.T) {
 	}
 }
 
-func TestValidateServiceIPFamily(t *testing.T) {
-	ipv4 := api.IPv4Protocol
-	ipv6 := api.IPv6Protocol
-	var unknown api.IPFamily = "Unknown"
+func TestValidateServiceIPFamilies(t *testing.T) {
 	testCases := []struct {
 		name             string
 		dualStackEnabled bool
@@ -271,7 +268,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv4,
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
 				},
 			},
 		},
@@ -281,7 +278,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv6Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv6,
+					IPFamilies: []api.IPFamily{api.IPv6Protocol},
 				},
 			},
 		},
@@ -291,7 +288,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv4,
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
 				},
 			},
 		},
@@ -301,7 +298,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv4,
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
 				},
 			},
 		},
@@ -311,7 +308,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv6,
+					IPFamilies: []api.IPFamily{api.IPv6Protocol},
 				},
 			},
 		},
@@ -321,7 +318,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv6,
+					IPFamilies: []api.IPFamily{api.IPv6Protocol},
 				},
 			},
 		},
@@ -331,12 +328,12 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &unknown,
+					IPFamilies: []api.IPFamily{api.IPFamily("Unknown")},
 				},
 			},
 			oldSvc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &unknown,
+					IPFamilies: []api.IPFamily{api.IPFamily("Unknown")},
 				},
 			},
 		},
@@ -346,11 +343,11 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily:  &ipv4,
-					ClusterIP: "ffd0::1",
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
+					ClusterIP:  "ffd0::1",
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Invalid value: \"IPv4\": does not match IPv6 cluster IP"},
+			expectErr: []string{"spec.ipFamilies[0]: Invalid value: \"IPv4\": does not match IPv6 cluster IP"},
 		},
 		{
 			name:             "not allowed unknown family",
@@ -358,10 +355,10 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &unknown,
+					IPFamilies: []api.IPFamily{api.IPFamily("Unknown")},
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Invalid value: \"Unknown\": only the following families are allowed: IPv4"},
+			expectErr: []string{"spec.ipFamilies[0]: Invalid value: \"Unknown\": only the following families are allowed: IPv4"},
 		},
 		{
 			name:             "not allowed ipv4 cluster ip without family",
@@ -372,7 +369,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 					ClusterIP: "127.0.0.1",
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Required value: programmer error, must be set or defaulted by other fields"},
+			expectErr: []string{"spec.ipFamilies: Required value: programmer error, must be set or defaulted by other fields"},
 		},
 		{
 			name:             "not allowed ipv6 cluster ip without family",
@@ -383,7 +380,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 					ClusterIP: "ffd0::1",
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Required value: programmer error, must be set or defaulted by other fields"},
+			expectErr: []string{"spec.ipFamilies: Required value: programmer error, must be set or defaulted by other fields"},
 		},
 
 		{
@@ -392,15 +389,15 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv4,
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
 				},
 			},
 			oldSvc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily: &ipv6,
+					IPFamilies: []api.IPFamily{api.IPv6Protocol},
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Invalid value: \"IPv4\": field is immutable"},
+			expectErr: []string{"spec.ipFamilies: Invalid value: []core.IPFamily{\"IPv4\"}: field is immutable"},
 		},
 		{
 			name:             "allowed to change ipfamily for external name",
@@ -408,14 +405,14 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					Type:     api.ServiceTypeExternalName,
-					IPFamily: &ipv4,
+					Type:       api.ServiceTypeExternalName,
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
 				},
 			},
 			oldSvc: &api.Service{
 				Spec: api.ServiceSpec{
-					Type:     api.ServiceTypeExternalName,
-					IPFamily: &ipv6,
+					Type:       api.ServiceTypeExternalName,
+					IPFamilies: []api.IPFamily{api.IPv6Protocol},
 				},
 			},
 		},
@@ -436,11 +433,11 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
 			svc: &api.Service{
 				Spec: api.ServiceSpec{
-					IPFamily:  &ipv4,
-					ClusterIP: "127.0.0.1",
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
+					ClusterIP:  "127.0.0.1",
 				},
 			},
-			expectErr: []string{"spec.ipFamily: Forbidden: programmer error, must be cleared when the dual-stack feature gate is off"},
+			expectErr: []string{"spec.ipFamilies: Forbidden: programmer error, must be cleared when the dual-stack feature gate is off"},
 		},
 		{
 			name:             "ipfamily allowed to be cleared when dual stack is off",
@@ -454,12 +451,24 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			},
 			oldSvc: &api.Service{
 				Spec: api.ServiceSpec{
-					Type:      api.ServiceTypeClusterIP,
-					ClusterIP: "127.0.0.1",
-					IPFamily:  &ipv4,
+					Type:       api.ServiceTypeClusterIP,
+					ClusterIP:  "127.0.0.1",
+					IPFamilies: []api.IPFamily{api.IPv4Protocol},
 				},
 			},
 			expectErr: nil,
+		},
+
+		{
+			name:             "not allowed dual-stack",
+			dualStackEnabled: true,
+			ipFamilies:       []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					IPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				},
+			},
+			expectErr: []string{"spec.ipFamilies: Invalid value: []core.IPFamily{\"IPv4\", \"IPv6\"}: must contain only a single value"},
 		},
 	}
 

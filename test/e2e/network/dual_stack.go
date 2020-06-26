@@ -230,7 +230,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			}
 		}()
 
-		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamily not set")
+		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamilies not set")
 		service := createService(t.ServiceName, t.Namespace, t.Labels, nil)
 
 		jig.Labels = t.Labels
@@ -272,8 +272,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			}
 		}()
 
-		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamily IPv4" + ns)
-		service := createService(t.ServiceName, t.Namespace, t.Labels, &ipv4)
+		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamilies IPv4" + ns)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, []v1.IPFamily{ipv4})
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
@@ -314,8 +314,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			}
 		}()
 
-		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamily IPv6" + ns)
-		service := createService(t.ServiceName, t.Namespace, t.Labels, &ipv6)
+		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamilies IPv6" + ns)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, []v1.IPFamily{ipv6})
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
@@ -349,11 +349,11 @@ func validateNumOfServicePorts(svc *v1.Service, expectedNumOfPorts int) {
 }
 
 func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamily v1.IPFamily) {
-	if svc.Spec.IPFamily == nil {
-		framework.Failf("service ip family nil for service %s/%s", svc.Namespace, svc.Name)
+	if svc.Spec.IPFamilies == nil {
+		framework.Failf("service ipFamilies nil for service %s/%s", svc.Namespace, svc.Name)
 	}
-	if *svc.Spec.IPFamily != expectedIPFamily {
-		framework.Failf("ip family mismatch for service: %s/%s, expected: %s, actual: %s", svc.Namespace, svc.Name, expectedIPFamily, *svc.Spec.IPFamily)
+	if svc.Spec.IPFamilies[0] != expectedIPFamily {
+		framework.Failf("IP family mismatch for service: %s/%s, expected: %s, actual: %s", svc.Namespace, svc.Name, expectedIPFamily, svc.Spec.IPFamilies[0])
 	}
 
 	isIPv6ClusterIP := netutils.IsIPv6String(svc.Spec.ClusterIP)
@@ -427,16 +427,16 @@ func isIPv4CIDR(cidr string) bool {
 }
 
 // createService returns a service spec with defined arguments
-func createService(name, ns string, labels map[string]string, ipFamily *v1.IPFamily) *v1.Service {
+func createService(name, ns string, labels map[string]string, ipFamilies []v1.IPFamily) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: labels,
-			Type:     v1.ServiceTypeNodePort,
-			IPFamily: ipFamily,
+			Selector:   labels,
+			Type:       v1.ServiceTypeNodePort,
+			IPFamilies: ipFamilies,
 			Ports: []v1.ServicePort{
 				{
 					Name:     "tcp-port",

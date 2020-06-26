@@ -406,7 +406,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	if !dryrun.IsDryRun(options.DryRun) {
 		// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
 		// Since we don't support changing the ip family of a service we don't need to handle
-		// oldService.Spec.ServiceIPFamily != service.Spec.ServiceIPFamily
+		// oldService.Spec.ServiceIPFamilies != service.Spec.ServiceIPFamilies
 		if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
 			allocator := rs.getAllocatorBySpec(service)
 			if releaseServiceIP, err = initClusterIP(service, allocator); err != nil {
@@ -557,13 +557,13 @@ func (r *REST) getAllocatorByClusterIP(service *api.Service) ipallocator.Interfa
 
 func (r *REST) getAllocatorBySpec(service *api.Service) ipallocator.Interface {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) ||
-		service.Spec.IPFamily == nil ||
+		service.Spec.IPFamilies == nil ||
 		r.secondaryServiceIPs == nil {
 		return r.serviceIPs
 	}
 
 	secondaryAllocatorCIDR := r.secondaryServiceIPs.CIDR()
-	if (*(service.Spec.IPFamily) == api.IPv6Protocol) == netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
+	if (service.Spec.IPFamilies[0] == api.IPv6Protocol) == netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
 		return r.secondaryServiceIPs
 	}
 
@@ -680,7 +680,7 @@ func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool,
 		allocatedIP = ip
 	}
 
-	// assuming the object was valid prior to setting, always force the IPFamily
+	// assuming the object was valid prior to setting, always force the IPFamilies
 	// to match the allocated IP at this point
 	if allocatedIP != nil {
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
@@ -688,7 +688,7 @@ func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool,
 			if netutil.IsIPv6(allocatedIP) {
 				ipFamily = api.IPv6Protocol
 			}
-			service.Spec.IPFamily = &ipFamily
+			service.Spec.IPFamilies = []api.IPFamily{ipFamily}
 		}
 	}
 

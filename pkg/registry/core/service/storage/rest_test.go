@@ -303,9 +303,6 @@ func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, 
 }
 
 func TestServiceRegistryCreate(t *testing.T) {
-	ipv4Service := api.IPv4Protocol
-	ipv6Service := api.IPv6Protocol
-
 	testCases := []struct {
 		svc             *api.Service
 		name            string
@@ -314,7 +311,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 		expectErr       string
 	}{
 		{
-			name:            "Service IPFamily default cluster dualstack:off",
+			name:            "Service IPFamilies default cluster dualstack:off",
 			enableDualStack: false,
 			families:        singleStackIPv4,
 			svc: &api.Service{
@@ -332,7 +329,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 			},
 		},
 		{
-			name:     "Service IPFamily:v4 dualstack off",
+			name:     "Service IPFamilies:v4 dualstack off",
 			families: singleStackIPv4,
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -340,7 +337,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv4Service,
+					IPFamilies:      singleStackIPv4,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -350,7 +347,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 			},
 		},
 		{
-			name:            "Service IPFamily:v4 dualstack on",
+			name:            "Service IPFamilies:v4 dualstack on",
 			enableDualStack: true,
 			families:        singleStackIPv4,
 			svc: &api.Service{
@@ -359,7 +356,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv4Service,
+					IPFamilies:      singleStackIPv4,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -369,7 +366,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 			},
 		},
 		{
-			name:            "Service IPFamily:v6 dualstack on",
+			name:            "Service IPFamilies:v6 dualstack on",
 			enableDualStack: true,
 			families:        singleStackIPv6,
 			svc: &api.Service{
@@ -378,7 +375,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -388,7 +385,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 			},
 		},
 		{
-			name:            "Service IPFamily:4 dualstack on, single stack ipv6, service CIDR IPv6",
+			name:            "Service IPFamilies:4 dualstack on, single stack ipv6, service CIDR IPv6",
 			enableDualStack: true,
 			families:        singleStackIPv6,
 			svc: &api.Service{
@@ -397,7 +394,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv4Service,
+					IPFamilies:      singleStackIPv4,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -405,7 +402,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					}},
 				},
 			},
-			expectErr: "Service \"foo\" is invalid: spec.ipFamily: Invalid value: \"IPv4\": only the following families are allowed: IPv6",
+			expectErr: "Service \"foo\" is invalid: spec.ipFamilies[0]: Invalid value: \"IPv4\": only the following families are allowed: IPv6",
 		},
 		{
 			name:            "Service IP:4 dualstack on, single stack ipv6, service CIDR IPv6",
@@ -425,7 +422,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 					}},
 				},
 			},
-			expectErr: "Service \"foo\" is invalid: spec.ipFamily: Invalid value: \"IPv6\": does not match IPv4 cluster IP",
+			expectErr: "Service \"foo\" is invalid: spec.ipFamilies[0]: Invalid value: \"IPv6\": does not match IPv4 cluster IP",
 		},
 	}
 	for _, tc := range testCases {
@@ -477,7 +474,6 @@ func TestServiceRegistryCreate(t *testing.T) {
 }
 
 func TestServiceRegistryCreateDryRun(t *testing.T) {
-	ipv6Service := api.IPv6Protocol
 	testCases := []struct {
 		name            string
 		svc             *api.Service
@@ -532,7 +528,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					ClusterIP:       "2000:0:0:0:0:0:0:1",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -552,7 +548,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					ClusterIP:       "2000:0:0:0:0:0:0:1",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -593,7 +589,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &singleStackIPv4[0],
+					IPFamilies:      singleStackIPv4,
 					ClusterIP:       "1.2.3.4",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -614,7 +610,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					ClusterIP:       "2000:0:0:0:0:0:0:1",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -634,7 +630,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					ClusterIP:       "2000:0:0:0:0:0:0:1",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -1021,7 +1017,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:            "ipv4: update to service that drops IPFamily succeeds",
+			name:            "ipv4: update to service that drops IPFamilies succeeds",
 			enableDualStack: true,
 			families:        singleStackIPv4,
 			in: &api.Service{
@@ -1037,14 +1033,14 @@ func TestServiceRegistryUpdate(t *testing.T) {
 				},
 			},
 			update: func(svc *api.Service) {
-				svc.Spec.IPFamily = nil
+				svc.Spec.IPFamilies = nil
 			},
 			out: &api.Service{
 				Spec: api.ServiceSpec{
 					Selector:        map[string]string{"bar": "baz1"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &singleStackIPv4[0],
+					IPFamilies:      singleStackIPv4,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -1054,14 +1050,14 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:            "ipv6: update to service that drops IPFamily succeeds",
+			name:            "ipv6: update to service that drops IPFamilies succeeds",
 			enableDualStack: true,
 			families:        singleStackIPv6,
 			in: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &singleStackIPv6[0],
+					IPFamilies:      singleStackIPv6,
 					Selector:        map[string]string{"bar": "baz1"},
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -1071,13 +1067,13 @@ func TestServiceRegistryUpdate(t *testing.T) {
 				},
 			},
 			update: func(svc *api.Service) {
-				svc.Spec.IPFamily = nil
+				svc.Spec.IPFamilies = nil
 			},
 			out: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &singleStackIPv6[0],
+					IPFamilies:      singleStackIPv6,
 					Selector:        map[string]string{"bar": "baz1"},
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -1088,14 +1084,14 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:            "ipv6: changing IPFamily fails",
+			name:            "ipv6: changing IPFamilies fails",
 			enableDualStack: true,
 			families:        singleStackIPv6,
 			in: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &singleStackIPv6[0],
+					IPFamilies:      singleStackIPv6,
 					Selector:        map[string]string{"bar": "baz1"},
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -1105,9 +1101,9 @@ func TestServiceRegistryUpdate(t *testing.T) {
 				},
 			},
 			update: func(svc *api.Service) {
-				svc.Spec.IPFamily = &singleStackIPv4[0]
+				svc.Spec.IPFamilies = singleStackIPv4
 			},
-			expectErr: "spec.ipFamily: Invalid value: \"IPv4\": field is immutable, spec.ipFamily: Invalid value: \"IPv4\": only the following families are allowed: IPv6",
+			expectErr: "spec.ipFamilies: Invalid value: []core.IPFamily{\"IPv4\"}: field is immutable, spec.ipFamilies[0]: Invalid value: \"IPv4\": only the following families are allowed: IPv6",
 		},
 	}
 	for _, tc := range testCases {
@@ -2298,8 +2294,6 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 }
 
 func TestInitClusterIP(t *testing.T) {
-	ipv4Service := api.IPv4Protocol
-	ipv6Service := api.IPv6Protocol
 	testCases := []struct {
 		name string
 		svc  *api.Service
@@ -2340,7 +2334,7 @@ func TestInitClusterIP(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -2361,7 +2355,7 @@ func TestInitClusterIP(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -2380,7 +2374,7 @@ func TestInitClusterIP(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					Ports: []api.ServicePort{{
 						Port:       6502,
 						Protocol:   api.ProtocolTCP,
@@ -2401,7 +2395,7 @@ func TestInitClusterIP(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv4Service,
+					IPFamilies:      singleStackIPv4,
 					ClusterIP:       "1.2.3.4",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -2423,7 +2417,7 @@ func TestInitClusterIP(t *testing.T) {
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
 					Type:            api.ServiceTypeClusterIP,
-					IPFamily:        &ipv6Service,
+					IPFamilies:      singleStackIPv6,
 					ClusterIP:       "2000:0:0:0:0:0:0:1",
 					Ports: []api.ServicePort{{
 						Port:       6502,
@@ -2944,9 +2938,6 @@ func TestUpdateNodePorts(t *testing.T) {
 }
 
 func TestAllocGetters(t *testing.T) {
-	ipv4Service := api.IPv4Protocol
-	ipv6Service := api.IPv6Protocol
-
 	testCases := []struct {
 		name string
 
@@ -2970,10 +2961,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv4Service,
-					ClusterIP: "10.0.0.1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv4,
+					ClusterIP:  "10.0.0.1",
 				},
 			},
 		},
@@ -2989,10 +2980,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv4Service,
-					ClusterIP: "10.0.0.1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv4,
+					ClusterIP:  "10.0.0.1",
 				},
 			},
 		},
@@ -3009,10 +3000,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv4Service,
-					ClusterIP: "2000::1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv4,
+					ClusterIP:  "2000::1",
 				},
 			},
 		},
@@ -3029,10 +3020,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv6Service,
-					ClusterIP: "2000::1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv6,
+					ClusterIP:  "2000::1",
 				},
 			},
 		},
@@ -3049,10 +3040,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv6Service,
-					ClusterIP: "10.0.0.10",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv6,
+					ClusterIP:  "10.0.0.10",
 				},
 			},
 		},
@@ -3069,10 +3060,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv6Service,
-					ClusterIP: "2000::1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv6,
+					ClusterIP:  "2000::1",
 				},
 			},
 		},
@@ -3089,10 +3080,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv6Service,
-					ClusterIP: "2000::1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv6,
+					ClusterIP:  "2000::1",
 				},
 			},
 		},
@@ -3109,10 +3100,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv6Service,
-					ClusterIP: "10.0.0.1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv6,
+					ClusterIP:  "10.0.0.1",
 				},
 			},
 		},
@@ -3129,10 +3120,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv4Service,
-					ClusterIP: "10.0.0.1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv4,
+					ClusterIP:  "10.0.0.1",
 				},
 			},
 		},
@@ -3149,10 +3140,10 @@ func TestAllocGetters(t *testing.T) {
 			svc: &api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					Type:      api.ServiceTypeClusterIP,
-					IPFamily:  &ipv4Service,
-					ClusterIP: "2000::1",
+					Selector:   map[string]string{"bar": "baz"},
+					Type:       api.ServiceTypeClusterIP,
+					IPFamilies: singleStackIPv4,
+					ClusterIP:  "2000::1",
 				},
 			},
 		},

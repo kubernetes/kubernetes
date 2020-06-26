@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -40,57 +41,62 @@ func ValidateConditionalService(service, oldService *api.Service, allowedIPFamil
 		}
 	}
 
-	errs = append(errs, validateIPFamily(service, oldService, allowedIPFamilies)...)
+	errs = append(errs, validateIPFamilies(service, oldService, allowedIPFamilies)...)
 
 	return errs
 }
 
-// validateIPFamily checks the IPFamily field.
-func validateIPFamily(service, oldService *api.Service, allowedIPFamilies []api.IPFamily) field.ErrorList {
+// validateIPFamilies checks the IPFamilies field.
+func validateIPFamilies(service, oldService *api.Service, allowedIPFamilies []api.IPFamily) field.ErrorList {
 	var errs field.ErrorList
 
 	// specifically allow an invalid value to remain in storage as long as the user isn't changing it, regardless of gate
-	if oldService != nil && oldService.Spec.IPFamily != nil && service.Spec.IPFamily != nil && *oldService.Spec.IPFamily == *service.Spec.IPFamily {
+	if oldService != nil && oldService.Spec.IPFamilies != nil && service.Spec.IPFamilies != nil && reflect.DeepEqual(oldService.Spec.IPFamilies, service.Spec.IPFamilies) {
 		return errs
 	}
 
-	// If the gate is off, setting or changing IPFamily is not allowed, but clearing it is
+	// If the gate is off, setting or changing IPFamilies is not allowed, but clearing it is
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		if service.Spec.IPFamily != nil {
+		if service.Spec.IPFamilies != nil {
 			if oldService != nil {
-				errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
+				errs = append(errs, ValidateImmutableField(service.Spec.IPFamilies, oldService.Spec.IPFamilies, field.NewPath("spec", "ipFamilies"))...)
 			} else {
-				errs = append(errs, field.Forbidden(field.NewPath("spec", "ipFamily"), "programmer error, must be cleared when the dual-stack feature gate is off"))
+				errs = append(errs, field.Forbidden(field.NewPath("spec", "ipFamilies"), "programmer error, must be cleared when the dual-stack feature gate is off"))
 			}
 		}
 		return errs
 	}
 
-	// PrepareCreate, PrepareUpdate, and test cases must all set IPFamily when the gate is on
-	if service.Spec.IPFamily == nil {
-		errs = append(errs, field.Required(field.NewPath("spec", "ipFamily"), "programmer error, must be set or defaulted by other fields"))
+	// PrepareCreate, PrepareUpdate, and test cases must all set IPFamilies when the gate is on
+	if service.Spec.IPFamilies == nil {
+		errs = append(errs, field.Required(field.NewPath("spec", "ipFamilies"), "programmer error, must be set or defaulted by other fields"))
 		return errs
 	}
 
-	// A user is not allowed to change the IPFamily field, except for ExternalName services
-	if oldService != nil && oldService.Spec.IPFamily != nil && service.Spec.Type != api.ServiceTypeExternalName {
-		errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
+	// A user is not allowed to change the IPFamilies field, except for ExternalName services
+	if oldService != nil && oldService.Spec.IPFamilies != nil && service.Spec.Type != api.ServiceTypeExternalName {
+		errs = append(errs, ValidateImmutableField(service.Spec.IPFamilies, oldService.Spec.IPFamilies, field.NewPath("spec", "ipFamilies"))...)
 	}
 
-	// Verify the IPFamily is one of the allowed families
-	desiredFamily := *service.Spec.IPFamily
+	// In Kubernetes 1.19, Services must be single-stack
+	if len(service.Spec.IPFamilies) > 1 {
+		errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamilies"), service.Spec.IPFamilies, "must contain only a single value"))
+	}
+
+	// Verify IPFamilies[0] is one of the allowed families
+	desiredFamily := service.Spec.IPFamilies[0]
 	if hasIPFamily(allowedIPFamilies, desiredFamily) {
 		// the IP family is one of the allowed families, verify that it matches cluster IP
 		switch ip := net.ParseIP(service.Spec.ClusterIP); {
 		case ip == nil:
 			// do not need to check anything
 		case netutils.IsIPv6(ip) && desiredFamily != api.IPv6Protocol:
-			errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamily"), *service.Spec.IPFamily, "does not match IPv6 cluster IP"))
+			errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), desiredFamily, "does not match IPv6 cluster IP"))
 		case !netutils.IsIPv6(ip) && desiredFamily != api.IPv4Protocol:
-			errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamily"), *service.Spec.IPFamily, "does not match IPv4 cluster IP"))
+			errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), desiredFamily, "does not match IPv4 cluster IP"))
 		}
 	} else {
-		errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamily"), desiredFamily, fmt.Sprintf("only the following families are allowed: %s", joinIPFamilies(allowedIPFamilies, ", "))))
+		errs = append(errs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), desiredFamily, fmt.Sprintf("only the following families are allowed: %s", joinIPFamilies(allowedIPFamilies, ", "))))
 	}
 	return errs
 }

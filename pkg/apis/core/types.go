@@ -3409,7 +3409,7 @@ type LoadBalancerIngress struct {
 }
 
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
-// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+// to express the family of an IP expressed by a type (e.g. service.Spec.IPFamilies)
 type IPFamily string
 
 const (
@@ -3417,9 +3417,10 @@ const (
 	IPv4Protocol IPFamily = "IPv4"
 	// IPv6Protocol indicates that this IP is IPv6 protocol
 	IPv6Protocol IPFamily = "IPv6"
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
 )
+
+// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
+const MaxServiceTopologyKeys = 16
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
@@ -3524,15 +3525,17 @@ type ServiceSpec struct {
 	// +optional
 	PublishNotReadyAddresses bool
 
-	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+	// ipFamilies specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
 	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
 	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
 	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
 	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
-	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+	// this family.  This field is immutable after creation. Assigning an IPFamily not available in the
 	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+	// In Kubernetes 1.19 this field can only contain a single value. It is expected that dual-stack Services
+	// will be allowed in Kubernetes 1.20.
 	// +optional
-	IPFamily *IPFamily
+	IPFamilies []IPFamily
 
 	// topologyKeys is a preference-order list of topology keys which
 	// implementations of services should use to preferentially sort endpoints
