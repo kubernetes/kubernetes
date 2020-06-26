@@ -625,7 +625,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}
 
-	if !metricsGrabber.HasRegisteredMaster() {
+	if !metricsGrabber.HasControlPlanePods() {
 		framework.Logf("Warning: Environment does not support getting controller-manager metrics")
 		return opCounts{}
 	}
