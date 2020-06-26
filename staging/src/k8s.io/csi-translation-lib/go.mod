@@ -9,7 +9,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cloud-provider v0.0.0
-	k8s.io/klog/v2 v2.1.0
+	k8s.io/klog/v2 v2.2.0
 )
 
 replace (
