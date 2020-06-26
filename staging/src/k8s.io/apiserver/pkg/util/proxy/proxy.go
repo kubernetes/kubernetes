@@ -40,7 +40,23 @@ func findServicePort(svc *v1.Service, port int32) (*v1.ServicePort, error) {
 }
 
 // ResolveEndpoint returns a URL to which one can send traffic for the specified service.
-func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port int32, seenEndpoints ...*url.URL) (*url.URL, error) {
+// This method accepts an optional parameter (excludedEndpoints) for specifying a list of endpoints that must be excluded.
+func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port int32, excludedEndpoints ...*url.URL) (*url.URL, error) {
+	allEndpoints, err := ResolveEndpoints(services, endpoints, namespace, id, port, excludedEndpoints...)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(allEndpoints) == 0 {
+		return nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
+	}
+
+	return allEndpoints[rand.Intn(len(allEndpoints))], nil
+}
+
+// ResolveEndpoint returns all URLs to which one can send traffic for the specified service.
+// This method accepts an optional parameter (excludedEndpoints) for specifying a list of endpoints that must be excluded.
+func ResolveEndpoints(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port int32, excludedEndpoints ...*url.URL) ([]*url.URL, error) {
 	svc, err := services.Services(namespace).Get(id)
 	if err != nil {
 		return nil, err
@@ -66,13 +82,9 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 		return nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svc.Name))
 	}
 
-	// Pick a random Subset to start searching from.
-	ssSeed := rand.Intn(len(eps.Subsets))
-
-
-	seenEndpointsToAddressesFn := func(scheme, port string) (sets.String, error) {
+	seenEndpointsToAddresses := func(scheme, port string) (sets.String, error) {
 		ret := sets.String{}
-		for _, ep := range seenEndpoints {
+		for _, ep := range excludedEndpoints {
 			if ep.Scheme == scheme && ep.Port() == port {
 				ip, _, err := net.SplitHostPort(ep.Host)
 				if err != nil {
@@ -84,39 +96,38 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 		return ret, nil
 	}
 
-	// Find a Subset that has the port.
+	allEndpoints := []*url.URL{}
 	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
-		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		ss := &eps.Subsets[ssi]
 		if len(ss.Addresses) == 0 {
 			continue
 		}
 		for i := range ss.Ports {
 			if ss.Ports[i].Name == svcPort.Name {
-				// Pick a random address.
 				port := int(ss.Ports[i].Port)
-				seenAddresses, err := seenEndpointsToAddressesFn("https", strconv.Itoa(port))
+
+				seenAddresses, err := seenEndpointsToAddresses("https", strconv.Itoa(port))
 				if err != nil {
 					return nil, err
 				}
-				availablePoolOfAddresses := []string{}
+
 				for _, ep := range ss.Addresses {
 					if seenAddresses.Has(ep.IP) {
 						continue
 					}
-					availablePoolOfAddresses = append(availablePoolOfAddresses, ep.IP)
+					allEndpoints = append(allEndpoints, &url.URL{
+						Scheme: "https",
+						Host:   net.JoinHostPort(ep.IP, strconv.Itoa(port)),
+					})
 				}
-				if len(availablePoolOfAddresses) == 0 {
-					continue
-				}
-				ip := availablePoolOfAddresses[rand.Intn(len(availablePoolOfAddresses))]
-				return &url.URL{
-					Scheme: "https",
-					Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
-				}, nil
 			}
 		}
 	}
-	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
+
+	if len(allEndpoints) == 0 {
+		return nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
+	}
+	return allEndpoints, nil
 }
 
 func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port int32) (*url.URL, error) {

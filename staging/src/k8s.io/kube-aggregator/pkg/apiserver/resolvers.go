@@ -31,8 +31,8 @@ type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
-// ServiceResolverExtended extends ServiceResolver interface by providing a few additional methods for supporting requests retries
-type ServiceResolverExtended interface {
+// RetryServiceResolver extends ServiceResolver interface by providing a few additional methods for supporting requests retries
+type RetryServiceResolver interface {
 	ServiceResolver
 
 	// ResolveEndpointWithVisited resolves an endpoint excluding already visited ones. Facilitates supporting retry mechanisms.
@@ -150,14 +150,9 @@ func (r *serviceResolver) EndpointCount(namespace, name string, port int32) (int
 		return 1, nil
 	}
 
-	allEndpoints := []*url.URL{}
-
-	for {
-		newEndpoint, err := proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name, port, allEndpoints...)
-		if err != nil {
-			break
-		}
-		allEndpoints = append(allEndpoints, newEndpoint)
+	allEndpoints, err := proxy.ResolveEndpoints(r.services, r.endpoints, namespace, name, port)
+	if err != nil {
+		return 0, err
 	}
 
 	if len(allEndpoints) == 0 {

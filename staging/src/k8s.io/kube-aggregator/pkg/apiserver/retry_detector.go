@@ -70,13 +70,13 @@ func newExtendedResponseWriterInterceptor(rw *responseWriter) *responseWriterExt
 type responseWriter struct {
 	http.ResponseWriter
 
-	statusCode int
+	statusCode  int
 	wasHijacked bool
 }
 
 // newSimpleResponseWriterInterceptor wraps the given ResponseWrite and intercept WriteHeader() and Hijack() methods
 func newSimpleResponseWriterInterceptor(w http.ResponseWriter) *responseWriter {
-	return &responseWriter{w,  0, false}
+	return &responseWriter{w, 0, false}
 }
 
 func (w *responseWriter) WriteHeader(code int) {
@@ -109,7 +109,7 @@ type retriable interface {
 
 type retryDecorator struct {
 	delegate retriable
-	rw responseWriterInterceptor
+	rw       responseWriterInterceptor
 }
 
 // newRetryDecorator wraps delegate for detecting Hijacked connections
@@ -142,13 +142,13 @@ func (p *retryDecorator) RetryIfNeeded() bool {
 type maxRetries struct {
 	retriable
 	counter int
-	max int
+	max     int
 }
 
 var _ retriable = &maxRetries{}
 
 func withMaxRetries(delegate retriable, max int) retriable {
-	return &maxRetries{retriable:delegate, max:max}
+	return &maxRetries{retriable: delegate, max: max}
 }
 
 func (r *maxRetries) retry() bool {
@@ -178,10 +178,10 @@ func (b *backOff) retry() bool {
 // retriableHijackErrorResponder wraps proxy.ErrorResponder and prevents errors from being written to the client if they can be retried
 type retriableHijackErrorResponder struct {
 	// delegate knows how to write errors to the client
-	delegate proxy.ErrorResponder
-	req *http.Request
+	delegate       proxy.ErrorResponder
+	req            *http.Request
 	lastKnownError error
-	isRetriable func(req *http.Request, err error) bool
+	isRetriable    func(req *http.Request, err error) bool
 }
 
 var _ proxy.ErrorResponder = &retriableHijackErrorResponder{}
@@ -212,7 +212,7 @@ func (hr *retriableHijackErrorResponder) retry() bool {
 // TODO: doc
 func withHijackErrorResponderForSingleEndpoint(hr *retriableHijackErrorResponder) retriable {
 	hr.isRetriable = func(req *http.Request, err error) bool {
-		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsProbableEOF(err) ||  isExperimental(err)) {
+		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsProbableEOF(err) || isExperimental(err)) {
 			return true
 		}
 		return false
@@ -223,7 +223,7 @@ func withHijackErrorResponderForSingleEndpoint(hr *retriableHijackErrorResponder
 // TODO: doc
 func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorResponder) retriable {
 	hr.isRetriable = func(req *http.Request, err error) bool {
-		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) || knet.IsProbableEOF(err) ||  isExperimental(err)) {
+		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) || knet.IsProbableEOF(err) || isExperimental(err)) {
 			return true
 		}
 		return false
