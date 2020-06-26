@@ -740,15 +740,6 @@ func autoConvert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *con
 	} else {
 		out.PostBind = nil
 	}
-	if in.Unreserve != nil {
-		in, out := &in.Unreserve, &out.Unreserve
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Unreserve = nil
-	}
 	return nil
 }
 
@@ -856,15 +847,6 @@ func autoConvert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1be
 		}
 	} else {
 		out.PostBind = nil
-	}
-	if in.Unreserve != nil {
-		in, out := &in.Unreserve, &out.Unreserve
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Unreserve = nil
 	}
 	return nil
 }

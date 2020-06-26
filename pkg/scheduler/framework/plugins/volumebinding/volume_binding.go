@@ -66,7 +66,6 @@ var _ framework.PreFilterPlugin = &VolumeBinding{}
 var _ framework.FilterPlugin = &VolumeBinding{}
 var _ framework.ReservePlugin = &VolumeBinding{}
 var _ framework.PreBindPlugin = &VolumeBinding{}
-var _ framework.UnreservePlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "VolumeBinding"

@@ -449,11 +449,6 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Unreserve != nil {
-		in, out := &in.Unreserve, &out.Unreserve
-		*out = new(PluginSet)
-		(*in).DeepCopyInto(*out)
-	}
 	return
 }
 

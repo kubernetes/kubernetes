@@ -192,7 +192,8 @@ type Plugins struct {
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet
 
-	// Reserve is a list of plugins invoked when reserving a node to run the pod.
+	// Reserve is a list of plugins invoked when reserving/unreserving resources
+	// after a node is assigned to run the pod.
 	Reserve *PluginSet
 
 	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
@@ -207,9 +208,6 @@ type Plugins struct {
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
 	PostBind *PluginSet
-
-	// Unreserve is a list of plugins invoked when a pod that was previously reserved is rejected in a later phase.
-	Unreserve *PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -288,7 +286,6 @@ func (p *Plugins) Append(src *Plugins) {
 	p.PreBind = appendPluginSet(p.PreBind, src.PreBind)
 	p.Bind = appendPluginSet(p.Bind, src.Bind)
 	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
-	p.Unreserve = appendPluginSet(p.Unreserve, src.Unreserve)
 }
 
 // Apply merges the plugin configuration from custom plugins, handling disabled sets.
@@ -308,7 +305,6 @@ func (p *Plugins) Apply(customPlugins *Plugins) {
 	p.PreBind = mergePluginSets(p.PreBind, customPlugins.PreBind)
 	p.Bind = mergePluginSets(p.Bind, customPlugins.Bind)
 	p.PostBind = mergePluginSets(p.PostBind, customPlugins.PostBind)
-	p.Unreserve = mergePluginSets(p.Unreserve, customPlugins.Unreserve)
 }
 
 func mergePluginSets(defaultPluginSet, customPluginSet *PluginSet) *PluginSet {

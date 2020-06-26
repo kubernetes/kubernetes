@@ -142,11 +142,6 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: volumebinding.Name},
 			},
 		},
-		Unreserve: &schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{
-				{Name: volumebinding.Name},
-			},
-		},
 		PreBind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
