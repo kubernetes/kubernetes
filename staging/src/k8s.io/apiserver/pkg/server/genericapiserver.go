@@ -18,7 +18,6 @@ package server
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	gpath "path"
@@ -28,7 +27,6 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/go-openapi/spec"
-	"go.uber.org/atomic"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -354,10 +352,9 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	s.SecureServingInfo.Listener = &terminationLoggingListener{
 		Listener:   s.SecureServingInfo.Listener,
-		stopCh:     stopCh,
 		lateStopCh: lateStopCh,
-		Eventf:     s.Eventf,
 	}
+	lateConnectionEventf = s.Eventf
 
 	// close socket after delayed stopCh
 	stoppedCh, err := s.NonBlockingRun(delayedStopCh)
@@ -673,36 +670,4 @@ func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...
 	if _, err := s.eventSink.Create(e); err != nil {
 		klog.Warningf("failed to create event %s/%s: %v", e.Namespace, e.Name, err)
 	}
-}
-
-// terminationLoggingListener wraps the given listener and logs new connections
-// after the stopCh has been closed, i.e. when termination has begun.
-type terminationLoggingListener struct {
-	net.Listener
-	stopCh, lateStopCh <-chan struct{}
-	Eventf             func(eventType, reason, messageFmt string, args ...interface{})
-	lateConnReceived   atomic.Bool
-}
-
-func (l *terminationLoggingListener) Accept() (net.Conn, error) {
-	c, err := l.Listener.Accept()
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-l.lateStopCh:
-		klog.Warningf("Accepted new connection from %s very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", c.RemoteAddr().String())
-		if swapped := l.lateConnReceived.CAS(false, true); swapped {
-			l.Eventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections (e.g. from %q) very late in the graceful termination process, possibly a sign for a broken load balancer setup.", c.RemoteAddr().String())
-		}
-	default:
-		select {
-		case <-l.stopCh:
-			klog.V(2).Infof("Accepted new connection from %s during graceful termination.", c.RemoteAddr())
-		default:
-		}
-	}
-
-	return c, err
 }
