@@ -113,16 +113,16 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*apps.ReplicaSe
 	// case 1:
 	// * Deployment is updated, newRS is created with 3 replicas, oldRS is scaled down to 8, and newRS is scaled up to 5.
 	// * The new replica set pods crashloop and never become available.
-	// * allPodsCount is 13. minAvailable is 8. newRSPodsUnavailable is 5.
+	// * allPodsCount is 13. minAvailable is 8. newRSUnavailablePodCount is 5.
 	// * A node fails and causes one of the oldRS pods to become unavailable. However, 13 - 8 - 5 = 0, so the oldRS won't be scaled down.
 	// * The user notices the crashloop and does kubectl rollout undo to rollback.
-	// * newRSPodsUnavailable is 1, since we rolled back to the good replica set, so maxScaledDown = 13 - 8 - 1 = 4. 4 of the crashlooping pods will be scaled down.
+	// * newRSUnavailablePodCount is 1, since we rolled back to the good replica set, so maxScaledDown = 13 - 8 - 1 = 4. 4 of the crashlooping pods will be scaled down.
 	// * The total number of pods will then be 9 and the newRS can be scaled up to 10.
 	//
 	// case 2:
 	// Same example, but pushing a new pod template instead of rolling back (aka "roll over"):
 	// * The new replica set created must start with 0 replicas because allPodsCount is already at 13.
-	// * However, newRSPodsUnavailable would also be 0, so the 2 old replica sets could be scaled down by 5 (13 - 8 - 0), which would then
+	// * However, newRSUnavailablePodCount would also be 0, so the 2 old replica sets could be scaled down by 5 (13 - 8 - 0), which would then
 	// allow the new replica set to be scaled up by 5.
 	minAvailable := *(deployment.Spec.Replicas) - maxUnavailable
 	newRSUnavailablePodCount := *(newRS.Spec.Replicas) - newRS.Status.AvailableReplicas
