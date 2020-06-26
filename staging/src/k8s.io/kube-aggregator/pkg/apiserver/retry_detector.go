@@ -223,7 +223,20 @@ func withHijackErrorResponderForSingleEndpoint(hr *retriableHijackErrorResponder
 // TODO: doc
 func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorResponder) retriable {
 	hr.isRetriable = func(req *http.Request, err error) bool {
-		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsConnectionRefused(err) || knet.IsProbableEOF(err) || isExperimental(err)) {
+		// we always want to retry connection refused errors as the aggregator will pick up a different host on the next try
+		//
+		// the error is of particular interest during graceful shutdown of the backend server
+		//
+		// net/http2 library automatically retries requests/streams after receiving a GOAWAY frame.
+		// this is true for StreamsWithID > LastStreamID (present in the GOAWAY frame) which represents the last stream identifier the server has processed or is aware of.
+		// StreamsWithID <= LastStreamID might be fully processed because the server waits until all current streams are done or the timeout expires.
+		// In case of the timeout, we will get "http2: server sent GOAWAY and closed the connection" error which is handled by IsProbableEOF() and it is safe to retry only for particular verbs (check isHTTPVerbRetriable method)
+		//
+		// on the next try a new connection will be opened to the same host and will fail with "connection refused" error because the remote host stopped listening on the port.
+		if knet.IsConnectionRefused(err) {
+			return true
+		}
+		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsProbableEOF(err) || isExperimental(err)) {
 			return true
 		}
 		return false
