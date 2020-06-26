@@ -173,9 +173,7 @@ function config-ip-firewall {
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
-    # We do not want to add quotes for METADATA_SERVER_IP
-    # shellcheck disable=SC2086
-    iptables -w -t nat -I PREROUTING -p tcp -d ${METADATA_SERVER_IP} --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
+    iptables -w -t nat -I PREROUTING -p tcp -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
   fi
 
   # Log all metadata access not from approved processes.
@@ -306,7 +304,7 @@ function unique-uuid-bind-mount(){
 
   # find uuid for actual_device
   local myuuid
-  myuuid=$(find -L /dev/disk/by-uuid -maxdepth 1 -samefile /dev/"${actual_device}" -printf '%P\n')
+  myuuid=$(find -L /dev/disk/by-uuid -maxdepth 1 -samefile /dev/"${actual_device}" -printf '%P')
   # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
   if [[ -z "${myuuid}" ]]; then
     echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
@@ -423,8 +421,8 @@ function ensure-local-ssds() {
       # This workaround to find if the NVMe device is a disk is required because
       # the existing Google images does not expose NVMe devices in /dev/disk/by-id
       if [[ $(udevadm info --query=property --name="${ssd}" | grep DEVTYPE | sed "s/DEVTYPE=//") == "disk" ]]; then
-        local devicenum
-        devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/')
+        # shellcheck disable=SC2155
+        local devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/')
         if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
           mount-ext "${ssd}" "${devicenum}" "nvme" "block"
         else
@@ -764,8 +762,7 @@ EOF
       # split NODE_TAGS into an array by comma.
       IFS=',' read -r -a node_tags <<< "${NODE_TAGS}"
     else
-      local -r node_tags
-      node_tags="${NODE_INSTANCE_PREFIX}"
+      local -r node_tags=("${NODE_INSTANCE_PREFIX}")
     fi
     cat <<EOF >>/etc/gce.conf
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
@@ -1563,7 +1560,7 @@ function prepare-kube-proxy-manifest-variables {
     # https://github.com/kubernetes/kubernetes/pull/70398
     local -r kernel_version=$(uname -r | cut -d\. -f1,2)
     local conntrack_module="nf_conntrack"
-    if [[ $(printf "%s\n4.18\n" "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
+    if [[ $(printf '%s\n4.18\n' "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
       conntrack_module="nf_conntrack_ipv4"
     fi
 
@@ -1621,8 +1618,7 @@ function start-kube-proxy {
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local host_ip
-  host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+  local -r host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -1871,7 +1867,7 @@ function update-node-label() {
 
 # A helper function that sets file permissions for kube-controller-manager to
 # run as non root.
-# (User- and groupnames not expected to contain characters that need quoting.)
+# User and group should never contain characters that need to be quoted
 # shellcheck disable=SC2086
 function run-kube-controller-manager-as-non-root {
   prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER} ${KUBE_CONTROLLER_MANAGER_RUNASGROUP}
@@ -1895,65 +1891,64 @@ function start-kube-controller-manager {
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
-  local params
-  params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
-  params+=" --use-service-account-credentials"
-  params+=" --cloud-provider=gce"
-  params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
-  params+=" --root-ca-file=${CA_CERT_BUNDLE_PATH}"
-  params+=" --service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}"
+  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  params+=("--use-service-account-credentials")
+  params+=("--cloud-provider=gce")
+  params+=("--kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig")
+  params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
+  params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
-    params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
+    params+=("--enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}")
   fi
   if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
-    params+=" --cluster-name=${INSTANCE_PREFIX}"
+    params+=("--cluster-name=${INSTANCE_PREFIX}")
   fi
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
-    params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
+    params+=("--cluster-cidr=${CLUSTER_IP_RANGE}")
   fi
   if [[ -n "${CA_KEY:-}" ]]; then
-    params+=" --cluster-signing-cert-file=${CA_CERT_PATH}"
-    params+=" --cluster-signing-key-file=${CA_KEY_PATH}"
+    params+=("--cluster-signing-cert-file=${CA_CERT_PATH}")
+    params+=("--cluster-signing-key-file=${CA_KEY_PATH}")
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
-    params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
+    params+=("--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}")
   fi
   if [[ -n "${CONCURRENT_SERVICE_SYNCS:-}" ]]; then
-    params+=" --concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}"
+    params+=("--concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}")
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
-    params+=" --allocate-node-cidrs=true"
+    params+=("--allocate-node-cidrs=true")
   elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
-    params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
+    params+=("--allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}")
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
-    params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+    params+=("--terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}")
   fi
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    params+=" --cidr-allocator-type=${NODE_IPAM_MODE}"
-    params+=" --configure-cloud-routes=false"
+    params+=("--cidr-allocator-type=${NODE_IPAM_MODE}")
+    params+=("--configure-cloud-routes=false")
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
-    params+=" --feature-gates=${FEATURE_GATES}"
+    params+=("--feature-gates=${FEATURE_GATES}")
   fi
   if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
-    params+=" --flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
+    params+=("--flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}")
   fi
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
-    params+=" --cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
+    params+=("--cluster-signing-duration=$CLUSTER_SIGNING_DURATION")
   fi
   # Disable using HPA metrics REST clients if metrics-server isn't enabled,
   # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
   if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
      [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
-    params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
+    params+=("--horizontal-pod-autoscaler-use-rest-clients=false")
   fi
   if [[ -n "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
-    params+=" --pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE"
-    params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
+    params+=("--pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE")
+    params+=("--pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE")
   fi
   if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    params+=" --controllers=${RUN_CONTROLLERS}"
+    params+=("--controllers=${RUN_CONTROLLERS}")
   fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
@@ -1962,12 +1957,13 @@ function start-kube-controller-manager {
     container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
   fi
 
-  params="$(convert-manifest-params "${params}")"
+  local paramstring
+  paramstring="$(convert-manifest-params "${params[*]}")"
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   # Evaluate variables.
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
-  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{params}}@${paramstring}@g" "${src_file}"
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -2000,38 +1996,40 @@ function start-kube-controller-manager {
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
   create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"
-  prepare-log-file /var/log/kube-scheduler.log "${KUBE_SCHEDULER_RUNASUSER:-2001}" "${KUBE_SCHEDULER_RUNASGROUP:-2001}"
+  # User and group should never contain characters that need to be quoted
+  # shellcheck disable=SC2086
+  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001} ${KUBE_SCHEDULER_RUNASGROUP:-2001}
 
   # Calculate variables and set them in the manifest.
-  local params
-  params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
+  params=("${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"}" "${SCHEDULER_TEST_ARGS:-}")
   if [[ -n "${FEATURE_GATES:-}" ]]; then
-    params+=" --feature-gates=${FEATURE_GATES}"
+    params+=("--feature-gates=${FEATURE_GATES}")
   fi
 
   # Scheduler Component Config takes precedence over some flags.
   if [[ -n "${KUBE_SCHEDULER_CONFIG:-}" ]]; then
     create-kube-scheduler-config
-    params+=" --config=/etc/srv/kubernetes/kube-scheduler/config"
+    params+=("--config=/etc/srv/kubernetes/kube-scheduler/config")
   else
-    params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
+    params+=("--kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig")
     if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
-      params+=" --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
+      params+=("--algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}")
     fi
     if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
       create-kubescheduler-policy-config
-      params+=" --use-legacy-policy-config"
-      params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
+      params+=("--use-legacy-policy-config")
+      params+=("--policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config")
     fi
   fi
 
-  params="$(convert-manifest-params "${params}")"
+  local paramstring
+  paramstring="$(convert-manifest-params "${params[*]}")"
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
 
-  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{params}}@${paramstring}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{cpurequest}}@${KUBE_SCHEDULER_CPU_REQUEST}@g" "${src_file}"
@@ -2055,13 +2053,12 @@ function start-cluster-autoscaler {
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
-    local params
-    params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
-    params+=" --kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig"
+    local params=("${AUTOSCALER_MIG_CONFIG}" "${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
+    params+=("--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig")
 
     # split the params into separate arguments passed to binary
     local params_split
-    params_split=$(eval "for param in $params; do echo -n \\\"\$param\\\",; done")
+    params_split=$(eval 'for param in "${params[@]}"; do echo -n "$param",; done')
     params_split=${params_split%?}
 
     sed -i -e "s@{{params}}@${params_split}@g" "${src_file}"
@@ -2437,7 +2434,9 @@ function start-kube-addons {
   local -r dst_dir="/etc/kubernetes/addons"
 
   create-kubeconfig "addon-manager" "${ADDON_MANAGER_TOKEN}"
-  prepare-log-file /var/log/kube-addon-manager.log "${KUBE_ADDON_MANAGER_RUNASUSER:-2002}" "${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}"
+  # User and group should never contain characters that need to be quoted
+  # shellcheck disable=SC2086
+  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002} ${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}
 
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
@@ -2847,8 +2846,7 @@ EOF
   fi
 
   # Reuse docker group for containerd.
-  local containerd_gid
-  containerd_gid="$(grep ^docker: /etc/group | cut -d: -f 3)"
+  local -r containerd_gid="$(grep ^docker: /etc/group | cut -d: -f 3)"
   if [[ -n "${containerd_gid:-}" ]]; then
     cat >> "${config_path}" <<EOF
 # reuse id of the docker group
