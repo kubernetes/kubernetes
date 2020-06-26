@@ -113,17 +113,15 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 		count := 0
 		for {
-			select {
-			case <-timer.C:
-				n, err := w.Write([]byte("w"))
-				if err != nil {
-					return
-				}
-				flusher.Flush()
-				count += n
-				if count == watchExpectSendBytes {
-					return
-				}
+			<-timer.C
+			n, err := w.Write([]byte("w"))
+			if err != nil {
+				return
+			}
+			flusher.Flush()
+			count += n
+			if count == watchExpectSendBytes {
+				return
 			}
 		}
 	})
