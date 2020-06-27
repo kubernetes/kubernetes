@@ -61,6 +61,8 @@ const (
 )
 
 type event struct {
+	// virtual indicates this event did not come from an informer, but was constructed artificially
+	virtual   bool
 	eventType eventType
 	obj       interface{}
 	// the update event comes with an old object, but it's not used by the garbage collector.
@@ -329,6 +331,7 @@ func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
 func (gb *GraphBuilder) enqueueVirtualDeleteEvent(ref objectReference) {
 	gv, _ := schema.ParseGroupVersion(ref.APIVersion)
 	gb.graphChanges.Add(&event{
+		virtual:   true,
 		eventType: deleteEvent,
 		gvk:       gv.WithKind(ref.Kind),
 		obj: &metaonly.MetadataOnlyObject{
@@ -545,10 +548,10 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	klog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	klog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v, virtual=%v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType, event.virtual)
 	// Check if the node already exists
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
-	if found {
+	if found && !event.virtual && !existingNode.isObserved() {
 		// this marks the node as having been observed via an informer event
 		// 1. this depends on graphChanges only containing add/update events from the actual informer
 		// 2. this allows things tracking virtual nodes' existence to stop polling and rely on informer events

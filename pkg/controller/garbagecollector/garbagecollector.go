@@ -18,6 +18,7 @@ package garbagecollector
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -294,6 +295,8 @@ func (gc *GarbageCollector) runAttemptToDeleteWorker() {
 	}
 }
 
+var enqueuedVirtualDeleteEventErr = goerrors.New("enqueued virtual delete event")
+
 func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 	item, quit := gc.attemptToDelete.Get()
 	gc.workerLock.RLock()
@@ -308,7 +311,10 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		return true
 	}
 	err := gc.attemptToDeleteItem(n)
-	if err != nil {
+	if err == enqueuedVirtualDeleteEventErr {
+		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
+		return true
+	} else if err != nil {
 		if _, ok := err.(*restMappingError); ok {
 			// There are at least two ways this can happen:
 			// 1. The reference is to an object of a custom type that has not yet been
@@ -426,9 +432,15 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 	return ret
 }
 
+// attemptToDeleteItem looks up the live API object associated with the node,
+// and issues a delete IFF the uid matches, the item is not blocked on deleting dependents,
+// and all owner references are dangling.
+//
+// if the API get request returns a NotFound error, or the retrieved item's uid does not match,
+// a virtual delete event for the node is enqueued and enqueuedVirtualDeleteEventErr is returned.
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	klog.V(2).InfoS("Processing object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
-		"objectUID", item.identity.UID, "kind", item.identity.Kind)
+		"objectUID", item.identity.UID, "kind", item.identity.Kind, "virtual", !item.isObserved())
 
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
@@ -446,10 +458,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// the virtual node from GraphBuilder.uidToNode.
 		klog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-		// since we're manually inserting a delete event to remove this node,
-		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
-		item.markObserved()
-		return nil
+		return enqueuedVirtualDeleteEventErr
 	case err != nil:
 		return err
 	}
@@ -457,10 +466,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	if latest.GetUID() != item.identity.UID {
 		klog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-		// since we're manually inserting a delete event to remove this node,
-		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
-		item.markObserved()
-		return nil
+		return enqueuedVirtualDeleteEventErr
 	}
 
 	// TODO: attemptToOrphanWorker() routine is similar. Consider merging

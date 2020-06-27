@@ -274,11 +274,15 @@ func TestAttemptToDeleteItem(t *testing.T) {
 			Namespace: pod.Namespace,
 		},
 		// owners are intentionally left empty. The attemptToDeleteItem routine should get the latest item from the server.
-		owners: nil,
+		owners:  nil,
+		virtual: true,
 	}
 	err := gc.attemptToDeleteItem(item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
+	}
+	if !item.virtual {
+		t.Errorf("attemptToDeleteItem changed virtual to false unexpectedly")
 	}
 	expectedActionSet := sets.NewString()
 	expectedActionSet.Insert("GET=/api/v1/namespaces/ns1/replicationcontrollers/owner1")
