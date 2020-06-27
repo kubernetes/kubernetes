@@ -376,6 +376,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, nil, nil, endpointSlicesEnabled),
 		iptables:                 ipt,
 		clusterCIDR:              "10.0.0.0/24",
+		masqueradeMark:           "0x4000",
 		hostname:                 testHostname,
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
@@ -2291,7 +2292,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 :KUBE-FORWARD - [0:0]
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: has no endpoints" -m  -p  -d 172.20.1.1/32 --dport 0 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
--A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark  -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -s 10.0.0.0/24 -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -d 10.0.0.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 COMMIT
@@ -2301,8 +2302,10 @@ COMMIT
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
 :KUBE-SVC-3WUAALNGPYZZAWAD - [0:0]
--A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark  -j MASQUERADE
--A KUBE-MARK-MASQ -j MARK --set-xmark 
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -X KUBE-SVC-3WUAALNGPYZZAWAD
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
@@ -2313,7 +2316,7 @@ COMMIT
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
--A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark  -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -s 10.0.0.0/24 -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -d 10.0.0.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 COMMIT
@@ -2326,8 +2329,10 @@ COMMIT
 : - [0:0]
 : - [0:0]
 : - [0:0]
--A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark  -j MASQUERADE
--A KUBE-MARK-MASQ -j MARK --set-xmark 
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m  -p  -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m  -p  -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-3WUAALNGPYZZAWAD
 -A KUBE-SVC-3WUAALNGPYZZAWAD -m statistic --mode random --probability 0.33333 -j 
