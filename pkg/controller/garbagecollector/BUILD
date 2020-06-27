@@ -83,6 +83,7 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/simple:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

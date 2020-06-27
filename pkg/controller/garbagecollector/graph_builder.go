@@ -104,7 +104,7 @@ type GraphBuilder struct {
 	attemptToOrphan workqueue.RateLimitingInterface
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
-	absentOwnerCache *UIDCache
+	absentOwnerCache *ReferenceCache
 	sharedInformers  informerfactory.InformerFactory
 	ignoredResources map[schema.GroupResource]struct{}
 }
@@ -327,8 +327,10 @@ func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
 // enqueueVirtualDeleteEvent is used to add a virtual delete event to be processed for virtual nodes
 // once it is determined they do not have backing objects in storage
 func (gb *GraphBuilder) enqueueVirtualDeleteEvent(ref objectReference) {
+	gv, _ := schema.ParseGroupVersion(ref.APIVersion)
 	gb.graphChanges.Add(&event{
 		eventType: deleteEvent,
+		gvk:       gv.WithKind(ref.Kind),
 		obj: &metaonly.MetadataOnlyObject{
 			TypeMeta:   metav1.TypeMeta{APIVersion: ref.APIVersion, Kind: ref.Kind},
 			ObjectMeta: metav1.ObjectMeta{Namespace: ref.Namespace, UID: ref.UID, Name: ref.Name},
@@ -348,7 +350,7 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 			// exist in the graph yet.
 			ownerNode = &node{
 				identity: objectReference{
-					OwnerReference: owner,
+					OwnerReference: ownerReferenceCoordinates(owner),
 					Namespace:      n.identity.Namespace,
 				},
 				dependents: make(map[*node]struct{}),
@@ -603,7 +605,15 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		existingNode.dependentsLock.RLock()
 		defer existingNode.dependentsLock.RUnlock()
 		if len(existingNode.dependents) > 0 {
-			gb.absentOwnerCache.Add(accessor.GetUID())
+			gb.absentOwnerCache.Add(objectReference{
+				OwnerReference: metav1.OwnerReference{
+					APIVersion: event.gvk.GroupVersion().String(),
+					Kind:       event.gvk.Kind,
+					Name:       accessor.GetName(),
+					UID:        accessor.GetUID(),
+				},
+				Namespace: accessor.GetNamespace(),
+			})
 		}
 		for dep := range existingNode.dependents {
 			gb.attemptToDelete.Add(dep)

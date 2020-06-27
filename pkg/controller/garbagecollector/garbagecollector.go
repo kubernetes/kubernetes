@@ -72,7 +72,7 @@ type GarbageCollector struct {
 	attemptToOrphan        workqueue.RateLimitingInterface
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
-	absentOwnerCache *UIDCache
+	absentOwnerCache *ReferenceCache
 
 	workerLock sync.RWMutex
 }
@@ -94,7 +94,7 @@ func NewGarbageCollector(
 
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
-	absentOwnerCache := NewUIDCache(500)
+	absentOwnerCache := NewReferenceCache(500)
 	gc := &GarbageCollector{
 		metadataClient:   metadataClient,
 		restMapper:       mapper,
@@ -338,10 +338,20 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 // returns its latest state.
 func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
 	dangling bool, owner *metav1.PartialObjectMetadata, err error) {
-	if gc.absentOwnerCache.Has(reference.UID) {
+
+	// check for recorded absent cluster-scoped parent
+	absentOwnerCacheKey := objectReference{OwnerReference: ownerReferenceCoordinates(reference)}
+	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
 		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	}
+	// check for recorded absent namespaced parent
+	absentOwnerCacheKey.Namespace = item.identity.Namespace
+	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
+		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist in namespace %s", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name, item.identity.Namespace)
+		return true, nil, nil
+	}
+
 	// TODO: we need to verify the reference resource is supported by the
 	// system. If it's not a valid resource, the garbage collector should i)
 	// ignore the reference when decide if the object should be deleted, and
@@ -352,6 +362,9 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	if err != nil {
 		return false, nil, err
 	}
+	if !namespaced {
+		absentOwnerCacheKey.Namespace = ""
+	}
 
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
@@ -359,7 +372,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(context.TODO(), reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		gc.absentOwnerCache.Add(reference.UID)
+		gc.absentOwnerCache.Add(absentOwnerCacheKey)
 		klog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	case err != nil:
@@ -368,7 +381,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 
 	if owner.GetUID() != reference.UID {
 		klog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
-		gc.absentOwnerCache.Add(reference.UID)
+		gc.absentOwnerCache.Add(absentOwnerCacheKey)
 		return true, nil, nil
 	}
 	return false, owner, nil

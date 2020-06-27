@@ -148,6 +148,17 @@ func (n *node) blockingDependents() []*node {
 	return ret
 }
 
+// ownerReferenceCoordinates returns an owner reference containing only the coordinate fields
+// from the input reference (uid, name, kind, apiVersion)
+func ownerReferenceCoordinates(ref metav1.OwnerReference) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		UID:        ref.UID,
+		Name:       ref.Name,
+		Kind:       ref.Kind,
+		APIVersion: ref.APIVersion,
+	}
+}
+
 // String renders node as a string using fmt. Acquires a read lock to ensure the
 // reflective dump of dependents doesn't race with any concurrent writes.
 func (n *node) String() string {
