@@ -32,6 +32,8 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,10 +64,7 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client *clientv3.Client
-	// getOps contains additional options that should be passed
-	// to all Get() calls.
-	getOps        []clientv3.OpOption
+	client        *clientv3.Client
 	codec         runtime.Codec
 	versioner     storage.Versioner
 	transformer   value.Transformer
@@ -115,13 +114,12 @@ func (s *store) Versioner() storage.Versioner {
 func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
-	callOpts := s.getOps
-	getResp, err := s.client.KV.Get(ctx, key, callOpts...)
+	getResp, err := s.client.KV.Get(ctx, key)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 	if err != nil {
 		return err
 	}
-	if err = s.ensureMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
+	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
 		return err
 	}
 
@@ -252,7 +250,7 @@ func (s *store) GuaranteedUpdate(
 
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+		getResp, err := s.client.KV.Get(ctx, key)
 		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 		if err != nil {
 			return nil, err
@@ -382,10 +380,12 @@ func (s *store) GuaranteedUpdate(
 // GetToList implements storage.Interface.GetToList.
 func (s *store) GetToList(ctx context.Context, key string, listOpts storage.ListOptions, listObj runtime.Object) error {
 	resourceVersion := listOpts.ResourceVersion
+	match := listOpts.ResourceVersionMatch
 	pred := listOpts.Predicate
 	trace := utiltrace.New("GetToList etcd3",
 		utiltrace.Field{"key", key},
 		utiltrace.Field{"resourceVersion", resourceVersion},
+		utiltrace.Field{"resourceVersionMatch", match},
 		utiltrace.Field{"limit", pred.Limit},
 		utiltrace.Field{"continue", pred.Continue})
 	defer trace.LogIfLong(500 * time.Millisecond)
@@ -402,12 +402,21 @@ func (s *store) GetToList(ctx context.Context, key string, listOpts storage.List
 
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
-	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	var opts []clientv3.OpOption
+	if len(resourceVersion) > 0 && match == metav1.ResourceVersionMatchExact {
+		rv, err := s.versioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+		}
+		opts = append(opts, clientv3.WithRev(int64(rv)))
+	}
+
+	getResp, err := s.client.KV.Get(ctx, key, opts...)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
 		return err
 	}
-	if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+	if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 		return err
 	}
 
@@ -515,10 +524,12 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 // List implements storage.Interface.List.
 func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	resourceVersion := opts.ResourceVersion
+	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
 	trace := utiltrace.New("List etcd3",
 		utiltrace.Field{"key", key},
 		utiltrace.Field{"resourceVersion", resourceVersion},
+		utiltrace.Field{"resourceVersionMatch", match},
 		utiltrace.Field{"limit", pred.Limit},
 		utiltrace.Field{"continue", pred.Continue})
 	defer trace.LogIfLong(500 * time.Millisecond)
@@ -552,6 +563,15 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 
 	newItemFunc := getNewItemFunc(listObj, v)
 
+	var fromRV *uint64
+	if len(resourceVersion) > 0 {
+		parsedRV, err := s.versioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+		}
+		fromRV = &parsedRV
+	}
+
 	var returnedRV, continueRV int64
 	var continueKey string
 	switch {
@@ -577,20 +597,41 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 			returnedRV = continueRV
 		}
 	case s.pagingEnabled && pred.Limit > 0:
-		if len(resourceVersion) > 0 {
-			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
-			if err != nil {
-				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+		if fromRV != nil {
+			switch match {
+			case metav1.ResourceVersionMatchNotOlderThan:
+				// The not older than constraint is checked after we get a response from etcd,
+				// and returnedRV is then set to the revision we get from the etcd response.
+			case metav1.ResourceVersionMatchExact:
+				returnedRV = int64(*fromRV)
+				options = append(options, clientv3.WithRev(returnedRV))
+			case "": // legacy case
+				if *fromRV > 0 {
+					returnedRV = int64(*fromRV)
+					options = append(options, clientv3.WithRev(returnedRV))
+				}
+			default:
+				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
 			}
-			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(int64(fromRV)))
-			}
-			returnedRV = int64(fromRV)
 		}
 
 		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
 		options = append(options, clientv3.WithRange(rangeEnd))
 	default:
+		if fromRV != nil {
+			switch match {
+			case metav1.ResourceVersionMatchNotOlderThan:
+				// The not older than constraint is checked after we get a response from etcd,
+				// and returnedRV is then set to the revision we get from the etcd response.
+			case metav1.ResourceVersionMatchExact:
+				returnedRV = int64(*fromRV)
+				options = append(options, clientv3.WithRev(returnedRV))
+			case "": // legacy case
+			default:
+				return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
+			}
+		}
+
 		options = append(options, clientv3.WithPrefix())
 	}
 
@@ -605,7 +646,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
-		if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
 		hasMore = getResp.More
@@ -822,9 +863,9 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
 }
 
-// ensureMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is
+// validateMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is
 // greater than the most recent actualRevision available from storage.
-func (s *store) ensureMinimumResourceVersion(minimumResourceVersion string, actualRevision uint64) error {
+func (s *store) validateMinimumResourceVersion(minimumResourceVersion string, actualRevision uint64) error {
 	if minimumResourceVersion == "" {
 		return nil
 	}
