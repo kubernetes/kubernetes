@@ -567,6 +567,14 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		// this marks the node as having been observed via an informer event
 		// 1. this depends on graphChanges only containing add/update events from the actual informer
 		// 2. this allows things tracking virtual nodes' existence to stop polling and rely on informer events
+		observedIdentity := identityFromEvent(event, accessor)
+		if observedIdentity != existingNode.identity {
+			// make a copy (so we don't modify the existing node in place), store the observed identity, and replace the virtual node
+			klog.V(2).Infof("replacing virtual node %s with observed node %s", existingNode.identity, observedIdentity)
+			existingNode = existingNode.clone()
+			existingNode.identity = observedIdentity
+			gb.uidToNode.Write(existingNode)
+		}
 		existingNode.markObserved()
 	}
 	switch {

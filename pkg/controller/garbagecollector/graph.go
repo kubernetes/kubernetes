@@ -61,6 +61,25 @@ type node struct {
 	owners []metav1.OwnerReference
 }
 
+// clone() must only be called from the single-threaded GraphBuilder.processGraphChanges()
+func (n *node) clone() *node {
+	c := &node{
+		identity:           n.identity,
+		dependents:         make(map[*node]struct{}, len(n.dependents)),
+		deletingDependents: n.deletingDependents,
+		beingDeleted:       n.beingDeleted,
+		virtual:            n.virtual,
+		owners:             make([]metav1.OwnerReference, 0, len(n.owners)),
+	}
+	for dep := range n.dependents {
+		c.dependents[dep] = struct{}{}
+	}
+	for _, owner := range n.owners {
+		c.owners = append(c.owners, owner)
+	}
+	return c
+}
+
 // An object is on a one way trip to its final deletion if it starts being
 // deleted, so we only provide a function to set beingDeleted to true.
 func (n *node) markBeingDeleted() {
