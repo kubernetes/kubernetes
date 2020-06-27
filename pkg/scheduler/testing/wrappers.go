@@ -238,6 +238,12 @@ func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	return p
 }
 
+// StartTime sets `t` as .status.startTime for the inner pod.
+func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
+	p.Status.StartTime = &t
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
@@ -355,6 +361,30 @@ func (p *PodWrapper) Label(k, v string) *PodWrapper {
 		p.Labels = make(map[string]string)
 	}
 	p.Labels[k] = v
+	return p
+}
+
+// Req adds a new container to the inner pod with given resource map.
+func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
+	if len(resMap) == 0 {
+		return p
+	}
+
+	res := v1.ResourceList{}
+	for k, v := range resMap {
+		res[k] = resource.MustParse(v)
+	}
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Resources: v1.ResourceRequirements{
+			Requests: res,
+		},
+	})
+	return p
+}
+
+// PreemptionPolicy sets the give preemption policy to the inner pod.
+func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
+	p.Spec.PreemptionPolicy = &policy
 	return p
 }
 
