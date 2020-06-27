@@ -269,6 +269,7 @@ func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleSt
 func (rp *ReservePlugin) reset() {
 	rp.numReserveCalled = 0
 	rp.numUnreserveCalled = 0
+	rp.failReserve = false
 }
 
 // Name returns name of the plugin.
@@ -1006,22 +1007,31 @@ func TestReservePluginUnreserve(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	tests := []struct {
-		name        string
-		preBindFail bool
+		name             string
+		failReserve      bool
+		failReserveIndex int
+		failPreBind      bool
 	}{
 		{
-			name:        "fail preBind",
-			preBindFail: true,
+			name:             "fail reserve",
+			failReserve:      true,
+			failReserveIndex: 1,
 		},
 		{
-			name:        "pass preBind",
-			preBindFail: false,
+			name:        "fail preBind",
+			failPreBind: true,
+		},
+		{
+			name: "pass everything",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			preBindPlugin.failPreBind = test.preBindFail
+			preBindPlugin.failPreBind = test.failPreBind
+			if test.failReserve {
+				reservePlugins[test.failReserveIndex].failReserve = true
+			}
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
 				initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
@@ -1029,7 +1039,7 @@ func TestReservePluginUnreserve(t *testing.T) {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
 
-			if test.preBindFail {
+			if test.failPreBind || test.failReserve {
 				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but didn't get it: %v", err)
 				}

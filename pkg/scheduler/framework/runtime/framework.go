@@ -788,7 +788,8 @@ func (f *frameworkImpl) runPostBindPlugin(ctx context.Context, pl framework.Post
 // RunReservePluginsReserve runs the Reserve method in the set of configured
 // reserve plugins. If any of these plugins returns an error, it does not
 // continue running the remaining ones and returns the error. In such a case,
-// the pod will not be scheduled.
+// the pod will not be scheduled and the caller will be expected to call
+// RunReservePluginsUnreserve.
 func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {

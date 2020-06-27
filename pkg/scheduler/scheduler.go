@@ -520,6 +520,8 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	if sts := prof.RunReservePluginsReserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
 		sched.recordSchedulingFailure(prof, assumedPodInfo, sts.AsError(), SchedulerError, "")
 		metrics.PodScheduleError(prof.Name, metrics.SinceInSeconds(start))
+		// trigger un-reserve to clean up state associated with the reserved Pod
+		prof.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		return
 	}
 
