@@ -106,7 +106,7 @@ if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
   export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
   export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-docker}
   export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
-elif [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+elif [[ "${CONTAINER_RUNTIME}" == "containerd" || "${CONTAINER_RUNTIME}" == "remote" ]]; then
   export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
   export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
   export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
