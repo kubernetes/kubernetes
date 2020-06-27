@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1020,6 +1021,69 @@ func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Po
 	kl.statusManager.RemoveOrphanedStatuses(podUIDs)
 }
 
+// deleteMirrorPod uses mirror client to delete the mirror pod from the API server
+func (kl *Kubelet) deleteMirrorPod(podFullName string) {
+	deleted, err := kl.podManager.DeleteMirrorPod(podFullName, nil)
+	if err != nil {
+		klog.Errorf("encountered error when deleting mirror pod %q : %v", podFullName, err)
+		return
+	}
+	if !deleted {
+		klog.Errorf("mirror pod %q was not deleted", podFullName)
+		return
+	}
+	// the mirror pod has been removed from api server, clean the entry for bookkeeping
+	kl.podManager.MarkPodTerminated(podFullName)
+}
+
+// deleteOrphanedMirrorPods checks whether grace period for orphaned mirror pod has elapsed.
+// Once the grace period has passed, podManager.DeleteMirrorPod() is called to delete mirror pod
+// from the API server
+func (kl *Kubelet) deleteOrphanedMirrorPods() {
+	podFullNames := kl.podManager.GetOrphanedMirrorPodNames()
+	for _, podFullName := range podFullNames {
+		start := time.Now()
+		uidWithGracePeriod, ok := kl.podManager.GetUIDForPodPendingTermination(podFullName)
+		if !ok {
+			klog.Warningf("unable to find pod UID for %q, likely kubelet restarted", podFullName)
+			kl.deleteMirrorPod(podFullName)
+			continue
+		}
+		allContainersExited := true
+		if start.Before(uidWithGracePeriod.Till) {
+			name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
+			if err != nil {
+				klog.Warningf("unable to parse %q : %v", podFullName, err)
+				continue
+			}
+			podStatus, err := kl.containerRuntime.GetPodStatus(types.UID(uidWithGracePeriod.UID), name, namespace)
+			if err != nil {
+				klog.Errorf("unable to retrieve pod status for %q / %q: %v", namespace, name, err)
+				continue
+			}
+			// check that all the containers have exited
+			for _, containerStatus := range podStatus.ContainerStatuses {
+				if containerStatus.State != kubecontainer.ContainerStateExited {
+					klog.V(3).Infof("container %q for %q has state %v", containerStatus.Name, name, containerStatus.State)
+					allContainersExited = false
+					break
+				}
+			}
+			if allContainersExited {
+				klog.V(3).Infof("all containers have exited for %q / %q (%v)", namespace, name, uidWithGracePeriod.UID)
+			}
+		} else {
+			klog.V(3).Infof("%q has passed the grace period %v", podFullName, uidWithGracePeriod.Till)
+		}
+		// the following condition, when true, covers two scenarios:
+		// 1. grace period has passed. the if block for start.Before() is not executed.
+		// 2. within grace period, CRI tells us that all the containers have exited
+		if allContainersExited {
+			kl.deleteMirrorPod(podFullName)
+		}
+	}
+}
+
 // HandlePodCleanups performs a series of cleanup work, including terminating
 // pod workers, killing unwanted pods, and removing orphaned volumes/pod
 // directories.
@@ -1033,9 +1097,10 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	var (
 		cgroupPods map[types.UID]cm.CgroupName
 		err        error
+		pcm        cm.PodContainerManager
 	)
 	if kl.cgroupsPerQOS {
-		pcm := kl.containerManager.NewPodContainerManager()
+		pcm = kl.containerManager.NewPodContainerManager()
 		cgroupPods, err = pcm.GetAllPodsFromCgroups()
 		if err != nil {
 			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
@@ -1099,11 +1164,11 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	}
 
 	// Remove any orphaned mirror pods.
-	kl.podManager.DeleteOrphanedMirrorPods()
+	kl.deleteOrphanedMirrorPods()
 
 	// Remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
-		kl.cleanupOrphanedPodCgroups(cgroupPods, activePods)
+		kl.cleanupOrphanedPodCgroups(pcm, cgroupPods, activePods)
 	}
 
 	kl.backOff.GC()
@@ -1722,13 +1787,12 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
 // it reconciles the cached state of cgroupPods with the specified list of runningPods
-func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupName, activePods []*v1.Pod) {
+func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupPods map[types.UID]cm.CgroupName, activePods []*v1.Pod) {
 	// Add all running pods to the set that we want to preserve
 	podSet := sets.NewString()
 	for _, pod := range activePods {
 		podSet.Insert(string(pod.UID))
 	}
-	pcm := kl.containerManager.NewPodContainerManager()
 
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
@@ -1737,6 +1801,11 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 			continue
 		}
 
+		// if the pod is within termination grace period, we shouldn't cleanup the underlying cgroup
+		if kl.podManager.IsPodPendingTermination(uid) {
+			klog.V(3).Infof("pod %q is pending termination", uid)
+			continue
+		}
 		// If volumes have not been unmounted/detached, do not delete the cgroup
 		// so any memory backed volumes don't have their charges propagated to the
 		// parent croup.  If the volumes still exist, reduce the cpu shares for any

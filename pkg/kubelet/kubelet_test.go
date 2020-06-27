@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -93,11 +94,34 @@ const (
 	maxImgSize int64 = 1000 * 1024 * 1024
 )
 
+var (
+	imageList = []kubecontainer.Image{
+		{
+			ID:       "abc",
+			RepoTags: []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
+			Size:     123,
+		},
+		{
+			ID:       "efg",
+			RepoTags: []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
+			Size:     456,
+		},
+	}
+)
+
 // fakeImageGCManager is a fake image gc manager for testing. It will return image
 // list from fake runtime directly instead of caching it.
 type fakeImageGCManager struct {
 	fakeImageService kubecontainer.ImageService
 	images.ImageGCManager
+}
+
+// assertNoLeakOfPodsPendingTermination makes sure that there is no pod pending termination
+func assertNoLeakOfPodsPendingTermination(t *testing.T, kubelet *Kubelet) {
+	numberOfPodsPendingTermination := kubelet.podManager.NumberOfPodsPendingTermination()
+	if numberOfPodsPendingTermination > 0 {
+		t.Errorf("there is leak in PodsPendingTermination map, size: %d", numberOfPodsPendingTermination)
+	}
 }
 
 func (f *fakeImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
@@ -122,26 +146,19 @@ func (tk *TestKubelet) Cleanup() {
 
 // newTestKubelet returns test kubelet with two images.
 func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
-	imageList := []kubecontainer.Image{
-		{
-			ID:       "abc",
-			RepoTags: []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
-			Size:     123,
-		},
-		{
-			ID:       "efg",
-			RepoTags: []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
-			Size:     456,
-		},
-	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, nil)
+}
+
+func newTestKubeletWithCGroupPods(t *testing.T, controllerAttachDetachEnabled bool, cgroupPods *cm.CGroupPods) *TestKubelet {
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, cgroupPods)
 }
 
 func newTestKubeletWithImageList(
 	t *testing.T,
 	imageList []kubecontainer.Image,
 	controllerAttachDetachEnabled bool,
-	initFakeVolumePlugin bool) *TestKubelet {
+	initFakeVolumePlugin bool,
+	cgroupPods *cm.CGroupPods) *TestKubelet {
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeRuntime.RuntimeType = "test"
 	fakeRuntime.VersionInfo = "1.5.0"
@@ -238,7 +255,7 @@ func newTestKubeletWithImageList(
 	kubelet.livenessManager = proberesults.NewManager()
 	kubelet.startupManager = proberesults.NewManager()
 
-	kubelet.containerManager = cm.NewStubContainerManager()
+	kubelet.containerManager = cm.NewStubContainerManagerWithCGroupPods(cgroupPods)
 	fakeNodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      testKubeletHostname,
@@ -1001,47 +1018,134 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	}
 }
 
+// TestDeleteOrphanedMirrorPods tests various scenarios for mirror pod grace period
+// The cgroup pods related code, cleanupOrphanedPodCgroups in particular, takes into account whether the pod is
+// in graceful termination before calling podContainerManagerImpl#Destroy.
+// Assert that the underlying cgroup should (or should not) exist depending on the phase of the pod termination (determined by pod status).
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kl := testKubelet.kubelet
-	manager := testKubelet.fakeMirrorClient
-	orphanPods := []*v1.Pod{
+	testCases := []struct {
+		// gracePeriod is the grace period for pod termination
+		gracePeriod int64
+		qos         bool
+	}{
+		// test case where there is no grace period
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       "12345678",
-				Name:      "pod1",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "api",
-					kubetypes.ConfigMirrorAnnotationKey: "mirror",
-				},
-			},
+			gracePeriod: 0,
+			qos:         false,
 		},
+		// test case where pod container runs half way through the grace period.
+		// kubelet detects the pod container has terminated and removes the pod.
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       "12345679",
-				Name:      "pod2",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					kubetypes.ConfigSourceAnnotationKey: "api",
-					kubetypes.ConfigMirrorAnnotationKey: "mirror",
-				},
-			},
+			gracePeriod: 2,
+			qos:         false,
+		},
+		// similar to the above case but with cgroupsPerQOS being true
+		{
+			gracePeriod: 2,
+			qos:         true,
 		},
 	}
-
-	kl.podManager.SetPods(orphanPods)
-	// Sync with an empty pod list to delete all mirror pods.
-	kl.HandlePodCleanups()
-	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
-	for _, pod := range orphanPods {
-		name := kubecontainer.GetPodFullName(pod)
-		creates, deletes := manager.GetCounts(name)
-		if creates != 0 || deletes != 1 {
-			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)
+	for _, tc := range testCases {
+		pod := podWithUIDNameNsSpec("12345679", "pod1", "ns",
+			v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "1234", Image: "foo"},
+				},
+				TerminationGracePeriodSeconds: &tc.gracePeriod,
+			},
+		)
+		// mirror pod whose termination is being tested
+		orphanPods := []*v1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "pod1",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						kubetypes.ConfigSourceAnnotationKey: "api",
+						kubetypes.ConfigMirrorAnnotationKey: "mirror",
+					},
+				},
+			},
 		}
+		cgp := cm.CGroupPods{Pods: make(map[types.UID]cm.CgroupName), Lock: &sync.RWMutex{}}
+		cgp.Pods[orphanPods[0].UID] = []string{"kubepods", "burstable", "pod1234-abcd-5678-efgh"}
+		testKubelet := newTestKubeletWithCGroupPods(t, false /* controllerAttachDetachEnabled */, &cgp)
+		defer testKubelet.Cleanup()
+
+		kl := testKubelet.kubelet
+		manager := testKubelet.fakeMirrorClient
+
+		pods := []*v1.Pod{orphanPods[0], pod}
+		kl.cgroupsPerQOS = tc.qos
+		kl.podManager.SetPods(pods)
+		// delete pod so that mirror pod in orphanPods[0] is pending termination
+		kl.podManager.DeletePod(pod)
+		// During mirror pod starts graceful termination, its associated cgroup should exist
+		// When the first call to Kubelet#cleanupOrphanedPodCgroups is complete, wgCgroup becomes done
+		wgCgroup := sync.WaitGroup{}
+		// when wgContainerExit is done, the container state has changed to ContainerStateExited
+		wgContainerExit := sync.WaitGroup{}
+		if tc.gracePeriod > 0 {
+			// the container is in running state
+			podStatus := kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{{State: kubecontainer.ContainerStateRunning}},
+			}
+			testKubelet.fakeRuntime.SetPodStatus(orphanPods[0].UID, &podStatus)
+			wgContainerExit.Add(1)
+			wgCgroup.Add(1)
+			go func() {
+				wgCgroup.Wait()
+				// set container to ContainerStateExited after runningDuration has elapsed
+				podStatus.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				testKubelet.fakeRuntime.SetPodStatus(orphanPods[0].UID, &podStatus)
+				wgContainerExit.Done()
+			}()
+		}
+		kl.HandlePodCleanups()
+		for _, orphanPod := range orphanPods {
+			name := kubecontainer.GetPodFullName(orphanPod)
+			creates, deletes := manager.GetCounts(name)
+			if creates != 0 {
+				t.Errorf("expected 0 creation of %q, got %d", name, creates)
+			}
+			if tc.gracePeriod > 0 {
+				// within grace period, there shouldn't be pod deletion
+				if deletes != 0 {
+					t.Errorf("expected no deletion of %q, got %d", name, deletes)
+				}
+				// within grace period, cgroup should still exist
+				if len(cgp.GetCgroupName(orphanPod.UID)) == 0 {
+					t.Errorf("expected cgroupPods to have an entry for %q", orphanPod.UID)
+				}
+				wgCgroup.Done()
+			}
+			if tc.gracePeriod == 0 && deletes != 1 {
+				// no grace period, orphan pod should be deleted
+				t.Errorf("expected one deletion of %q, got %d", name, deletes)
+			}
+		}
+		if tc.gracePeriod > 0 {
+			wgContainerExit.Wait()
+			assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
+			kl.HandlePodCleanups()
+			for _, orphanPod := range orphanPods {
+				name := kubecontainer.GetPodFullName(orphanPod)
+				creates, deletes := manager.GetCounts(name)
+				if creates != 0 {
+					t.Errorf("expected 0 creation of %q, got %d", name, creates)
+				}
+				// grace period has passed, the pod should be deleted
+				if deletes != 1 {
+					t.Errorf("expected one deletion of %q, got %d", name, deletes)
+				}
+				// post grace period, cgroup should have been deleted
+				if tc.qos && len(cgp.GetCgroupName(orphanPod.UID)) > 0 {
+					t.Errorf("expected cgroupPods to have no entry for %q", orphanPod.UID)
+				}
+			}
+		}
+		assertNoLeakOfPodsPendingTermination(t, kl)
 	}
 }
 
@@ -1304,6 +1408,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	kl.HandlePodCleanups()
 	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
 	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
+	assertNoLeakOfPodsPendingTermination(t, testKubelet.kubelet)
 }
 
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod, podsToCheck []*v1.Pod, shouldExist bool) {

@@ -278,13 +278,44 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
+// copyPodStatus performs deep copy of PodStatus
+// this is called by PodStatus getter / setter
+func copyPodStatus(podStatus *kubecontainer.PodStatus) *kubecontainer.PodStatus {
+	containerStatuses := make([]*kubecontainer.Status, len(podStatus.ContainerStatuses))
+	for i, status := range podStatus.ContainerStatuses {
+		copy := *status
+		containerStatuses[i] = &copy
+	}
+	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podStatus.SandboxStatuses))
+	for i, status := range podStatus.SandboxStatuses {
+		copy := *status
+		sandboxStatuses[i] = &copy
+	}
+	status := kubecontainer.PodStatus{
+		ID:                podStatus.ID,
+		Name:              podStatus.Name,
+		Namespace:         podStatus.Namespace,
+		IPs:               podStatus.IPs,
+		ContainerStatuses: containerStatuses,
+		SandboxStatuses:   sandboxStatuses,
+	}
+	return &status
+}
+
 func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPodStatus")
-	status := f.PodStatus
-	return &status, f.Err
+	return copyPodStatus(&f.PodStatus), f.Err
+}
+
+func (f *FakeRuntime) SetPodStatus(uid types.UID, podStatus *kubecontainer.PodStatus) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "SetPodStatus")
+	f.PodStatus = *copyPodStatus(podStatus)
 }
 
 func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {

@@ -100,3 +100,10 @@ type ResolvedPodUID types.UID
 
 // A pod UID for a mirror pod.
 type MirrorPodUID types.UID
+
+// UIDWithGracePeriod records the time by which grace period ends
+// It is placed here to avoid import cycle
+type UIDWithGracePeriod struct {
+	UID  ResolvedPodUID
+	Till time.Time
+}
