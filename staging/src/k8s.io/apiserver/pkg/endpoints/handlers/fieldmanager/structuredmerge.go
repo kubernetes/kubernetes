@@ -55,7 +55,7 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub),
+			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
 		},
 	}, nil
 }
