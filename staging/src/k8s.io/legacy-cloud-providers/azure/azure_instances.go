@@ -236,9 +236,16 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 }
 
 // InstanceMetadataByProviderID returns metadata of the specified instance.
+// InstanceMetadataByProviderID is part of InstancesV2 interface and is only used in cloud node-controller.
 func (az *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
 	if providerID == "" {
 		return nil, errNodeNotInitialized
+	}
+
+	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	if az.IsNodeUnmanagedByProviderID(providerID) {
+		klog.V(4).Infof("NodeAddressesByProviderID: omitting unmanaged node %q", providerID)
+		return nil, nil
 	}
 
 	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
@@ -246,20 +253,10 @@ func (az *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID st
 		return nil, err
 	}
 
-	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
-	unmanaged, err := az.IsNodeUnmanaged(string(nodeName))
-	if err != nil {
-		return nil, err
-	}
-	if unmanaged {
-		klog.V(4).Infof("InstanceType: omitting unmanaged node %q", string(nodeName))
-		return nil, nil
-	}
-
 	md := &cloudprovider.InstanceMetadata{}
 	md.ProviderID = providerID
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata(azcache.CacheReadTypeUnsafe)
+		metadata, err := az.metadata.GetMetadata(azcache.CacheReadTypeDefault)
 		if err != nil {
 			return nil, err
 		}
@@ -288,6 +285,7 @@ func (az *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID st
 			return nil, fmt.Errorf("no credentials provided for Azure cloud provider")
 		}
 
+		// Get instance metadata from IMDS for local instance.
 		if metadata.Compute.VMSize != "" {
 			md.Type = metadata.Compute.VMSize
 		} else {
@@ -301,6 +299,7 @@ func (az *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID st
 		return md, nil
 	}
 
+	// Get instance metadata from ARM API when UseInstanceMetadata is disabled.
 	if md.Type, err = az.vmSet.GetInstanceTypeByNodeName(string(nodeName)); err != nil {
 		return nil, err
 	}

@@ -691,6 +691,11 @@ func TestInstanceMetadataByProviderID(t *testing.T) {
 			expectedErrMsg: fmt.Errorf("providerID is empty, the node is not initialized yet"),
 		},
 		{
+			name:             "InstanceMetadataByProviderID should return nil if the node is unmanaged",
+			providerID:       "baremental-node",
+			expectedMetadata: nil,
+		},
+		{
 			name:                "InstanceMetadataByProviderID should report error if providerID is invalid",
 			providerID:          "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachine/vm3",
 			vmType:              vmTypeStandard,
