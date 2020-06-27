@@ -1,4 +1,4 @@
-// +build !dockerless
+// +build !windows,!dockerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -19,20 +19,23 @@ limitations under the License.
 package dockershim
 
 import (
-	"fmt"
-
+	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-// modifyHostOptionsForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
-func modifyHostOptionsForContainer(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hc *dockercontainer.HostConfig) {
-	sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
-	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
-	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
-	hc.UTSMode = ""
-
-	if nsOpts.GetNetwork() == runtimeapi.NamespaceMode_NODE {
-		hc.UTSMode = namespaceModeHost
+// applySandboxOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
+func (ds *dockerService) applySandboxOptions(hc *dockercontainer.HostConfig, c *runtimeapi.PodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string, separator rune) error {
+	lc := c.GetLinux()
+	if lc == nil {
+		return nil
 	}
+	// Apply security context.
+	if err := applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+		return err
+	}
+
+	// Set sysctls.
+	hc.Sysctls = lc.Sysctls
+	return nil
 }

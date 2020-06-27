@@ -16,6 +16,8 @@ go_library(
         "docker_legacy_service.go",
         "docker_logs.go",
         "docker_sandbox.go",
+        "docker_sandbox_others.go",
+        "docker_sandbox_windows.go",
         "docker_service.go",
         "docker_stats.go",
         "docker_stats_linux.go",
@@ -31,6 +33,8 @@ go_library(
         "helpers_windows.go",
         "naming.go",
         "security_context.go",
+        "security_context_others.go",
+        "security_context_windows.go",
         "selinux_util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
@@ -97,7 +101,8 @@ go_test(
         "helpers_linux_test.go",
         "helpers_test.go",
         "naming_test.go",
-        "security_context_test.go",
+        "security_context_others_test.go",
+        "security_context_windows_test.go",
         "selinux_util_test.go",
     ],
     embed = [":go_default_library"],
@@ -115,14 +120,56 @@ go_test(
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
-        "//vendor/github.com/docker/docker/api/types/container:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/go-connections/nat:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/docker/docker/api/types/container:go_default_library",
             "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],
         "//conditions:default": [],

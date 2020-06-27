@@ -133,72 +133,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		podSandboxConfig.PortMappings = portMappings
 	}
 
-	lc, err := m.generatePodSandboxLinuxConfig(pod)
+	err = m.applyPodSandboxConfig(pod, podSandboxConfig)
 	if err != nil {
 		return nil, err
 	}
-	podSandboxConfig.Linux = lc
-
 	return podSandboxConfig, nil
-}
-
-// generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
-	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
-	lc := &runtimeapi.LinuxPodSandboxConfig{
-		CgroupParent: cgroupParent,
-		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			Privileged: kubecontainer.HasPrivilegedContainer(pod),
-
-			// Forcing sandbox to run as `runtime/default` allow users to
-			// use least privileged seccomp profiles at pod level. Issue #84623
-			SeccompProfilePath: v1.SeccompProfileRuntimeDefault,
-		},
-	}
-
-	sysctls := make(map[string]string)
-	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
-		if pod.Spec.SecurityContext != nil {
-			for _, c := range pod.Spec.SecurityContext.Sysctls {
-				sysctls[c.Name] = c.Value
-			}
-		}
-	}
-
-	lc.Sysctls = sysctls
-
-	if pod.Spec.SecurityContext != nil {
-		sc := pod.Spec.SecurityContext
-		if sc.RunAsUser != nil {
-			lc.SecurityContext.RunAsUser = &runtimeapi.Int64Value{Value: int64(*sc.RunAsUser)}
-		}
-		if sc.RunAsGroup != nil {
-			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
-		}
-		lc.SecurityContext.NamespaceOptions = namespacesForPod(pod)
-
-		if sc.FSGroup != nil {
-			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(*sc.FSGroup))
-		}
-		if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
-			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, groups...)
-		}
-		if sc.SupplementalGroups != nil {
-			for _, sg := range sc.SupplementalGroups {
-				lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(sg))
-			}
-		}
-		if sc.SELinuxOptions != nil {
-			lc.SecurityContext.SelinuxOptions = &runtimeapi.SELinuxOption{
-				User:  sc.SELinuxOptions.User,
-				Role:  sc.SELinuxOptions.Role,
-				Type:  sc.SELinuxOptions.Type,
-				Level: sc.SELinuxOptions.Level,
-			}
-		}
-	}
-
-	return lc, nil
 }
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
