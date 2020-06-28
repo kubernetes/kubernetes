@@ -42,15 +42,15 @@ RUN clean-install \
     ceph-common \
     cifs-utils \
     e2fsprogs \
-    xfsprogs \
     ethtool \
     git \
     glusterfs-client \
     jq \
-    openssh-client \
     nfs-common \
+    openssh-client \
     socat \
     udev \
-    util-linux
+    util-linux \
+    xfsprogs
 
 COPY cni-bin/bin /opt/cni/bin
