@@ -25,9 +25,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/klog/v2"
 )
 
 // EventFunc does some work that needs to be done at or after the
