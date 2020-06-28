@@ -1,4 +1,3 @@
-cluster/images/etcd/migrate
 pkg/controller/garbagecollector
 pkg/controller/nodeipam
 pkg/controller/podautoscaler
