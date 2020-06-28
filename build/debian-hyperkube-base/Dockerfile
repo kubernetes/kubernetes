@@ -44,6 +44,7 @@ RUN clean-install \
     ethtool \
     git \
     glusterfs-client \
+    iproute2 \
     jq \
     nfs-common \
     openssh-client \
