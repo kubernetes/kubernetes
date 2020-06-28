@@ -309,7 +309,7 @@ func (c *Client) Delete(ctx context.Context, resourceGroupName string, networkSe
 	return nil
 }
 
-// deleteNSG deletes a PublicIPAddress by name.
+// deleteNSG deletes a SecurityGroup by name.
 func (c *Client) deleteNSG(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) *retry.Error {
 	resourceID := armclient.GetResourceID(
 		c.subscriptionID,

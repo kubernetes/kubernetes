@@ -77,7 +77,6 @@ type frameworkImpl struct {
 	preBindPlugins        []framework.PreBindPlugin
 	bindPlugins           []framework.BindPlugin
 	postBindPlugins       []framework.PostBindPlugin
-	unreservePlugins      []framework.UnreservePlugin
 	permitPlugins         []framework.PermitPlugin
 
 	clientSet       clientset.Interface
@@ -85,6 +84,7 @@ type frameworkImpl struct {
 	informerFactory informers.SharedInformerFactory
 
 	metricsRecorder *metricsRecorder
+	profileName     string
 
 	preemptHandle framework.PreemptHandle
 
@@ -115,7 +115,6 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{plugins.PreBind, &f.preBindPlugins},
 		{plugins.Bind, &f.bindPlugins},
 		{plugins.PostBind, &f.postBindPlugins},
-		{plugins.Unreserve, &f.unreservePlugins},
 		{plugins.Permit, &f.permitPlugins},
 		{plugins.QueueSort, &f.queueSortPlugins},
 	}
@@ -127,6 +126,7 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister framework.SharedLister
 	metricsRecorder      *metricsRecorder
+	profileName          string
 	podNominator         framework.PodNominator
 	extenders            []framework.Extender
 	runAllFilters        bool
@@ -168,6 +168,13 @@ func WithSnapshotSharedLister(snapshotSharedLister framework.SharedLister) Optio
 func WithRunAllFilters(runAllFilters bool) Option {
 	return func(o *frameworkOptions) {
 		o.runAllFilters = runAllFilters
+	}
+}
+
+// WithProfileName sets the profile name.
+func WithProfileName(name string) Option {
+	return func(o *frameworkOptions) {
+		o.profileName = name
 	}
 }
 
@@ -228,6 +235,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		eventRecorder:         options.eventRecorder,
 		informerFactory:       options.informerFactory,
 		metricsRecorder:       options.metricsRecorder,
+		profileName:           options.profileName,
 		runAllFilters:         options.runAllFilters,
 	}
 	f.preemptHandle = &preemptHandle{
@@ -381,7 +389,7 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preFilterPlugins {
 		status = f.runPreFilterPlugin(ctx, pl, state, pod)
@@ -528,7 +536,7 @@ func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.Filter
 func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	statuses := make(framework.PluginToStatus)
@@ -566,7 +574,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 ) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preScorePlugins {
 		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
@@ -597,7 +605,7 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreS
 func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) (ps framework.PluginToNodeScores, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	pluginToNodeScores := make(framework.PluginToNodeScores, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
@@ -699,7 +707,7 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl framework.Scor
 func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preBind, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preBind, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preBindPlugins {
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
@@ -726,7 +734,7 @@ func (f *frameworkImpl) runPreBindPlugin(ctx context.Context, pl framework.PreBi
 func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(bind, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(bind, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	if len(f.bindPlugins) == 0 {
 		return framework.NewStatus(framework.Skip, "")
@@ -760,7 +768,7 @@ func (f *frameworkImpl) runBindPlugin(ctx context.Context, bp framework.BindPlug
 func (f *frameworkImpl) RunPostBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(postBind, framework.Success.String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(postBind, framework.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.postBindPlugins {
 		f.runPostBindPlugin(ctx, pl, state, pod, nodeName)
@@ -777,18 +785,20 @@ func (f *frameworkImpl) runPostBindPlugin(ctx context.Context, pl framework.Post
 	f.metricsRecorder.observePluginDurationAsync(postBind, pl.Name(), nil, metrics.SinceInSeconds(startTime))
 }
 
-// RunReservePlugins runs the set of configured reserve plugins. If any of these
-// plugins returns an error, it does not continue running the remaining ones and
-// returns the error. In such case, pod will not be scheduled.
-func (f *frameworkImpl) RunReservePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
+// RunReservePluginsReserve runs the Reserve method in the set of configured
+// reserve plugins. If any of these plugins returns an error, it does not
+// continue running the remaining ones and returns the error. In such a case,
+// the pod will not be scheduled and the caller will be expected to call
+// RunReservePluginsUnreserve.
+func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.reservePlugins {
-		status = f.runReservePlugin(ctx, pl, state, pod, nodeName)
+		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
+			msg := fmt.Sprintf("error while running Reserve in %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return framework.NewStatus(framework.Error, msg)
 		}
@@ -796,7 +806,7 @@ func (f *frameworkImpl) RunReservePlugins(ctx context.Context, state *framework.
 	return nil
 }
 
-func (f *frameworkImpl) runReservePlugin(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (f *frameworkImpl) runReservePluginReserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Reserve(ctx, state, pod, nodeName)
 	}
@@ -806,18 +816,21 @@ func (f *frameworkImpl) runReservePlugin(ctx context.Context, pl framework.Reser
 	return status
 }
 
-// RunUnreservePlugins runs the set of configured unreserve plugins.
-func (f *frameworkImpl) RunUnreservePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+// RunReservePluginsUnreserve runs the Unreserve method in the set of
+// configured reserve plugins.
+func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(unreserve, framework.Success.String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(unreserve, framework.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	for _, pl := range f.unreservePlugins {
-		f.runUnreservePlugin(ctx, pl, state, pod, nodeName)
+	// Execute the Unreserve operation of each reserve plugin in the
+	// *reverse* order in which the Reserve operation was executed.
+	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
+		f.runReservePluginUnreserve(ctx, f.reservePlugins[i], state, pod, nodeName)
 	}
 }
 
-func (f *frameworkImpl) runUnreservePlugin(ctx context.Context, pl framework.UnreservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (f *frameworkImpl) runReservePluginUnreserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	if !state.ShouldRecordPluginMetrics() {
 		pl.Unreserve(ctx, state, pod, nodeName)
 		return
@@ -836,7 +849,7 @@ func (f *frameworkImpl) runUnreservePlugin(ctx context.Context, pl framework.Unr
 func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(permit, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(permit, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	pluginsWaitTime := make(map[string]time.Duration)
 	statusCode := framework.Success

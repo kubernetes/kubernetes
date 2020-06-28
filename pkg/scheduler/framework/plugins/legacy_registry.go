@@ -273,8 +273,6 @@ func NewLegacyRegistry() *LegacyRegistry {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumebinding.Name, nil)
 			plugins.Reserve = appendToPluginSet(plugins.Reserve, volumebinding.Name, nil)
 			plugins.PreBind = appendToPluginSet(plugins.PreBind, volumebinding.Name, nil)
-			plugins.Unreserve = appendToPluginSet(plugins.Unreserve, volumebinding.Name, nil)
-			plugins.PostBind = appendToPluginSet(plugins.PostBind, volumebinding.Name, nil)
 			return
 		})
 	registry.registerPredicateConfigProducer(NoDiskConflictPred,

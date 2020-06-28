@@ -112,11 +112,6 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: volumebinding.Name},
 			},
 		},
-		Unreserve: &schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{
-				{Name: volumebinding.Name},
-			},
-		},
 		PreBind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
@@ -125,11 +120,6 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 		Bind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultbinder.Name},
-			},
-		},
-		PostBind: &schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{
-				{Name: volumebinding.Name},
 			},
 		},
 	}
@@ -214,11 +204,6 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: volumebinding.Name},
 					},
 				},
-				Unreserve: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
-					},
-				},
 				PreBind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
@@ -227,11 +212,6 @@ func TestApplyFeatureGates(t *testing.T) {
 				Bind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultbinder.Name},
-					},
-				},
-				PostBind: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
 					},
 				},
 			},
@@ -302,11 +282,6 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: volumebinding.Name},
 					},
 				},
-				Unreserve: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
-					},
-				},
 				PreBind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
@@ -315,11 +290,6 @@ func TestApplyFeatureGates(t *testing.T) {
 				Bind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultbinder.Name},
-					},
-				},
-				PostBind: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
 					},
 				},
 			},

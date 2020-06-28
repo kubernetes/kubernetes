@@ -60,6 +60,17 @@ func init() {
 
 type opCounts map[string]int64
 
+// migrationOpCheck validates migrated metrics.
+type migrationOpCheck struct {
+	cs         clientset.Interface
+	pluginName string
+	skipCheck  bool
+
+	// The old ops are not set if skipCheck is true.
+	oldInTreeOps   opCounts
+	oldMigratedOps opCounts
+}
+
 // BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
 var BaseSuites = []func() TestSuite{
 	InitVolumesTestSuite,
@@ -625,7 +636,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}
 
-	if !metricsGrabber.HasRegisteredMaster() {
+	if !metricsGrabber.HasControlPlanePods() {
 		framework.Logf("Warning: Environment does not support getting controller-manager metrics")
 		return opCounts{}
 	}
@@ -687,24 +698,18 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 	return opCounts{}, opCounts{}
 }
 
-func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, oldInTreeOps, oldMigratedOps opCounts) {
+func newMigrationOpCheck(cs clientset.Interface, pluginName string) *migrationOpCheck {
+	moc := migrationOpCheck{
+		cs:         cs,
+		pluginName: pluginName,
+	}
 	if len(pluginName) == 0 {
 		// This is a native CSI Driver and we don't check ops
-		return
+		moc.skipCheck = true
+		return &moc
 	}
 
-	if sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
-		// If this plugin is migrated based on the test flag storage.migratedPlugins
-		newInTreeOps, _ := getMigrationVolumeOpCounts(cs, pluginName)
-
-		for op, count := range newInTreeOps {
-			if count != oldInTreeOps[op] {
-				framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
-			}
-		}
-		// We don't check for migrated metrics because some negative test cases
-		// may not do any volume operations and therefore not emit any metrics
-	} else {
+	if !sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
 		// In-tree plugin is not migrated
 		framework.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
 
@@ -721,7 +726,27 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 		// and native CSI Driver metrics. This way we can check the counts for
 		// migrated version of the driver for stronger negative test case
 		// guarantees (as well as more informative metrics).
+		moc.skipCheck = true
+		return &moc
 	}
+	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, pluginName)
+	return &moc
+}
+
+func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
+	if moc.skipCheck {
+		return
+	}
+
+	newInTreeOps, _ := getMigrationVolumeOpCounts(moc.cs, moc.pluginName)
+
+	for op, count := range newInTreeOps {
+		if count != moc.oldInTreeOps[op] {
+			framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", moc.pluginName, count-moc.oldInTreeOps[op], op)
+		}
+	}
+	// We don't check for migrated metrics because some negative test cases
+	// may not do any volume operations and therefore not emit any metrics
 }
 
 // Skip skipVolTypes patterns if the driver supports dynamic provisioning

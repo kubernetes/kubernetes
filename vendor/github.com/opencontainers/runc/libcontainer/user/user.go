@@ -162,10 +162,6 @@ func ParsePasswdFilter(r io.Reader, filter func(User) bool) ([]User, error) {
 	)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		line := strings.TrimSpace(s.Text())
 		if line == "" {
 			continue
@@ -182,6 +178,9 @@ func ParsePasswdFilter(r io.Reader, filter func(User) bool) ([]User, error) {
 		if filter == nil || filter(p) {
 			out = append(out, p)
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 
 	return out, nil
@@ -221,10 +220,6 @@ func ParseGroupFilter(r io.Reader, filter func(Group) bool) ([]Group, error) {
 	)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		text := s.Text()
 		if text == "" {
 			continue
@@ -241,6 +236,9 @@ func ParseGroupFilter(r io.Reader, filter func(Group) bool) ([]Group, error) {
 		if filter == nil || filter(p) {
 			out = append(out, p)
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 
 	return out, nil
@@ -532,10 +530,6 @@ func ParseSubIDFilter(r io.Reader, filter func(SubID) bool) ([]SubID, error) {
 	)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		line := strings.TrimSpace(s.Text())
 		if line == "" {
 			continue
@@ -548,6 +542,9 @@ func ParseSubIDFilter(r io.Reader, filter func(SubID) bool) ([]SubID, error) {
 		if filter == nil || filter(p) {
 			out = append(out, p)
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 
 	return out, nil
@@ -586,10 +583,6 @@ func ParseIDMapFilter(r io.Reader, filter func(IDMap) bool) ([]IDMap, error) {
 	)
 
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return nil, err
-		}
-
 		line := strings.TrimSpace(s.Text())
 		if line == "" {
 			continue
@@ -602,6 +595,9 @@ func ParseIDMapFilter(r io.Reader, filter func(IDMap) bool) ([]IDMap, error) {
 		if filter == nil || filter(p) {
 			out = append(out, p)
 		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
 	}
 
 	return out, nil

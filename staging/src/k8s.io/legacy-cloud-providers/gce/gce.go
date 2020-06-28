@@ -659,6 +659,11 @@ func (g *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return g, true
 }
 
+// InstancesV2 returns an implementation of InstancesV2 for Google Compute Engine.
+func (g *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 // Zones returns an implementation of Zones for Google Compute Engine.
 func (g *Cloud) Zones() (cloudprovider.Zones, bool) {
 	return g, true

@@ -94,7 +94,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters = make(map[string]string)
 		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
-		masternodes, _, err := e2enode.GetMasterAndWorkerNodes(client)
+		masternodes, _, err := e2enode.DeprecatedGetMasterAndWorkerNodes(client)
 		framework.ExpectNoError(err)
 		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
 		masterNode = masternodes.List()[0]
@@ -335,8 +335,9 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	fnvHash := fnv.New32a()
 	fnvHash.Write([]byte(vmName))
 	dummyVMFullName := dummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
-	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
+	errorMsg := "Dummy VM - " + vmName + " is still present. Failing the test.."
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
-	isVMPresentFlag, _ := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
-	framework.ExpectNotEqual(isVMPresentFlag, true, errorMsg)
+	isVMPresentFlag, err := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(isVMPresentFlag, false, errorMsg)
 }

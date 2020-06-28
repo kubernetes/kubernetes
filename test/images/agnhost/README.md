@@ -88,7 +88,7 @@ Usage:
 
 ### connect
 
-Tries to open a TCP connection to the given host and port. On error it
+Tries to open a TCP or SCTP connection to the given host and port. On error it
 prints an error message prefixed with a specific fixed string that
 test cases can check for:
 
@@ -105,9 +105,11 @@ output than to check the exit code.)
 Usage:
 
 ```console
-    kubectl exec test-agnost -- /agnost connect [--timeout=<duration>] <host>:<port>
+    kubectl exec test-agnhost -- /agnhost connect [--timeout=<duration>] [--protocol=<protocol>] <host>:<port>
 ```
 
+The optional `--protocol` parameter can be set to `sctp` to test SCTP
+connections. The default value is `tcp`.
 
 ### crd-conversion-webhook
 
@@ -543,10 +545,10 @@ Usage:
 
 ### porter
 
-Serves requested data on ports specified in ENV variables. For example, if the environment
-variable `SERVE_PORT_9001` is set, then the subcommand will start serving on the port 9001.
-Additionally, if the environment variable `SERVE_TLS_PORT_9002` is set, then the subcommand
-will start a TLS server on that port.
+Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT}_[NNNN]`. eg:
+    - `SERVE_PORT_9001` - serve TCP connections on port 9001
+    - `SERVE_TLS_PORT_9002` - serve TLS-encrypted TCP connections on port 9002
+    - `SERVE_SCTP_PORT_9003` - serve SCTP connections on port 9003
 
 The included `localhost.crt` is a PEM-encoded TLS cert with SAN IPs `127.0.0.1` and `[::1]`,
 expiring in January 2084, generated from `src/crypto/tls`:

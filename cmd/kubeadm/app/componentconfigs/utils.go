@@ -18,6 +18,8 @@ package componentconfigs
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
@@ -38,6 +40,27 @@ type UnsupportedConfigVersionError struct {
 // Error implements the standard Golang error interface for UnsupportedConfigVersionError
 func (err *UnsupportedConfigVersionError) Error() string {
 	return fmt.Sprintf("unsupported apiVersion %q, you may have to do manual conversion to %q and run kubeadm again", err.OldVersion, err.CurrentVersion)
+}
+
+// UnsupportedConfigVersionsErrorMap is a cumulative version of the UnsupportedConfigVersionError type
+type UnsupportedConfigVersionsErrorMap map[string]*UnsupportedConfigVersionError
+
+// Error implements the standard Golang error interface for UnsupportedConfigVersionsErrorMap
+func (errs UnsupportedConfigVersionsErrorMap) Error() string {
+	// Make sure the error messages we print are predictable by sorting them by the group names involved
+	groups := make([]string, 0, len(errs))
+	for group := range errs {
+		groups = append(groups, group)
+	}
+	sort.Strings(groups)
+
+	msgs := make([]string, 1, 1+len(errs))
+	msgs[0] = "multiple unsupported config version errors encountered:"
+	for _, group := range groups {
+		msgs = append(msgs, errs[group].Error())
+	}
+
+	return strings.Join(msgs, "\n\t- ")
 }
 
 // warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain

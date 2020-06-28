@@ -31,7 +31,6 @@ go_library(
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/perftype:go_default_library",
-        "//test/e2e/system:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

@@ -9,7 +9,10 @@ go_library(
     name = "go_default_library",
     srcs = ["connect.go"],
     importpath = "k8s.io/kubernetes/test/images/agnhost/connect",
-    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
+    deps = [
+        "//vendor/github.com/ishidawataru/sctp:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+    ],
 )
 
 filegroup(

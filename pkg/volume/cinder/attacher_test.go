@@ -645,6 +645,10 @@ func (testcase *testcase) Instances() (cloudprovider.Instances, bool) {
 	return &instances{testcase.instanceID}, true
 }
 
+func (testcase *testcase) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 func (testcase *testcase) DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error) {
 	expected := &testcase.disksAreAttached
 

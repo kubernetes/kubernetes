@@ -2,7 +2,7 @@
 
 module k8s.io/sample-apiserver
 
-go 1.13
+go 1.14
 
 require (
 	github.com/go-openapi/spec v0.19.3
@@ -18,8 +18,6 @@ require (
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

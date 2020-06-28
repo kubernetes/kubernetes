@@ -4,9 +4,7 @@ package fs2
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -16,16 +14,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func isPidsSet(cgroup *configs.Cgroup) bool {
+	return cgroup.Resources.PidsLimit != 0
+}
+
 func setPids(dirPath string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.PidsLimit != 0 {
-		// "max" is the fallback value.
-		limit := "max"
-
-		if cgroup.Resources.PidsLimit > 0 {
-			limit = strconv.FormatInt(cgroup.Resources.PidsLimit, 10)
-		}
-
-		if err := fscommon.WriteFile(dirPath, "pids.max", limit); err != nil {
+	if !isPidsSet(cgroup) {
+		return nil
+	}
+	if val := numToStr(cgroup.Resources.PidsLimit); val != "" {
+		if err := fscommon.WriteFile(dirPath, "pids.max", val); err != nil {
 			return err
 		}
 	}
@@ -33,20 +31,11 @@ func setPids(dirPath string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func isNOTSUP(err error) bool {
-	switch err := err.(type) {
-	case *os.PathError:
-		return err.Err == unix.ENOTSUP
-	default:
-		return false
-	}
-}
-
 func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
 	contents, err := ioutil.ReadFile(filepath.Join(dirPath, "cgroup.procs"))
-	if err != nil && isNOTSUP(err) {
+	if errors.Is(err, unix.ENOTSUP) {
 		contents, err = ioutil.ReadFile(filepath.Join(dirPath, "cgroup.threads"))
 	}
 	if err != nil {

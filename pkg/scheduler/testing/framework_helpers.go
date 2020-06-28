@@ -100,8 +100,6 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return initializeIfNeeded(&plugins.Bind)
 	case "Reserve":
 		return initializeIfNeeded(&plugins.Reserve)
-	case "Unreserve":
-		return initializeIfNeeded(&plugins.Unreserve)
 	case "Permit":
 		return initializeIfNeeded(&plugins.Permit)
 	case "PreBind":

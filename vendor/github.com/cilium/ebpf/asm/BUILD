@@ -20,7 +20,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/cilium/ebpf/asm",
     importpath = "github.com/cilium/ebpf/asm",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
+    deps = ["//vendor/golang.org/x/xerrors:go_default_library"],
 )
 
 filegroup(

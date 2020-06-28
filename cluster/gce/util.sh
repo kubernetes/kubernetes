@@ -891,7 +891,7 @@ function construct-windows-kubelet-flags {
   flags+=" --cgroups-per-qos=false --enforce-node-allocatable="
 
   # Turn off kernel memory cgroup notification.
-  flags+=" --experimental-kernel-memcg-notification=false"
+  flags+=" --kernel-memcg-notification=false"
 
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
@@ -3033,7 +3033,7 @@ function create-linux-nodes() {
           --base-instance-name "${extra_group_name}" \
           --size "${num_additional}" \
           --template "${extra_template_name}" || true;
-      gcloud compute instance-groups managed wait-until-stable \
+      gcloud compute instance-groups managed wait-until --stable \
           "${extra_group_name}" \
           --zone "${ZONE}" \
           --project "${PROJECT}" \
@@ -3064,7 +3064,7 @@ function create-linux-nodes() {
           --base-instance-name "${group_name}" \
           --size "${this_mig_size}" \
           --template "${template_name}" || true;
-      gcloud compute instance-groups managed wait-until-stable \
+      gcloud compute instance-groups managed wait-until --stable \
           "${group_name}" \
           --zone "${ZONE}" \
           --project "${PROJECT}" \
@@ -3104,7 +3104,7 @@ function create-windows-nodes() {
         --base-instance-name "${group_name}" \
         --size "${this_mig_size}" \
         --template "${template_name}" || true;
-    gcloud compute instance-groups managed wait-until-stable \
+    gcloud compute instance-groups managed wait-until --stable \
         "${group_name}" \
         --zone "${ZONE}" \
         --project "${PROJECT}" \

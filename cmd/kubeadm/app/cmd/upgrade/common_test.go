@@ -18,97 +18,10 @@ package upgrade
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
-
-func TestGetK8sVersionFromUserInput(t *testing.T) {
-	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
-	validConfig := "apiVersion: kubeadm.k8s.io/v1beta2\n" +
-		"kind: ClusterConfiguration\n" +
-		"kubernetesVersion: " + currentVersion
-
-	var tcases = []struct {
-		name               string
-		isVersionMandatory bool
-		clusterConfig      string
-		args               []string
-		expectedErr        bool
-		expectedVersion    string
-	}{
-		{
-			name:               "No config and version as an argument",
-			isVersionMandatory: true,
-			args:               []string{"v1.13.1"},
-			expectedVersion:    "v1.13.1",
-		},
-		{
-			name:               "Neither config nor version specified",
-			isVersionMandatory: true,
-			expectedErr:        true,
-		},
-		{
-			name:               "No config and empty version as an argument",
-			isVersionMandatory: true,
-			args:               []string{""},
-			expectedErr:        true,
-		},
-		{
-			name:               "Valid config, but no version specified",
-			isVersionMandatory: true,
-			clusterConfig:      validConfig,
-			expectedVersion:    currentVersion,
-		},
-		{
-			name:               "Valid config and different version specified",
-			isVersionMandatory: true,
-			clusterConfig:      validConfig,
-			args:               []string{"v1.13.1"},
-			expectedVersion:    "v1.13.1",
-		},
-		{
-			name: "Version is optional",
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			flags := &applyPlanFlags{}
-			if len(tt.clusterConfig) > 0 {
-				file, err := ioutil.TempFile("", "kubeadm-upgrade-common-test-*.yaml")
-				if err != nil {
-					t.Fatalf("Failed to create test config file: %+v", err)
-				}
-
-				tmpFileName := file.Name()
-				defer os.Remove(tmpFileName)
-
-				_, err = file.WriteString(tt.clusterConfig)
-				file.Close()
-				if err != nil {
-					t.Fatalf("Failed to write test config file contents: %+v", err)
-				}
-
-				flags.cfgPath = tmpFileName
-			}
-
-			userVersion, err := getK8sVersionFromUserInput(flags, tt.args, tt.isVersionMandatory)
-
-			if err == nil && tt.expectedErr {
-				t.Error("Expected error, but got success")
-			}
-			if err != nil && !tt.expectedErr {
-				t.Errorf("Unexpected error: %+v", err)
-			}
-			if userVersion != tt.expectedVersion {
-				t.Errorf("Expected %q, but got %q", tt.expectedVersion, userVersion)
-			}
-		})
-	}
-}
 
 func TestEnforceRequirements(t *testing.T) {
 	tcases := []struct {
@@ -139,7 +52,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, tt.dryRun, tt.newK8sVersion)
+			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false)
 
 			if err == nil && tt.expectedErr {
 				t.Error("Expected error, but got success")

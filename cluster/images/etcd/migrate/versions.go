@@ -164,10 +164,9 @@ func (sv SupportedVersions) NextVersionPair(current *EtcdVersionPair) *EtcdVersi
 	return &EtcdVersionPair{version: nextVersion, storageVersion: storageVersion}
 }
 
-// ParseSupportedVersions parses a comma separated list of etcd versions.
-func ParseSupportedVersions(s string) (SupportedVersions, error) {
+// ParseSupportedVersions parses a list of etcd versions.
+func ParseSupportedVersions(list []string) (SupportedVersions, error) {
 	var err error
-	list := strings.Split(s, ",")
 	versions := make(SupportedVersions, len(list))
 	for i, v := range list {
 		versions[i], err = ParseEtcdVersion(strings.TrimSpace(v))
@@ -177,3 +176,4 @@ func ParseSupportedVersions(s string) (SupportedVersions, error) {
 	}
 	return versions, nil
 }
+

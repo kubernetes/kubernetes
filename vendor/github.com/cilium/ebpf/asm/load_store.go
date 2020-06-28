@@ -110,8 +110,23 @@ func LoadMapPtr(dst Register, fd int) Instruction {
 	return Instruction{
 		OpCode:   LoadImmOp(DWord),
 		Dst:      dst,
-		Src:      R1,
+		Src:      PseudoMapFD,
 		Constant: int64(fd),
+	}
+}
+
+// LoadMapValue stores a pointer to the value at a certain offset of a map.
+func LoadMapValue(dst Register, fd int, offset uint32) Instruction {
+	if fd < 0 {
+		return Instruction{OpCode: InvalidOpCode}
+	}
+
+	fdAndOffset := (uint64(offset) << 32) | uint64(uint32(fd))
+	return Instruction{
+		OpCode:   LoadImmOp(DWord),
+		Dst:      dst,
+		Src:      PseudoMapValue,
+		Constant: int64(fdAndOffset),
 	}
 }
 

@@ -31,18 +31,21 @@ import (
 	"sync"
 	"unsafe"
 
-	info "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+
+	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/stats"
 )
 
 type collector struct {
 	cgroupPath         string
-	events             Events
+	events             PerfEvents
 	cpuFiles           map[string]map[int]readerCloser
 	cpuFilesLock       sync.Mutex
 	numCores           int
 	eventToCustomEvent map[Event]*CustomEvent
+	uncore             stats.Collector
 }
 
 var (
@@ -61,48 +64,66 @@ func init() {
 	isLibpfmInitialized = true
 }
 
-func newCollector(cgroupPath string, events Events, numCores int) *collector {
-	collector := &collector{cgroupPath: cgroupPath, events: events, cpuFiles: map[string]map[int]readerCloser{}, numCores: numCores}
+func newCollector(cgroupPath string, events PerfEvents, numCores int, topology []info.Node) *collector {
+	collector := &collector{cgroupPath: cgroupPath, events: events, cpuFiles: map[string]map[int]readerCloser{}, numCores: numCores, uncore: NewUncoreCollector(cgroupPath, events, topology)}
 	mapEventsToCustomEvents(collector)
+
 	return collector
 }
 
 func (c *collector) UpdateStats(stats *info.ContainerStats) error {
+	err := c.uncore.UpdateStats(stats)
+	if err != nil {
+		klog.Errorf("Failed to get uncore perf event stats: %v", err)
+	}
+
 	c.cpuFilesLock.Lock()
 	defer c.cpuFilesLock.Unlock()
 
 	stats.PerfStats = []info.PerfStat{}
 	klog.V(5).Infof("Attempting to update perf_event stats from cgroup %q", c.cgroupPath)
-	for name, files := range c.cpuFiles {
-		for cpu, file := range files {
-			buf := make([]byte, 32)
-			_, err := file.Read(buf)
+	for name, cpus := range c.cpuFiles {
+		for cpu, file := range cpus {
+			stat, err := readPerfStat(file, name, cpu)
 			if err != nil {
-				klog.Warningf("Unable to read from perf_event file (event: %q, CPU: %d) for %q", name, cpu, c.cgroupPath)
+				klog.Warningf("Unable to read from perf_event_file (event: %q, CPU: %d) for %q: %q", name, cpu, c.cgroupPath, err.Error())
 				continue
 			}
-			perfData := &ReadFormat{}
-			reader := bytes.NewReader(buf)
-			err = binary.Read(reader, binary.LittleEndian, perfData)
-			if err != nil {
-				klog.Warningf("Unable to decode from binary format read from perf_event file (event: %q, CPU: %d) for %q", name, cpu, c.cgroupPath)
-				continue
-			}
-			klog.V(5).Infof("Read metric for event %q for cpu %d from cgroup %q: %d", name, cpu, c.cgroupPath, perfData.Value)
-			scalingRatio := 1.0
-			if perfData.TimeEnabled != 0 {
-				scalingRatio = float64(perfData.TimeRunning) / float64(perfData.TimeEnabled)
-			}
-			stat := info.PerfStat{
-				Value:        uint64(float64(perfData.Value) / scalingRatio),
-				Name:         name,
-				ScalingRatio: scalingRatio,
-				Cpu:          cpu,
-			}
-			stats.PerfStats = append(stats.PerfStats, stat)
+			klog.V(5).Infof("Read perf event (event: %q, CPU: %d) for %q: %d", name, cpu, c.cgroupPath, stat.Value)
+
+			stats.PerfStats = append(stats.PerfStats, *stat)
 		}
 	}
+
 	return nil
+}
+
+func readPerfStat(file readerCloser, name string, cpu int) (*info.PerfStat, error) {
+	buf := make([]byte, 32)
+	_, err := file.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	perfData := &ReadFormat{}
+	reader := bytes.NewReader(buf)
+	err = binary.Read(reader, binary.LittleEndian, perfData)
+	if err != nil {
+		return nil, err
+	}
+
+	scalingRatio := 1.0
+	if perfData.TimeEnabled != 0 {
+		scalingRatio = float64(perfData.TimeRunning) / float64(perfData.TimeEnabled)
+	}
+
+	stat := info.PerfStat{
+		Value:        uint64(float64(perfData.Value) / scalingRatio),
+		Name:         name,
+		ScalingRatio: scalingRatio,
+		Cpu:          cpu,
+	}
+
+	return &stat, nil
 }
 
 func (c *collector) setup() error {
@@ -115,7 +136,7 @@ func (c *collector) setup() error {
 	c.cpuFilesLock.Lock()
 	defer c.cpuFilesLock.Unlock()
 	cgroupFd := int(cgroup.Fd())
-	for _, group := range c.events.Events {
+	for _, group := range c.events.Core.Events {
 		customEvent, ok := c.eventToCustomEvent[group[0]]
 		var err error
 		if ok {
@@ -127,6 +148,7 @@ func (c *collector) setup() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -141,10 +163,10 @@ func (c *collector) setupRawNonGrouped(event *CustomEvent, cgroup int) error {
 	return nil
 }
 
-func (c *collector) registerEvent(config *unix.PerfEventAttr, name string, cgroup int) error {
+func (c *collector) registerEvent(config *unix.PerfEventAttr, name string, pid int) error {
 	var cpu int
 	for cpu = 0; cpu < c.numCores; cpu++ {
-		pid, groupFd, flags := cgroup, -1, unix.PERF_FLAG_FD_CLOEXEC|unix.PERF_FLAG_PID_CGROUP
+		groupFd, flags := -1, unix.PERF_FLAG_FD_CLOEXEC|unix.PERF_FLAG_PID_CGROUP
 		fd, err := unix.PerfEventOpen(config, pid, cpu, groupFd, flags)
 		if err != nil {
 			return fmt.Errorf("setting up perf event %#v failed: %q", config, err)
@@ -164,35 +186,18 @@ func (c *collector) addEventFile(name string, cpu int, perfFile *os.File) {
 	if !ok {
 		c.cpuFiles[name] = map[int]readerCloser{}
 	}
+
 	c.cpuFiles[name][cpu] = perfFile
 }
 
 func (c *collector) setupNonGrouped(name string, cgroup int) error {
-	if !isLibpfmInitialized {
-		return fmt.Errorf("libpfm4 is not initialized, cannot proceed with setting perf events up")
+	perfEventAttr, err := getPerfEventAttr(name)
+	if err != nil {
+		return err
 	}
+	defer C.free(unsafe.Pointer(perfEventAttr))
 
-	klog.V(5).Infof("Setting up non-grouped perf event %s", name)
-
-	perfEventAttrMemory := C.malloc(C.ulong(unsafe.Sizeof(unix.PerfEventAttr{})))
-	defer C.free(perfEventAttrMemory)
-	event := pfmPerfEncodeArgT{}
-
-	perfEventAttr := (*unix.PerfEventAttr)(perfEventAttrMemory)
-	fstr := C.CString("")
-	event.fstr = unsafe.Pointer(fstr)
-	event.attr = perfEventAttrMemory
-	event.size = C.ulong(unsafe.Sizeof(event))
-
-	cSafeName := C.CString(name)
-	pErr := C.pfm_get_os_event_encoding(cSafeName, C.PFM_PLM0|C.PFM_PLM3, C.PFM_OS_PERF_EVENT, unsafe.Pointer(&event))
-	if pErr != C.PFM_SUCCESS {
-		return fmt.Errorf("unable to transform event name %s to perf_event_attr: %d", name, int(pErr))
-	}
-
-	klog.V(5).Infof("perf_event_attr: %#v", perfEventAttr)
-	setAttributes(perfEventAttr)
-	return c.registerEvent(perfEventAttr, string(name), cgroup)
+	return c.registerEvent(perfEventAttr, name, cgroup)
 }
 
 func createPerfEventAttr(event CustomEvent) *unix.PerfEventAttr {
@@ -214,6 +219,34 @@ func createPerfEventAttr(event CustomEvent) *unix.PerfEventAttr {
 	return config
 }
 
+func getPerfEventAttr(name string) (*unix.PerfEventAttr, error) {
+	if !isLibpfmInitialized {
+		return nil, fmt.Errorf("libpfm4 is not initialized, cannot proceed with setting perf events up")
+	}
+
+	perfEventAttrMemory := C.malloc(C.ulong(unsafe.Sizeof(unix.PerfEventAttr{})))
+	event := pfmPerfEncodeArgT{}
+
+	perfEventAttr := (*unix.PerfEventAttr)(perfEventAttrMemory)
+	fstr := C.CString("")
+	event.fstr = unsafe.Pointer(fstr)
+	event.attr = perfEventAttrMemory
+	event.size = C.ulong(unsafe.Sizeof(event))
+
+	cSafeName := C.CString(name)
+
+	pErr := C.pfm_get_os_event_encoding(cSafeName, C.PFM_PLM0|C.PFM_PLM3, C.PFM_OS_PERF_EVENT, unsafe.Pointer(&event))
+	if pErr != C.PFM_SUCCESS {
+		return nil, fmt.Errorf("unable to transform event name %s to perf_event_attr: %v", name, int(pErr))
+	}
+
+	klog.V(5).Infof("perf_event_attr: %#v", perfEventAttr)
+
+	setAttributes(perfEventAttr)
+
+	return perfEventAttr, nil
+}
+
 func setAttributes(config *unix.PerfEventAttr) {
 	config.Sample_type = perfSampleIdentifier
 	config.Read_format = unix.PERF_FORMAT_TOTAL_TIME_ENABLED | unix.PERF_FORMAT_TOTAL_TIME_RUNNING | unix.PERF_FORMAT_ID
@@ -222,6 +255,7 @@ func setAttributes(config *unix.PerfEventAttr) {
 }
 
 func (c *collector) Destroy() {
+	c.uncore.Destroy()
 	c.cpuFilesLock.Lock()
 	defer c.cpuFilesLock.Unlock()
 
@@ -233,7 +267,6 @@ func (c *collector) Destroy() {
 				klog.Warningf("Unable to close perf_event file descriptor for cgroup %q, event %q and CPU %d", c.cgroupPath, name, cpu)
 			}
 		}
-
 		delete(c.cpuFiles, name)
 	}
 }
@@ -255,7 +288,7 @@ func Finalize() {
 
 func mapEventsToCustomEvents(collector *collector) {
 	collector.eventToCustomEvent = map[Event]*CustomEvent{}
-	for key, event := range collector.events.CustomEvents {
-		collector.eventToCustomEvent[event.Name] = &collector.events.CustomEvents[key]
+	for key, event := range collector.events.Core.CustomEvents {
+		collector.eventToCustomEvent[event.Name] = &collector.events.Core.CustomEvents[key]
 	}
 }

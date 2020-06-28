@@ -18,6 +18,7 @@ go_library(
         "//vendor/golang.org/x/tools/go/packages:go_default_library",
         "//vendor/golang.org/x/tools/internal/gopathwalk:go_default_library",
         "//vendor/golang.org/x/tools/internal/module:go_default_library",
+        "//vendor/golang.org/x/tools/internal/semver:go_default_library",
     ],
 )
 

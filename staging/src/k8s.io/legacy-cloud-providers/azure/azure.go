@@ -63,6 +63,11 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	_ "k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient"
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	_ "k8s.io/legacy-cloud-providers/azure/clients/deploymentclient"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -657,6 +662,11 @@ func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 // Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return az, true
+}
+
+// InstancesV2 returns an instancesV2 interface. Also returns true if the interface is supported, false otherwise.
+func (az *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
 }
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.

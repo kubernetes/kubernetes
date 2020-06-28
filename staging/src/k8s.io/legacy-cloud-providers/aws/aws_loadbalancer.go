@@ -185,9 +185,12 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			}
 
 			// actual maps FrontendPort to an elbv2.Listener
-			actual := map[int64]*elbv2.Listener{}
+			actual := map[int64]map[string]*elbv2.Listener{}
 			for _, listener := range listenerDescriptions.Listeners {
-				actual[*listener.Port] = listener
+				if actual[*listener.Port] == nil {
+					actual[*listener.Port] = map[string]*elbv2.Listener{}
+				}
+				actual[*listener.Port][*listener.Protocol] = listener
 			}
 
 			actualTargetGroups, err := c.elbv2.DescribeTargetGroups(
@@ -207,10 +210,11 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			// Handle additions/modifications
 			for _, mapping := range mappings {
 				frontendPort := mapping.FrontendPort
+				frontendProtocol := mapping.FrontendProtocol
 				nodePort := mapping.TrafficPort
 
 				// modifications
-				if listener, ok := actual[frontendPort]; ok {
+				if listener, ok := actual[frontendPort][frontendProtocol]; ok {
 					listenerNeedsModification := false
 
 					if aws.StringValue(listener.Protocol) != mapping.FrontendProtocol {
@@ -315,23 +319,27 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 				dirty = true
 			}
 
-			frontEndPorts := map[int64]bool{}
+			frontEndPorts := map[int64]map[string]bool{}
 			for i := range mappings {
-				frontEndPorts[mappings[i].FrontendPort] = true
+				if frontEndPorts[mappings[i].FrontendPort] == nil {
+					frontEndPorts[mappings[i].FrontendPort] = map[string]bool{}
+				}
+				frontEndPorts[mappings[i].FrontendPort][mappings[i].FrontendProtocol] = true
 			}
 
 			// handle deletions
-			for port, listener := range actual {
-				if _, ok := frontEndPorts[port]; !ok {
-					err := c.deleteListenerV2(listener)
-					if err != nil {
-						return nil, err
+			for port := range actual {
+				for protocol := range actual[port] {
+					if _, ok := frontEndPorts[port][protocol]; !ok {
+						err := c.deleteListenerV2(actual[port][protocol])
+						if err != nil {
+							return nil, err
+						}
+						dirty = true
 					}
-					dirty = true
 				}
 			}
 		}
-
 		if err := c.reconcileLBAttributes(aws.StringValue(loadBalancer.LoadBalancerArn), annotations); err != nil {
 			return nil, err
 		}
@@ -768,10 +776,14 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(lbName string, instances map[
 
 	{
 		clientPorts := sets.Int64{}
+		clientProtocol := "tcp"
 		healthCheckPorts := sets.Int64{}
 		for _, port := range portMappings {
 			clientPorts.Insert(port.TrafficPort)
 			healthCheckPorts.Insert(port.HealthCheckPort)
+			if port.TrafficProtocol == string(v1.ProtocolUDP) {
+				clientProtocol = "udp"
+			}
 		}
 		clientRuleAnnotation := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
 		healthRuleAnnotation := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
@@ -785,14 +797,14 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(lbName string, instances map[
 				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, healthRuleAnnotation, "tcp", healthCheckPorts, vpcCIDRs); err != nil {
 					return err
 				}
-				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, "tcp", clientPorts, clientCIDRs); err != nil {
+				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, clientProtocol, clientPorts, clientCIDRs); err != nil {
 					return err
 				}
 			} else {
 				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, healthRuleAnnotation, "tcp", nil, nil); err != nil {
 					return err
 				}
-				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, "tcp", nil, nil); err != nil {
+				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, clientProtocol, nil, nil); err != nil {
 					return err
 				}
 			}

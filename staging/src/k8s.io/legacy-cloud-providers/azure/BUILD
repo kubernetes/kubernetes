@@ -63,6 +63,8 @@ go_library(
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/cache:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/deploymentclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/diskclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient:go_default_library",

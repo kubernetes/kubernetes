@@ -65,8 +65,7 @@ dependencies:
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
-    - path: cluster/images/etcd/migrate-if-needed.sh
-      match: BUNDLED_VERSIONS=
+    - path: cluster/images/etcd/migrate/options.go
 
   - name: "golang"
     version: 1.14.4

@@ -63,13 +63,15 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	unsupportedFlags := fmt.Sprintf("--%s", strings.Join(unsupportedLoggingFlags(), ", --"))
 	formats := fmt.Sprintf(`"%s"`, strings.Join(logRegistry.List(), `", "`))
 	fs.StringVar(&o.LogFormat, logFormatFlagName, defaultLogFormat, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
+
+	// No new log formats should be added after generation is of flag options
+	logRegistry.Freeze()
 }
 
 // Apply set klog logger from LogFormat type
 func (o *Options) Apply() {
 	// if log format not exists, use nil loggr
 	loggr, _ := o.Get()
-
 	klog.SetLogger(loggr)
 }
 

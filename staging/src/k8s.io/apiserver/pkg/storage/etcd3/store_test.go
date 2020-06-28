@@ -373,6 +373,10 @@ func TestConditionalDelete(t *testing.T) {
 func TestGetToList(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
+	prevKey, prevStoredObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
+
+	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
+
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
@@ -382,6 +386,7 @@ func TestGetToList(t *testing.T) {
 		pred             storage.SelectionPredicate
 		expectedOut      []*example.Pod
 		rv               string
+		rvMatch          metav1.ResourceVersionMatch
 		expectRVTooLarge bool
 	}{{ // test GetToList on existing key
 		key:         key,
@@ -392,11 +397,41 @@ func TestGetToList(t *testing.T) {
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          "0",
+	}, { // test GetToList on existing key with minimum resource version set to 0, match=minimum
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          "0",
+		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, { // test GetToList on existing key with minimum resource version set to current resource version
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", currentRV),
+	}, { // test GetToList on existing key with minimum resource version set to current resource version, match=minimum
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          fmt.Sprintf("%d", currentRV),
+		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+	}, { // test GetToList on existing key with minimum resource version set to previous resource version, match=minimum
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          fmt.Sprintf("%d", prevRV),
+		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+	}, { // test GetToList on existing key with resource version set to current resource version, match=exact
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          fmt.Sprintf("%d", currentRV),
+		rvMatch:     metav1.ResourceVersionMatchExact,
+	}, { // test GetToList on existing key with resource version set to previous resource version, match=exact
+		key:         prevKey,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{prevStoredObj},
+		rv:          fmt.Sprintf("%d", prevRV),
+		rvMatch:     metav1.ResourceVersionMatchExact,
 	}, { // test GetToList on existing key with minimum resource version set too high
 		key:              key,
 		pred:             storage.Everything,
@@ -422,7 +457,7 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := store.GetToList(ctx, tt.key, storage.ListOptions{ResourceVersion: tt.rv, Predicate: tt.pred}, out)
+		err := store.GetToList(ctx, tt.key, storage.ListOptions{ResourceVersion: tt.rv, ResourceVersionMatch: tt.rvMatch, Predicate: tt.pred}, out)
 
 		if tt.expectRVTooLarge {
 			if err == nil || !storage.IsTooLargeResourceVersion(err) {
@@ -934,6 +969,7 @@ func TestList(t *testing.T) {
 		name                       string
 		disablePaging              bool
 		rv                         string
+		rvMatch                    metav1.ResourceVersionMatch
 		prefix                     string
 		pred                       storage.SelectionPredicate
 		expectedOut                []*example.Pod
@@ -982,11 +1018,53 @@ func TestList(t *testing.T) {
 			rv:          "0",
 		},
 		{
+			name:        "test List on existing key with resource version set to 1, match=Exact",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{},
+			rv:          "1",
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    "1",
+		},
+		{
+			name:        "test List on existing key with resource version set to 1, match=NotOlderThan",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          "0",
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+		},
+		{
+			name:        "test List on existing key with resource version set to 1, match=Invalid",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			rv:          "0",
+			rvMatch:     "Invalid",
+			expectError: true,
+		},
+		{
 			name:        "test List on existing key with resource version set to current resource version",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          list.ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set to current resource version, match=Exact",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          list.ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    list.ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          list.ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 		},
 		{
 			name:        "test List on non-existing key",
@@ -1030,6 +1108,21 @@ func TestList(t *testing.T) {
 			expectRV:                   list.ResourceVersion,
 		},
 		{
+			name:   "test List with limit at current resource version and match=Exact",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         list.ResourceVersion,
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectRV:                   list.ResourceVersion,
+		},
+		{
 			name:   "test List with limit at resource version 0",
 			prefix: "/two-level/",
 			pred: storage.SelectionPredicate{
@@ -1042,6 +1135,49 @@ func TestList(t *testing.T) {
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         "0",
 			expectRV:                   list.ResourceVersion,
+		},
+		{
+			name:   "test List with limit at resource version 0 match=NotOlderThan",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         "0",
+			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
+			expectRV:                   list.ResourceVersion,
+		},
+		{
+			name:   "test List with limit at resource version 1 and match=Exact",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []*example.Pod{},
+			expectContinue: false,
+			rv:             "1",
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRV:       "1",
+		},
+		{
+			name:   "test List with limit at old resource version and match=Exact",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []*example.Pod{},
+			expectContinue: false,
+			rv:             "1",
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRV:       "1",
 		},
 		{
 			name:          "test List with limit when paging disabled",
@@ -1201,7 +1337,7 @@ func TestList(t *testing.T) {
 			}
 
 			out := &example.PodList{}
-			storageOpts := storage.ListOptions{ResourceVersion: tt.rv, Predicate: tt.pred}
+			storageOpts := storage.ListOptions{ResourceVersion: tt.rv, ResourceVersionMatch: tt.rvMatch, Predicate: tt.pred}
 			var err error
 			if tt.disablePaging {
 				err = disablePagingStore.List(ctx, tt.prefix, storageOpts, out)

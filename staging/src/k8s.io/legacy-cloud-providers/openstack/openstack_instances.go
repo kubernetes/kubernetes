@@ -62,6 +62,11 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	}, true
 }
 
+// InstancesV2 returns an implementation of InstancesV2 for OpenStack.
+func (os *OpenStack) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 // CurrentNodeName implements Instances.CurrentNodeName
 // Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {

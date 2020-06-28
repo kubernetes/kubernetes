@@ -554,7 +554,7 @@ type DaemonSetList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.1
 // +k8s:prerelease-lifecycle-gen:deprecated=1.14
 // +k8s:prerelease-lifecycle-gen:removed=1.22
-// +k8s:prerelease-lifecycle-gen:replacement=networking.k8s.io,v1beta1,Ingress
+// +k8s:prerelease-lifecycle-gen:replacement=networking.k8s.io,v1,Ingress
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
@@ -583,7 +583,7 @@ type Ingress struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.1
 // +k8s:prerelease-lifecycle-gen:deprecated=1.14
 // +k8s:prerelease-lifecycle-gen:removed=1.22
-// +k8s:prerelease-lifecycle-gen:replacement=networking.k8s.io,v1beta1,IngressList
+// +k8s:prerelease-lifecycle-gen:replacement=networking.k8s.io,v1,IngressList
 
 // IngressList is a collection of Ingress.
 type IngressList struct {
