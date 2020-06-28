@@ -18,14 +18,14 @@ package storage
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-
-	"github.com/onsi/ginkgo"
 )
 
 var _ = utils.SIGDescribe("Subpath", func() {
@@ -48,7 +48,6 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				framework.ExpectNoError(err, "while creating configmap")
 			}
-
 		})
 
 		/*
@@ -124,6 +123,15 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				},
 			}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
+		})
+
+	})
+
+	ginkgo.Context("Container restart", func() {
+		ginkgo.It("should verify that container can restart successfully after configmaps modified", func() {
+			configmapToModify := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap-to-modify"}, Data: map[string]string{"configmap-key": "configmap-value"}}
+			configmapModified := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap-to-modify"}, Data: map[string]string{"configmap-key": "configmap-modified-value"}}
+			testsuites.TestPodContainerRestartWithConfigmapModified(f, configmapToModify, configmapModified)
 		})
 	})
 })
