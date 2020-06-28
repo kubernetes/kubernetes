@@ -17,14 +17,9 @@ limitations under the License.
 package common
 
 import (
-	"context"
-	"fmt"
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -362,110 +357,6 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
-
-	/*
-		Release : v1.19
-		Testname: VolumeSubpathEnvExpansion, subpath lifecycle
-		Description: Verify should not change the subpath mount on a container restart if the environment variable changes
-		1.	valid subpathexpr starts a container running
-		2.	test for valid subpath writes
-		3.	container restarts
-		4.	delete cleanly
-	*/
-	framework.ConformanceIt("should not change the subpath mount on a container restart if the environment variable changes [sig-storage][Slow]", func() {
-		envVars := []v1.EnvVar{
-			{
-				Name: "POD_NAME",
-				ValueFrom: &v1.EnvVarSource{
-					FieldRef: &v1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.annotations['mysubpath']",
-					},
-				},
-			},
-		}
-		mounts := []v1.VolumeMount{
-			{
-				Name:      "workdir1",
-				MountPath: "/subpath_mount",
-			},
-			{
-				Name:      "workdir1",
-				MountPath: "/volume_mount",
-			},
-		}
-		subpathMounts := []v1.VolumeMount{
-			{
-				Name:        "workdir1",
-				MountPath:   "/subpath_mount",
-				SubPathExpr: "$(POD_NAME)",
-			},
-			{
-				Name:      "workdir1",
-				MountPath: "/volume_mount",
-			},
-		}
-		volumes := []v1.Volume{
-			{
-				Name: "workdir1",
-				VolumeSource: v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{},
-				},
-			},
-		}
-		pod := newPod([]string{"/bin/sh", "-ec", "sleep 100000"}, envVars, subpathMounts, volumes)
-		pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-		pod.ObjectMeta.Annotations = map[string]string{"mysubpath": "foo"}
-		sideContainerName := "side-container"
-		pod.Spec.Containers = append(pod.Spec.Containers, newContainer(sideContainerName, []string{"/bin/sh", "-ec", "sleep 100000"}, envVars, subpathMounts))
-		suffix := string(uuid.NewUUID())
-		pod.Spec.InitContainers = []v1.Container{newContainer(
-			fmt.Sprintf("init-volume-%s", suffix), []string{"sh", "-c", "mkdir -p /volume_mount/foo; touch /volume_mount/foo/test.log"}, nil, mounts)}
-
-		// Add liveness probe to subpath container
-		pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
-			Handler: v1.Handler{
-				Exec: &v1.ExecAction{
-
-					Command: []string{"cat", "/subpath_mount/test.log"},
-				},
-			},
-			InitialDelaySeconds: 1,
-			FailureThreshold:    1,
-			PeriodSeconds:       2,
-		}
-
-		// Start pod
-		ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
-		var podClient *framework.PodClient = f.PodClient()
-		pod = podClient.Create(pod)
-		defer func() {
-			e2epod.DeletePodWithWait(f.ClientSet, pod)
-		}()
-		err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
-		framework.ExpectNoError(err, "while waiting for pod to be running")
-
-		ginkgo.By("updating the pod")
-		podClient.Update(pod.ObjectMeta.Name, func(pod *v1.Pod) {
-			pod.ObjectMeta.Annotations = map[string]string{"mysubpath": "newsubpath"}
-		})
-
-		ginkgo.By("waiting for pod and container restart")
-		waitForPodContainerRestart(f, pod, "/volume_mount/foo/test.log")
-
-		ginkgo.By("test for subpath mounted with old value")
-		cmd := "test -f /volume_mount/foo/test.log"
-		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
-		if err != nil {
-			framework.Failf("expected to be able to verify old file exists")
-		}
-
-		cmd = "test ! -f /volume_mount/newsubpath/test.log"
-		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
-		if err != nil {
-			framework.Failf("expected to be able to verify new file does not exist")
-		}
-	})
 })
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
@@ -478,72 +369,6 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 
 	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 	framework.ExpectError(err, "while waiting for pod to be running")
-}
-
-// Tests that the existing subpath mount is detected when a container restarts
-func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount string) {
-
-	ginkgo.By("Failing liveness probe")
-	stdout, stderr, err := f.ExecShellInPodWithFullOutput(pod.Name, fmt.Sprintf("rm %v", volumeMount))
-
-	framework.Logf("Pod exec output: %v / %v", stdout, stderr)
-	framework.ExpectNoError(err, "while failing liveness probe")
-
-	// Check that container has restarted
-	ginkgo.By("Waiting for container to restart")
-	restarts := int32(0)
-	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.Name == pod.Spec.Containers[0].Name {
-				framework.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
-				restarts = status.RestartCount
-				if restarts > 0 {
-					framework.Logf("Container has restart count: %v", restarts)
-					return true, nil
-				}
-			}
-		}
-		return false, nil
-	})
-	framework.ExpectNoError(err, "while waiting for container to restart")
-
-	// Fix liveness probe
-	ginkgo.By("Rewriting the file")
-	stdout = f.ExecShellInContainer(pod.Name, pod.Spec.Containers[1].Name, fmt.Sprintf("echo test-after > %v", volumeMount))
-	framework.Logf("Pod exec output: %v", stdout)
-
-	// Wait for container restarts to stabilize
-	ginkgo.By("Waiting for container to stop restarting")
-	stableCount := int(0)
-	stableThreshold := int(time.Minute / framework.Poll)
-	err = wait.PollImmediate(framework.Poll, 2*time.Minute, func() (bool, error) {
-		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.Name == pod.Spec.Containers[0].Name {
-				if status.RestartCount == restarts {
-					stableCount++
-					if stableCount > stableThreshold {
-						framework.Logf("Container restart has stabilized")
-						return true, nil
-					}
-				} else {
-					restarts = status.RestartCount
-					stableCount = 0
-					framework.Logf("Container has restart count: %v", restarts)
-				}
-				break
-			}
-		}
-		return false, nil
-	})
-	framework.ExpectNoError(err, "while waiting for container to stabilize")
 }
 
 func newPod(command []string, envVars []v1.EnvVar, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {

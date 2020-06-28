@@ -431,14 +431,6 @@
     environment variables when backticks are supplied.
   release: v1.19
   file: test/e2e/common/expansion.go
-- testname: VolumeSubpathEnvExpansion, subpath lifecycle
-  codename: '[k8s.io] Variable Expansion should not change the subpath mount on a
-    container restart if the environment variable changes [sig-storage][Slow] [Conformance]'
-  description: "Verify should not change the subpath mount on a container restart
-    if the environment variable changes 1.\tvalid subpathexpr starts a container running
-    2.\ttest for valid subpath writes 3.\tcontainer restarts 4.\tdelete cleanly"
-  release: v1.19
-  file: test/e2e/common/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath test writes
   codename: '[k8s.io] Variable Expansion should succeed in writing subpaths in container
     [sig-storage][Slow] [Conformance]'
