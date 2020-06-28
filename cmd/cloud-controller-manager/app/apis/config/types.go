@@ -26,7 +26,7 @@ import (
 
 // CloudControllerManagerConfiguration contains elements describing cloud-controller manager.
 type CloudControllerManagerConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// Generic holds configuration for a generic controller-manager
 	Generic kubectrlmgrconfig.GenericControllerManagerConfiguration
