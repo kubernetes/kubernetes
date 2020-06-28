@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -168,7 +168,9 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 // ttl, or if the token is older than 24 hours.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
-		klog.Errorf("expiration seconds was nil for tr: %#v", tr)
+		cpy := tr.DeepCopy()
+		cpy.Status.Token = ""
+		klog.Errorf("expiration seconds was nil for tr: %#v", cpy)
 		return false
 	}
 	now := m.clock.Now()

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -200,17 +201,39 @@ func (c *Repair) runOnce() error {
 	return nil
 }
 
+// collectServiceNodePorts returns nodePorts specified in the Service.
+// Please note that:
+//   1. same nodePort with *same* protocol will be duplicated as it is
+//   2. same nodePort with *different* protocol will be deduplicated
 func collectServiceNodePorts(service *corev1.Service) []int {
-	servicePorts := []int{}
-	for i := range service.Spec.Ports {
-		servicePort := &service.Spec.Ports[i]
-		if servicePort.NodePort != 0 {
-			servicePorts = append(servicePorts, int(servicePort.NodePort))
+	var servicePorts []int
+	// map from nodePort to set of protocols
+	seen := make(map[int]sets.String)
+	for _, port := range service.Spec.Ports {
+		nodePort := int(port.NodePort)
+		if nodePort == 0 {
+			continue
 		}
+		proto := string(port.Protocol)
+		s := seen[nodePort]
+		if s == nil { // have not seen this nodePort before
+			s = sets.NewString(proto)
+			servicePorts = append(servicePorts, nodePort)
+		} else if s.Has(proto) { // same nodePort with same protocol
+			servicePorts = append(servicePorts, nodePort)
+		} else { // same nodePort with different protocol
+			s.Insert(proto)
+		}
+		seen[nodePort] = s
 	}
 
-	if service.Spec.HealthCheckNodePort != 0 {
-		servicePorts = append(servicePorts, int(service.Spec.HealthCheckNodePort))
+	healthPort := int(service.Spec.HealthCheckNodePort)
+	if healthPort != 0 {
+		s := seen[healthPort]
+		// TODO: is it safe to assume the protocol is always TCP?
+		if s == nil || s.Has(string(corev1.ProtocolTCP)) {
+			servicePorts = append(servicePorts, healthPort)
+		}
 	}
 
 	return servicePorts

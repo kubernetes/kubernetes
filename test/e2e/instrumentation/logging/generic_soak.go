@@ -58,14 +58,14 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 		var wg sync.WaitGroup
 		wg.Add(loggingSoak.Scale)
 		for i := 0; i < loggingSoak.Scale; i++ {
-			go func() {
+			go func(i int) {
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
 				framework.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
 				framework.Logf("Completed logging soak, wave %v", i)
-			}()
+			}(i)
 			// Niceness.
 			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}

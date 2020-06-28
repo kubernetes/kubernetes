@@ -106,8 +106,9 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						fmt.Sprintf("--file_content=%s/data", volumeMountPath),
 						fmt.Sprintf("--file_mode=%s/data", volumeMountPath),
 					},

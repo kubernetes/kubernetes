@@ -31,10 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -250,8 +249,6 @@ func isNodeUntainted(node *v1.Node) bool {
 		},
 	}
 
-	nodeInfo := schedulertypes.NewNodeInfo()
-
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -260,6 +257,7 @@ func isNodeUntainted(node *v1.Node) bool {
 		}
 	}
 
+	n := node
 	if len(nonblockingTaintsMap) > 0 {
 		nodeCopy := node.DeepCopy()
 		nodeCopy.Spec.Taints = []v1.Taint{}
@@ -268,18 +266,10 @@ func isNodeUntainted(node *v1.Node) bool {
 				nodeCopy.Spec.Taints = append(nodeCopy.Spec.Taints, v)
 			}
 		}
-		nodeInfo.SetNode(nodeCopy)
-	} else {
-		nodeInfo.SetNode(node)
+		n = nodeCopy
 	}
 
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		klog.Fatalf("Can't test predicates for node %s: %v", node.Name, err)
-		return false
-	}
-
-	return v1helper.TolerationsTolerateTaintsWithFilter(fakePod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+	return v1helper.TolerationsTolerateTaintsWithFilter(fakePod.Spec.Tolerations, n.Spec.Taints, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
 	})
 }

@@ -9,10 +9,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
@@ -30,11 +30,9 @@ go_library(
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//pkg/scheduler/framework/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -51,6 +49,7 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/defaultbinder:all-srcs",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:all-srcs",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
         "//pkg/scheduler/framework/plugins/helper:all-srcs",
         "//pkg/scheduler/framework/plugins/imagelocality:all-srcs",

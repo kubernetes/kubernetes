@@ -444,7 +444,13 @@ type ComponentConfig interface {
 	Unmarshal(docmap DocumentMap) error
 
 	// Default patches the component config with kubeadm preferred defaults
-	Default(cfg *ClusterConfiguration, localAPIEndpoint *APIEndpoint)
+	Default(cfg *ClusterConfiguration, localAPIEndpoint *APIEndpoint, nodeRegOpts *NodeRegistrationOptions)
+
+	// IsUserSupplied indicates if the component config was supplied or modified by a user or was kubeadm generated
+	IsUserSupplied() bool
+
+	// SetUserSupplied sets the state of the component config "user supplied" flag to, either true, or false.
+	SetUserSupplied(userSupplied bool)
 }
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig

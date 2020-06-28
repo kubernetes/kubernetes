@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -300,6 +300,13 @@ func (f *FakeRuntime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+	if f.Err == nil {
+		i := kubecontainer.Image{
+			ID:   image.Image,
+			Spec: image,
+		}
+		f.ImageList = append(f.ImageList, i)
+	}
 	return image.Image, f.Err
 }
 
@@ -341,7 +348,7 @@ func (f *FakeRuntime) RemoveImage(image kubecontainer.ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (f *FakeRuntime) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -399,7 +406,7 @@ type FakeContainerCommandRunner struct {
 	Cmd         []string
 }
 
-var _ kubecontainer.ContainerCommandRunner = &FakeContainerCommandRunner{}
+var _ kubecontainer.CommandRunner = &FakeContainerCommandRunner{}
 
 func (f *FakeContainerCommandRunner) RunInContainer(containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values

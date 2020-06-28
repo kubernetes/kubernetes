@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "admission_webhook.go",
         "audit.go",
-        "audit_dynamic.go",
         "conditions.go",
         "create_resources.go",
         "delete_resources.go",
@@ -36,7 +35,6 @@ go_library(
         "//pkg/util/labels:go_default_library",
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
-        "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
@@ -59,7 +57,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
@@ -69,8 +66,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/scale:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -46,8 +46,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
@@ -393,7 +394,7 @@ func TestRunInContainer(t *testing.T) {
 		actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
 		assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
 		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
-		// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
+		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
 		assert.Equal(t, "foo", string(actualOutput), "(testError=%v) output", testError)
 		assert.Equal(t, err, testError, "(testError=%v) err", testError)
 	}
@@ -454,12 +455,36 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		container          *v1.Container          // the container to use
 		masterServiceNs    string                 // the namespace to read master service info from
 		nilLister          bool                   // whether the lister should be nil
+		staticPod          bool                   // whether the pod should be a static pod (versus an API pod)
+		unsyncedServices   bool                   // whether the services should NOT be synced
 		configMap          *v1.ConfigMap          // an optional ConfigMap to pull from
 		secret             *v1.Secret             // an optional Secret to pull from
 		expectedEnvs       []kubecontainer.EnvVar // a set of expected environment vars
 		expectedError      bool                   // does the test fail
 		expectedEvent      string                 // does the test emit an event
 	}{
+		{
+			name:               "if services aren't synced, non-static pods should fail",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container:          &v1.Container{Env: []v1.EnvVar{}},
+			masterServiceNs:    metav1.NamespaceDefault,
+			nilLister:          false,
+			staticPod:          false,
+			unsyncedServices:   true,
+			expectedEnvs:       []kubecontainer.EnvVar{},
+			expectedError:      true,
+		},
+		{
+			name:               "if services aren't synced, static pods should succeed", // if there is no service
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container:          &v1.Container{Env: []v1.EnvVar{}},
+			masterServiceNs:    metav1.NamespaceDefault,
+			nilLister:          false,
+			staticPod:          true,
+			unsyncedServices:   true,
+		},
 		{
 			name:               "api server = Y, kubelet = Y",
 			ns:                 "test1",
@@ -1606,71 +1631,82 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fakeRecorder := record.NewFakeRecorder(1)
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		testKubelet.kubelet.recorder = fakeRecorder
-		defer testKubelet.Cleanup()
-		kl := testKubelet.kubelet
-		kl.masterServiceNamespace = tc.masterServiceNs
-		if tc.nilLister {
-			kl.serviceLister = nil
-		} else {
-			kl.serviceLister = testServiceLister{services}
-		}
-
-		testKubelet.fakeKubeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-			var err error
-			if tc.configMap == nil {
-				err = apierrors.NewNotFound(action.GetResource().GroupResource(), "configmap-name")
+		t.Run(tc.name, func(t *testing.T) {
+			fakeRecorder := record.NewFakeRecorder(1)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			testKubelet.kubelet.recorder = fakeRecorder
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.masterServiceNamespace = tc.masterServiceNs
+			if tc.nilLister {
+				kl.serviceLister = nil
+			} else if tc.unsyncedServices {
+				kl.serviceLister = testServiceLister{}
+				kl.serviceHasSynced = func() bool { return false }
+			} else {
+				kl.serviceLister = testServiceLister{services}
+				kl.serviceHasSynced = func() bool { return true }
 			}
-			return true, tc.configMap, err
-		})
-		testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
-			var err error
-			if tc.secret == nil {
-				err = apierrors.NewNotFound(action.GetResource().GroupResource(), "secret-name")
+
+			testKubelet.fakeKubeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+				var err error
+				if tc.configMap == nil {
+					err = apierrors.NewNotFound(action.GetResource().GroupResource(), "configmap-name")
+				}
+				return true, tc.configMap, err
+			})
+			testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+				var err error
+				if tc.secret == nil {
+					err = apierrors.NewNotFound(action.GetResource().GroupResource(), "secret-name")
+				}
+				return true, tc.secret, err
+			})
+
+			testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+				var err error
+				if tc.secret == nil {
+					err = errors.New("no secret defined")
+				}
+				return true, tc.secret, err
+			})
+
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   tc.ns,
+					Name:        "dapi-test-pod-name",
+					Annotations: map[string]string{},
+				},
+				Spec: v1.PodSpec{
+					ServiceAccountName: "special",
+					NodeName:           "node-name",
+					EnableServiceLinks: tc.enableServiceLinks,
+				},
 			}
-			return true, tc.secret, err
-		})
-
-		testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
-			var err error
-			if tc.secret == nil {
-				err = errors.New("no secret defined")
+			podIP := "1.2.3.4"
+			podIPs := []string{"1.2.3.4,fd00::6"}
+			if tc.staticPod {
+				testPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			}
-			return true, tc.secret, err
+
+			result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP, podIPs)
+			select {
+			case e := <-fakeRecorder.Events:
+				assert.Equal(t, tc.expectedEvent, e)
+			default:
+				assert.Equal(t, "", tc.expectedEvent)
+			}
+			if tc.expectedError {
+				assert.Error(t, err, tc.name)
+			} else {
+				assert.NoError(t, err, "[%s]", tc.name)
+
+				sort.Sort(envs(result))
+				sort.Sort(envs(tc.expectedEnvs))
+				assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
+			}
 		})
 
-		testPod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: tc.ns,
-				Name:      "dapi-test-pod-name",
-			},
-			Spec: v1.PodSpec{
-				ServiceAccountName: "special",
-				NodeName:           "node-name",
-				EnableServiceLinks: tc.enableServiceLinks,
-			},
-		}
-		podIP := "1.2.3.4"
-		podIPs := []string{"1.2.3.4,fd00::6"}
-
-		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP, podIPs)
-		select {
-		case e := <-fakeRecorder.Events:
-			assert.Equal(t, tc.expectedEvent, e)
-		default:
-			assert.Equal(t, "", tc.expectedEvent)
-		}
-		if tc.expectedError {
-			assert.Error(t, err, tc.name)
-		} else {
-			assert.NoError(t, err, "[%s]", tc.name)
-
-			sort.Sort(envs(result))
-			sort.Sort(envs(tc.expectedEnvs))
-			assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
-		}
 	}
 }
 

@@ -130,21 +130,6 @@ type driverDefinition struct {
 	ClientNodeName string
 }
 
-// List of testSuites to be executed for each external driver.
-var csiTestSuites = []func() testsuites.TestSuite{
-	testsuites.InitEphemeralTestSuite,
-	testsuites.InitMultiVolumeTestSuite,
-	testsuites.InitProvisioningTestSuite,
-	testsuites.InitSnapshottableTestSuite,
-	testsuites.InitSubPathTestSuite,
-	testsuites.InitVolumeIOTestSuite,
-	testsuites.InitVolumeModeTestSuite,
-	testsuites.InitVolumesTestSuite,
-	testsuites.InitVolumeExpandTestSuite,
-	testsuites.InitDisruptiveTestSuite,
-	testsuites.InitVolumeLimitsTestSuite,
-}
-
 func init() {
 	e2econfig.Flags.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
 }
@@ -182,7 +167,7 @@ func AddDriverDefinition(filename string) error {
 
 	description := "External Storage " + testsuites.GetDriverNameWithFeatureTags(driver)
 	ginkgo.Describe(description, func() {
-		testsuites.DefineTestSuite(driver, csiTestSuites)
+		testsuites.DefineTestSuite(driver, testsuites.CSISuites)
 	})
 
 	return nil
@@ -297,7 +282,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites
 		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 		framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
-		err = utils.PatchItems(f, items...)
+		err = utils.PatchItems(f, f.Namespace, items...)
 		framework.ExpectNoError(err, "patch items")
 
 		sc, ok = items[0].(*storagev1.StorageClass)
@@ -354,6 +339,10 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 				parameters[k] = v.(string)
 			}
 		}
+
+		if snapshotProvider, ok := snapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
+		}
 	case d.SnapshotClass.FromFile != "":
 		snapshotClass, err := loadSnapshotClass(d.SnapshotClass.FromFile)
 		framework.ExpectNoError(err, "load snapshot class from %s", d.SnapshotClass.FromFile)
@@ -362,6 +351,10 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 			for k, v := range params {
 				parameters[k] = v.(string)
 			}
+		}
+
+		if snapshotProvider, ok := snapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
 		}
 	}
 

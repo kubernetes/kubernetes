@@ -53,6 +53,7 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -60,12 +61,14 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	utilsnet "k8s.io/utils/net"
 
 	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
@@ -676,6 +679,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
+	handler = genericapifilters.WithAuditAnnotations(handler, c.AuditBackend, c.AuditPolicyChecker)
+	handler = genericapifilters.WithWarningRecorder(handler)
+	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }
@@ -705,6 +711,9 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
+	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
+		c.FlowControl.Install(s.Handler.NonGoRestfulMux)
+	}
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
@@ -730,7 +739,7 @@ func (s *SecureServingInfo) HostPort() (string, int, error) {
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to get port from listener address %q: %v", addr, err)
 	}
-	port, err := strconv.Atoi(portStr)
+	port, err := utilsnet.ParsePort(portStr, true)
 	if err != nil {
 		return "", 0, fmt.Errorf("invalid non-numeric port %q", portStr)
 	}

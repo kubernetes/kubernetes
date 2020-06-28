@@ -29,14 +29,14 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
@@ -68,11 +68,11 @@ type Manager interface {
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
-	// ClientFn will be used to create a client for
-	// signing new certificate requests generated when a key rotation occurs.
-	// It must be set at initialization. The function will never be invoked
-	// in parallel. It is passed the current client certificate if one exists.
-	ClientFn CSRClientFunc
+	// ClientsetFn will be used to create a clientset for
+	// creating/fetching new certificate requests generated when a key rotation occurs.
+	// The function will never be invoked in parallel.
+	// It is passed the current client certificate if one exists.
+	ClientsetFn ClientsetFunc
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
 	// part of rotation. It follows the same rules as the template parameter of
@@ -162,9 +162,9 @@ type Counter interface {
 // NoCertKeyError indicates there is no cert/key currently available.
 type NoCertKeyError string
 
-// CSRClientFunc returns a new client for requesting CSRs. It passes the
-// current certificate if one is available and valid.
-type CSRClientFunc func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error)
+// ClientsetFunc returns a new clientset for discovering CSR API availability and requesting CSRs.
+// It is passed the current certificate if one is available and valid.
+type ClientsetFunc func(current *tls.Certificate) (clientset.Interface, error)
 
 func (e *NoCertKeyError) Error() string { return string(*e) }
 
@@ -193,7 +193,7 @@ type manager struct {
 
 	// the clientFn must only be accessed under the clientAccessLock
 	clientAccessLock sync.Mutex
-	clientFn         CSRClientFunc
+	clientsetFn      ClientsetFunc
 	stopCh           chan struct{}
 	stopped          bool
 
@@ -220,7 +220,7 @@ func NewManager(config *Config) (Manager, error) {
 
 	m := manager{
 		stopCh:                  make(chan struct{}),
-		clientFn:                config.ClientFn,
+		clientsetFn:             config.ClientsetFn,
 		getTemplate:             getTemplate,
 		dynamicTemplate:         config.GetTemplate != nil,
 		signerName:              config.SignerName,
@@ -274,7 +274,7 @@ func (m *manager) Start() {
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
 	// client.
-	if m.clientFn == nil {
+	if m.clientsetFn == nil {
 		klog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
 	}
@@ -374,6 +374,9 @@ func getCurrentCertificateOrBootstrap(
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
+	if len(certs) < 1 {
+		return nil, false, fmt.Errorf("no cert data found")
+	}
 	bootstrapCert.Leaf = certs[0]
 
 	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {
@@ -385,11 +388,11 @@ func getCurrentCertificateOrBootstrap(
 	return &bootstrapCert, true, nil
 }
 
-func (m *manager) getClient() (certificatesclient.CertificateSigningRequestInterface, error) {
+func (m *manager) getClientset() (clientset.Interface, error) {
 	current := m.Current()
 	m.clientAccessLock.Lock()
 	defer m.clientAccessLock.Unlock()
-	return m.clientFn(current)
+	return m.clientsetFn(current)
 }
 
 // RotateCerts is exposed for testing only and is not a part of the public interface.
@@ -418,7 +421,7 @@ func (m *manager) rotateCerts() (bool, error) {
 	}
 
 	// request the client each time
-	client, err := m.getClient()
+	clientSet, err := m.getClientset()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to load a client to request certificates: %v", err))
 		if m.certificateRenewFailure != nil {
@@ -429,7 +432,7 @@ func (m *manager) rotateCerts() (bool, error) {
 
 	// Call the Certificate Signing Request API to get a certificate for the
 	// new private key.
-	req, err := csr.RequestCertificate(client, csrPEM, "", m.signerName, m.usages, privateKey)
+	reqName, reqUID, err := csr.RequestCertificate(clientSet, csrPEM, "", m.signerName, m.usages, privateKey)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Failed while requesting a signed certificate from the master: %v", err))
 		if m.certificateRenewFailure != nil {
@@ -446,7 +449,7 @@ func (m *manager) rotateCerts() (bool, error) {
 
 	// Wait for the certificate to be signed. This interface and internal timout
 	// is a remainder after the old design using raw watch wrapped with backoff.
-	crtPEM, err := csr.WaitForCertificate(ctx, client, req)
+	crtPEM, err := csr.WaitForCertificate(ctx, clientSet, reqName, reqUID)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("certificate request was not signed: %v", err))
 		if m.certificateRenewFailure != nil {

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agnhost-replica
+  labels:
+    app: agnhost
+    role: replica
+    tier: backend
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: agnhost
+    role: replica
+    tier: backend

@@ -21,18 +21,23 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/net/http2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // JoinPreservingTrailingSlash does a path.Join of the specified elements,
@@ -55,6 +60,12 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 	return result
 }
 
+// IsTimeout returns true if the given error is a network timeout error
+func IsTimeout(err error) bool {
+	neterr, ok := err.(net.Error)
+	return ok && neterr != nil && neterr.Timeout()
+}
+
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
 // These errors are what the Go http stack returns back to us which are general
@@ -71,6 +82,8 @@ func IsProbableEOF(err error) bool {
 	msg := err.Error()
 	switch {
 	case err == io.EOF:
+		return true
+	case err == io.ErrUnexpectedEOF:
 		return true
 	case msg == "http: can't write HTTP request on broken connection":
 		return true
@@ -475,4 +488,233 @@ func CloneHeader(in http.Header) http.Header {
 		out[key] = newValues
 	}
 	return out
+}
+
+// WarningHeader contains a single RFC2616 14.46 warnings header
+type WarningHeader struct {
+	// Codeindicates the type of warning. 299 is a miscellaneous persistent warning
+	Code int
+	// Agent contains the name or pseudonym of the server adding the Warning header.
+	// A single "-" is recommended when agent is unknown.
+	Agent string
+	// Warning text
+	Text string
+}
+
+// ParseWarningHeaders extract RFC2616 14.46 warnings headers from the specified set of header values.
+// Multiple comma-separated warnings per header are supported.
+// If errors are encountered on a header, the remainder of that header are skipped and subsequent headers are parsed.
+// Returns successfully parsed warnings and any errors encountered.
+func ParseWarningHeaders(headers []string) ([]WarningHeader, []error) {
+	var (
+		results []WarningHeader
+		errs    []error
+	)
+	for _, header := range headers {
+		for len(header) > 0 {
+			result, remainder, err := ParseWarningHeader(header)
+			if err != nil {
+				errs = append(errs, err)
+				break
+			}
+			results = append(results, result)
+			header = remainder
+		}
+	}
+	return results, errs
+}
+
+var (
+	codeMatcher = regexp.MustCompile(`^[0-9]{3}$`)
+	wordDecoder = &mime.WordDecoder{}
+)
+
+// ParseWarningHeader extracts one RFC2616 14.46 warning from the specified header,
+// returning an error if the header does not contain a correctly formatted warning.
+// Any remaining content in the header is returned.
+func ParseWarningHeader(header string) (result WarningHeader, remainder string, err error) {
+	// https://tools.ietf.org/html/rfc2616#section-14.46
+	//   updated by
+	// https://tools.ietf.org/html/rfc7234#section-5.5
+	//   https://tools.ietf.org/html/rfc7234#appendix-A
+	//     Some requirements regarding production and processing of the Warning
+	//     header fields have been relaxed, as it is not widely implemented.
+	//     Furthermore, the Warning header field no longer uses RFC 2047
+	//     encoding, nor does it allow multiple languages, as these aspects were
+	//     not implemented.
+	//
+	// Format is one of:
+	// warn-code warn-agent "warn-text"
+	// warn-code warn-agent "warn-text" "warn-date"
+	//
+	// warn-code is a three digit number
+	// warn-agent is unquoted and contains no spaces
+	// warn-text is quoted with backslash escaping (RFC2047-encoded according to RFC2616, not encoded according to RFC7234)
+	// warn-date is optional, quoted, and in HTTP-date format (no embedded or escaped quotes)
+	//
+	// additional warnings can optionally be included in the same header by comma-separating them:
+	// warn-code warn-agent "warn-text" "warn-date"[, warn-code warn-agent "warn-text" "warn-date", ...]
+
+	// tolerate leading whitespace
+	header = strings.TrimSpace(header)
+
+	parts := strings.SplitN(header, " ", 3)
+	if len(parts) != 3 {
+		return WarningHeader{}, "", errors.New("invalid warning header: fewer than 3 segments")
+	}
+	code, agent, textDateRemainder := parts[0], parts[1], parts[2]
+
+	// verify code format
+	if !codeMatcher.Match([]byte(code)) {
+		return WarningHeader{}, "", errors.New("invalid warning header: code segment is not 3 digits between 100-299")
+	}
+	codeInt, _ := strconv.ParseInt(code, 10, 64)
+
+	// verify agent presence
+	if len(agent) == 0 {
+		return WarningHeader{}, "", errors.New("invalid warning header: empty agent segment")
+	}
+	if !utf8.ValidString(agent) || hasAnyRunes(agent, unicode.IsControl) {
+		return WarningHeader{}, "", errors.New("invalid warning header: invalid agent")
+	}
+
+	// verify textDateRemainder presence
+	if len(textDateRemainder) == 0 {
+		return WarningHeader{}, "", errors.New("invalid warning header: empty text segment")
+	}
+
+	// extract text
+	text, dateAndRemainder, err := parseQuotedString(textDateRemainder)
+	if err != nil {
+		return WarningHeader{}, "", fmt.Errorf("invalid warning header: %v", err)
+	}
+	// tolerate RFC2047-encoded text from warnings produced according to RFC2616
+	if decodedText, err := wordDecoder.DecodeHeader(text); err == nil {
+		text = decodedText
+	}
+	if !utf8.ValidString(text) || hasAnyRunes(text, unicode.IsControl) {
+		return WarningHeader{}, "", errors.New("invalid warning header: invalid text")
+	}
+	result = WarningHeader{Code: int(codeInt), Agent: agent, Text: text}
+
+	if len(dateAndRemainder) > 0 {
+		if dateAndRemainder[0] == '"' {
+			// consume date
+			foundEndQuote := false
+			for i := 1; i < len(dateAndRemainder); i++ {
+				if dateAndRemainder[i] == '"' {
+					foundEndQuote = true
+					remainder = strings.TrimSpace(dateAndRemainder[i+1:])
+					break
+				}
+			}
+			if !foundEndQuote {
+				return WarningHeader{}, "", errors.New("invalid warning header: unterminated date segment")
+			}
+		} else {
+			remainder = dateAndRemainder
+		}
+	}
+	if len(remainder) > 0 {
+		if remainder[0] == ',' {
+			// consume comma if present
+			remainder = strings.TrimSpace(remainder[1:])
+		} else {
+			return WarningHeader{}, "", errors.New("invalid warning header: unexpected token after warn-date")
+		}
+	}
+
+	return result, remainder, nil
+}
+
+func parseQuotedString(quotedString string) (string, string, error) {
+	if len(quotedString) == 0 {
+		return "", "", errors.New("invalid quoted string: 0-length")
+	}
+
+	if quotedString[0] != '"' {
+		return "", "", errors.New("invalid quoted string: missing initial quote")
+	}
+
+	quotedString = quotedString[1:]
+	var remainder string
+	escaping := false
+	closedQuote := false
+	result := &bytes.Buffer{}
+loop:
+	for i := 0; i < len(quotedString); i++ {
+		b := quotedString[i]
+		switch b {
+		case '"':
+			if escaping {
+				result.WriteByte(b)
+				escaping = false
+			} else {
+				closedQuote = true
+				remainder = strings.TrimSpace(quotedString[i+1:])
+				break loop
+			}
+		case '\\':
+			if escaping {
+				result.WriteByte(b)
+				escaping = false
+			} else {
+				escaping = true
+			}
+		default:
+			result.WriteByte(b)
+			escaping = false
+		}
+	}
+
+	if !closedQuote {
+		return "", "", errors.New("invalid quoted string: missing closing quote")
+	}
+	return result.String(), remainder, nil
+}
+
+func NewWarningHeader(code int, agent, text string) (string, error) {
+	if code < 0 || code > 999 {
+		return "", errors.New("code must be between 0 and 999")
+	}
+	if len(agent) == 0 {
+		agent = "-"
+	} else if !utf8.ValidString(agent) || strings.ContainsAny(agent, `\"`) || hasAnyRunes(agent, unicode.IsSpace, unicode.IsControl) {
+		return "", errors.New("agent must be valid UTF-8 and must not contain spaces, quotes, backslashes, or control characters")
+	}
+	if !utf8.ValidString(text) || hasAnyRunes(text, unicode.IsControl) {
+		return "", errors.New("text must be valid UTF-8 and must not contain control characters")
+	}
+	return fmt.Sprintf("%03d %s %s", code, agent, makeQuotedString(text)), nil
+}
+
+func hasAnyRunes(s string, runeCheckers ...func(rune) bool) bool {
+	for _, r := range s {
+		for _, checker := range runeCheckers {
+			if checker(r) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func makeQuotedString(s string) string {
+	result := &bytes.Buffer{}
+	// opening quote
+	result.WriteRune('"')
+	for _, c := range s {
+		switch c {
+		case '"', '\\':
+			// escape " and \
+			result.WriteRune('\\')
+			result.WriteRune(c)
+		default:
+			// write everything else as-is
+			result.WriteRune(c)
+		}
+	}
+	// closing quote
+	result.WriteRune('"')
+	return result.String()
 }

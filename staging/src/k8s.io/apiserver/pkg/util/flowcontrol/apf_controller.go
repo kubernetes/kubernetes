@@ -45,7 +45,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	fcclientv1a1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
@@ -440,7 +440,7 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*fctypesv1a1.FlowSchema) {
 	}
 
 	meal.cfgCtl.flowSchemas = fsSeq
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		for _, fs := range fsSeq {
 			klog.Infof("Using FlowSchema %s", fcfmt.Fmt(fs))
 		}
@@ -641,14 +641,15 @@ func (cfgCtl *configController) startRequest(ctx context.Context, rd RequestDige
 				numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
 
 			}
+			var flowDistinguisher string
 			var hashValue uint64
 			if numQueues > 1 {
-				flowDistinguisher := computeFlowDistinguisher(rd, fs.Spec.DistinguisherMethod)
+				flowDistinguisher = computeFlowDistinguisher(rd, fs.Spec.DistinguisherMethod)
 				hashValue = hashFlowID(fs.Name, flowDistinguisher)
 			}
 			startWaitingTime = time.Now()
 			klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, numQueues)
-			req, idle := plState.queues.StartRequest(ctx, hashValue, fs.Name, rd.RequestInfo, rd.User)
+			req, idle := plState.queues.StartRequest(ctx, hashValue, flowDistinguisher, fs.Name, rd.RequestInfo, rd.User)
 			if idle {
 				cfgCtl.maybeReapLocked(plName, plState)
 			}

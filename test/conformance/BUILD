@@ -34,6 +34,7 @@ filegroup(
         ":package-srcs",
         "//test/conformance/behaviors:all-srcs",
         "//test/conformance/kubeconform:all-srcs",
+        "//test/conformance/testdata:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
@@ -68,8 +69,8 @@ sh_test(
     name = "conformance_test",
     srcs = ["conformance_test.sh"],
     data = [
-        "testdata/conformance.yaml",
         ":list_conformance_tests",
+        ":testdata",
     ],
 )
 

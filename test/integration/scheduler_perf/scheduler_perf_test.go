@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
@@ -45,6 +45,8 @@ var (
 			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
 			"scheduler_binding_duration_seconds",
 			"scheduler_e2e_scheduling_duration_seconds",
+			"scheduler_scheduling_algorithm_preemption_evaluation_seconds",
+			"scheduler_pod_scheduling_duration_seconds",
 		},
 	}
 )
@@ -66,6 +68,9 @@ type testCase struct {
 	Nodes nodeCase
 	// configures pods in the cluster before running the tests
 	InitPods []podCase
+	// configures the test to now wait for init pods to schedule before creating
+	// test pods.
+	SkipWaitUntilInitPodsScheduled bool
 	// pods to be scheduled during the test.
 	PodsToSchedule podCase
 	// optional, feature gates to set before running the test
@@ -154,8 +159,10 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 		}
 		total += p.Num
 	}
-	if err := waitNumPodsScheduled(b, total, podInformer); err != nil {
-		b.Fatal(err)
+	if !test.SkipWaitUntilInitPodsScheduled {
+		if err := waitNumPodsScheduled(b, total, podInformer, setupNamespace); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// start benchmark
@@ -172,7 +179,7 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 	if err := createPods(testNamespace, test.PodsToSchedule, clientset); err != nil {
 		b.Fatal(err)
 	}
-	if err := waitNumPodsScheduled(b, total+test.PodsToSchedule.Num, podInformer); err != nil {
+	if err := waitNumPodsScheduled(b, test.PodsToSchedule.Num, podInformer, testNamespace); err != nil {
 		b.Fatal(err)
 	}
 
@@ -187,9 +194,9 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 	return dataItems
 }
 
-func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodInformer) error {
+func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodInformer, namespace string) error {
 	for {
-		scheduled, err := getScheduledPods(podInformer)
+		scheduled, err := getScheduledPods(podInformer, namespace)
 		if err != nil {
 			return err
 		}
@@ -203,7 +210,7 @@ func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodIn
 }
 
 func getTestDataCollectors(tc testCase, podInformer coreinformers.PodInformer, b *testing.B) []testDataCollector {
-	collectors := []testDataCollector{newThroughputCollector(podInformer, map[string]string{"Name": b.Name()})}
+	collectors := []testDataCollector{newThroughputCollector(podInformer, map[string]string{"Name": b.Name()}, []string{testNamespace})}
 	metricsCollectorConfig := defaultMetricsCollectorConfig
 	if tc.MetricsCollectorConfig != nil {
 		metricsCollectorConfig = *tc.MetricsCollectorConfig

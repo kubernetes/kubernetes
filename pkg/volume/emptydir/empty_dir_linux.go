@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	"k8s.io/api/core/v1"
@@ -69,7 +69,11 @@ func getPageSize(path string, mounter mount.Interface) (*resource.Quantity, erro
 			// NOTE: Adding suffix 'i' as result should be comparable with a medium size.
 			// pagesize mount option is specified without a suffix,
 			// e.g. pagesize=2M or pagesize=1024M for x86 CPUs
-			pageSize, err := resource.ParseQuantity(strings.TrimPrefix(opt, prefix) + "i")
+			trimmedOpt := strings.TrimPrefix(opt, prefix)
+			if !strings.HasSuffix(trimmedOpt, "i") {
+				trimmedOpt = trimmedOpt + "i"
+			}
+			pageSize, err := resource.ParseQuantity(trimmedOpt)
 			if err != nil {
 				return nil, fmt.Errorf("error getting page size from '%s' mount option: %v", opt, err)
 			}

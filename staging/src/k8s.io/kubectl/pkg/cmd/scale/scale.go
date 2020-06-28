@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -89,6 +89,8 @@ type ScaleOptions struct {
 	scaler                       scale.Scaler
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	parent                       string
+	dryRunStrategy               cmdutil.DryRunStrategy
+	dryRunVerifier               *resource.DryRunVerifier
 
 	genericclioptions.IOStreams
 }
@@ -134,6 +136,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.MarkFlagRequired("replicas")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to set a new size")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -149,6 +152,20 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return err
 	}
 	o.PrintObj = printer.PrintObj
+
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -216,7 +233,7 @@ func (o *ScaleOptions) RunScale() error {
 	retry := scale.NewRetryParams(1*time.Second, 5*time.Minute)
 
 	var waitForReplicas *scale.RetryParams
-	if o.Timeout != 0 {
+	if o.Timeout != 0 && o.dryRunStrategy == cmdutil.DryRunNone {
 		waitForReplicas = scale.NewRetryParams(1*time.Second, timeout)
 	}
 
@@ -225,9 +242,13 @@ func (o *ScaleOptions) RunScale() error {
 		if err != nil {
 			return err
 		}
+		counter++
 
 		mapping := info.ResourceMapping()
-		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource); err != nil {
+		if o.dryRunStrategy == cmdutil.DryRunClient {
+			return o.PrintObj(info.Object, o.Out)
+		}
+		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource, o.dryRunStrategy == cmdutil.DryRunServer); err != nil {
 			return err
 		}
 
@@ -245,7 +266,6 @@ func (o *ScaleOptions) RunScale() error {
 			}
 		}
 
-		counter++
 		return o.PrintObj(info.Object, o.Out)
 	})
 	if err != nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package netexec
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,13 +45,15 @@ var (
 	sctpPort    = -1
 	shellPath   = "/bin/sh"
 	serverReady = &atomicBool{0}
+	certFile    = ""
+	privKeyFile = ""
 )
 
 // CmdNetexec is used by agnhost Cobra.
 var CmdNetexec = &cobra.Command{
 	Use:   "netexec",
-	Short: "Creates HTTP, UDP, and (optionally) SCTP servers with various endpoints",
-	Long: `Starts a HTTP server on given port with the following endpoints:
+	Short: "Creates HTTP(S), UDP, and (optionally) SCTP servers with various endpoints",
+	Long: `Starts a HTTP(S) server on given port with the following endpoints:
 
 - /: Returns the request's timestamp.
 - /clientip: Returns the request's IP address.
@@ -67,8 +70,14 @@ var CmdNetexec = &cobra.Command{
     Acceptable values: "http", "udp", "sctp".
   - "tries": The number of times the request will be performed. Default value: "1".
 - "/echo": Returns the given "msg" ("/echo?msg=echoed_msg")
-- "/exit": Closes the server with the given code ("/exit?code=some-code"). The "code"
-  is expected to be an integer [0-127] or empty; if it is not, it will return an error message.
+- "/exit": Closes the server with the given code and graceful shutdown. The endpoint's parameters
+	are:
+	- "code": The exit code for the process. Default value: 0. Allows an integer [0-127].
+	- "timeout": The amount of time to wait for connections to close before shutting down.
+		Acceptable values are golang durations. If 0 the process will exit immediately without
+		shutdown.
+	- "wait": The amount of time to wait before starting shutdown. Acceptable values are
+	  golang durations. If 0 the process will start shutdown immediately.
 - "/healthz": Returns "200 OK" if the server is ready, "412 Status Precondition Failed"
   otherwise. The server is considered not ready if the UDP server did not start yet or
   it exited.
@@ -97,6 +106,10 @@ responding to the same commands as the UDP server.
 
 func init() {
 	CmdNetexec.Flags().IntVar(&httpPort, "http-port", 8080, "HTTP Listen Port")
+	CmdNetexec.Flags().StringVar(&certFile, "tls-cert-file", "",
+		"File containing an x509 certificate for HTTPS. (CA cert, if any, concatenated after server cert)")
+	CmdNetexec.Flags().StringVar(&privKeyFile, "tls-private-key-file", "",
+		"File containing an x509 private key matching --tls-cert-file")
 	CmdNetexec.Flags().IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")
 	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
 }
@@ -121,18 +134,27 @@ func (a *atomicBool) get() bool {
 }
 
 func main(cmd *cobra.Command, args []string) {
+	exitCh := make(chan shutdownRequest)
+	addRoutes(exitCh)
+
 	go startUDPServer(udpPort)
 	if sctpPort != -1 {
 		go startSCTPServer(sctpPort)
 	}
-	startHTTPServer(httpPort)
+
+	server := &http.Server{Addr: fmt.Sprintf(":%d", httpPort)}
+	if len(certFile) > 0 {
+		startServer(server, exitCh, func() error { return server.ListenAndServeTLS(certFile, privKeyFile) })
+	} else {
+		startServer(server, exitCh, server.ListenAndServe)
+	}
 }
 
-func startHTTPServer(httpPort int) {
+func addRoutes(exitCh chan shutdownRequest) {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/clientip", clientIPHandler)
 	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/exit", exitHandler)
+	http.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
 	http.HandleFunc("/hostname", hostnameHandler)
 	http.HandleFunc("/shell", shellHandler)
 	http.HandleFunc("/upload", uploadHandler)
@@ -141,7 +163,25 @@ func startHTTPServer(httpPort int) {
 	// older handlers
 	http.HandleFunc("/hostName", hostNameHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
+}
+
+func startServer(server *http.Server, exitCh chan shutdownRequest, fn func() error) {
+	go func() {
+		re := <-exitCh
+		ctx, cancelFn := context.WithTimeout(context.Background(), re.timeout)
+		defer cancelFn()
+		err := server.Shutdown(ctx)
+		log.Printf("Graceful shutdown completed with: %v", err)
+		os.Exit(re.code)
+	}()
+
+	if err := fn(); err != nil {
+		if err == http.ErrServerClosed {
+			// wait until the goroutine calls os.Exit()
+			select {}
+		}
+		log.Fatal(err)
+	}
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -159,13 +199,37 @@ func clientIPHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, r.RemoteAddr)
 }
 
-func exitHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GET /exit?code=%s", r.FormValue("code"))
-	code, err := strconv.Atoi(r.FormValue("code"))
-	if err == nil || r.FormValue("code") == "" {
+type shutdownRequest struct {
+	code    int
+	timeout time.Duration
+}
+
+func exitHandler(w http.ResponseWriter, r *http.Request, exitCh chan<- shutdownRequest) {
+	waitString := r.FormValue("wait")
+	timeoutString := r.FormValue("timeout")
+	codeString := r.FormValue("code")
+	log.Printf("GET /exit?code=%s&timeout=%s&wait=%s", codeString, timeoutString, waitString)
+	timeout, err := time.ParseDuration(timeoutString)
+	if err != nil && timeoutString != "" {
+		fmt.Fprintf(w, "argument 'timeout' must be a valid golang duration or empty, got %q\n", timeoutString)
+		return
+	}
+	wait, err := time.ParseDuration(waitString)
+	if err != nil && waitString != "" {
+		fmt.Fprintf(w, "argument 'wait' must be a valid golang duration or empty, got %q\n", waitString)
+		return
+	}
+	code, err := strconv.Atoi(codeString)
+	if err != nil && codeString != "" {
+		fmt.Fprintf(w, "argument 'code' must be an integer [0-127] or empty, got %q\n", codeString)
+		return
+	}
+	log.Printf("Will begin shutdown in %s, allowing %s for connections to close, then will exit with %d", wait, timeout, code)
+	time.Sleep(wait)
+	if timeout == 0 {
 		os.Exit(code)
 	}
-	fmt.Fprintf(w, "argument 'code' must be an integer [0-127] or empty, got %q", r.FormValue("code"))
+	exitCh <- shutdownRequest{code: code, timeout: timeout}
 }
 
 func hostnameHandler(w http.ResponseWriter, r *http.Request) {

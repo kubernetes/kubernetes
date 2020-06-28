@@ -54,4 +54,7 @@ type Interface interface {
 
 	// DeleteInstances deletes the instances for a VirtualMachineScaleSet.
 	DeleteInstances(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) *retry.Error
+
+	// DeleteInstancesAsync sends the delete request to the ARM client and DOEST NOT wait on the future
+	DeleteInstancesAsync(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (*azure.Future, *retry.Error)
 }

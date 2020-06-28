@@ -227,3 +227,33 @@
   - numNodes: 5000
     numInitPods: [2000, 2000, 2000, 2000, 2000]
     numPodsToSchedule: 1000
+- template:
+    desc: Preemption
+    initPods:
+    - podTemplatePath: config/pod-low-priority.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-high-priority.yaml
+  params:
+  - numNodes: 500
+    numInitPods: [2000]
+    numPodsToSchedule: 500
+  - numNodes: 5000
+    numInitPods: [20000]
+    numPodsToSchedule: 5000
+- template:
+    desc: Unschedulable
+    skipWaitUntilInitPodsScheduled: true
+    initPods:
+    - podTemplatePath: config/pod-large-cpu.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-default.yaml
+  params:
+  - numNodes: 500
+    numInitPods: [200]
+    numPodsToSchedule: 1000
+  - numNodes: 5000
+    numInitPods: [200]
+    numPodsToSchedule: 5000
+  - numNodes: 5000
+    numInitPods: [2000]
+    numPodsToSchedule: 5000

@@ -154,6 +154,5 @@ type EndpointSliceList struct {
 	// +optional
 	metav1.ListMeta
 	// List of endpoint slices
-	// +listType=set
 	Items []EndpointSlice
 }

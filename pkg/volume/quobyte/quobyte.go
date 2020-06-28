@@ -24,7 +24,7 @@ import (
 	gostrings "strings"
 
 	"github.com/google/uuid"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -465,19 +465,14 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	var apiServer, secretName string
 	secretNamespace := "default"
 
-	deleteKeys := []string{}
-
 	for k, v := range params {
 		switch gostrings.ToLower(k) {
 		case "adminsecretname":
 			secretName = v
-			deleteKeys = append(deleteKeys, k)
 		case "adminsecretnamespace":
 			secretNamespace = v
-			deleteKeys = append(deleteKeys, k)
 		case "quobyteapiserver":
 			apiServer = v
-			deleteKeys = append(deleteKeys, k)
 		}
 	}
 

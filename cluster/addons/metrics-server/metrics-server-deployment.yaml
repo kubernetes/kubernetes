@@ -64,7 +64,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.7
+        image: k8s.gcr.io/addon-resizer:1.8.10
         resources:
           limits:
             cpu: 100m
@@ -99,6 +99,8 @@ spec:
           # Specifies the smallest cluster (defined in number of nodes)
           # resources will be scaled to.
           - --minClusterSize={{ metrics_server_min_cluster_size }}
+          # Use kube-apiserver metrics to avoid periodically listing nodes.
+          - --use-metrics=true
       volumes:
         - name: metrics-server-config-volume
           configMap:

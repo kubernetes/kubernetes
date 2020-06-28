@@ -103,8 +103,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		sourcePVC *v1.PersistentVolumeClaim
 		sc        *storagev1.StorageClass
 
-		intreeOps   opCounts
-		migratedOps opCounts
+		migrationCheck *migrationOpCheck
 	}
 	var (
 		dInfo   = driver.GetDriverInfo()
@@ -139,7 +138,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
@@ -177,7 +176,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
-		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	ginkgo.It("should provision storage with mount options", func() {
@@ -349,6 +348,23 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
 	}()
+
+	if class == nil {
+		// StorageClass is nil, so the default one will be used
+		scName, err := e2epv.GetDefaultStorageClassName(client)
+		framework.ExpectNoError(err)
+		defaultSC, err := client.StorageV1().StorageClasses().Get(context.TODO(), scName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		// If late binding is configured, create and delete a pod to provision the volume
+		if *defaultSC.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+			ginkgo.By("creating a pod referring to the claim")
+			var pod *v1.Pod
+			pod, err := e2epod.CreatePod(t.Client, claim.Namespace, nil /* nodeSelector */, []*v1.PersistentVolumeClaim{claim}, true /* isPrivileged */, "" /* command */)
+			// Delete pod now, otherwise PV can't be deleted below
+			framework.ExpectNoError(err)
+			e2epod.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
+		}
+	}
 
 	// Run the checker
 	if t.PvCheck != nil {
@@ -693,8 +709,7 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	} else {
 		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
 	}
-	e2epod.DeletePodOrFail(c, pod.Namespace, pod.Name)
-	e2epod.WaitForPodNoLongerRunningInNamespace(c, pod.Name, pod.Namespace)
+	e2epod.DeletePodWithWait(c, pod)
 }
 
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {

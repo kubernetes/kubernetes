@@ -23,12 +23,17 @@ import (
 	"fmt"
 
 	"github.com/Microsoft/hcsshim/hcn"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"strings"
 )
 
 type hnsV2 struct{}
+
+var (
+	// LoadBalancerFlagsIPv6 enables IPV6.
+	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
+)
 
 func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(name)
@@ -90,10 +95,14 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 		equal := false
 		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
+
+			if !equal && len(endpoint.IpConfigurations) > 1 {
+				equal = endpoint.IpConfigurations[1].IpAddress == ip
+			}
 		}
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
 			return &endpointsInfo{
-				ip:         endpoint.IpConfigurations[0].IpAddress,
+				ip:         ip,
 				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
@@ -232,16 +241,41 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		lbFlags |= hcn.LoadBalancerFlagsDSR
 	}
 
-	lb, err := hcn.AddLoadBalancer(
-		hnsEndpoints,
-		lbFlags,
-		lbPortMappingFlags,
-		sourceVip,
-		vips,
-		protocol,
-		internalPort,
-		externalPort,
-	)
+	if flags.isIPv6 {
+		lbFlags |= LoadBalancerFlagsIPv6
+	}
+
+	lbDistributionType := hcn.LoadBalancerDistributionNone
+
+	if flags.sessionAffinity {
+		lbDistributionType = hcn.LoadBalancerDistributionSourceIP
+	}
+
+	loadBalancer := &hcn.HostComputeLoadBalancer{
+		SourceVIP: sourceVip,
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{
+				Protocol:         uint32(protocol),
+				InternalPort:     internalPort,
+				ExternalPort:     externalPort,
+				DistributionType: lbDistributionType,
+				Flags:            lbPortMappingFlags,
+			},
+		},
+		FrontendVIPs: vips,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: lbFlags,
+	}
+
+	for _, endpoint := range hnsEndpoints {
+		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, endpoint.Id)
+	}
+
+	lb, err := loadBalancer.Create()
+
 	if err != nil {
 		return nil, err
 	}

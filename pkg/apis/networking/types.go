@@ -248,26 +248,27 @@ type IngressSpec struct {
 	// +optional
 	IngressClassName *string
 
-	// Backend is a default backend capable of servicing requests that don't
-	// match any rule. At least one of 'backend' or 'rules' must be specified.
-	// This field is optional to allow the loadbalancer controller or defaulting
-	// logic to specify a global default.
+	// DefaultBackend is the backend that should handle requests that don't
+	// match any rule. If Rules are not specified, DefaultBackend must be specified.
+	// If DefaultBackend is not set, the handling of requests that do not match any
+	// of the rules will be up to the Ingress controller.
 	// +optional
-	Backend *IngressBackend
+	DefaultBackend *IngressBackend
 
 	// TLS configuration. Currently the Ingress only supports a single TLS
 	// port, 443. If multiple members of this list specify different hosts, they
 	// will be multiplexed on the same port according to the hostname specified
 	// through the SNI TLS extension, if the ingress controller fulfilling the
 	// ingress supports SNI.
+	// +listType=atomic
 	// +optional
 	TLS []IngressTLS
 
 	// A list of host rules used to configure the Ingress. If unspecified, or
 	// no rule matches, all traffic is sent to the default backend.
+	// +listType=atomic
 	// +optional
 	Rules []IngressRule
-	// TODO: Add the ability to specify load-balancer IP through claims
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -314,7 +315,6 @@ type IngressClassList struct {
 	metav1.ListMeta
 
 	// Items is the list of IngressClasses.
-	// +listType=set
 	Items []IngressClass
 }
 
@@ -324,6 +324,7 @@ type IngressTLS struct {
 	// this list must match the name/s used in the tlsSecret. Defaults to the
 	// wildcard host setting for the loadbalancer controller fulfilling this
 	// Ingress, if left unspecified.
+	// +listType=atomic
 	// +optional
 	Hosts []string
 	// SecretName is the name of the secret used to terminate TLS traffic on
@@ -404,6 +405,7 @@ type IngressRuleValue struct {
 // or '#'.
 type HTTPIngressRuleValue struct {
 	// A collection of paths that map requests to backends.
+	// +listType=atomic
 	Paths []HTTPIngressPath
 	// TODO: Consider adding fields for ingress-type specific global
 	// options usable by a loadbalancer, like http keep-alive.
@@ -462,17 +464,39 @@ type HTTPIngressPath struct {
 
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
-	// Specifies the name of the referenced service.
+	// Service references a Service as a Backend.
+	// This is a mutually exclusive setting with "Resource".
 	// +optional
-	ServiceName string
-
-	// Specifies the port of the referenced service.
-	// +optional
-	ServicePort intstr.IntOrString
+	Service *IngressServiceBackend
 
 	// Resource is an ObjectRef to another Kubernetes resource in the namespace
-	// of the Ingress object. If resource is specified, serviceName and servicePort
-	// must not be specified.
+	// of the Ingress object. If resource is specified, a service.Name and
+	// service.Port must not be specified.
+	// This is a mutually exclusive setting with "Service".
 	// +optional
 	Resource *api.TypedLocalObjectReference
+}
+
+// IngressServiceBackend references a Kubernetes Service as a Backend.
+type IngressServiceBackend struct {
+	// Name is the referenced service. The service must exist in
+	// the same namespace as the Ingress object.
+	Name string
+
+	// Port of the referenced service. A port name or port number
+	// is required for a IngressServiceBackend.
+	Port ServiceBackendPort
+}
+
+// ServiceBackendPort is the service port being referenced.
+type ServiceBackendPort struct {
+	// Name is the name of the port on the Service.
+	// This is a mutually exclusive setting with "Number".
+	// +optional
+	Name string
+
+	// Number is the numerical port number (e.g. 80) on the Service.
+	// This is a mutually exclusive setting with "Name".
+	// +optional
+	Number int32
 }

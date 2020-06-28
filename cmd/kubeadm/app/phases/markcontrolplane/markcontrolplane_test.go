@@ -19,17 +19,15 @@ package markcontrolplane
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func TestMarkControlPlane(t *testing.T) {
@@ -46,77 +44,74 @@ func TestMarkControlPlane(t *testing.T) {
 		expectedPatch  string
 	}{
 		{
-			"control-plane label and taint missing",
-			"",
-			nil,
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
+			name:           "control-plane label and taint missing",
+			existingLabel:  "",
+			existingTaints: nil,
+			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/master":""}},"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
 		},
 		{
-			"control-plane label and taint missing but taint not wanted",
-			"",
-			nil,
-			nil,
-			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
+			name:           "control-plane label and taint missing but taint not wanted",
+			existingLabel:  "",
+			existingTaints: nil,
+			newTaints:      nil,
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/master":""}}}`,
 		},
 		{
-			"control-plane label missing",
-			"",
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
+			name:           "control-plane label missing",
+			existingLabel:  "",
+			existingTaints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/master":""}}}`,
 		},
 		{
-			"control-plane taint missing",
-			kubeadmconstants.LabelNodeRoleMaster,
-			nil,
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
+			name:           "control-plane taint missing",
+			existingLabel:  kubeadmconstants.LabelNodeRoleMaster,
+			existingTaints: nil,
+			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			expectedPatch:  `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
 		},
 		{
-			"nothing missing",
-			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{}",
+			name:           "nothing missing",
+			existingLabel:  kubeadmconstants.LabelNodeRoleMaster,
+			existingTaints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			expectedPatch:  `{}`,
 		},
 		{
-			"has taint and no new taints wanted",
-			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{
+			name:          "has taint and no new taints wanted",
+			existingLabel: kubeadmconstants.LabelNodeRoleMaster,
+			existingTaints: []v1.Taint{
 				{
 					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			nil,
-			"{}",
+			newTaints:     nil,
+			expectedPatch: `{}`,
 		},
 		{
-			"has taint and should merge with wanted taint",
-			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{
+			name:          "has taint and should merge with wanted taint",
+			existingLabel: kubeadmconstants.LabelNodeRoleMaster,
+			existingTaints: []v1.Taint{
 				{
 					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"},{\"effect\":\"NoSchedule\",\"key\":\"node.cloudprovider.kubernetes.io/uninitialized\"}]}}",
+			newTaints:     []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			expectedPatch: `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"},{"effect":"NoSchedule","key":"node.cloudprovider.kubernetes.io/uninitialized"}]}}`,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hostname, err := kubeadmutil.GetHostname("")
-			if err != nil {
-				t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
-			}
+			nodename := "node01"
 			controlPlaneNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: hostname,
+					Name: nodename,
 					Labels: map[string]string{
-						v1.LabelHostname: hostname,
+						v1.LabelHostname: nodename,
 					},
 				},
 			}
@@ -131,15 +126,15 @@ func TestMarkControlPlane(t *testing.T) {
 
 			jsonNode, err := json.Marshal(controlPlaneNode)
 			if err != nil {
-				t.Fatalf("MarkControlPlane(%s): unexpected encoding error: %v", tc.name, err)
+				t.Fatalf("unexpected encoding error: %v", err)
 			}
 
 			var patchRequest string
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
-				if req.URL.Path != "/api/v1/nodes/"+hostname {
-					t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
+				if req.URL.Path != "/api/v1/nodes/"+nodename {
+					t.Errorf("request for unexpected HTTP resource: %v", req.URL.Path)
 					http.Error(w, "", http.StatusNotFound)
 					return
 				}
@@ -147,9 +142,11 @@ func TestMarkControlPlane(t *testing.T) {
 				switch req.Method {
 				case "GET":
 				case "PATCH":
-					patchRequest = toString(req.Body)
+					buf := new(bytes.Buffer)
+					buf.ReadFrom(req.Body)
+					patchRequest = buf.String()
 				default:
-					t.Errorf("MarkControlPlane(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
+					t.Errorf("request for unexpected HTTP verb: %v", req.Method)
 					http.Error(w, "", http.StatusNotFound)
 					return
 				}
@@ -161,22 +158,16 @@ func TestMarkControlPlane(t *testing.T) {
 
 			cs, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 			if err != nil {
-				t.Fatalf("MarkControlPlane(%s): unexpected error building clientset: %v", tc.name, err)
+				t.Fatalf("unexpected error building clientset: %v", err)
 			}
 
-			if err := MarkControlPlane(cs, hostname, tc.newTaints); err != nil {
-				t.Errorf("MarkControlPlane(%s) returned unexpected error: %v", tc.name, err)
+			if err := MarkControlPlane(cs, nodename, tc.newTaints); err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 
 			if tc.expectedPatch != patchRequest {
-				t.Errorf("MarkControlPlane(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
+				t.Errorf("unexpected error: wanted patch %v, got %v", tc.expectedPatch, patchRequest)
 			}
 		})
 	}
-}
-
-func toString(r io.Reader) string {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(r)
-	return buf.String()
 }

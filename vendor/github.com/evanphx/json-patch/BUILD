@@ -10,6 +10,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/evanphx/json-patch",
     importpath = "github.com/evanphx/json-patch",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

@@ -76,7 +76,11 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 
 	go func() {
 		var m sync.Mutex
-		logging := map[string]bool{}
+		// Key is pod/container name, true if currently logging it.
+		active := map[string]bool{}
+		// Key is pod/container/container-id, true if we have ever started to capture its output.
+		started := map[string]bool{}
+
 		check := func() {
 			m.Lock()
 			defer m.Unlock()
@@ -91,10 +95,17 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 
 			for _, pod := range pods.Items {
 				for i, c := range pod.Spec.Containers {
+					// sanity check, array should have entry for each container
+					if len(pod.Status.ContainerStatuses) <= i {
+						continue
+					}
 					name := pod.ObjectMeta.Name + "/" + c.Name
-					if logging[name] ||
-						// sanity check, array should have entry for each container
-						len(pod.Status.ContainerStatuses) <= i ||
+					id := name + "/" + pod.Status.ContainerStatuses[i].ContainerID
+					if active[name] ||
+						// If we have worked on a container before and it has now terminated, then
+						// there cannot be any new output and we can ignore it.
+						(pod.Status.ContainerStatuses[i].State.Terminated != nil &&
+							started[id]) ||
 						// Don't attempt to get logs for a container unless it is running or has terminated.
 						// Trying to get a log would just end up with an error that we would have to suppress.
 						(pod.Status.ContainerStatuses[i].State.Running == nil &&
@@ -117,7 +128,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 					}
 
 					// Determine where we write. If this fails, we intentionally return without clearing
-					// the logging[name] flag, which prevents trying over and over again to
+					// the active[name] flag, which prevents trying over and over again to
 					// create the output file.
 					var out io.Writer
 					var closer io.Closer
@@ -155,14 +166,22 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 						if closer != nil {
 							defer closer.Close()
 						}
+						first := true
 						defer func() {
 							m.Lock()
-							logging[name] = false
+							// If we never printed anything, then also skip the final message.
+							if !first {
+								if prefix != "" {
+									fmt.Fprintf(out, "%s==== end of pod log ====\n", prefix)
+								} else {
+									fmt.Fprintf(out, "==== end of pod log for container %s ====\n", name)
+								}
+							}
+							active[name] = false
 							m.Unlock()
 							readCloser.Close()
 						}()
 						scanner := bufio.NewScanner(readCloser)
-						first := true
 						for scanner.Scan() {
 							line := scanner.Text()
 							// Filter out the expected "end of stream" error message,
@@ -170,21 +189,25 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 							// Same for attempts to read logs from a container that
 							// isn't ready (yet?!).
 							if !strings.HasPrefix(line, "rpc error: code = Unknown desc = Error: No such container:") &&
+								!strings.HasPrefix(line, "unable to retrieve container logs for ") &&
 								!strings.HasPrefix(line, "Unable to retrieve container logs for ") {
 								if first {
-									if to.LogWriter == nil {
-										// Because the same log might be written to multiple times
-										// in different test instances, log an extra line to separate them.
-										// Also provides some useful extra information.
-										fmt.Fprintf(out, "==== start of log for container %s ====\n", name)
+									// Because the same log might be written to multiple times
+									// in different test instances, log an extra line to separate them.
+									// Also provides some useful extra information.
+									if prefix == "" {
+										fmt.Fprintf(out, "==== start of pod log for container %s ====\n", name)
+									} else {
+										fmt.Fprintf(out, "%s==== start of pod log ====\n", prefix)
 									}
 									first = false
 								}
-								fmt.Fprintf(out, "%s%s\n", prefix, scanner.Text())
+								fmt.Fprintf(out, "%s%s\n", prefix, line)
 							}
 						}
 					}()
-					logging[name] = true
+					active[name] = true
+					started[id] = true
 				}
 			}
 		}

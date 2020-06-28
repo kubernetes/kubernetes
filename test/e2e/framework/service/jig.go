@@ -325,8 +325,8 @@ func (j *TestJig) WaitForEndpointOnNode(nodeName string) error {
 	})
 }
 
-// WaitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
-func (j *TestJig) WaitForAvailableEndpoint(timeout time.Duration) error {
+// waitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
+func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", j.Name)
 	stopCh := make(chan struct{})
@@ -842,7 +842,7 @@ func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod
 	clusterIP := svc.Spec.ClusterIP
 	servicePorts := svc.Spec.Ports
 
-	err := j.WaitForAvailableEndpoint(ServiceEndpointsTimeout)
+	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
 	if err != nil {
 		return err
 	}
@@ -875,7 +875,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 		return err
 	}
 
-	err = j.WaitForAvailableEndpoint(ServiceEndpointsTimeout)
+	err = j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
 	if err != nil {
 		return err
 	}
@@ -901,10 +901,14 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 // checkExternalServiceReachability ensures service of type externalName resolves to IP address and no fake externalName is set
 // FQDN of kubernetes is used as externalName(for air tight platforms).
 func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) error {
+	// NOTE(claudiub): Windows does not support PQDN.
+	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
-	cmd := fmt.Sprintf("nslookup %s", svc.Name)
-	_, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
+	cmd := fmt.Sprintf("nslookup %s", svcName)
+	_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
+	// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
+	// we can check stderr for the error.
+	if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
 		return fmt.Errorf("ExternalName service %q must resolve to IP", pod.Namespace+"/"+pod.Name)
 	}
 	return nil
@@ -961,4 +965,19 @@ func (j *TestJig) CreateTCPUDPServicePods(replica int) error {
 		Replicas:     replica,
 	}
 	return e2erc.RunRC(config)
+}
+
+// CreateSCTPServiceWithPort creates a new SCTP Service with given port based on the
+// j's defaults. Callers can provide a function to tweak the Service object before
+// it is created.
+func (j *TestJig) CreateSCTPServiceWithPort(tweak func(svc *v1.Service), port int32) (*v1.Service, error) {
+	svc := j.newServiceTemplate(v1.ProtocolSCTP, port)
+	if tweak != nil {
+		tweak(svc)
+	}
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SCTP Service %q: %v", svc.Name, err)
+	}
+	return j.sanityCheckService(result, svc.Spec.Type)
 }

@@ -32,6 +32,7 @@ var (
 		plugins.CinderDriverName:    plugins.NewOpenStackCinderCSITranslator(),
 		plugins.AzureDiskDriverName: plugins.NewAzureDiskCSITranslator(),
 		plugins.AzureFileDriverName: plugins.NewAzureFileCSITranslator(),
+		plugins.VSphereDriverName:   plugins.NewvSphereCSITranslator(),
 	}
 )
 

@@ -18,6 +18,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"regexp"
@@ -29,19 +30,20 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
-
-var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
@@ -389,7 +391,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: tc.PodName},
 				Spec: v1.PodSpec{
-					Containers:                   []v1.Container{{Name: "token-test", Image: mountImage}},
+					Containers:                   []v1.Container{{Name: "token-test", Image: imageutils.GetE2EImage(imageutils.Agnhost)}},
 					RestartPolicy:                v1.RestartPolicyNever,
 					ServiceAccountName:           tc.ServiceAccountName,
 					AutomountServiceAccountToken: tc.AutomountPodSpec,
@@ -413,6 +415,127 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			} else {
 				framework.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
+		}
+	})
+
+	/*
+	   Testname: Projected service account token file ownership and permission.
+	   Description: Ensure that Projected Service Account Token is mounted with
+	               correct file ownership and permission mounted. We test the
+	               following scenarios here.
+	   1. RunAsUser is set,
+	   2. FsGroup is set,
+	   3. RunAsUser and FsGroup are set,
+	   4. Default, neither RunAsUser nor FsGroup is set,
+
+	   Containers MUST verify that the projected service account token can be
+	   read and has correct file mode set including ownership and permission.
+	*/
+	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup] [Feature:TokenRequestProjection]", func() {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+
+		var (
+			podName         = "test-pod-" + string(uuid.NewUUID())
+			containerName   = "test-container"
+			volumeName      = "test-volume"
+			volumeMountPath = "/test-volume"
+			tokenVolumePath = "/test-volume/token"
+			int64p          = func(i int64) *int64 { return &i }
+		)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							Projected: &v1.ProjectedVolumeSource{
+								Sources: []v1.VolumeProjection{
+									{
+										ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+											Path:              "token",
+											ExpirationSeconds: int64p(60 * 60),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  containerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args: []string{
+							"mounttest",
+							fmt.Sprintf("--file_perm=%v", tokenVolumePath),
+							fmt.Sprintf("--file_owner=%v", tokenVolumePath),
+							fmt.Sprintf("--file_content=%v", tokenVolumePath),
+						},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		testcases := []struct {
+			runAsUser bool
+			fsGroup   bool
+			wantPerm  string
+			wantUID   int64
+			wantGID   int64
+		}{
+			{
+				runAsUser: true,
+				wantPerm:  "-rw-------",
+				wantUID:   1000,
+				wantGID:   0,
+			},
+			{
+				fsGroup:  true,
+				wantPerm: "-rw-r-----",
+				wantUID:  0,
+				wantGID:  10000,
+			},
+			{
+				runAsUser: true,
+				fsGroup:   true,
+				wantPerm:  "-rw-r-----",
+				wantUID:   1000,
+				wantGID:   10000,
+			},
+			{
+				wantPerm: "-rw-r--r--",
+				wantUID:  0,
+				wantGID:  0,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			if tc.runAsUser {
+				pod.Spec.SecurityContext.RunAsUser = &tc.wantUID
+			}
+			if tc.fsGroup {
+				pod.Spec.SecurityContext.FSGroup = &tc.wantGID
+			}
+
+			output := []string{
+				fmt.Sprintf("perms of file \"%v\": %s", tokenVolumePath, tc.wantPerm),
+				fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, ".+"),
+				fmt.Sprintf("owner UID of \"%v\": %d", tokenVolumePath, tc.wantUID),
+				fmt.Sprintf("owner GID of \"%v\": %d", tokenVolumePath, tc.wantGID),
+			}
+			f.TestContainerOutputRegexp("service account token: ", pod, 0, output)
 		}
 	})
 
@@ -620,6 +743,90 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		framework.ExpectNoError(podErr)
 		framework.Logf("completed pod")
+	})
+
+	/*
+			   Release: v1.19
+			   Testname: ServiceAccount lifecycle test
+			   Description: Creates a ServiceAccount with a static Label MUST be added as shown in watch event.
+		                        Patching the ServiceAccount MUST return it's new property.
+		                        Listing the ServiceAccounts MUST return the test ServiceAccount with it's patched values.
+		                        ServiceAccount will be deleted and MUST find a deleted watch event.
+	*/
+	framework.ConformanceIt("should run through the lifecycle of a ServiceAccount", func() {
+		testNamespaceName := f.Namespace.Name
+		testServiceAccountName := "testserviceaccount"
+		testServiceAccountStaticLabels := map[string]string{"test-serviceaccount-static": "true"}
+		testServiceAccountStaticLabelsFlat := "test-serviceaccount-static=true"
+
+		ginkgo.By("creating a ServiceAccount")
+		testServiceAccount := v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   testServiceAccountName,
+				Labels: testServiceAccountStaticLabels,
+			},
+		}
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(context.TODO(), &testServiceAccount, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+
+		ginkgo.By("watching for the ServiceAccount to be added")
+		resourceWatchTimeoutSeconds := int64(180)
+		resourceWatch, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat, TimeoutSeconds: &resourceWatchTimeoutSeconds})
+		if err != nil {
+			fmt.Println(err, "failed to setup watch on newly created ServiceAccount")
+			return
+		}
+
+		resourceWatchChan := resourceWatch.ResultChan()
+		eventFound := false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Added {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Added)
+
+		ginkgo.By("patching the ServiceAccount")
+		boolFalse := false
+		testServiceAccountPatchData, err := json.Marshal(v1.ServiceAccount{
+			AutomountServiceAccountToken: &boolFalse,
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
+		_, err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(context.TODO(), testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch the ServiceAccount")
+		eventFound = false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Modified {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Modified)
+
+		ginkgo.By("finding ServiceAccount in list of all ServiceAccounts (by LabelSelector)")
+		serviceAccountList, err := f.ClientSet.CoreV1().ServiceAccounts("").List(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat})
+		framework.ExpectNoError(err, "failed to list ServiceAccounts by LabelSelector")
+		foundServiceAccount := false
+		for _, serviceAccountItem := range serviceAccountList.Items {
+			if serviceAccountItem.ObjectMeta.Name == testServiceAccountName && serviceAccountItem.ObjectMeta.Namespace == testNamespaceName && *serviceAccountItem.AutomountServiceAccountToken == boolFalse {
+				foundServiceAccount = true
+				break
+			}
+		}
+		framework.ExpectEqual(foundServiceAccount, true, "failed to find the created ServiceAccount")
+
+		ginkgo.By("deleting the ServiceAccount")
+		err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to delete the ServiceAccount by Collection")
+		eventFound = false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Deleted {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
 	})
 })
 

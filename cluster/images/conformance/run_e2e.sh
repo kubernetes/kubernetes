@@ -37,7 +37,7 @@ saveResults() {
 }
 
 # Optional Golang runner alternative to the bash script.
-# Entry provided via env var to simplify invocation. 
+# Entry provided via env var to simplify invocation.
 if [[ -n ${E2E_USE_GO_RUNNER:-} ]]; then
     set -x
     /gorunner && ret=0 || ret=$?

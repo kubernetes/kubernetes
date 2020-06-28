@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "conntrack.go",
         "dns.go",
         "dns_common.go",
         "dns_configmap.go",
@@ -38,6 +39,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
@@ -81,13 +83,13 @@ go_library(
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/network/scale:go_default_library",
+        "//test/e2e/storage/utils:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
         "//vendor/github.com/miekg/dns:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],

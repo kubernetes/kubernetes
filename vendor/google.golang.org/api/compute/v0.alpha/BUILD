@@ -7,8 +7,8 @@ go_library(
     importpath = "google.golang.org/api/compute/v0.alpha",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/google.golang.org/api/gensupport:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//vendor/google.golang.org/api/internal/gensupport:go_default_library",
         "//vendor/google.golang.org/api/option:go_default_library",
         "//vendor/google.golang.org/api/transport/http:go_default_library",
     ],

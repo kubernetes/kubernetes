@@ -45,7 +45,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -87,6 +87,8 @@ var noBackoff = &NoBackoff{}
 // check once.
 type Request struct {
 	c *RESTClient
+
+	warningHandler WarningHandler
 
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
@@ -135,12 +137,13 @@ func NewRequest(c *RESTClient) *Request {
 	}
 
 	r := &Request{
-		c:           c,
-		rateLimiter: c.rateLimiter,
-		backoff:     backoff,
-		timeout:     timeout,
-		pathPrefix:  pathPrefix,
-		maxRetries:  10,
+		c:              c,
+		rateLimiter:    c.rateLimiter,
+		backoff:        backoff,
+		timeout:        timeout,
+		pathPrefix:     pathPrefix,
+		maxRetries:     10,
+		warningHandler: c.warningHandler,
 	}
 
 	switch {
@@ -215,6 +218,13 @@ func (r *Request) BackOff(manager BackoffManager) *Request {
 	}
 
 	r.backoff = manager
+	return r
+}
+
+// WarningHandler sets the handler this client uses when warning headers are encountered.
+// If set to nil, this client will use the default warning handler (see SetDefaultWarningHandler).
+func (r *Request) WarningHandler(handler WarningHandler) *Request {
+	r.warningHandler = handler
 	return r
 }
 
@@ -608,7 +618,7 @@ var globalThrottledLogger = &throttledLogger{
 
 func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
 	for _, setting := range b.settings {
-		if bool(klog.V(setting.logLevel)) {
+		if bool(klog.V(setting.logLevel).Enabled()) {
 			// Return early without write locking if possible.
 			if func() bool {
 				setting.lock.RLock()
@@ -669,7 +679,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
-		if net.IsProbableEOF(err) {
+		if net.IsProbableEOF(err) || net.IsTimeout(err) {
 			return watch.NewEmptyWatch(), nil
 		}
 		return nil, err
@@ -691,6 +701,8 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	handleWarnings(resp.Header, r.warningHandler)
 
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
@@ -764,6 +776,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 	switch {
 	case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
+		handleWarnings(resp.Header, r.warningHandler)
 		return resp.Body, nil
 
 	default:
@@ -1020,6 +1033,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 				body:        body,
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
+				warnings:    handleWarnings(resp.Header, r.warningHandler),
 			}
 		}
 	}
@@ -1038,6 +1052,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			statusCode:  resp.StatusCode,
 			decoder:     decoder,
 			err:         err,
+			warnings:    handleWarnings(resp.Header, r.warningHandler),
 		}
 	}
 
@@ -1046,6 +1061,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
+		warnings:    handleWarnings(resp.Header, r.warningHandler),
 	}
 }
 
@@ -1053,11 +1069,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
-	case bool(klog.V(10)):
+	case bool(klog.V(10).Enabled()):
 		return body
-	case bool(klog.V(9)):
+	case bool(klog.V(9).Enabled()):
 		max = 10240
-	case bool(klog.V(8)):
+	case bool(klog.V(8).Enabled()):
 		max = 1024
 	}
 
@@ -1072,7 +1088,7 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if klog.V(8) {
+	if klog.V(8).Enabled() {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
@@ -1181,6 +1197,7 @@ func retryAfterSeconds(resp *http.Response) (int, bool) {
 // Result contains the result of calling Request.Do().
 type Result struct {
 	body        []byte
+	warnings    []net.WarningHeader
 	contentType string
 	err         error
 	statusCode  int
@@ -1292,6 +1309,11 @@ func (r Result) Error() error {
 		}
 	}
 	return r.err
+}
+
+// Warnings returns any warning headers received in the response
+func (r Result) Warnings() []net.WarningHeader {
+	return r.warnings
 }
 
 // NameMayNotBe specifies strings that cannot be used as names specified as path segments (like the REST API or etcd store)

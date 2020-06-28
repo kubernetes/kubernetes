@@ -65,7 +65,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -195,10 +195,11 @@ type LeaderElector struct {
 
 // Run starts the leader election loop
 func (le *LeaderElector) Run(ctx context.Context) {
+	defer runtime.HandleCrash()
 	defer func() {
-		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
+
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}

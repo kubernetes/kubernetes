@@ -29,14 +29,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -123,7 +123,7 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
 	}
 
-	bootstrapClient, err := certificatesv1beta1.NewForConfig(bootstrapClientConfig)
+	bootstrapClient, err := clientset.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
@@ -160,7 +160,7 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		klog.Warningf("Error waiting for apiserver to come up: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
+	certData, err := requestNodeCertificate(bootstrapClient, keyData, nodeName)
 	if err != nil {
 		return err
 	}
@@ -312,7 +312,7 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error. This is intended for use on nodes (kubelet and
 // kubeadm).
-func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
+func requestNodeCertificate(client clientset.Interface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
 		CommonName:   "system:node:" + string(nodeName),
@@ -327,10 +327,10 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}
 
-	usages := []certificates.KeyUsage{
-		certificates.UsageDigitalSignature,
-		certificates.UsageKeyEncipherment,
-		certificates.UsageClientAuth,
+	usages := []certificatesv1.KeyUsage{
+		certificatesv1.UsageDigitalSignature,
+		certificatesv1.UsageKeyEncipherment,
+		certificatesv1.UsageClientAuth,
 	}
 
 	// The Signer interface contains the Public() method to get the public key.
@@ -344,7 +344,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		return nil, err
 	}
 
-	req, err := csr.RequestCertificate(client, csrData, name, certificates.KubeAPIServerClientKubeletSignerName, usages, privateKey)
+	reqName, reqUID, err := csr.RequestCertificate(client, csrData, name, certificatesv1.KubeAPIServerClientKubeletSignerName, usages, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 	defer cancel()
 
 	klog.V(2).Infof("Waiting for client certificate to be issued")
-	return csr.WaitForCertificate(ctx, client, req)
+	return csr.WaitForCertificate(ctx, client, reqName, reqUID)
 }
 
 // This digest should include all the relevant pieces of the CSR we care about.
@@ -361,7 +361,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 // regenerate every loop and we include usages which are not contained in the
 // CSR. This needs to be kept up to date as we add new fields to the node
 // certificates and with ensureCompatible.
-func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificates.KeyUsage) (string, error) {
+func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificatesv1.KeyUsage) (string, error) {
 	hash := sha512.New512_256()
 
 	// Here we make sure two different inputs can't write the same stream

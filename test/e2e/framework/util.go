@@ -22,10 +22,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -41,7 +39,6 @@ import (
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,17 +49,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/component-base/featuregate"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -137,11 +134,18 @@ const (
 	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
 	SnapshotCreateTimeout = 5 * time.Minute
 
+	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
+	SnapshotDeleteTimeout = 5 * time.Minute
+
 	// Minimal number of nodes for the cluster to be considered large.
 	largeClusterThreshold = 100
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
+
+	// AllContainers specifies that all containers be visited
+	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+	AllContainers = InitContainers | Containers | EphemeralContainers
 )
 
 var (
@@ -244,7 +248,7 @@ OUTER:
 
 // WaitForNamespacesDeleted waits for the namespaces to be deleted.
 func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeout time.Duration) error {
-	ginkgo.By("Waiting for namespaces to vanish")
+	ginkgo.By(fmt.Sprintf("Waiting for namespaces %+v to vanish", namespaces))
 	nsMap := map[string]bool{}
 	for _, ns := range namespaces {
 		nsMap[ns] = true
@@ -266,13 +270,20 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 }
 
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
-	w, err := c.CoreV1().ServiceAccounts(ns).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: serviceAccountName}))
-	if err != nil {
-		return err
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", serviceAccountName).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ServiceAccounts(ns).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ServiceAccounts(ns).Watch(context.TODO(), options)
+		},
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, serviceAccountHasSecrets)
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, serviceAccountHasSecrets)
 	return err
 }
 
@@ -297,25 +308,6 @@ func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace st
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
-// findAvailableNamespaceName random namespace name starting with baseName.
-func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
-	var name string
-	err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
-		name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
-		_, err := c.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
-		if err == nil {
-			// Already taken
-			return false, nil
-		}
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		Logf("Unexpected error while getting namespace: %v", err)
-		return false, nil
-	})
-	return name, err
-}
-
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error) {
@@ -327,10 +319,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	// We don't use ObjectMeta.GenerateName feature, as in case of API call
 	// failure we don't know whether the namespace was created and what is its
 	// name.
-	name, err := findAvailableNamespaceName(baseName, c)
-	if err != nil {
-		return nil, err
-	}
+	name := fmt.Sprintf("%v-%v", baseName, RandomSuffix())
 
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -346,7 +335,13 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
 		if err != nil {
-			Logf("Unexpected error while creating namespace: %v", err)
+			if apierrors.IsAlreadyExists(err) {
+				// regenerate on conflict
+				Logf("Namespace name %q was already taken, generate a new name and retry", namespaceObj.Name)
+				namespaceObj.Name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
+			} else {
+				Logf("Unexpected error while creating namespace: %v", err)
+			}
 			return false, nil
 		}
 		return true, nil
@@ -402,32 +397,6 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 		}
 	}
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
-}
-
-// WaitForService waits until the service appears (exist == true), or disappears (exist == false)
-func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		switch {
-		case err == nil:
-			Logf("Service %s in namespace %s found.", name, namespace)
-			return exist, nil
-		case apierrors.IsNotFound(err):
-			Logf("Service %s in namespace %s disappeared.", name, namespace)
-			return !exist, nil
-		case !testutils.IsRetryableAPIError(err):
-			Logf("Non-retryable failure while getting service.")
-			return false, err
-		default:
-			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
-			return false, nil
-		}
-	})
-	if err != nil {
-		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
-	}
-	return nil
 }
 
 //WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
@@ -623,13 +592,19 @@ func isTimeout(err error) bool {
 
 // Exec runs the kubectl executable.
 func (b KubectlBuilder) Exec() (string, error) {
+	stdout, _, err := b.ExecWithFullOutput()
+	return stdout, err
+}
+
+// ExecWithFullOutput runs the kubectl executable, and returns the stdout and stderr.
+func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
+		return "", "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -643,18 +618,18 @@ func (b KubectlBuilder) Exec() (string, error) {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)
 			}
-			return "", uexec.CodeExitError{
+			return stdout.String(), stderr.String(), uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
-		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
+		return "", "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
 	Logf("stdout: %q", stdout.String())
-	return stdout.String(), nil
+	return stdout.String(), stderr.String(), nil
 }
 
 // RunKubectlOrDie is a convenience wrapper over kubectlBuilder
@@ -665,6 +640,12 @@ func RunKubectlOrDie(namespace string, args ...string) string {
 // RunKubectl is a convenience wrapper over kubectlBuilder
 func RunKubectl(namespace string, args ...string) (string, error) {
 	return NewKubectlCommand(namespace, args...).Exec()
+}
+
+// RunKubectlWithFullOutput is a convenience wrapper over kubectlBuilder
+// It will also return the command's stderr.
+func RunKubectlWithFullOutput(namespace string, args ...string) (string, string, error) {
+	return NewKubectlCommand(namespace, args...).ExecWithFullOutput()
 }
 
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
@@ -734,6 +715,66 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
 }
 
+// ContainerType signifies container type
+type ContainerType int
+
+const (
+	// FeatureEphemeralContainers allows running an ephemeral container in pod namespaces to troubleshoot a running pod
+	FeatureEphemeralContainers featuregate.Feature = "EphemeralContainers"
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// InitContainers is for init containers
+	InitContainers
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// allFeatureEnabledContainers returns a ContainerType mask which includes all container
+// types except for the ones guarded by feature gate.
+// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+func allFeatureEnabledContainers() ContainerType {
+	containerType := AllContainers
+	if !utilfeature.DefaultFeatureGate.Enabled(FeatureEphemeralContainers) {
+		containerType &= ^EphemeralContainers
+	}
+	return containerType
+}
+
+// ContainerVisitor is called with each container spec, and returns true
+// if visiting should continue.
+// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+type ContainerVisitor func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
+
+// visitContainers invokes the visitor function with a pointer to every container
+// spec in the given pod spec with type set in mask. If visitor returns false,
+// visiting is short-circuited. visitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
+	if mask&InitContainers != 0 {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainers) {
+				return false
+			}
+		}
+	}
+	if mask&Containers != 0 {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Containers) {
+				return false
+			}
+		}
+	}
+	if mask&EphemeralContainers != 0 {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
 // It then tests that the matcher with each expectedOutput matches the output of the specified container.
 func (f *Framework) MatchContainerOutput(
@@ -764,7 +805,7 @@ func (f *Framework) MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = podutil.VisitContainers(&podStatus.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+		_ = visitContainers(&podStatus.Spec, allFeatureEnabledContainers(), func(c *v1.Container, containerType ContainerType) bool {
 			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
@@ -978,17 +1019,6 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 	ExpectEqual(node.Labels[labelKey], labelValue)
 }
 
-// RemoveTaintOffNode removes the given taint from the given node.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
-	verifyThatTaintIsGone(c, nodeName, &taint)
-}
-
-// AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
-}
-
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
@@ -997,15 +1027,6 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string)
 
 	ginkgo.By("verifying the node doesn't have the label " + labelKey)
 	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
-}
-
-func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
-	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
-	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	if taintExists(nodeUpdated.Spec.Taints, taint) {
-		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
-	}
 }
 
 // ExpectNodeHasTaint expects that the node has the given taint.
@@ -1036,6 +1057,12 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
 	return RunKubectl(ns, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
+}
+
+// RunHostCmdWithFullOutput runs the given cmd in the context of the given pod using `kubectl exec`
+// inside of a shell. It will also return the command's stderr.
+func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
+	return RunKubectlWithFullOutput(ns, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -1236,14 +1263,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 	return ips.List()
 }
 
-// DescribeIng describes information of ingress by running kubectl describe ing.
-func DescribeIng(ns string) {
-	Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := RunKubectl(
-		ns, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-	Logf(desc)
-}
-
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 // TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
@@ -1261,51 +1280,6 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 		l, _ := RunKubectl(ns, "logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
 		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
 	}
-}
-
-// DsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	Logf("Parsing ds from %v", url)
-
-	var response *http.Response
-	var err error
-
-	for i := 1; i <= 5; i++ {
-		response, err = http.Get(url)
-		if err == nil && response.StatusCode == 200 {
-			break
-		}
-		time.Sleep(time.Duration(i) * time.Second)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get url: %v", err)
-	}
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
-	}
-	defer response.Body.Close()
-
-	data, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to read html response body: %v", err)
-	}
-	return DsFromData(data)
-}
-
-// DsFromData reads a byte slice and returns the daemonset in it.
-func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
-	var ds appsv1.DaemonSet
-	dataJSON, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
-	}
-
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
-	}
-	return &ds, nil
 }
 
 // PrettyPrintJSON converts metrics to JSON format.
@@ -1331,4 +1305,120 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 		}
 	}
 	return false
+}
+
+// WatchEventSequenceVerifier ...
+// manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
+//   testContext         cancelation signal across API boundries, e.g: context.TODO()
+//   dc                  sets up a client to the API
+//   resourceType        specify the type of resource
+//   namespace           select a namespace
+//   resourceName        the name of the given resource
+//   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
+//   expectedWatchEvents array of events which are expected to occur
+//   scenario            the test itself
+//   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+// this tooling relies on the test to return the events as they occur
+// the entire scenario must be run to ensure that the desired watch events arrive in order (allowing for interweaving of watch events)
+//   if an expected watch event is missing we elect to clean up and run the entire scenario again
+// we try the scenario three times to allow the sequencing to fail a couple of times
+func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
+	listWatcher := &cache.ListWatch{
+		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
+			return dc.Resource(resourceType).Namespace(namespace).Watch(ctx, listOptions)
+		},
+	}
+
+	retries := 3
+retriesLoop:
+	for try := 1; try <= retries; try++ {
+		initResource, err := dc.Resource(resourceType).Namespace(namespace).List(ctx, listOptions)
+		ExpectNoError(err, "Failed to fetch initial resource")
+
+		resourceWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
+		ExpectNoError(err, "Failed to create a resource watch of %v in namespace %v", resourceType.Resource, namespace)
+
+		// NOTE the test may need access to the events to see what's going on, such as a change in status
+		actualWatchEvents := scenario(resourceWatch)
+		errs := sets.NewString()
+		ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
+
+		totalValidWatchEvents := 0
+		foundEventIndexes := map[int]*int{}
+
+		for watchEventIndex, expectedWatchEvent := range expectedWatchEvents {
+			foundExpectedWatchEvent := false
+		actualWatchEventsLoop:
+			for actualWatchEventIndex, actualWatchEvent := range actualWatchEvents {
+				if foundEventIndexes[actualWatchEventIndex] != nil {
+					continue actualWatchEventsLoop
+				}
+				if actualWatchEvent.Type == expectedWatchEvent.Type {
+					foundExpectedWatchEvent = true
+					foundEventIndexes[actualWatchEventIndex] = &watchEventIndex
+					break actualWatchEventsLoop
+				}
+			}
+			if foundExpectedWatchEvent == false {
+				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvent.Type))
+			}
+			totalValidWatchEvents++
+		}
+		err = retryCleanup()
+		ExpectNoError(err, "Error occurred when cleaning up resources")
+		if errs.Len() > 0 && try < retries {
+			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
+			continue retriesLoop
+		}
+		ExpectEqual(errs.Len() > 0, false, strings.Join(errs.List(), "\n - "))
+		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
+		break retriesLoop
+	}
+}
+
+// WatchUntilWithoutRetry ...
+// reads items from the watch until each provided condition succeeds, and then returns the last watch
+// encountered. The first condition that returns an error terminates the watch (and the event is also returned).
+// If no event has been received, the returned event will be nil.
+// Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
+// Waits until context deadline or until context is canceled.
+//
+// the same as watchtools.UntilWithoutRetry, just without the closing of the watch - as for the purpose of being paired with WatchEventSequenceVerifier, the watch is needed for continual watch event collection
+func WatchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
+	ch := watcher.ResultChan()
+	var lastEvent *watch.Event
+	for _, condition := range conditions {
+		// check the next condition against the previous event and short circuit waiting for the next watch
+		if lastEvent != nil {
+			done, err := condition(*lastEvent)
+			if err != nil {
+				return lastEvent, err
+			}
+			if done {
+				continue
+			}
+		}
+	ConditionSucceeded:
+		for {
+			select {
+			case event, ok := <-ch:
+				if !ok {
+					return lastEvent, watchtools.ErrWatchClosed
+				}
+				lastEvent = &event
+
+				done, err := condition(event)
+				if err != nil {
+					return lastEvent, err
+				}
+				if done {
+					break ConditionSucceeded
+				}
+
+			case <-ctx.Done():
+				return lastEvent, wait.ErrWaitTimeout
+			}
+		}
+	}
+	return lastEvent, nil
 }

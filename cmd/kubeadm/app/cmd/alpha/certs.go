@@ -100,6 +100,7 @@ func NewCmdCertificateKey() *cobra.Command {
 			fmt.Println(key)
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 }
 
@@ -121,7 +122,6 @@ type renewFlags struct {
 	cfgPath        string
 	kubeconfigPath string
 	cfg            kubeadmapiv1beta2.ClusterConfiguration
-	useAPI         bool
 	csrOnly        bool
 	csrPath        string
 }
@@ -195,6 +195,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 			}
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 	addRenewFlags(allCmd, flags)
 
@@ -208,12 +209,6 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
 	options.AddCSRFlag(cmd.Flags(), &flags.csrOnly)
 	options.AddCSRDirFlag(cmd.Flags(), &flags.csrPath)
-	// TODO: remove the flag and related logic once legacy signers are removed,
-	// potentially with the release of certificates.k8s.io/v1:
-	//   https://github.com/kubernetes/kubeadm/issues/2047
-	cmd.Flags().BoolVar(&flags.useAPI, "use-api", flags.useAPI, "Use the Kubernetes certificate API to renew certificates")
-	cmd.Flags().MarkDeprecated("use-api", "certificate renewal from kubeadm using the Kubernetes API "+
-		"is deprecated and will be removed when 'certificates.k8s.io/v1' releases.")
 }
 
 func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
@@ -239,29 +234,15 @@ func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfi
 
 	// otherwise, the renewal operation has to actually renew a certificate
 
-	// renew the certificate using the requested renew method
-	if flags.useAPI {
-		// renew using K8s certificate API
-		kubeConfigPath := cmdutil.GetKubeConfigPath(flags.kubeconfigPath)
-		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigPath)
-		if err != nil {
-			return err
-		}
-
-		if err := rm.RenewUsingCSRAPI(handler.Name, client); err != nil {
-			return err
-		}
-	} else {
-		// renew using local certificate authorities.
-		// this operation can't complete in case the certificate key is not provided (external CA)
-		renewed, err := rm.RenewUsingLocalCA(handler.Name)
-		if err != nil {
-			return err
-		}
-		if !renewed {
-			fmt.Printf("Detected external %s, %s can't be renewed\n", handler.CABaseName, handler.LongName)
-			return nil
-		}
+	// renew using local certificate authorities.
+	// this operation can't complete in case the certificate key is not provided (external CA)
+	renewed, err := rm.RenewUsingLocalCA(handler.Name)
+	if err != nil {
+		return err
+	}
+	if !renewed {
+		fmt.Printf("Detected external %s, %s can't be renewed\n", handler.CABaseName, handler.LongName)
+		return nil
 	}
 	fmt.Printf("%s renewed\n", handler.LongName)
 	return nil
@@ -273,7 +254,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1beta2
 	if cfgPath == "" {
 		client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
 		if err == nil {
-			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, out, logPrefix, false)
+			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, out, logPrefix, false, false)
 			if err == nil {
 				fmt.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 				return internalcfg, nil
@@ -378,6 +359,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 			w.Flush()
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 	addExpirationFlags(cmd, flags)
 

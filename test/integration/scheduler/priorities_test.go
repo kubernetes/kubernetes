@@ -26,9 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils"
@@ -62,7 +59,7 @@ func TestNodeAffinity(t *testing.T) {
 	}
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      podName,
 		Namespace: testCtx.NS.Name,
 		Affinity: &v1.Affinity{
@@ -121,7 +118,7 @@ func TestPodAffinity(t *testing.T) {
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
 	labelValue := "S1"
-	_, err = runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      "attractor-pod",
 		Namespace: testCtx.NS.Name,
 		Labels:    map[string]string{labelKey: labelValue},
@@ -136,7 +133,7 @@ func TestPodAffinity(t *testing.T) {
 	}
 	// Add a new pod with affinity to the attractor pod.
 	podName := "pod-with-podaffinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      podName,
 		Namespace: testCtx.NS.Name,
 		Affinity: &v1.Affinity{
@@ -247,8 +244,6 @@ func makeContainersWithImages(images []string) []v1.Container {
 
 // TestEvenPodsSpreadPriority verifies that EvenPodsSpread priority functions well.
 func TestEvenPodsSpreadPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
-
 	testCtx := initTest(t, "eps-priority")
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name

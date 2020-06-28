@@ -25,7 +25,7 @@ import (
 	"runtime"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -165,9 +165,12 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, fmt.Errorf("invalid PV spec")
 	}
 	shareName := spec.PersistentVolume.Spec.AzureFile.ShareName
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		return oldSize, err
+	}
+	if spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation] != "" {
+		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
 	}
 
 	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
@@ -175,12 +178,18 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	accountName, accountKey, err := (&azureSvc{}).GetAzureCredentials(plugin.host, secretNamespace, secretName)
+	accountName, _, err := (&azureSvc{}).GetAzureCredentials(plugin.host, secretNamespace, secretName)
 	if err != nil {
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volumehelpers.RoundUpToGiB(newSize))); err != nil {
+	requestGiB, err := volumehelpers.RoundUpToGiBInt(newSize)
+
+	if err != nil {
+		return oldSize, err
+	}
+
+	if err := azure.ResizeFileShare(resourceGroup, accountName, shareName, requestGiB); err != nil {
 		return oldSize, err
 	}
 

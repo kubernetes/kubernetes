@@ -20,7 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilptr "k8s.io/utils/pointer"
 )
 
 func TestAddNoNewPrivileges(t *testing.T) {
@@ -118,5 +119,94 @@ func TestConvertToRuntimeReadonlyPaths(t *testing.T) {
 		if !reflect.DeepEqual(actual, v.expect) {
 			t.Errorf("%s failed, expected %#v but received %#v", k, v.expect, actual)
 		}
+	}
+}
+
+func TestDetermineEffectiveRunAsUser(t *testing.T) {
+	tests := []struct {
+		desc          string
+		pod           *v1.Pod
+		container     *v1.Container
+		wantRunAsUser *int64
+	}{
+		{
+			desc: "no securityContext in pod, no securityContext in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			container:     &v1.Container{},
+			wantRunAsUser: nil,
+		},
+		{
+			desc: "no runAsUser in pod, no runAsUser in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{},
+			},
+			wantRunAsUser: nil,
+		},
+		{
+			desc: "runAsUser in pod, no runAsUser in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser: new(int64),
+					},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{},
+			},
+			wantRunAsUser: new(int64),
+		},
+		{
+			desc: "no runAsUser in pod, runAsUser in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{
+					RunAsUser: new(int64),
+				},
+			},
+			wantRunAsUser: new(int64),
+		},
+		{
+			desc: "no runAsUser in pod, runAsUser in container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser: new(int64),
+					},
+				},
+			},
+			container: &v1.Container{
+				SecurityContext: &v1.SecurityContext{
+					RunAsUser: utilptr.Int64Ptr(1),
+				},
+			},
+			wantRunAsUser: utilptr.Int64Ptr(1),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			runAsUser, ok := DetermineEffectiveRunAsUser(test.pod, test.container)
+			if !ok && test.wantRunAsUser != nil {
+				t.Errorf("DetermineEffectiveRunAsUser(%v, %v) = %v, want %d", test.pod, test.container, runAsUser, *test.wantRunAsUser)
+			}
+			if ok && test.wantRunAsUser == nil {
+				t.Errorf("DetermineEffectiveRunAsUser(%v, %v) = %d, want %v", test.pod, test.container, *runAsUser, test.wantRunAsUser)
+			}
+			if ok && test.wantRunAsUser != nil && *runAsUser != *test.wantRunAsUser {
+				t.Errorf("DetermineEffectiveRunAsUser(%v, %v) = %d, want %d", test.pod, test.container, *runAsUser, *test.wantRunAsUser)
+			}
+		})
 	}
 }

@@ -86,7 +86,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.7.1
+        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.8.1
         resources:
             requests:
                 cpu: "20m"
@@ -99,7 +99,7 @@ spec:
           - --target={{.Target}}
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
-          - --default-params={"linear":{"coresPerReplica":256,"nodesPerReplica":16,"preventSinglePointFailure":true}}
+          - --default-params={"linear":{"coresPerReplica":256,"nodesPerReplica":16,"preventSinglePointFailure":true,"includeUnschedulableNodes":true}}
           - --logtostderr=true
           - --v=2
       tolerations:

@@ -18,18 +18,18 @@ package stats
 import info "github.com/google/cadvisor/info/v1"
 
 // This is supposed to store global state about an cAdvisor metrics collector.
-// cAdvisor manager will call Setup() when it starts and Destroy() when it stops.
+// cAdvisor manager will call Destroy() when it stops.
 // For each container detected by the cAdvisor manager, it will call
 // GetCollector() with the devices cgroup path for that container.
 // GetCollector() is supposed to return an object that can update
 // accelerator stats for that container.
 type Manager interface {
-	Setup()
 	Destroy()
 	GetCollector(deviceCgroup string) (Collector, error)
 }
 
 // Collector can update ContainerStats by adding more metrics.
 type Collector interface {
+	Destroy()
 	UpdateStats(*info.ContainerStats) error
 }

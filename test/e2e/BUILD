@@ -43,6 +43,7 @@ go_test(
         "//test/e2e/windows:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 
@@ -75,6 +76,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/kubectl:go_default_library",
+        "//test/e2e/framework/manifest:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
@@ -86,7 +88,6 @@ go_library(
         "//test/e2e/framework/providers/vsphere:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
-        "//test/e2e/manifest:go_default_library",
         "//test/e2e/reporters:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -95,7 +96,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/spf13/viper:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
@@ -123,7 +124,6 @@ filegroup(
         "//test/e2e/instrumentation:all-srcs",
         "//test/e2e/kubectl:all-srcs",
         "//test/e2e/lifecycle:all-srcs",
-        "//test/e2e/manifest:all-srcs",
         "//test/e2e/network:all-srcs",
         "//test/e2e/node:all-srcs",
         "//test/e2e/perftype:all-srcs",

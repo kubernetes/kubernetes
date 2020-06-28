@@ -29,20 +29,21 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/kubernetes/pkg/controller/certificates"
 
-	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 )
 
 func TestSigner(t *testing.T) {
 	clock := clock.FakeClock{}
 
-	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	s, err := newSigner("kubernetes.io/legacy-unknown", "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -114,10 +115,14 @@ func TestHandle(t *testing.T) {
 		usages     []capi.KeyUsage
 		// whether the generated CSR should be marked as approved
 		approved bool
+		// whether the generated CSR should be marked as failed
+		failed bool
 		// the signerName to be set on the generated CSR
 		signerName string
 		// if true, expect an error to be returned
 		err bool
+		// if true, expect an error to be returned during construction
+		constructionErr bool
 		// additional verification function
 		verify func(*testing.T, []testclient.Action)
 	}{
@@ -147,9 +152,16 @@ func TestHandle(t *testing.T) {
 			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageClientAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
 			approved:   true,
 			verify: func(t *testing.T, as []testclient.Action) {
-				if len(as) != 0 {
-					t.Errorf("expected no Update action but got %d", len(as))
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
 					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) != 0 {
+					t.Errorf("expected no certificate to be issued")
+				}
+				if !certificates.HasTrueCondition(csr, capi.CertificateFailed) {
+					t.Errorf("expected Failed condition")
 				}
 			},
 		},
@@ -206,9 +218,25 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
-			name:       "should do nothing if an unrecognised signerName is used",
-			signerName: "kubernetes.io/not-recognised",
+			name:       "should do nothing if failed",
+			signerName: "kubernetes.io/kubelet-serving",
+			commonName: "system:node:testnode",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			dnsNames:   []string{"example.com"},
 			approved:   true,
+			failed:     true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		{
+			name:            "should do nothing if an unrecognised signerName is used",
+			signerName:      "kubernetes.io/not-recognised",
+			constructionErr: true,
+			approved:        true,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -225,9 +253,10 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
-			name:       "should do nothing if signerName does not start with kubernetes.io",
-			signerName: "example.com/sample-name",
-			approved:   true,
+			name:            "should do nothing if signerName does not start with kubernetes.io",
+			signerName:      "example.com/sample-name",
+			constructionErr: true,
+			approved:        true,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -235,9 +264,10 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
-			name:       "should do nothing if signerName starts with kubernetes.io but is unrecognised",
-			signerName: "kubernetes.io/not-a-real-signer",
-			approved:   true,
+			name:            "should do nothing if signerName starts with kubernetes.io but is unrecognised",
+			signerName:      "kubernetes.io/not-a-real-signer",
+			constructionErr: true,
+			approved:        true,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -249,12 +279,20 @@ func TestHandle(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := &fake.Clientset{}
-			s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
-			if err != nil {
+			s, err := newSigner(c.signerName, "./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
+			switch {
+			case c.constructionErr && err != nil:
+				return
+			case c.constructionErr && err == nil:
+				t.Fatalf("expected failure during construction of controller")
+			case !c.constructionErr && err != nil:
 				t.Fatalf("failed to create signer: %v", err)
+
+			case !c.constructionErr && err == nil:
+				// continue with rest of test
 			}
 
-			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
+			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, failed: c.failed, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
 			if err := s.handle(csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -273,6 +311,7 @@ type csrBuilder struct {
 	org        []string
 	signerName string
 	approved   bool
+	failed     bool
 	usages     []capi.KeyUsage
 }
 
@@ -298,11 +337,16 @@ func makeTestCSR(b csrBuilder) *capi.CertificateSigningRequest {
 		},
 	}
 	if b.signerName != "" {
-		csr.Spec.SignerName = &b.signerName
+		csr.Spec.SignerName = b.signerName
 	}
 	if b.approved {
 		csr.Status.Conditions = append(csr.Status.Conditions, capi.CertificateSigningRequestCondition{
 			Type: capi.CertificateApproved,
+		})
+	}
+	if b.failed {
+		csr.Status.Conditions = append(csr.Status.Conditions, capi.CertificateSigningRequestCondition{
+			Type: capi.CertificateFailed,
 		})
 	}
 	return csr

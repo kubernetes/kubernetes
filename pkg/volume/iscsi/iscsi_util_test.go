@@ -156,7 +156,7 @@ func TestWaitForPathToExist(t *testing.T) {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
 
-	exist = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
+	_ = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
 	if devicePath[1] != fpath {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}

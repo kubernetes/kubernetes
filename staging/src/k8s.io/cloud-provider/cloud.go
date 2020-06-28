@@ -49,6 +49,9 @@ type Interface interface {
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 	Instances() (Instances, bool)
+	// InstancesV2 is an implementation for instances only used by cloud node-controller now.
+	// Also returns true if the interface is supported, false otherwise.
+	InstancesV2() (InstancesV2, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
@@ -157,9 +160,6 @@ type LoadBalancer interface {
 // Instances is an abstract, pluggable interface for sets of instances.
 type Instances interface {
 	// NodeAddresses returns the addresses of the specified instance.
-	// TODO(roberthbailey): This currently is only used in such a way that it
-	// returns the address of the calling instance. We should do a rename to
-	// make this clearer.
 	NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error)
 	// NodeAddressesByProviderID returns the addresses of the specified instance.
 	// The instance is specified using the providerID of the node. The
@@ -187,6 +187,17 @@ type Instances interface {
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+}
+
+// InstancesV2 is an abstract, pluggable interface for sets of instances.
+// Unlike Instances, it is only used by cloud node-controller now.
+type InstancesV2 interface {
+	// InstanceExistsByProviderID returns true if the instance for the given provider exists.
+	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider.
+	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceMetadataByProviderID returns the instance's metadata.
+	InstanceMetadataByProviderID(ctx context.Context, providerID string) (*InstanceMetadata, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -252,4 +263,14 @@ type Zones interface {
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
+}
+
+// InstanceMetadata contains metadata about the specific instance.
+type InstanceMetadata struct {
+	// ProviderID is provider's id that instance belongs to.
+	ProviderID string
+	// Type is instance's type.
+	Type string
+	// NodeAddress contains information for the instance's address.
+	NodeAddresses []v1.NodeAddress
 }

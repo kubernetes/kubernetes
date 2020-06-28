@@ -459,7 +459,7 @@ message ConfigMap {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 4;
 
@@ -1055,7 +1055,8 @@ message EndpointPort {
   // RFC-6335 and http://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
-  // Field can be enabled with ServiceAppProtocol feature gate.
+  // This is a beta field that is guarded by the ServiceAppProtocol feature
+  // gate and enabled by default.
   // +optional
   optional string appProtocol = 4;
 }
@@ -1165,7 +1166,7 @@ message EnvVar {
 
 // EnvVarSource represents a source for the value of an EnvVar.
 message EnvVarSource {
-  // Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
+  // Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
   // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
   // +optional
   optional ObjectFieldSelector fieldRef = 1;
@@ -1454,10 +1455,6 @@ message EventSeries {
 
   // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
-
-  // State of this Series: Ongoing or Finished
-  // Deprecated. Planned removal for 1.18
-  optional string state = 3;
 }
 
 // EventSource contains information for an event.
@@ -3546,7 +3543,6 @@ message PodSpec {
 
   // TopologySpreadConstraints describes how a group of pods ought to spread across topology
   // domains. Scheduler will schedule pods in a way which abides by the constraints.
-  // This field is only honored by clusters that enable the EvenPodsSpread feature.
   // All topologySpreadConstraints are ANDed.
   // +optional
   // +patchMergeKey=topologyKey
@@ -3555,6 +3551,14 @@ message PodSpec {
   // +listMapKey=topologyKey
   // +listMapKey=whenUnsatisfiable
   repeated TopologySpreadConstraint topologySpreadConstraints = 33;
+
+  // If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default).
+  // In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
+  // In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
+  // If a pod does not have FQDN, this has no effect.
+  // Default to false.
+  // +optional
+  optional bool setHostnameAsFQDN = 35;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -4309,7 +4313,7 @@ message Secret {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 5;
 
@@ -4646,7 +4650,8 @@ message ServicePort {
   // RFC-6335 and http://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
-  // Field can be enabled with ServiceAppProtocol feature gate.
+  // This is a beta field that is guarded by the ServiceAppProtocol feature
+  // gate and enabled by default.
   // +optional
   optional string appProtocol = 6;
 
@@ -4788,12 +4793,14 @@ message ServiceSpec {
   // +optional
   optional int32 healthCheckNodePort = 12;
 
-  // publishNotReadyAddresses, when set to true, indicates that DNS implementations
-  // must publish the notReadyAddresses of subsets for the Endpoints associated with
-  // the Service. The default value is false.
-  // The primary use case for setting this field is to use a StatefulSet's Headless Service
-  // to propagate SRV records for its Pods without respect to their readiness for purpose
-  // of peer discovery.
+  // publishNotReadyAddresses indicates that any agent which deals with endpoints for this
+  // Service should disregard any indications of ready/not-ready.
+  // The primary use case for setting this field is for a StatefulSet's Headless Service to
+  // propagate SRV DNS records for its Pods for the purpose of peer discovery.
+  // The Kubernetes controllers that generate Endpoints and EndpointSlice resources for
+  // Services interpret this to mean that all endpoints are considered "ready" even if the
+  // Pods themselves are not. Agents which consume only Kubernetes generated endpoints
+  // through the Endpoints or EndpointSlice resources can safely assume this behavior.
   // +optional
   optional bool publishNotReadyAddresses = 13;
 
@@ -5006,8 +5013,8 @@ message TopologySelectorTerm {
 // TopologySpreadConstraint specifies how to spread matching pods among the given topology.
 message TopologySpreadConstraint {
   // MaxSkew describes the degree to which pods may be unevenly distributed.
-  // It's the maximum permitted difference between the number of matching pods in
-  // any two topology domains of a given topology type.
+  // When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference
+  // between the number of matching pods in the target topology and the global minimum.
   // For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
   // labelSelector spread as 1/1/0:
   // +-------+-------+-------+
@@ -5019,6 +5026,8 @@ message TopologySpreadConstraint {
   // scheduling it onto zone1(zone2) would make the ActualSkew(2-0) on zone1(zone2)
   // violate MaxSkew(1).
   // - if MaxSkew is 2, incoming pod can be scheduled onto any zone.
+  // When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
+  // to topologies that satisfy it.
   // It's a required field. Default value is 1 and 0 is not allowed.
   optional int32 maxSkew = 1;
 
@@ -5031,10 +5040,13 @@ message TopologySpreadConstraint {
 
   // WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
   // the spread constraint.
-  // - DoNotSchedule (default) tells the scheduler not to schedule it
-  // - ScheduleAnyway tells the scheduler to still schedule it
-  // It's considered as "Unsatisfiable" if and only if placing incoming pod on any
-  // topology violates "MaxSkew".
+  // - DoNotSchedule (default) tells the scheduler not to schedule it.
+  // - ScheduleAnyway tells the scheduler to schedule the pod in any location,
+  //   but giving higher precedence to topologies that would help reduce the
+  //   skew.
+  // A constraint is considered "Unsatisfiable" for an incoming pod
+  // if and only if every possible node assigment for that pod would violate
+  // "MaxSkew" on some topology.
   // For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
   // labelSelector spread as 3/1/1:
   // +-------+-------+-------+

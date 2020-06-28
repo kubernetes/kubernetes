@@ -57,16 +57,15 @@ var (
 // CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
-// CommonImageWhiteList is the list of images used in common test. These images should be prepulled
-// before a tests starts, so that the tests won't fail due image pulling flakes. Currently, this is
-// only used by node e2e test.
+// PrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
+// before tests starts, so that the tests won't fail due image pulling flakes.
+// Currently, this is only used by node e2e test.
+// See also updateImageWhiteList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
-var CommonImageWhiteList = sets.NewString(
+var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
-	imageutils.GetE2EImage(imageutils.Mounttest),
-	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Httpd),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
@@ -75,17 +74,16 @@ var CommonImageWhiteList = sets.NewString(
 )
 
 type testImagesStruct struct {
-	AgnhostImage   string
-	BusyBoxImage   string
-	KittenImage    string
-	MounttestImage string
-	NautilusImage  string
-	NginxImage     string
-	NginxNewImage  string
-	HttpdImage     string
-	HttpdNewImage  string
-	PauseImage     string
-	RedisImage     string
+	AgnhostImage  string
+	BusyBoxImage  string
+	KittenImage   string
+	NautilusImage string
+	NginxImage    string
+	NginxNewImage string
+	HttpdImage    string
+	HttpdNewImage string
+	PauseImage    string
+	RedisImage    string
 }
 
 var testImages testImagesStruct
@@ -95,7 +93,6 @@ func init() {
 		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.BusyBox),
 		imageutils.GetE2EImage(imageutils.Kitten),
-		imageutils.GetE2EImage(imageutils.Mounttest),
 		imageutils.GetE2EImage(imageutils.Nautilus),
 		imageutils.GetE2EImage(imageutils.Nginx),
 		imageutils.GetE2EImage(imageutils.NginxNew),

@@ -25,6 +25,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/cache"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -370,6 +372,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	w, err := c.CoreV1().Pods(ns).Watch(context.TODO(), options)
 	framework.ExpectNoError(err)
 	go func() {
+		defer ginkgo.GinkgoRecover()
 		// There should be only one pod being created, which is the pod with the agnhost image.
 		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.
 		numPodCreation := 1
@@ -1024,9 +1027,12 @@ func watchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error 
 		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
 	}
 
-	w, err := c.AppsV1().Deployments(d.Namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
-	if err != nil {
-		return err
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", d.Name).String()
+	w := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+			options.FieldSelector = fieldSelector
+			return c.AppsV1().Deployments(d.Namespace).Watch(context.TODO(), options)
+		},
 	}
 
 	status := d.Status
@@ -1053,7 +1059,7 @@ func watchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error 
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, condition)
+	_, err := watchtools.Until(ctx, d.ResourceVersion, w, condition)
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
 	}

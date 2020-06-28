@@ -82,6 +82,16 @@ function start-kube-apiserver {
   fi
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
+  if [[ -n "${OLD_MASTER_IP:-}" ]]; then
+    local old_ips="${OLD_MASTER_IP}"
+    if [[ -n "${OLD_LOAD_BALANCER_IP:-}" ]]; then
+      old_ips+=",${OLD_LOAD_BALANCER_IP}"
+    fi
+    if [[ -n "${OLD_PRIVATE_VIP:-}" ]]; then
+      old_ips+=",${OLD_PRIVATE_VIP}"
+    fi
+    params+=" --tls-sni-cert-key=${OLD_MASTER_CERT_PATH},${OLD_MASTER_KEY_PATH}:${old_ips}"
+  fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
@@ -111,14 +121,16 @@ function start-kube-apiserver {
   if [[ -n "${NUM_NODES:-}" ]]; then
     # If the cluster is large, increase max-requests-inflight limit in apiserver.
     if [[ "${NUM_NODES}" -gt 3000 ]]; then
-      params+=" --max-requests-inflight=3000 --max-mutating-requests-inflight=1000"
+      params=$(append-param-if-not-present "${params}" "max-requests-inflight" 3000)
+      params=$(append-param-if-not-present "${params}" "max-mutating-requests-inflight" 1000)
     elif [[ "${NUM_NODES}" -gt 500 ]]; then
-      params+=" --max-requests-inflight=1500 --max-mutating-requests-inflight=500"
+      params=$(append-param-if-not-present "${params}" "max-requests-inflight" 1500)
+      params=$(append-param-if-not-present "${params}" "max-mutating-requests-inflight" 500)
     fi
     # Set amount of memory available for apiserver based on number of nodes.
     # TODO: Once we start setting proper requests and limits for apiserver
     # we should reuse the same logic here instead of current heuristic.
-    params+=" --target-ram-mb=$((NUM_NODES * 60))"
+    params=$(append-param-if-not-present "${params}" "target-ram-mb" $((NUM_NODES * 60)))
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
@@ -252,9 +264,6 @@ function start-kube-apiserver {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
-  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
-    params+=" --runtime-config=node.k8s.io/v1alpha1=true"
-  fi
   if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
@@ -354,6 +363,7 @@ function start-kube-apiserver {
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
 
+  params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"

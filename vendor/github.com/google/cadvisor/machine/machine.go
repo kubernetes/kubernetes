@@ -16,6 +16,7 @@
 package machine
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,18 +34,16 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"golang.org/x/sys/unix"
 )
 
 var (
-	cpuRegExp     = regexp.MustCompile(`^processor\s*:\s*([0-9]+)$`)
-	coreRegExp    = regexp.MustCompile(`(?m)^core id\s*:\s*([0-9]+)$`)
-	nodeRegExp    = regexp.MustCompile(`(?m)^physical id\s*:\s*([0-9]+)$`)
-	nodeBusRegExp = regexp.MustCompile(`^node([0-9]+)$`)
+	coreRegExp = regexp.MustCompile(`(?m)^core id\s*:\s*([0-9]+)$`)
+	nodeRegExp = regexp.MustCompile(`(?m)^physical id\s*:\s*([0-9]+)$`)
 	// Power systems have a different format so cater for both
-	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
+	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|CPU MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 	swapCapacityRegexp   = regexp.MustCompile(`SwapTotal:\s*([0-9]+) kB`)
 
@@ -52,10 +51,9 @@ var (
 	isMemoryController = regexp.MustCompile("mc[0-9]+")
 	isDimm             = regexp.MustCompile("dimm[0-9]+")
 	machineArch        = getMachineArch()
+	maxFreqFile        = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 )
 
-const maxFreqFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
-const nodePath = "/sys/devices/system/node"
 const sysFsCPUCoreID = "core_id"
 const sysFsCPUPhysicalPackageID = "physical_package_id"
 const sysFsCPUTopology = "topology"
@@ -171,10 +169,10 @@ func GetMachineMemoryByType(edacPath string) (map[string]*info.MemoryInfo, error
 				continue
 			}
 			memType, err := ioutil.ReadFile(path.Join(edacPath, controller, dimm, memTypeFileName))
-			readableMemType := strings.TrimSpace(string(memType))
 			if err != nil {
 				return map[string]*info.MemoryInfo{}, err
 			}
+			readableMemType := strings.TrimSpace(string(memType))
 			if _, exists := memory[readableMemType]; !exists {
 				memory[readableMemType] = &info.MemoryInfo{}
 			}
@@ -249,6 +247,17 @@ func getUniqueCPUPropertyCount(cpuBusPath string, propertyName string) int {
 	}
 	uniques := make(map[string]bool)
 	for _, sysCPUPath := range sysCPUPaths {
+		onlinePath := filepath.Join(sysCPUPath, "online")
+		onlineVal, err := ioutil.ReadFile(onlinePath)
+		if err != nil {
+			klog.Warningf("Cannot determine CPU %s online state, skipping", sysCPUPath)
+			continue
+		}
+		onlineVal = bytes.TrimSpace(onlineVal)
+		if len(onlineVal) == 0 || onlineVal[0] != 49 {
+			klog.Warningf("CPU %s is offline, skipping", sysCPUPath)
+			continue
+		}
 		propertyPath := filepath.Join(sysCPUPath, sysFsCPUTopology, propertyName)
 		propertyVal, err := ioutil.ReadFile(propertyPath)
 		if err != nil {
@@ -258,18 +267,6 @@ func getUniqueCPUPropertyCount(cpuBusPath string, propertyName string) int {
 		uniques[string(propertyVal)] = true
 	}
 	return len(uniques)
-}
-
-func extractValue(s string, r *regexp.Regexp) (bool, int, error) {
-	matches := r.FindSubmatch([]byte(s))
-	if len(matches) == 2 {
-		val, err := strconv.ParseInt(string(matches[1]), 10, 32)
-		if err != nil {
-			return false, -1, err
-		}
-		return true, int(val), nil
-	}
-	return false, -1, nil
 }
 
 // getUniqueMatchesCount returns number of unique matches in given argument using provided regular expression

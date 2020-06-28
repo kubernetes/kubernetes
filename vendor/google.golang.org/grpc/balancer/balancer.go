@@ -203,11 +203,6 @@ type ConfigParser interface {
 	ParseConfig(LoadBalancingConfigJSON json.RawMessage) (serviceconfig.LoadBalancingConfig, error)
 }
 
-// PickOptions is a type alias of PickInfo for legacy reasons.
-//
-// Deprecated: use PickInfo instead.
-type PickOptions = PickInfo
-
 // PickInfo contains additional information for the Pick operation.
 type PickInfo struct {
 	// FullMethodName is the method name that NewClientStream() is called

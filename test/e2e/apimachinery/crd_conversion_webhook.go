@@ -338,11 +338,14 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 	}
 	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentCRDName, namespace)
+
 	ginkgo.By("Wait for the deployment to be ready")
+
 	err = e2edeployment.WaitForDeploymentRevisionAndImage(client, namespace, deploymentCRDName, "1", image)
-	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
+	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentCRDName, namespace)
+
 	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
-	framework.ExpectNoError(err, "waiting for the deployment status valid", image, deploymentCRDName, namespace)
+	framework.ExpectNoError(err, "waiting for %s deployment status valid", deploymentCRDName)
 
 	ginkgo.By("Deploying the webhook service")
 

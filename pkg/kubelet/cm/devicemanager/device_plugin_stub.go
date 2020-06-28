@@ -18,7 +18,6 @@ package devicemanager
 
 import (
 	"context"
-	"log"
 	"net"
 	"os"
 	"path"
@@ -27,6 +26,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -108,7 +108,7 @@ func (m *Stub) Start() error {
 		return err
 	}
 	conn.Close()
-	log.Println("Starting to serve on", m.socket)
+	klog.Infof("Starting to serve on %v", m.socket)
 
 	return nil
 }
@@ -130,7 +130,7 @@ func (m *Stub) Stop() error {
 
 // GetInfo is the RPC which return pluginInfo
 func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
-	log.Println("GetInfo")
+	klog.Info("GetInfo")
 	return &watcherapi.PluginInfo{
 		Type:              watcherapi.DevicePlugin,
 		Name:              m.resourceName,
@@ -144,7 +144,7 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 		m.registrationStatus <- *status
 	}
 	if !status.PluginRegistered {
-		log.Println("Registration failed: ", status.Error)
+		klog.Infof("Registration failed: %v", status.Error)
 	}
 	return &watcherapi.RegistrationStatusResponse{}, nil
 }
@@ -153,11 +153,11 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir string) error {
 	if pluginSockDir != "" {
 		if _, err := os.Stat(pluginSockDir + "DEPRECATION"); err == nil {
-			log.Println("Deprecation file found. Skip registration.")
+			klog.Info("Deprecation file found. Skip registration.")
 			return nil
 		}
 	}
-	log.Println("Deprecation file not found. Invoke registration")
+	klog.Info("Deprecation file not found. Invoke registration")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -191,13 +191,13 @@ func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (
 
 // PreStartContainer resets the devices received
 func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
-	log.Printf("PreStartContainer, %+v", r)
+	klog.Infof("PreStartContainer, %+v", r)
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	log.Println("ListAndWatch")
+	klog.Info("ListAndWatch")
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})
 
@@ -218,7 +218,7 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 
 // Allocate does a mock allocation
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	log.Printf("Allocate, %+v", r)
+	klog.Infof("Allocate, %+v", r)
 
 	devs := make(map[string]pluginapi.Device)
 

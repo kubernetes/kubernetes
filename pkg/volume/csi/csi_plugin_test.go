@@ -62,6 +62,8 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
+	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
+	volumeAttachmentLister := volumeAttachmentInformer.Lister()
 	go factory.Start(wait.NeverStop)
 
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
@@ -70,6 +72,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 		ProbeVolumePlugins(),
 		"fakeNode",
 		csiDriverLister,
+		volumeAttachmentLister,
 	)
 
 	pluginMgr := host.GetPluginMgr()
@@ -88,6 +91,9 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 		return csiDriverInformer.Informer().HasSynced(), nil
 	})
 
+	wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
+		return volumeAttachmentInformer.Informer().HasSynced(), nil
+	})
 	return csiPlug, tmpDir
 }
 
@@ -623,7 +629,7 @@ func TestPluginNewMounter(t *testing.T) {
 			}
 			csiClient, err := csiMounter.csiClientGetter.Get()
 			if csiClient == nil {
-				t.Error("mounter csiClient is nil")
+				t.Errorf("mounter csiClient is nil: %v", err)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -765,7 +771,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				}
 				csiClient, err := csiMounter.csiClientGetter.Get()
 				if csiClient == nil {
-					t.Error("mounter csiClient is nil")
+					t.Errorf("mounter csiClient is nil: %v", err)
 				}
 				if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 					t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
@@ -860,7 +866,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 
 	csiClient, err := csiUnmounter.csiClientGetter.Get()
 	if csiClient == nil {
-		t.Error("mounter csiClient is nil")
+		t.Errorf("mounter csiClient is nil: %v", err)
 	}
 }
 
@@ -1018,6 +1024,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				factory.Storage().V1().CSIDrivers().Lister(),
+				factory.Storage().V1().VolumeAttachments().Lister(),
 			)
 
 			plugMgr := host.GetPluginMgr()
@@ -1137,7 +1144,7 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 					Spec: v1.NodeSpec{},
 				},
 			)
-			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, tmpDir, client, ProbeVolumePlugins(), "fakeNode", nil)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, tmpDir, client, ProbeVolumePlugins(), "fakeNode", nil, nil)
 			plugMgr := host.GetPluginMgr()
 			plug, err := plugMgr.FindDeviceMountablePluginBySpec(test.spec)
 			if err != nil && !test.shouldFail {
@@ -1185,7 +1192,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	}
 	csiClient, err := csiMapper.csiClientGetter.Get()
 	if csiClient == nil {
-		t.Error("mapper csiClient is nil")
+		t.Errorf("mapper csiClient is nil: %v", err)
 	}
 
 	// ensure data file is created
@@ -1248,7 +1255,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 
 	csiClient, err := csiUnmapper.csiClientGetter.Get()
 	if csiClient == nil {
-		t.Error("unmapper csiClient is nil")
+		t.Errorf("unmapper csiClient is nil: %v", err)
 	}
 
 	// test loaded vol data

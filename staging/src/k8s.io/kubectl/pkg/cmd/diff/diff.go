@@ -35,7 +35,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -150,6 +150,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	usage := "contains the configuration to diff"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
 
 	return cmd
 }
@@ -312,7 +313,9 @@ func (obj InfoObject) Live() runtime.Object {
 // Returns the "merged" object, as it would look like if applied or
 // created.
 func (obj InfoObject) Merged() (runtime.Object, error) {
-	helper := resource.NewHelper(obj.Info.Client, obj.Info.Mapping).DryRun(true)
+	helper := resource.NewHelper(obj.Info.Client, obj.Info.Mapping).
+		DryRun(true).
+		WithFieldManager(obj.FieldManager)
 	if obj.ServerSideApply {
 		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj.LocalObj)
 		if err != nil {
@@ -364,7 +367,6 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		Helper:          helper,
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
-		ServerDryRun:    true,
 		OpenapiSchema:   obj.OpenAPI,
 		ResourceVersion: resourceVersion,
 	}
@@ -444,7 +446,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
-	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
+	o.FieldManager = apply.GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")

@@ -29,7 +29,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -173,7 +173,7 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if newVal, exists := newAnnotations[k]; exists && newVal == oldVal {
 			continue // No change.
 		}
-		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update AppArmor annotations"))
 		}
 		if k == core.MirrorPodAnnotationKey {
@@ -185,7 +185,7 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if _, ok := oldAnnotations[k]; ok {
 			continue // No change.
 		}
-		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add AppArmor annotations"))
 		}
 		if k == core.MirrorPodAnnotationKey {
@@ -3113,8 +3113,9 @@ func ValidatePodSingleHugePageResources(pod *core.Pod, specPath *field.Path) fie
 	return allErrs
 }
 
-// ValidatePod tests if required fields in the pod are set.
-func ValidatePod(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
+// validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
+// and is called by ValidatePodCreate and ValidatePodUpdate.
+func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
@@ -3144,6 +3145,13 @@ func ValidatePod(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	if !opts.AllowMultipleHugePageResources {
 		allErrs = append(allErrs, ValidatePodSingleHugePageResources(pod, specPath)...)
 	}
+
+	return allErrs
+}
+
+// validatePodIPs validates IPs in pod status
+func validatePodIPs(pod *core.Pod) field.ErrorList {
+	allErrs := field.ErrorList{}
 
 	podIPsField := field.NewPath("status", "podIPs")
 
@@ -3572,10 +3580,10 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k, p := range annotations {
-		if !strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+		if !strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 			continue
 		}
-		containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
+		containerName := strings.TrimPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix)
 		if !podSpecHasContainer(spec, containerName) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), containerName, "container not found"))
 		}
@@ -3705,7 +3713,7 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 
 // ValidatePodCreate validates a pod in the context of its initial create
 func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
-	allErrs := ValidatePod(pod, opts)
+	allErrs := validatePodMetadataAndSpec(pod, opts)
 
 	fldPath := field.NewPath("spec")
 	// EphemeralContainers can only be set on update using the ephemeralcontainers subresource
@@ -3721,6 +3729,7 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
 	specPath := field.NewPath("spec")
 
@@ -3850,6 +3859,14 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), oldPod.Spec.RestartPolicy)...)
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), oldPod.Spec.RestartPolicy)...)
 
+	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
+		// Tolerate IP errors if IP errors already existed in the old pod. See http://issue.k8s.io/90625
+		// TODO(liggitt): Drop the check of oldPod in 1.20
+		if oldIPErrs := validatePodIPs(oldPod); len(oldIPErrs) == 0 {
+			allErrs = append(allErrs, newIPErrs...)
+		}
+	}
+
 	// For status update we ignore changes to pod spec.
 	newPod.Spec = oldPod.Spec
 
@@ -3934,7 +3951,6 @@ func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate) field.ErrorList
 var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityClientIP), string(core.ServiceAffinityNone))
 var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
 	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
-var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
 
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorList {
@@ -4135,21 +4151,6 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 		}
 	}
 
-	//if an ipfamily provided then it has to be one of the supported values
-	// note:
-	// - we don't validate service.Spec.IPFamily is supported by the cluster
-	// - we don't validate service.Spec.ClusterIP is within a range supported by the cluster
-	// both of these validations are done by the ipallocator
-
-	// if the gate is on this field is required (and defaulted by REST if not provided by user)
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamily == nil {
-		allErrs = append(allErrs, field.Required(specPath.Child("ipFamily"), ""))
-	}
-
-	if service.Spec.IPFamily != nil && !supportedServiceIPFamily.Has(string(*service.Spec.IPFamily)) {
-		allErrs = append(allErrs, field.NotSupported(specPath.Child("ipFamily"), service.Spec.IPFamily, supportedServiceIPFamily.List()))
-	}
-
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
 	return allErrs
 }
@@ -4258,18 +4259,11 @@ func ValidateServiceCreate(service *core.Service) field.ErrorList {
 func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
 
-	// ClusterIP and IPFamily should be immutable for services using it (every type other than ExternalName)
+	// ClusterIP should be immutable for services using it (every type other than ExternalName)
 	// which do not have ClusterIP assigned yet (empty string value)
 	if service.Spec.Type != core.ServiceTypeExternalName {
 		if oldService.Spec.Type != core.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
 			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
-		}
-		// notes:
-		// we drop the IPFamily field when the Dualstack gate is off.
-		// once the gate is on, we start assigning default ipfamily according to cluster settings. in other words
-		// though the field is immutable, we allow (onetime) change from nil==> to value
-		if oldService.Spec.IPFamily != nil {
-			allErrs = append(allErrs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
 		}
 	}
 

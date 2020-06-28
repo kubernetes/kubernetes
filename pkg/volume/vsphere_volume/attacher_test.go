@@ -28,7 +28,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {

@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 
 	"go.etcd.io/etcd/clientv3"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -126,7 +126,15 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		// The filter doesn't filter out any object.
 		wc.internalPred = storage.Everything
 	}
-	wc.ctx, wc.cancel = context.WithCancel(ctx)
+
+	// The etcd server waits until it cannot find a leader for 3 election
+	// timeouts to cancel existing streams. 3 is currently a hard coded
+	// constant. The election timeout defaults to 1000ms. If the cluster is
+	// healthy, when the leader is stopped, the leadership transfer should be
+	// smooth. (leader transfers its leadership before stopping). If leader is
+	// hard killed, other servers will take an election timeout to realize
+	// leader lost and start campaign.
+	wc.ctx, wc.cancel = context.WithCancel(clientv3.WithRequireLeader(ctx))
 	return wc
 }
 
@@ -253,8 +261,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				continue
 			}
 			if len(wc.resultChan) == outgoingBufSize {
-				klog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
-					"Probably caused by slow dispatching events to watchers", outgoingBufSize)
+				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
@@ -360,9 +367,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		klog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
-			"Probably caused by slow decoding, user not receiving fast, or other processing logic",
-			incomingBufSize)
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize)
 	}
 	select {
 	case wc.incomingEventChan <- e:

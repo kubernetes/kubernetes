@@ -29,10 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/configz"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeschedulerconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/util/configz"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -114,7 +114,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("kube-scheduler will listen insecurely on port %d...", opts.CombinedInsecureServing.BindPort)
 	}
 
-	cc, sched, err := app.Setup(ctx, []string{}, opts)
+	cc, sched, err := app.Setup(ctx, opts)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}

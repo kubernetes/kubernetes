@@ -165,7 +165,7 @@ func readProjectFiles(projects *os.File, projid *os.File) projectsList {
 
 func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.QuotaID, error) {
 	unusedQuotasSearched := 0
-	for id := common.FirstQuota; id == id; id++ {
+	for id := common.FirstQuota; true; id++ {
 		if _, ok := idMap[id]; !ok {
 			isInUse, err := getApplier(path).QuotaIDIsInUse(id)
 			if err != nil {

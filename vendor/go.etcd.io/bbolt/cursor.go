@@ -366,7 +366,7 @@ func (c *Cursor) node() *node {
 	}
 	for _, ref := range c.stack[:len(c.stack)-1] {
 		_assert(!n.isLeaf, "expected branch node")
-		n = n.childAt(int(ref.index))
+		n = n.childAt(ref.index)
 	}
 	_assert(n.isLeaf, "expected leaf node")
 	return n

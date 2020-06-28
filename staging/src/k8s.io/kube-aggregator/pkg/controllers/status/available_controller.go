@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
@@ -285,9 +285,14 @@ func (c *AvailableConditionController) sync(key string) error {
 					results <- err
 					return
 				}
-				discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+				// render legacyAPIService health check path when it is delegated to a service
+				if apiService.Name == "v1." {
+					discoveryURL.Path = "/api/" + apiService.Spec.Version
+				} else {
+					discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+				}
 
-				errCh := make(chan error)
+				errCh := make(chan error, 1)
 				go func() {
 					// be sure to check a URL that the aggregated API server is required to serve
 					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)

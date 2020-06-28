@@ -966,6 +966,10 @@ rules:
       branch: master
     - repository: api
       branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kubelet
@@ -1212,6 +1216,8 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: component-base
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/cloud-provider
@@ -1276,6 +1282,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: cloud-provider
+      branch: master
+    - repository: component-base
       branch: master
   - source:
       branch: release-1.15
@@ -1594,3 +1602,13 @@ rules:
       branch: release-1.18
     - repository: metrics
       branch: release-1.18
+
+- destination: controller-manager
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/controller-manager
+    name: master
+    go: 1.13.9
+

@@ -22,7 +22,7 @@ import (
 	"sort"
 	"time"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
 )
 
 // SigningPolicy validates a CertificateRequest before it's signed by the

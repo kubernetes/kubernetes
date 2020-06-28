@@ -41,22 +41,16 @@ function detect-project() {
 }
 
 function create-certs {
-  rm /tmp/kubeconfig
+  execute-cmd-on-pre-existing-master-with-retries 'sudo cat /etc/kubernetes/admin.conf' > /tmp/kubeconfig
 
-  execute-cmd-on-pre-existing-master-with-retries "sudo cat /etc/kubernetes/admin.conf" > /tmp/kubeconfig
-  CA_CERT_BASE64=$(cat /tmp/kubeconfig | grep certificate-authority | awk '{print $2}' | head -n 1)
-  KUBELET_CERT_BASE64=$(cat /tmp/kubeconfig | grep client-certificate-data | awk '{print $2}' | head -n 1)
-  KUBELET_KEY_BASE64=$(cat /tmp/kubeconfig | grep client-key-data | awk '{print $2}' | head -n 1)
-
-  # Local kubeconfig.kubemark vars
-  KUBECFG_CERT_BASE64="${KUBELET_CERT_BASE64}"
-  KUBECFG_KEY_BASE64="${KUBELET_KEY_BASE64}"
-
-  # The pre-existing Kubernetes master already has these setup
-  # Set these vars but don't use them
-  CA_KEY_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  MASTER_CERT_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  MASTER_KEY_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  KUBEAPISERVER_CERT_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  KUBEAPISERVER_KEY_BASE64=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  # CA_CERT_BASE64, KUBELET_CERT_BASE64 and KUBELET_KEY_BASE64 might be used
+  # in test/kubemark/iks/util.sh
+  # If it becomes clear that the variables are not used anywhere, then we can
+  # remove them:
+  CA_CERT_BASE64=$(grep certificate-authority /tmp/kubeconfig | awk '{print $2}' | head -n 1)
+  KUBELET_CERT_BASE64=$(grep client-certificate-data /tmp/kubeconfig | awk '{print $2}' | head -n 1)
+  KUBELET_KEY_BASE64=$(grep client-key-data /tmp/kubeconfig | awk '{print $2}' | head -n 1)
+  export CA_CERT_BASE64
+  export KUBELET_CERT_BASE64
+  export KUBELET_KEY_BASE64
 }

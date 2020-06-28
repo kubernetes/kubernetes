@@ -1612,7 +1612,6 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	}
 	if hasCacheEnabled {
 		config := cacherstorage.Config{
-			CacheCapacity:  10,
 			Storage:        s,
 			Versioner:      etcd3.APIObjectVersioner{},
 			ResourcePrefix: podPrefix,

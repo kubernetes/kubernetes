@@ -36,20 +36,30 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
+# Exclude generated-files-remake in certain cases, if they're running in a separate job.
+if [[ ${EXCLUDE_FILES_REMAKE:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-generated-files-remake.sh" # run in a separate job
+    )
+fi
+
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
     "verify-typecheck.sh"              # runs in separate typecheck job
     "verify-typecheck-providerless.sh" # runs in separate typecheck job
+    "verify-typecheck-dockerless.sh" # runs in separate typecheck job
     )
 fi
 
-
-# Exclude vendor checks in certain cases, if they're running in a separate job.
+# Exclude dependency checks in certain cases, if they're running in a separate job.
+# From @cblecker: We can't change the variable name here, unless we update it throughout
+#                 test-infra (and we would need to pick it backwards).
 if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
-    "verify-vendor.sh"             # runs in separate godeps job
-    "verify-vendor-licenses.sh"    # runs in separate godeps job
+    "verify-external-dependencies-version.sh" # runs in separate dependencies job
+    "verify-vendor.sh"                        # runs in separate dependencies job
+    "verify-vendor-licenses.sh"               # runs in separate dependencies job
     )
 fi
 
@@ -67,6 +77,7 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
+  "verify-external-dependencies-version.sh"
   "verify-vendor-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"

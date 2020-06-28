@@ -211,6 +211,19 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 		}
 	}
 	s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
+
+	// if the type implements DeepCopyInto(<obj>), register a self-conversion
+	if m := reflect.ValueOf(obj).MethodByName("DeepCopyInto"); m.IsValid() && m.Type().NumIn() == 1 && m.Type().NumOut() == 0 && m.Type().In(0) == reflect.TypeOf(obj) {
+		if err := s.AddGeneratedConversionFunc(obj, obj, func(a, b interface{}, scope conversion.Scope) error {
+			// copy a to b
+			reflect.ValueOf(a).MethodByName("DeepCopyInto").Call([]reflect.Value{reflect.ValueOf(b)})
+			// clear TypeMeta to match legacy reflective conversion
+			b.(Object).GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	}
 }
 
 // KnownTypes returns the types known for the given version.

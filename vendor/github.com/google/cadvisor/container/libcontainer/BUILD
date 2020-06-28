@@ -14,8 +14,11 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs2:go_default_library",
+        "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         "//vendor/golang.org/x/sys/unix:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

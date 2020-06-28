@@ -225,6 +225,24 @@ function start-hollow-nodes {
   wait-for-hollow-nodes-to-run-or-timeout
 }
 
+# Annotates the node objects in the kubemark cluster to make their size
+# similar to regular nodes.
+# TODO(#90833): Replace this with image preloading from ClusterLoader to better
+# reflect the reality in kubemark tests.
+function resize-node-objects {
+  if [[ -z "$KUBEMARK_NODE_OBJECT_SIZE_BYTES" ]]; then
+    return 0
+  fi
+
+  annotation_size_bytes="${KUBEMARK_NODE_OBJECT_SIZE_BYTES}"
+  echo "Annotating node objects with ${annotation_size_bytes} byte label"
+  label=$( (< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w "$annotation_size_bytes"; true) | head -n 1)
+  "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get nodes -o name \
+    | xargs -n10 -P100 -r -I% "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" annotate --overwrite % label="$label" > /dev/null
+  echo "Annotating node objects completed"
+}
+
+
 detect-project &> /dev/null
 create-kubemark-master
 
@@ -237,6 +255,7 @@ fi
 MASTER_IP=$(grep server "${HOLLOWNODE_KUBECONFIG}" | awk -F "/" '{print $3}')
 
 start-hollow-nodes
+resize-node-objects
 
 echo ""
 echo "Master IP: ${MASTER_IP}"

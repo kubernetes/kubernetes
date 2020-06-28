@@ -28,23 +28,25 @@ import (
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
-	"k8s.io/kubernetes/pkg/util/configz"
 	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
-
-	"k8s.io/klog"
+	utilsnet "k8s.io/utils/net"
 )
 
 // NewProxyServer returns a new ProxyServer.
@@ -102,18 +104,39 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
 		klog.V(0).Info("Using Kernelspace Proxier.")
-		proxier, err = winkernel.NewProxier(
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
-			config.ClusterCIDR,
-			hostname,
-			utilnode.GetNodeIP(client, hostname),
-			recorder,
-			healthzServer,
-			config.Winkernel,
-		)
+		isIPv6DualStackEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
+		if isIPv6DualStackEnabled {
+			klog.V(0).Info("creating dualStackProxier for Windows kernel.")
+
+			proxier, err = winkernel.NewDualStackProxier(
+				config.IPTables.SyncPeriod.Duration,
+				config.IPTables.MinSyncPeriod.Duration,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				config.ClusterCIDR,
+				hostname,
+				nodeIPTuple(config.BindAddress),
+				recorder,
+				healthzServer,
+				config.Winkernel,
+			)
+		} else {
+
+			proxier, err = winkernel.NewProxier(
+				config.IPTables.SyncPeriod.Duration,
+				config.IPTables.MinSyncPeriod.Duration,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				config.ClusterCIDR,
+				hostname,
+				utilnode.GetNodeIP(client, hostname),
+				recorder,
+				healthzServer,
+				config.Winkernel,
+			)
+
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
@@ -138,19 +161,20 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}
 
 	return &ProxyServer{
-		Client:             client,
-		EventClient:        eventClient,
-		Proxier:            proxier,
-		Broadcaster:        eventBroadcaster,
-		Recorder:           recorder,
-		ProxyMode:          proxyMode,
-		NodeRef:            nodeRef,
-		MetricsBindAddress: config.MetricsBindAddress,
-		EnableProfiling:    config.EnableProfiling,
-		OOMScoreAdj:        config.OOMScoreAdj,
-		ConfigSyncPeriod:   config.ConfigSyncPeriod.Duration,
-		HealthzServer:      healthzServer,
-		UseEndpointSlices:  false,
+		Client:              client,
+		EventClient:         eventClient,
+		Proxier:             proxier,
+		Broadcaster:         eventBroadcaster,
+		Recorder:            recorder,
+		ProxyMode:           proxyMode,
+		NodeRef:             nodeRef,
+		MetricsBindAddress:  config.MetricsBindAddress,
+		BindAddressHardFail: config.BindAddressHardFail,
+		EnableProfiling:     config.EnableProfiling,
+		OOMScoreAdj:         config.OOMScoreAdj,
+		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
+		HealthzServer:       healthzServer,
+		UseEndpointSlices:   false,
 	}, nil
 }
 
@@ -179,4 +203,20 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	// Fallback.
 	klog.V(1).Infof("Can't use winkernel proxy, using userspace proxier")
 	return proxyModeUserspace
+}
+
+// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
+// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
+// will have "any" address (0.0.0.0 or ::) inserted.
+func nodeIPTuple(bindAddress string) [2]net.IP {
+	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
+
+	adr := net.ParseIP(bindAddress)
+	if utilsnet.IsIPv6(adr) {
+		nodes[1] = adr
+	} else {
+		nodes[0] = adr
+	}
+
+	return nodes
 }

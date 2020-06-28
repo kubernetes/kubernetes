@@ -56,6 +56,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
@@ -100,42 +101,81 @@ var (
 // portsByPodName is a map that maps pod name to container ports.
 type portsByPodName map[string][]int
 
+// affinityCheckFromPod returns interval, timeout and function pinging the service and
+// returning pinged hosts for pinging the service from execPod.
+func affinityCheckFromPod(execPod *v1.Pod, serviceIP string, servicePort int) (time.Duration, time.Duration, func() []string) {
+	timeout := AffinityTimeout
+	// interval considering a maximum of 2 seconds per connection
+	interval := 2 * AffinityConfirmCount * time.Second
+
+	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
+	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
+	getHosts := func() []string {
+		stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
+			framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
+			return nil
+		}
+		return strings.Split(stdout, "\n")
+	}
+
+	return interval, timeout, getHosts
+}
+
+// affinityCheckFromTest returns interval, timeout and function pinging the service and
+// returning pinged hosts for pinging the service from the test itself.
+func affinityCheckFromTest(cs clientset.Interface, serviceIP string, servicePort int) (time.Duration, time.Duration, func() []string) {
+	interval := 2 * time.Second
+	timeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
+
+	params := &e2enetwork.HTTPPokeParams{Timeout: 2 * time.Second}
+	getHosts := func() []string {
+		var hosts []string
+		for i := 0; i < AffinityConfirmCount; i++ {
+			result := e2enetwork.PokeHTTP(serviceIP, servicePort, "", params)
+			if result.Status == e2enetwork.HTTPSuccess {
+				hosts = append(hosts, string(result.Body))
+			}
+		}
+		return hosts
+	}
+
+	return interval, timeout, getHosts
+}
+
 // CheckAffinity function tests whether the service affinity works as expected.
 // If affinity is expected, the test will return true once affinityConfirmCount
 // number of same response observed in a row. If affinity is not expected, the
 // test will keep observe until different responses observed. The function will
 // return false only in case of unexpected errors.
 func checkAffinity(cs clientset.Interface, execPod *v1.Pod, serviceIP string, servicePort int, shouldHold bool) bool {
-	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
-	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
-	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
-	timeout := AffinityTimeout
-	if execPod == nil {
-		timeout = e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
+	var interval, timeout time.Duration
+	var getHosts func() []string
+	if execPod != nil {
+		interval, timeout, getHosts = affinityCheckFromPod(execPod, serviceIP, servicePort)
+	} else {
+		interval, timeout, getHosts = affinityCheckFromTest(cs, serviceIP, servicePort)
 	}
+
 	var tracker affinityTracker
-	// interval considering a maximum of 2 seconds per connection
-	interval := 2 * AffinityConfirmCount * time.Second
 	if pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if execPod != nil {
-			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
-			if err != nil {
-				framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
-				return false, nil
-			}
-			hosts := strings.Split(stdout, "\n")
-			for _, host := range hosts {
+		hosts := getHosts()
+		for _, host := range hosts {
+			if len(host) > 0 {
 				tracker.recordHost(strings.TrimSpace(host))
 			}
-		} else {
-			rawResponse := GetHTTPContent(serviceIP, servicePort, timeout, "")
-			tracker.recordHost(rawResponse.String())
 		}
+
 		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
+		if !trackerFulfilled {
+			return false, nil
+		}
+
 		if !shouldHold && !affinityHolds {
 			return true, nil
 		}
-		if shouldHold && trackerFulfilled && affinityHolds {
+		if shouldHold && affinityHolds {
 			return true, nil
 		}
 		return false, nil
@@ -146,7 +186,7 @@ func checkAffinity(cs clientset.Interface, execPod *v1.Pod, serviceIP string, se
 			return false
 		}
 		if !trackerFulfilled {
-			checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", serviceIPPort))
+			checkAffinityFailed(tracker, fmt.Sprintf("Connection timed out or not enough responses."))
 		}
 		if shouldHold {
 			checkAffinityFailed(tracker, "Affinity should hold but didn't.")
@@ -2162,8 +2202,7 @@ var _ = SIGDescribe("Services", func() {
 		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should be able to create an internal type load balancer [Slow] [DisabledForLargeClusters]", func() {
+	ginkgo.It("should be able to create an internal type load balancer [Slow]", func() {
 		e2eskipper.SkipUnlessProviderIs("azure", "gke", "gce")
 
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
@@ -2356,43 +2395,96 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for service with type clusterIP [LinuxOnly]", func() {
+	/*
+		Release: v1.19
+		Testname: Service, ClusterIP type, session affinity to ClientIP
+		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP" to the service.
+		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create another pod to make requests to the service. Service MUST serve the hostname from the same pod of the replica for all consecutive requests.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
+		[LinuxOnly]: Windows does not support session affinity.
+	*/
+	framework.ConformanceIt("should have session affinity work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
+	/*
+		Release: v1.19
+		Testname: Service, ClusterIP type, session affinity to ClientIP with timeout
+		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP" and session affinity timeout is set. Service creation MUST be successful by assigning "ClusterIP" to the service.
+		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create another pod to make requests to the service. Service MUST serve the hostname from the same pod of the replica for all consecutive requests until timeout expires.
+		After timeout, requests MUST be served from different pods of the replica.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
+		[LinuxOnly]: Windows does not support session affinity.
+	*/
+	framework.ConformanceIt("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
 	})
 
-	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func() {
+	/*
+		Release: v1.19
+		Testname: Service, ClusterIP type, session affinity to None
+		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP" to the service.
+		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create another pod to make requests to the service. Update the service's sessionAffinity to "None". Service update MUST be successful. When a requests are made to the service, it MUST be able serve the hostname from any pod of the replica.
+		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
+		[LinuxOnly]: Windows does not support session affinity.
+	*/
+	framework.ConformanceIt("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-transition")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
-	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for NodePort service [LinuxOnly]", func() {
+	/*
+		Release: v1.19
+		Testname: Service, NodePort type, session affinity to ClientIP
+		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning a "ClusterIP" to service and allocating NodePort on all nodes.
+		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when a requests are sent to the service.
+		Create another pod to make requests to the service on node's IP and NodePort. Service MUST serve the hostname from the same pod of the replica for all consecutive requests.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
+		[LinuxOnly]: Windows does not support session affinity.
+	*/
+	framework.ConformanceIt("should have session affinity work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
+	/*
+		Release: v1.19
+		Testname: Service, NodePort type, session affinity to ClientIP with timeout
+		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP" and session affinity timeout is set.
+		Service creation MUST be successful by assigning a "ClusterIP" to service and allocating NodePort on all nodes.
+		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create another pod to make requests to the service on node's IP and NodePort. Service MUST serve the hostname from the same pod of the replica for all consecutive requests until timeout.
+		After timeout, requests MUST be served from different pods of the replica.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
+		[LinuxOnly]: Windows does not support session affinity.
+	*/
+	framework.ConformanceIt("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
 	})
 
-	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for NodePort service [LinuxOnly]", func() {
+	/*
+		Release: v1.19
+		Testname: Service, NodePort type, session affinity to None
+		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning a "ClusterIP" to the service and allocating NodePort on all the nodes.
+		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create another pod to make requests to the service. Update the service's sessionAffinity to "None". Service update MUST be successful. When a requests are made to the service on node's IP and NodePort, service MUST be able serve the hostname from any pod of the replica.
+		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
+		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
+		[LinuxOnly]: Windows does not support session affinity.
+	*/
+	framework.ConformanceIt("should be able to switch session affinity for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-transition")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
@@ -2788,8 +2880,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 })
 
-// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
+var _ = SIGDescribe("ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	var loadBalancerCreateTimeout time.Duration
 
@@ -3017,7 +3108,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 	})
 
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #90047 is fixed.
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -3175,6 +3267,18 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 	serviceType := svc.Spec.Type
 	// set an affinity timeout equal to the number of connection requests
 	svcSessionAffinityTimeout := int32(AffinityConfirmCount)
+	if proxyMode, err := proxyMode(f); err == nil {
+		if proxyMode == "ipvs" {
+			// session affinity timeout must be greater than 120 in ipvs mode,
+			// because IPVS module has a hardcoded TIME_WAIT timeout of 120s,
+			// and that value can't be sysctl'ed now.
+			// Ref: https://github.com/torvalds/linux/blob/master/net/netfilter/ipvs/ip_vs_proto_tcp.c
+			// TODO: remove this to speed up testing when IPVS does really respect session affinity timeout
+			svcSessionAffinityTimeout = int32(125)
+		}
+	} else {
+		framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
+	}
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 		ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -3504,40 +3608,42 @@ func translatePodNameToUID(c clientset.Interface, ns string, expectedEndpoints p
 // validateEndpointsPorts validates that the given service exists and is served by the given expectedEndpoints.
 func validateEndpointsPorts(c clientset.Interface, namespace, serviceName string, expectedEndpoints portsByPodName) error {
 	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
-	i := 1
-	for start := time.Now(); time.Since(start) < framework.ServiceStartTimeout; time.Sleep(1 * time.Second) {
+	expectedPortsByPodUID, err := translatePodNameToUID(c, namespace, expectedEndpoints)
+	if err != nil {
+		return err
+	}
+
+	i := 0
+	if pollErr := wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
 		ep, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
-			continue
+			framework.Logf("Failed go get Endpoints object: %v", err)
+			// Retry the error
+			return false, nil
 		}
 		portsByPodUID := e2eendpoints.GetContainerPortsByPodUID(ep)
-		expectedPortsByPodUID, err := translatePodNameToUID(c, namespace, expectedEndpoints)
-		if err != nil {
-			return err
-		}
-		if len(portsByPodUID) == len(expectedEndpoints) {
-			err := validatePorts(portsByPodUID, expectedPortsByPodUID)
-			if err != nil {
-				return err
-			}
-			framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
-				serviceName, namespace, expectedEndpoints, time.Since(start))
-			return nil
-		}
-		if i%5 == 0 {
-			framework.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
-		}
+
 		i++
-	}
-	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
-		for _, pod := range pods.Items {
-			framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+		if err := validatePorts(portsByPodUID, expectedPortsByPodUID); err != nil {
+			if i%5 == 0 {
+				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByPodUID, expectedEndpoints)
+			}
+			return false, nil
 		}
-	} else {
-		framework.Logf("Can't list pod debug info: %v", err)
+		framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v",
+			serviceName, namespace, expectedEndpoints)
+		return true, nil
+	}); pollErr != nil {
+		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
+			for _, pod := range pods.Items {
+				framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			}
+		} else {
+			framework.Logf("Can't list pod debug info: %v", err)
+		}
+		return fmt.Errorf("error waithing for service %s in namespace %s to expose endpoints %v: %v", serviceName, namespace, expectedEndpoints, pollErr)
 	}
-	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
+	return nil
 }
 
 // restartApiserver restarts the kube-apiserver.
@@ -3619,3 +3725,211 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 	}
 	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
 }
+
+var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
+	f := framework.NewDefaultFramework("sctp")
+
+	var cs clientset.Interface
+
+	ginkgo.BeforeEach(func() {
+		cs = f.ClientSet
+	})
+
+	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints", func() {
+		serviceName := "sctp-endpoint-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("getting the state of the sctp module on nodes")
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		_, err = jig.CreateSCTPServiceWithPort(nil, 5060)
+		framework.ExpectNoError(err)
+		defer func() {
+			err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		}()
+
+		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
+		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
+
+		ginkgo.By("validating endpoints do not exist yet")
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("creating a pod for the service")
+		names := map[string]bool{}
+
+		name1 := "pod1"
+
+		createPodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
+		names[name1] = true
+		defer func() {
+			for name := range names {
+				err := cs.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
+			}
+		}()
+
+		ginkgo.By("validating endpoints exists")
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{name1: {5060}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("deleting the pod")
+		e2epod.DeletePodOrFail(cs, ns, name1)
+		delete(names, name1)
+		ginkgo.By("validating endpoints do not exist anymore")
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
+
+	ginkgo.It("should create a Pod with SCTP HostPort", func() {
+		ginkgo.By("checking whether kubenet is used")
+		node, err := e2enode.GetRandomReadySchedulableNode(cs)
+		framework.ExpectNoError(err)
+		hostExec := utils.NewHostExec(f)
+		defer hostExec.Cleanup()
+		cmd := "ps -C kubelet -o cmd= | grep kubenet"
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		err = hostExec.IssueCommand(cmd, node)
+		if err != nil {
+			e2eskipper.Skipf("Interrogation of kubenet usage failed on node %s", node.Name)
+		}
+		framework.Logf("kubenet is in use")
+
+		ginkgo.By("getting the state of the sctp module on the selected node")
+		nodes := &v1.NodeList{}
+		nodes.Items = append(nodes.Items, *node)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating a pod with hostport on the selected node")
+		podName := "hostport"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: f.Namespace.Name,
+				Labels:    map[string]string{"app": "hostport-pod"},
+			},
+			Spec: v1.PodSpec{
+				NodeName: node.Name,
+				Containers: []v1.Container{
+					{
+						Name:  "hostport",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"pause"},
+						Ports: []v1.ContainerPort{
+							{
+								Protocol:      v1.ProtocolSCTP,
+								ContainerPort: 5060,
+								HostPort:      5060,
+							},
+						},
+						ImagePullPolicy: "IfNotPresent",
+					},
+				},
+			},
+		}
+
+		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
+		f.PodClient().CreateSync(podSpec)
+		defer func() {
+			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
+		}()
+
+		ginkgo.By("dumping iptables rules on the node")
+		cmd = "sudo iptables-save"
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		result, err := hostExec.IssueCommandWithResult(cmd, node)
+		if err != nil {
+			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		}
+
+		ginkgo.By("checking that iptables contains the necessary iptables rules")
+		found := false
+		for _, line := range strings.Split(result, "\n") {
+			if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			framework.Failf("iptables rules are not set for a pod with sctp hostport")
+		}
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
+	ginkgo.It("should create a ClusterIP Service with SCTP ports", func() {
+		ginkgo.By("checking that kube-proxy is in iptables mode")
+		if proxyMode, err := proxyMode(f); err != nil {
+			e2eskipper.Skipf("Couldn't detect KubeProxy mode - skip, %v", err)
+		} else if proxyMode != "iptables" {
+			e2eskipper.Skipf("The test doesn't work if kube-proxy is not in iptables mode")
+		}
+
+		serviceName := "sctp-clusterip"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("getting the state of the sctp module on nodes")
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		_, err = jig.CreateSCTPServiceWithPort(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolSCTP, Port: 5060}}
+		}, 5060)
+		framework.ExpectNoError(err)
+		defer func() {
+			err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		}()
+
+		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
+		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
+
+		ginkgo.By("dumping iptables rules on a node")
+		hostExec := utils.NewHostExec(f)
+		defer hostExec.Cleanup()
+		node, err := e2enode.GetRandomReadySchedulableNode(cs)
+		framework.ExpectNoError(err)
+		cmd := "sudo iptables-save"
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		result, err := hostExec.IssueCommandWithResult(cmd, node)
+		if err != nil {
+			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		}
+
+		ginkgo.By("checking that iptables contains the necessary iptables rules")
+		kubeService := false
+		for _, line := range strings.Split(result, "\n") {
+			if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
+				kubeService = true
+				break
+			}
+		}
+		if !kubeService {
+			framework.Failf("iptables rules are not set for a clusterip service with sctp ports")
+		}
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
+})

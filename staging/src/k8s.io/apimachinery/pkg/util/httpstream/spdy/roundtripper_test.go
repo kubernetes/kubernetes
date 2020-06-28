@@ -282,7 +282,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					t.Fatalf("%s: Error creating request: %s", k, err)
 				}
 
-				spdyTransport := NewSpdyRoundTripper(testCase.clientTLS, redirect, redirect)
+				spdyTransport := NewRoundTripper(testCase.clientTLS, redirect, redirect)
 
 				var proxierCalled bool
 				var proxyCalledWithHost string
@@ -425,7 +425,7 @@ func TestRoundTripRedirects(t *testing.T) {
 				t.Fatalf("Error creating request: %s", err)
 			}
 
-			spdyTransport := NewSpdyRoundTripper(nil, true, true)
+			spdyTransport := NewRoundTripper(nil, true, true)
 			client := &http.Client{Transport: spdyTransport}
 
 			resp, err := client.Do(req)

@@ -36,7 +36,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -688,14 +687,7 @@ func checkAtLeastOneNewPod(c clientset.Interface, ns string, label map[string]st
 // canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
 func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
 	newPod := daemon.NewPod(ds, node.Name)
-	nodeInfo := schedulertypes.NewNodeInfo()
-	nodeInfo.SetNode(&node)
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		framework.Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
-		return false
-	}
-	fitsNodeName, fitsNodeAffinity, fitsTaints := daemon.Predicates(newPod, &node, taints)
+	fitsNodeName, fitsNodeAffinity, fitsTaints := daemon.Predicates(newPod, &node, node.Spec.Taints)
 	return fitsNodeName && fitsNodeAffinity && fitsTaints
 }
 

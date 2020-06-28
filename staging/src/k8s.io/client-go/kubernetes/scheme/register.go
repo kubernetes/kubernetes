@@ -24,7 +24,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -35,6 +34,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -75,7 +75,6 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	appsv1.AddToScheme,
 	appsv1beta1.AddToScheme,
 	appsv1beta2.AddToScheme,
-	auditregistrationv1alpha1.AddToScheme,
 	authenticationv1.AddToScheme,
 	authenticationv1beta1.AddToScheme,
 	authorizationv1.AddToScheme,
@@ -86,6 +85,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	batchv1.AddToScheme,
 	batchv1beta1.AddToScheme,
 	batchv2alpha1.AddToScheme,
+	certificatesv1.AddToScheme,
 	certificatesv1beta1.AddToScheme,
 	coordinationv1beta1.AddToScheme,
 	coordinationv1.AddToScheme,

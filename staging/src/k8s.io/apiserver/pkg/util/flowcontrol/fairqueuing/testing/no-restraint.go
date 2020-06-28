@@ -19,6 +19,7 @@ package testing
 import (
 	"context"
 
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 )
 
@@ -53,8 +54,12 @@ func (noRestraint) IsIdle() bool {
 	return false
 }
 
-func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
+func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
 	return noRestraintRequest{}, false
+}
+
+func (noRestraint) Dump(bool) debug.QueueSetDump {
+	return debug.QueueSetDump{}
 }
 
 func (noRestraintRequest) Finish(execute func()) (idle bool) {

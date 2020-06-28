@@ -30,7 +30,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // getResourceList returns a ResourceList with the
@@ -75,8 +75,14 @@ func makePodToVerifyCgroups(cgroupNames []string) *v1.Pod {
 	klog.Infof("expecting %v cgroups to be found", cgroupFsNames)
 	// build the pod command to either verify cgroups exist
 	command := ""
+
 	for _, cgroupFsName := range cgroupFsNames {
-		localCommand := "if [ ! -d /tmp/memory/" + cgroupFsName + " ] || [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 1; fi; "
+		localCommand := ""
+		if IsCgroup2UnifiedMode() {
+			localCommand = "if [ ! -d /tmp/" + cgroupFsName + " ]; then exit 1; fi; "
+		} else {
+			localCommand = "if [ ! -d /tmp/memory/" + cgroupFsName + " ] || [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 1; fi; "
+		}
 		command += localCommand
 	}
 
@@ -117,6 +123,14 @@ func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 	components := strings.Split(baseName, "/")
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, components...)
 	cgroupFsName := toCgroupFsName(cgroupName)
+
+	command := ""
+	if IsCgroup2UnifiedMode() {
+		command = "for i in `seq 1 10`; do if [ ! -d /tmp/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"
+	} else {
+		command = "for i in `seq 1 10`; do if [ ! -d /tmp/memory/" + cgroupFsName + " ] && [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
@@ -127,7 +141,7 @@ func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 				{
 					Image:   busyboxImage,
 					Name:    "container" + string(uuid.NewUUID()),
-					Command: []string{"sh", "-c", "for i in `seq 1 10`; do if [ ! -d /tmp/memory/" + cgroupFsName + " ] && [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"},
+					Command: []string{"sh", "-c", command},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "sysfscgroup",

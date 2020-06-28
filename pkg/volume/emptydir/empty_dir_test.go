@@ -837,6 +837,12 @@ func TestGetPageSize(t *testing.T) {
 				Opts:   []string{"rw", "relatime", "pagesize=2M"},
 			},
 			{
+				Device: "/dev/hugepages",
+				Type:   "hugetlbfs",
+				Path:   "/mnt/hugepages-2Mi",
+				Opts:   []string{"rw", "relatime", "pagesize=2Mi"},
+			},
+			{
 				Device: "sysfs",
 				Type:   "sysfs",
 				Path:   "/sys",

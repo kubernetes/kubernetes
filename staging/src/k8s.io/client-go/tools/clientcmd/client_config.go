@@ -20,28 +20,38 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
-	"github.com/imdario/mergo"
-	"k8s.io/klog"
-
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
+
+	"github.com/imdario/mergo"
 )
 
 var (
 	// ClusterDefaults has the same behavior as the old EnvVar and DefaultCluster fields
 	// DEPRECATED will be replaced
-	ClusterDefaults = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
+	ClusterDefaults = clientcmdapi.Cluster{Server: getDefaultServer()}
 	// DefaultClientConfig represents the legacy behavior of this package for defaulting
 	// DEPRECATED will be replace
 	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{
 		ClusterDefaults: ClusterDefaults,
 	}, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
 )
+
+// getDefaultServer returns a default setting for DefaultClientConfig
+// DEPRECATED
+func getDefaultServer() string {
+	if server := os.Getenv("KUBERNETES_MASTER"); len(server) > 0 {
+		return server
+	}
+	return "http://localhost:8080"
+}
 
 // ClientConfig is used to make it easy to get an api server client
 type ClientConfig interface {
@@ -141,6 +151,13 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	if configClusterInfo.ProxyURL != "" {
+		u, err := parseProxyURL(configClusterInfo.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+		clientConfig.Proxy = http.ProxyURL(u)
+	}
 
 	if len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)

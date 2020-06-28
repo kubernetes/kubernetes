@@ -60,6 +60,7 @@ func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePl
 		csi.ProbeVolumePlugins(),
 		"fakeNode",
 		csiDriverLister,
+		nil,
 	)
 	plugMgr := host.GetPluginMgr()
 

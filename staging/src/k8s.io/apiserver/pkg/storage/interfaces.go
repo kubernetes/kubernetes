@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -175,7 +176,7 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will get current object at given key
 	// and send it in an "ADDED" event, before watch starts.
-	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
+	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item selected by 'p' are sent down to returned watch.Interface.
@@ -184,26 +185,26 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will list current objects directory defined by key
 	// and send them in "ADDED" events, before watch starts.
-	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
-	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
+	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
 	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	List(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
@@ -242,4 +243,30 @@ type Interface interface {
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+}
+
+// GetOptions provides the options that may be provided for storage get operations.
+type GetOptions struct {
+	// IgnoreNotFound determines what is returned if the requested object is not found. If
+	// true, a zero object is returned. If false, an error is returned.
+	IgnoreNotFound bool
+	// ResourceVersion provides a resource version constraint to apply to the get operation
+	// as a "not older than" constraint: the result contains data at least as new as the provided
+	// ResourceVersion. The newest available data is preferred, but any data not older than this
+	// ResourceVersion may be served.
+	ResourceVersion string
+}
+
+// ListOptions provides the options that may be provided for storage list operations.
+type ListOptions struct {
+	// ResourceVersion provides a resource version constraint to apply to the list operation
+	// as a "not older than" constraint: the result contains data at least as new as the provided
+	// ResourceVersion. The newest available data is preferred, but any data not older than this
+	// ResourceVersion may be served.
+	ResourceVersion string
+	// ResourceVersionMatch provides the rule for how the resource version constraint applies. If set
+	// to the default value "" the legacy resource version semantic apply.
+	ResourceVersionMatch metav1.ResourceVersionMatch
+	// Predicate provides the selection rules for the list operation.
+	Predicate SelectionPredicate
 }

@@ -188,6 +188,17 @@ type DriverInfo struct {
 	// Only relevant if TopologyKeys is set. Defaults to 1.
 	// Example: multi-zonal disk requires at least 2 allowed topologies.
 	NumAllowedTopologies int
+	// [Optional] Scale parameters for stress tests.
+	StressTestOptions *StressTestOptions
+}
+
+// StressTestOptions contains parameters used for stress tests.
+type StressTestOptions struct {
+	// Number of pods to create in the test. This may also create
+	// up to 1 volume per pod.
+	NumPods int
+	// Number of times to restart each Pod.
+	NumRestarts int
 }
 
 // PerTestConfig represents parameters that control test execution.
@@ -215,6 +226,9 @@ type PerTestConfig struct {
 	// the configuration that then has to be used to run tests.
 	// The values above are ignored for such tests.
 	ServerConfig *e2evolume.TestConfig
+
+	// Some drivers run in their own namespace
+	DriverNamespace *v1.Namespace
 }
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests

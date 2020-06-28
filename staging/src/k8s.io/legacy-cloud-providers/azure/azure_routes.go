@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
@@ -405,7 +405,7 @@ func mapNodeNameToRouteName(ipv6DualStackEnabled bool, nodeName types.NodeName, 
 // Used with mapNodeNameToRouteName. See comment on mapNodeNameToRouteName.
 func mapRouteNameToNodeName(ipv6DualStackEnabled bool, routeName string) types.NodeName {
 	if !ipv6DualStackEnabled {
-		return types.NodeName(fmt.Sprintf("%s", routeName))
+		return types.NodeName(routeName)
 	}
 	parts := strings.Split(routeName, routeNameSeparator)
 	nodeName := parts[0]

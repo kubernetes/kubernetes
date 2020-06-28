@@ -721,6 +721,7 @@ spec:
           runAsUserName: "370"
       serviceAccount: "362"
       serviceAccountName: "361"
+      setHostnameAsFQDN: false
       shareProcessNamespace: true
       subdomain: "375"
       terminationGracePeriodSeconds: 2666412258966278206
@@ -941,14 +942,14 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: -928976522
+  availableReplicas: -983106472
   conditions:
-  - lastTransitionTime: "2233-10-15T01:58:37Z"
+  - lastTransitionTime: "2376-03-18T02:40:44Z"
     message: "435"
     reason: "434"
-    status: ű孖站畦f黹ʩ鹸ɷ
-    type: 暁×軓鼐嵱宯ÙQ阉(闒ƈƳ
-  fullyLabeledReplicas: 1893057016
-  observedGeneration: 702392770146794584
-  readyReplicas: -2099726885
-  replicas: -1165029050
+    status: 站畦f黹ʩ鹸ɷLȋ
+    type: ×軓鼐嵱宯ÙQ阉(闒ƈƳ萎Ŋ
+  fullyLabeledReplicas: -2099726885
+  observedGeneration: 4693783954739913971
+  readyReplicas: -928976522
+  replicas: 1893057016

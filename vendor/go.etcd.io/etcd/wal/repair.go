@@ -18,10 +18,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"go.etcd.io/etcd/pkg/fileutil"
 	"go.etcd.io/etcd/wal/walpb"
-
 	"go.uber.org/zap"
 )
 
@@ -105,6 +105,7 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 				return false
 			}
 
+			start := time.Now()
 			if err = fileutil.Fsync(f.File); err != nil {
 				if lg != nil {
 					lg.Warn("failed to fsync", zap.String("path", f.Name()), zap.Error(err))
@@ -113,6 +114,7 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 				}
 				return false
 			}
+			walFsyncSec.Observe(time.Since(start).Seconds())
 
 			if lg != nil {
 				lg.Info("repaired", zap.String("path", f.Name()), zap.Error(io.ErrUnexpectedEOF))

@@ -90,6 +90,7 @@ func getTestCloudConfigTypeMergeConfigExpected() *Config {
 
 func TestGetConfigFromSecret(t *testing.T) {
 	emptyConfig := &Config{}
+	badConfig := &Config{ResourceGroup: "DuplicateColumnsIncloud-config"}
 	tests := []struct {
 		name           string
 		existingConfig *Config
@@ -104,6 +105,108 @@ func TestGetConfigFromSecret(t *testing.T) {
 				CloudConfigType: cloudConfigTypeFile,
 			},
 			secretConfig: getTestConfig(),
+			expected:     nil,
+		},
+		{
+			name:           "Azure config should be override when cloud config type is secret",
+			existingConfig: getTestCloudConfigTypeSecretConfig(),
+			secretConfig:   getTestConfig(),
+			expected:       getTestConfig(),
+		},
+		{
+			name:           "Azure config should be override when cloud config type is merge",
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
+			secretConfig:   getTestConfig(),
+			expected:       getTestCloudConfigTypeMergeConfigExpected(),
+		},
+		{
+			name:           "Error should be reported when secret doesn't exists",
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
+			expectErr:      true,
+		},
+		{
+			name:           "Error should be reported when secret exists but cloud-config data is not provided",
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
+			secretConfig:   emptyConfig,
+			expectErr:      true,
+		},
+		{
+			name:           "Error should be reported when it failed to parse Azure cloud-config",
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
+			secretConfig:   badConfig,
+			expectErr:      true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			az := &Cloud{
+				KubeClient: fakeclient.NewSimpleClientset(),
+			}
+			if test.existingConfig != nil {
+				az.Config = *test.existingConfig
+			}
+			if test.secretConfig != nil {
+				secret := &v1.Secret{
+					Type: v1.SecretTypeOpaque,
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "azure-cloud-provider",
+						Namespace: "kube-system",
+					},
+				}
+				if test.secretConfig != emptyConfig && test.secretConfig != badConfig {
+					secretData, err := yaml.Marshal(test.secretConfig)
+					assert.NoError(t, err, test.name)
+					secret.Data = map[string][]byte{
+						"cloud-config": secretData,
+					}
+				}
+				if test.secretConfig == badConfig {
+					secret.Data = map[string][]byte{"cloud-config": []byte(`unknown: "hello",unknown: "hello"`)}
+				}
+				_, err := az.KubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+				assert.NoError(t, err, test.name)
+			}
+
+			real, err := az.getConfigFromSecret()
+			if test.expectErr {
+				assert.Error(t, err, test.name)
+				return
+			}
+
+			assert.NoError(t, err, test.name)
+			assert.Equal(t, test.expected, real, test.name)
+		})
+	}
+}
+
+func TestInitializeCloudFromSecret(t *testing.T) {
+	emptyConfig := &Config{}
+	unknownConfigTypeConfig := getTestConfig()
+	unknownConfigTypeConfig.CloudConfigType = "UnknownConfigType"
+	tests := []struct {
+		name           string
+		existingConfig *Config
+		secretConfig   *Config
+		expected       *Config
+		expectErr      bool
+	}{
+		{
+			name: "Azure config shouldn't be override when cloud config type is file",
+			existingConfig: &Config{
+				ResourceGroup:   "ResourceGroup1",
+				CloudConfigType: cloudConfigTypeFile,
+			},
+			secretConfig: getTestConfig(),
+			expected:     nil,
+		},
+		{
+			name: "Azure config shouldn't be override when cloud config type is unknown",
+			existingConfig: &Config{
+				ResourceGroup:   "ResourceGroup1",
+				CloudConfigType: "UnknownConfigType",
+			},
+			secretConfig: unknownConfigTypeConfig,
 			expected:     nil,
 		},
 		{
@@ -158,14 +261,7 @@ func TestGetConfigFromSecret(t *testing.T) {
 				assert.NoError(t, err, test.name)
 			}
 
-			real, err := az.getConfigFromSecret()
-			if test.expectErr {
-				assert.Error(t, err, test.name)
-				return
-			}
-
-			assert.NoError(t, err, test.name)
-			assert.Equal(t, test.expected, real, test.name)
+			az.InitializeCloudFromSecret()
 		})
 	}
 }

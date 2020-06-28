@@ -27,7 +27,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -41,6 +40,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ==================================================================
@@ -157,6 +157,7 @@ type PersistentVolumeController struct {
 	classListerSynced  cache.InformerSynced
 	podLister          corelisters.PodLister
 	podListerSynced    cache.InformerSynced
+	podIndexer         cache.Indexer
 	NodeLister         corelisters.NodeLister
 	NodeListerSynced   cache.InformerSynced
 
@@ -296,6 +297,31 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	return nil
 }
 
+// emitEventForUnboundDelayBindingClaim generates informative event for claim
+// if it's in delay binding mode and not bound yet.
+func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(claim *v1.PersistentVolumeClaim) error {
+	reason := events.WaitForFirstConsumer
+	message := "waiting for first consumer to be created before binding"
+	podNames, err := ctrl.findNonScheduledPodsByPVC(claim)
+	if err != nil {
+		return err
+	}
+	if len(podNames) > 0 {
+		reason = events.WaitForPodScheduled
+		if len(podNames) > 1 {
+			// Although only one pod is taken into account in
+			// volume scheduling, more than one pods can reference
+			// the PVC at the same time. We can't know which pod is
+			// used in scheduling, all pods are included.
+			message = fmt.Sprintf("waiting for pods %s to be scheduled", strings.Join(podNames, ","))
+		} else {
+			message = fmt.Sprintf("waiting for pod %s to be scheduled", podNames[0])
+		}
+	}
+	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, reason, message)
+	return nil
+}
+
 // syncUnboundClaim is the main controller method to decide what to do with an
 // unbound claim.
 func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVolumeClaim) error {
@@ -320,7 +346,9 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			// OBSERVATION: pvc is "Pending", will retry
 			switch {
 			case delayBinding && !pvutil.IsDelayBindingProvisioning(claim):
-				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.WaitForFirstConsumer, "waiting for first consumer to be created before binding")
+				if err = ctrl.emitEventForUnboundDelayBindingClaim(claim); err != nil {
+					return err
+				}
 			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
@@ -415,6 +443,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
 				if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBoundByController) {
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
+					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
+					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
 					// User asked for a specific PV, retry later
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
@@ -424,6 +454,9 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					// This should never happen because someone had to remove
 					// AnnBindCompleted annotation on the claim.
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
+					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
+					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
+
 					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 				}
 			}
@@ -604,11 +637,14 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 					return err
 				}
 			}
-
 			if err = ctrl.reclaimVolume(volume); err != nil {
 				// Release failed, we will fall back into the same condition
 				// in the next call to this method
 				return err
+			}
+			if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimRetain {
+				// volume is being retained, it references a claim that does not exist now.
+				klog.V(4).Infof("PersistentVolume[%s] references a claim %q (%s) that is not found", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef), volume.Spec.ClaimRef.UID)
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
@@ -1286,30 +1322,59 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 	return true, nil
 }
 
-// isVolumeUsed returns list of pods that use given PV.
+func (ctrl *PersistentVolumeController) findPodsByPVCKey(key string) ([]*v1.Pod, error) {
+	pods := []*v1.Pod{}
+	objs, err := ctrl.podIndexer.ByIndex(common.PodPVCIndex, key)
+	if err != nil {
+		return pods, err
+	}
+	for _, obj := range objs {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+	return pods, err
+}
+
+// isVolumeUsed returns list of active pods that use given PV.
 func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([]string, bool, error) {
 	if pv.Spec.ClaimRef == nil {
 		return nil, false, nil
 	}
-	claimName := pv.Spec.ClaimRef.Name
-
 	podNames := sets.NewString()
-	pods, err := ctrl.podLister.Pods(pv.Spec.ClaimRef.Namespace).List(labels.Everything())
+	pvcKey := fmt.Sprintf("%s/%s", pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	pods, err := ctrl.findPodsByPVCKey(pvcKey)
 	if err != nil {
-		return nil, false, fmt.Errorf("error listing pods: %s", err)
+		return nil, false, fmt.Errorf("error finding pods by pvc %q: %s", pvcKey, err)
 	}
 	for _, pod := range pods {
 		if util.IsPodTerminated(pod, pod.Status) {
 			continue
 		}
-		for i := range pod.Spec.Volumes {
-			usedPV := &pod.Spec.Volumes[i]
-			if usedPV.PersistentVolumeClaim != nil && usedPV.PersistentVolumeClaim.ClaimName == claimName {
-				podNames.Insert(pod.Namespace + "/" + pod.Name)
-			}
-		}
+		podNames.Insert(pod.Namespace + "/" + pod.Name)
 	}
 	return podNames.List(), podNames.Len() != 0, nil
+}
+
+// findNonScheduledPodsByPVC returns list of non-scheduled active pods that reference given PVC.
+func (ctrl *PersistentVolumeController) findNonScheduledPodsByPVC(pvc *v1.PersistentVolumeClaim) ([]string, error) {
+	pvcKey := fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
+	pods, err := ctrl.findPodsByPVCKey(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+	podNames := []string{}
+	for _, pod := range pods {
+		if util.IsPodTerminated(pod, pod.Status) {
+			continue
+		}
+		if len(pod.Spec.NodeName) == 0 {
+			podNames = append(podNames, pod.Name)
+		}
+	}
+	return podNames, nil
 }
 
 // doDeleteVolume finds appropriate delete plugin and deletes given volume, returning

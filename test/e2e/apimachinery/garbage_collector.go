@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -443,6 +444,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
+		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
+			framework.Logf("WARNING: failed to delete pods: %v", err)
+		}
 	})
 
 	// deleteOptions.OrphanDependents is deprecated in 1.7 and preferred to use the PropagationPolicy.
@@ -489,6 +493,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
+		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
+			framework.Logf("WARNING: failed to delete pods: %v", err)
+		}
 	})
 
 	/*
@@ -827,6 +834,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 		}
 		gatherMetrics(f)
+		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
+			framework.Logf("WARNING: failed to delete pods: %v", err)
+		}
 	})
 
 	// TODO: should be an integration test

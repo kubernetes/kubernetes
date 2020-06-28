@@ -31,12 +31,16 @@ go_library(
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
     deps = [
         "//vendor/github.com/Microsoft/go-winio:go_default_library",
-        "//vendor/github.com/Microsoft/hcsshim/internal/guid:go_default_library",
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/hcserror:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/interop:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/log:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/longpath:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/oc:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/safefile:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/osversion:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
+        "//vendor/go.opencensus.io/trace:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows:go_default_library",

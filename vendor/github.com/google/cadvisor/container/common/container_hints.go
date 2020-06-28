@@ -27,7 +27,7 @@ import (
 
 var ArgContainerHints = flag.String("container_hints", "/etc/cadvisor/container_hints.json", "location of the container hints file")
 
-type containerHints struct {
+type ContainerHints struct {
 	AllHosts []containerHint `json:"all_hosts,omitempty"`
 }
 
@@ -47,12 +47,12 @@ type networkInterface struct {
 	VethChild string `json:"veth_child,omitempty"`
 }
 
-func GetContainerHintsFromFile(containerHintsFile string) (containerHints, error) {
+func GetContainerHintsFromFile(containerHintsFile string) (ContainerHints, error) {
 	dat, err := ioutil.ReadFile(containerHintsFile)
 	if os.IsNotExist(err) {
-		return containerHints{}, nil
+		return ContainerHints{}, nil
 	}
-	var cHints containerHints
+	var cHints ContainerHints
 	if err == nil {
 		err = json.Unmarshal(dat, &cHints)
 	}

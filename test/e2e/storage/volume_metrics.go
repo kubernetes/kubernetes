@@ -59,9 +59,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		defaultScName, err = e2epv.GetDefaultStorageClassName(c)
-		if err != nil {
-			framework.Failf(err.Error())
-		}
+		framework.ExpectNoError(err)
+
 		test := testsuites.StorageClassTest{
 			Name:      "default",
 			ClaimSize: "2Gi",
@@ -101,7 +100,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func() {
 		var err error
 
-		if !metricsGrabber.HasRegisteredMaster() {
+		if !metricsGrabber.HasControlPlanePods() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
@@ -147,7 +146,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func() {
 		var err error
 
-		if !metricsGrabber.HasRegisteredMaster() {
+		if !metricsGrabber.HasControlPlanePods() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
@@ -447,7 +446,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		ginkgo.BeforeEach(func() {
-			if !metricsGrabber.HasRegisteredMaster() {
+			if !metricsGrabber.HasControlPlanePods() {
 				e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 			}
 

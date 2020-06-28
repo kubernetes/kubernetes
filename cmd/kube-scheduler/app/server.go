@@ -27,8 +27,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
-	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -38,33 +36,29 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
-	"k8s.io/client-go/kubernetes/scheme"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
-	"k8s.io/kubernetes/pkg/util/configz"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 // Option configures a framework.Registry.
-type Option func(framework.Registry) error
+type Option func(runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
@@ -75,19 +69,27 @@ func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "kube-scheduler",
-		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
-workload-specific function that significantly impacts availability, performance,
-and capacity. The scheduler needs to take into account individual and collective
-resource requirements, quality of service requirements, hardware/software/policy
-constraints, affinity and anti-affinity specifications, data locality, inter-workload
-interference, deadlines, and so on. Workload-specific requirements will be exposed
-through the API as necessary. See [scheduling](https://kubernetes.io/docs/concepts/scheduling/)
+		Long: `The Kubernetes scheduler is a control plane process which assigns
+Pods to Nodes. The scheduler determines which Nodes are valid placements for
+each Pod in the scheduling queue according to constraints and available
+resources. The scheduler then ranks each valid Node and binds the Pod to a
+suitable Node. Multiple different schedulers may be used within a cluster;
+kube-scheduler is the reference implementation.
+See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := runCommand(cmd, args, opts, registryOptions...); err != nil {
+			if err := runCommand(cmd, opts, registryOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
+		},
+		Args: func(cmd *cobra.Command, args []string) error {
+			for _, arg := range args {
+				if len(arg) > 0 {
+					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
+				}
+			}
+			return nil
 		},
 	}
 	fs := cmd.Flags()
@@ -115,14 +117,14 @@ for more information about scheduling and the kube-scheduler component.`,
 }
 
 // runCommand runs the scheduler.
-func runCommand(cmd *cobra.Command, args []string, opts *options.Options, registryOptions ...Option) error {
+func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
-	utilflag.PrintFlags(cmd.Flags())
+	cliflag.PrintFlags(cmd.Flags())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cc, sched, err := Setup(ctx, args, opts, registryOptions...)
+	cc, sched, err := Setup(ctx, opts, registryOptions...)
 	if err != nil {
 		return err
 	}
@@ -151,12 +153,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Prepare the event broadcaster.
-	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartRecordingToSink(ctx.Done())
-	}
-	if cc.CoreBroadcaster != nil && cc.CoreEventClient != nil {
-		cc.CoreBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
-	}
+	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
+
 	// Setup healthz checks.
 	var checks []healthz.HealthChecker
 	if cc.ComponentConfig.LeaderElection.LeaderElect {
@@ -280,30 +278,21 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 }
 
 func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
-	if _, err := cc.Client.Discovery().ServerResourcesForGroupVersion(eventsv1beta1.SchemeGroupVersion.String()); err == nil {
-		cc.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: cc.EventClient.Events("")})
-		return profile.NewRecorderFactory(cc.Broadcaster)
-	}
 	return func(name string) events.EventRecorder {
-		r := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: name})
-		return record.NewEventRecorderAdapter(r)
+		return cc.EventBroadcaster.NewRecorder(name)
 	}
 }
 
 // WithPlugin creates an Option based on plugin name and factory. Please don't remove this function: it is used to register out-of-tree plugins,
 // hence there are no references to it from the kubernetes scheduler code base.
-func WithPlugin(name string, factory framework.PluginFactory) Option {
-	return func(registry framework.Registry) error {
+func WithPlugin(name string, factory runtime.PluginFactory) Option {
+	return func(registry runtime.Registry) error {
 		return registry.Register(name, factory)
 	}
 }
 
 // Setup creates a completed config and a scheduler based on the command args and options
-func Setup(ctx context.Context, args []string, opts *options.Options, outOfTreeRegistryOptions ...Option) (*schedulerserverconfig.CompletedConfig, *scheduler.Scheduler, error) {
-	if len(args) != 0 {
-		fmt.Fprint(os.Stderr, "arguments are not supported\n")
-	}
-
+func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions ...Option) (*schedulerserverconfig.CompletedConfig, *scheduler.Scheduler, error) {
 	if errs := opts.Validate(); len(errs) > 0 {
 		return nil, nil, utilerrors.NewAggregate(errs)
 	}
@@ -316,7 +305,7 @@ func Setup(ctx context.Context, args []string, opts *options.Options, outOfTreeR
 	// Get the completed config
 	cc := c.Complete()
 
-	outOfTreeRegistry := make(framework.Registry)
+	outOfTreeRegistry := make(runtime.Registry)
 	for _, option := range outOfTreeRegistryOptions {
 		if err := option(outOfTreeRegistry); err != nil {
 			return nil, nil, err
@@ -334,7 +323,6 @@ func Setup(ctx context.Context, args []string, opts *options.Options, outOfTreeR
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),

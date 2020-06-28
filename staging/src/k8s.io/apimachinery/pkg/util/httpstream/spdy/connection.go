@@ -24,7 +24,7 @@ import (
 
 	"github.com/docker/spdystream"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // connection maintains state about a spdystream.Connection and its associated

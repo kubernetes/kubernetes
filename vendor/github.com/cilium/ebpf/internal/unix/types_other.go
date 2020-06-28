@@ -12,9 +12,15 @@ var errNonLinux = fmt.Errorf("unsupported platform %s/%s", runtime.GOOS, runtime
 
 const (
 	ENOENT                   = syscall.ENOENT
+	EEXIST                   = syscall.EEXIST
 	EAGAIN                   = syscall.EAGAIN
 	ENOSPC                   = syscall.ENOSPC
 	EINVAL                   = syscall.EINVAL
+	EINTR                    = syscall.EINTR
+	ESRCH                    = syscall.ESRCH
+	ENODEV                   = syscall.ENODEV
+	BPF_F_RDONLY_PROG        = 0
+	BPF_F_WRONLY_PROG        = 0
 	BPF_OBJ_NAME_LEN         = 0x10
 	BPF_TAG_SIZE             = 0x8
 	SYS_BPF                  = 321
@@ -32,6 +38,8 @@ const (
 	PerfBitWatermark         = 0x4000
 	PERF_SAMPLE_RAW          = 0x400
 	PERF_FLAG_FD_CLOEXEC     = 0x8
+	RLIM_INFINITY            = 0x7fffffffffffffff
+	RLIMIT_MEMLOCK           = 8
 )
 
 // Statfs_t is a wrapper
@@ -180,4 +188,29 @@ type PerfEventAttr struct {
 // PerfEventOpen is a wrapper
 func PerfEventOpen(attr *PerfEventAttr, pid int, cpu int, groupFd int, flags int) (fd int, err error) {
 	return 0, errNonLinux
+}
+
+// Utsname is a wrapper
+type Utsname struct {
+	Release [65]byte
+}
+
+// Uname is a wrapper
+func Uname(buf *Utsname) (err error) {
+	return errNonLinux
+}
+
+// Getpid is a wrapper
+func Getpid() int {
+	return -1
+}
+
+// Gettid is a wrapper
+func Gettid() int {
+	return -1
+}
+
+// Tgkill is a wrapper
+func Tgkill(tgid int, tid int, sig syscall.Signal) (err error) {
+	return errNonLinux
 }

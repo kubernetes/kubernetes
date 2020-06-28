@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -103,6 +103,22 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 		return err
 	}
 
+	members, err := etcdClient.ListMembers()
+	if err != nil {
+		return err
+	}
+	// If this is the only remaining stacked etcd member in the cluster, calling RemoveMember()
+	// is not needed.
+	if len(members) == 1 {
+		etcdClientAddress := etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)
+		for _, endpoint := range etcdClient.Endpoints {
+			if endpoint == etcdClientAddress {
+				klog.V(1).Info("[etcd] This is the only remaining etcd member in the etcd cluster, skip removing it")
+				return nil
+			}
+		}
+	}
+
 	// notifies the other members of the etcd cluster about the removing member
 	etcdPeerAddress := etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint)
 
@@ -113,7 +129,7 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	}
 
 	klog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
-	members, err := etcdClient.RemoveMember(id)
+	members, err = etcdClient.RemoveMember(id)
 	if err != nil {
 		return err
 	}
@@ -133,16 +149,36 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		return err
 	}
 
-	// notifies the other members of the etcd cluster about the joining member
 	etcdPeerAddress := etcdutil.GetPeerURL(endpoint)
 
-	klog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
-	initialCluster, err := etcdClient.AddMember(nodeName, etcdPeerAddress)
+	klog.V(1).Infoln("[etcd] Getting the list of existing members")
+	initialCluster, err := etcdClient.ListMembers()
 	if err != nil {
 		return err
 	}
-	fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
-	klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
+
+	// only add the new member if it doesn't already exists
+	var exists bool
+	klog.V(1).Infof("[etcd] Checking if the etcd member already exists: %s", etcdPeerAddress)
+	for _, member := range initialCluster {
+		if member.PeerURL == etcdPeerAddress {
+			exists = true
+			break
+		}
+	}
+
+	if exists {
+		klog.V(1).Infof("[etcd] Etcd member already exists: %s", endpoint)
+	} else {
+		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
+		initialCluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
+		klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
+	}
 
 	fmt.Printf("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
 
@@ -193,6 +229,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 				staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 			},
 			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
+			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)

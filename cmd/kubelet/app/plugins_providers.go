@@ -21,7 +21,7 @@ package app
 import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/csi-translation-lib/plugins"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
@@ -65,6 +65,7 @@ func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate f
 	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationOpenStack, pluginMigrationCompleteFeature: features.CSIMigrationOpenStackComplete, pluginProbeFunction: cinder.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginMigrationCompleteFeature: features.CSIMigrationAzureDiskComplete, pluginProbeFunction: azure_dd.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginMigrationCompleteFeature: features.CSIMigrationAzureFileComplete, pluginProbeFunction: azure_file.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginMigrationCompleteFeature: features.CSIMigrationvSphereComplete, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
 
 	var err error
 	for pluginName, pluginInfo := range pluginMigrationStatus {
@@ -73,7 +74,5 @@ func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate f
 			return allPlugins, err
 		}
 	}
-
-	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	return allPlugins, nil
 }

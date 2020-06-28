@@ -31,20 +31,20 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *schedulertypes.NodeInfo) error {
+func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.NodeInfo) error {
 	if (actual == nil) != (expected == nil) {
 		return errors.New("one of the actual or expected is nil and the other is not")
 	}
 	// Ignore generation field.
 	if actual != nil {
-		actual.info.SetGeneration(0)
+		actual.info.Generation = 0
 	}
 	if expected != nil {
-		expected.SetGeneration(0)
+		expected.Generation = 0
 	}
 	if actual != nil && !reflect.DeepEqual(actual.info, expected) {
 		return fmt.Errorf("got node info %s, want %s", actual.info, expected)
@@ -70,26 +70,25 @@ func (b *hostPortInfoBuilder) add(protocol, ip string, port int32) *hostPortInfo
 	return b
 }
 
-func (b *hostPortInfoBuilder) build() schedulertypes.HostPortInfo {
-	res := make(schedulertypes.HostPortInfo)
+func (b *hostPortInfoBuilder) build() framework.HostPortInfo {
+	res := make(framework.HostPortInfo)
 	for _, param := range b.inputs {
 		res.Add(param.ip, param.protocol, param.port)
 	}
 	return res
 }
 
-func newNodeInfo(requestedResource *schedulertypes.Resource,
-	nonzeroRequest *schedulertypes.Resource,
+func newNodeInfo(requestedResource *framework.Resource,
+	nonzeroRequest *framework.Resource,
 	pods []*v1.Pod,
-	usedPorts schedulertypes.HostPortInfo,
-	imageStates map[string]*schedulertypes.ImageStateSummary,
-) *schedulertypes.NodeInfo {
-	nodeInfo := schedulertypes.NewNodeInfo(pods...)
-	nodeInfo.SetRequestedResource(requestedResource)
-	nodeInfo.SetNonZeroRequest(nonzeroRequest)
-	nodeInfo.SetUsedPorts(usedPorts)
-	nodeInfo.SetImageStates(imageStates)
-
+	usedPorts framework.HostPortInfo,
+	imageStates map[string]*framework.ImageStateSummary,
+) *framework.NodeInfo {
+	nodeInfo := framework.NewNodeInfo(pods...)
+	nodeInfo.Requested = requestedResource
+	nodeInfo.NonZeroRequested = nonzeroRequest
+	nodeInfo.UsedPorts = usedPorts
+	nodeInfo.ImageStates = imageStates
 	return nodeInfo
 }
 
@@ -112,98 +111,98 @@ func TestAssumePodScheduled(t *testing.T) {
 	tests := []struct {
 		pods []*v1.Pod
 
-		wNodeInfo *schedulertypes.NodeInfo
+		wNodeInfo *framework.NodeInfo
 	}{{
 		pods: []*v1.Pod{testPods[0]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}, {
 		pods: []*v1.Pod{testPods[1], testPods[2]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
 			[]*v1.Pod{testPods[1], testPods[2]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}, { // test non-zero request
 		pods: []*v1.Pod{testPods[3]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 0,
 				Memory:   0,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: schedutil.DefaultMilliCPURequest,
 				Memory:   schedutil.DefaultMemoryRequest,
 			},
 			[]*v1.Pod{testPods[3]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}, {
 		pods: []*v1.Pod{testPods[4]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU:        100,
 				Memory:          500,
 				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{testPods[4]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}, {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU:        300,
 				Memory:          1524,
 				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
 			[]*v1.Pod{testPods[4], testPods[5]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}, {
 		pods: []*v1.Pod{testPods[6]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{testPods[6]},
 			newHostPortInfoBuilder().build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	},
 	}
@@ -263,13 +262,13 @@ func TestExpirePod(t *testing.T) {
 		pods        []*testExpirePodStruct
 		cleanupTime time.Time
 
-		wNodeInfo *schedulertypes.NodeInfo
+		wNodeInfo *framework.NodeInfo
 	}{{ // assumed pod would expires
 		pods: []*testExpirePodStruct{
 			{pod: testPods[0], finishBind: true, assumedTime: now},
 		},
 		cleanupTime: now.Add(2 * ttl),
-		wNodeInfo:   schedulertypes.NewNodeInfo(),
+		wNodeInfo:   framework.NewNodeInfo(),
 	}, { // first one would expire, second and third would not.
 		pods: []*testExpirePodStruct{
 			{pod: testPods[0], finishBind: true, assumedTime: now},
@@ -278,18 +277,18 @@ func TestExpirePod(t *testing.T) {
 		},
 		cleanupTime: now.Add(2 * ttl),
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 400,
 				Memory:   2048,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 400,
 				Memory:   2048,
 			},
 			// Order gets altered when removing pods.
 			[]*v1.Pod{testPods[2], testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}}
 
@@ -336,22 +335,22 @@ func TestAddPodWillConfirm(t *testing.T) {
 		podsToAssume []*v1.Pod
 		podsToAdd    []*v1.Pod
 
-		wNodeInfo *schedulertypes.NodeInfo
+		wNodeInfo *framework.NodeInfo
 	}{{ // two pod were assumed at same time. But first one is called Add() and gets confirmed.
 		podsToAssume: []*v1.Pod{testPods[0], testPods[1]},
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}}
 
@@ -438,25 +437,25 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 		podsToAdd    []*v1.Pod
 		podsToUpdate [][]*v1.Pod
 
-		wNodeInfo map[string]*schedulertypes.NodeInfo
+		wNodeInfo map[string]*framework.NodeInfo
 	}{{
 		podsToAssume: []*v1.Pod{assumedPod.DeepCopy()},
 		podsToAdd:    []*v1.Pod{addedPod.DeepCopy()},
 		podsToUpdate: [][]*v1.Pod{{addedPod.DeepCopy(), updatedPod.DeepCopy()}},
-		wNodeInfo: map[string]*schedulertypes.NodeInfo{
+		wNodeInfo: map[string]*framework.NodeInfo{
 			"assumed-node": nil,
 			"actual-node": newNodeInfo(
-				&schedulertypes.Resource{
+				&framework.Resource{
 					MilliCPU: 200,
 					Memory:   500,
 				},
-				&schedulertypes.Resource{
+				&framework.Resource{
 					MilliCPU: 200,
 					Memory:   500,
 				},
 				[]*v1.Pod{updatedPod.DeepCopy()},
 				newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
-				make(map[string]*schedulertypes.ImageStateSummary),
+				make(map[string]*framework.ImageStateSummary),
 			),
 		},
 	}}
@@ -499,21 +498,21 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	tests := []struct {
 		pod *v1.Pod
 
-		wNodeInfo *schedulertypes.NodeInfo
+		wNodeInfo *framework.NodeInfo
 	}{{
 		pod: basePod,
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{basePod},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}}
 
@@ -555,34 +554,34 @@ func TestUpdatePod(t *testing.T) {
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
 
-		wNodeInfo []*schedulertypes.NodeInfo
+		wNodeInfo []*framework.NodeInfo
 	}{{ // add a pod and then update it twice
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
-		wNodeInfo: []*schedulertypes.NodeInfo{newNodeInfo(
-			&schedulertypes.Resource{
+		wNodeInfo: []*framework.NodeInfo{newNodeInfo(
+			&framework.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
 			[]*v1.Pod{testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		), newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		)},
 	}}
 
@@ -686,35 +685,35 @@ func TestExpireAddUpdatePod(t *testing.T) {
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
 
-		wNodeInfo []*schedulertypes.NodeInfo
+		wNodeInfo []*framework.NodeInfo
 	}{{ // Pod is assumed, expired, and added. Then it would be updated twice.
 		podsToAssume: []*v1.Pod{testPods[0]},
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
-		wNodeInfo: []*schedulertypes.NodeInfo{newNodeInfo(
-			&schedulertypes.Resource{
+		wNodeInfo: []*framework.NodeInfo{newNodeInfo(
+			&framework.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
 			[]*v1.Pod{testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		), newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		)},
 	}}
 
@@ -780,21 +779,21 @@ func TestEphemeralStorageResource(t *testing.T) {
 	podE := makePodWithEphemeralStorage(nodeName, "500")
 	tests := []struct {
 		pod       *v1.Pod
-		wNodeInfo *schedulertypes.NodeInfo
+		wNodeInfo *framework.NodeInfo
 	}{
 		{
 			pod: podE,
 			wNodeInfo: newNodeInfo(
-				&schedulertypes.Resource{
+				&framework.Resource{
 					EphemeralStorage: 500,
 				},
-				&schedulertypes.Resource{
+				&framework.Resource{
 					MilliCPU: schedutil.DefaultMilliCPURequest,
 					Memory:   schedutil.DefaultMemoryRequest,
 				},
 				[]*v1.Pod{podE},
-				schedulertypes.HostPortInfo{},
-				make(map[string]*schedulertypes.ImageStateSummary),
+				framework.HostPortInfo{},
+				make(map[string]*framework.ImageStateSummary),
 			),
 		},
 	}
@@ -827,7 +826,7 @@ func TestRemovePod(t *testing.T) {
 	tests := []struct {
 		nodes     []*v1.Node
 		pod       *v1.Pod
-		wNodeInfo *schedulertypes.NodeInfo
+		wNodeInfo *framework.NodeInfo
 	}{{
 		nodes: []*v1.Node{
 			{
@@ -839,17 +838,17 @@ func TestRemovePod(t *testing.T) {
 		},
 		pod: basePod,
 		wNodeInfo: newNodeInfo(
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			&schedulertypes.Resource{
+			&framework.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
 			[]*v1.Pod{basePod},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*schedulertypes.ImageStateSummary),
+			make(map[string]*framework.ImageStateSummary),
 		),
 	}}
 
@@ -927,44 +926,15 @@ func TestForgetPod(t *testing.T) {
 	}
 }
 
-// getResourceRequest returns the resource request of all containers in Pods;
-// excluding initContainers.
-func getResourceRequest(pod *v1.Pod) v1.ResourceList {
-	result := &schedulertypes.Resource{}
-	for _, container := range pod.Spec.Containers {
-		result.Add(container.Resources.Requests)
-	}
-
-	return result.ResourceList()
-}
-
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
-func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *schedulertypes.NodeInfo {
-	expected := schedulertypes.NewNodeInfo()
-
-	// Simulate SetNode.
+func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *framework.NodeInfo {
+	expected := framework.NewNodeInfo()
 	expected.SetNode(node)
-
-	expected.SetAllocatableResource(schedulertypes.NewResource(node.Status.Allocatable))
-	expected.SetTaints(node.Spec.Taints)
-	expected.SetGeneration(expected.GetGeneration() + 1)
-
+	expected.Allocatable = framework.NewResource(node.Status.Allocatable)
+	expected.Generation++
 	for _, pod := range pods {
-		// Simulate AddPod
-		pods := append(expected.Pods(), pod)
-		expected.SetPods(pods)
-		requestedResource := expected.RequestedResource()
-		newRequestedResource := &requestedResource
-		newRequestedResource.Add(getResourceRequest(pod))
-		expected.SetRequestedResource(newRequestedResource)
-		nonZeroRequest := expected.NonZeroRequest()
-		newNonZeroRequest := &nonZeroRequest
-		newNonZeroRequest.Add(getResourceRequest(pod))
-		expected.SetNonZeroRequest(newNonZeroRequest)
-		expected.UpdateUsedPorts(pod, true)
-		expected.SetGeneration(expected.GetGeneration() + 1)
+		expected.AddPod(pod)
 	}
-
 	return expected
 }
 
@@ -1125,7 +1095,7 @@ func TestNodeOperators(t *testing.T) {
 			}
 
 			// Generations are globally unique. We check in our unit tests that they are incremented correctly.
-			expected.SetGeneration(got.info.GetGeneration())
+			expected.Generation = got.info.Generation
 			if !reflect.DeepEqual(got.info, expected) {
 				t.Errorf("Failed to add node into schedulercache:\n got: %+v \nexpected: %+v", got, expected)
 			}
@@ -1139,17 +1109,14 @@ func TestNodeOperators(t *testing.T) {
 			if !found || len(cachedNodes.nodeInfoMap) != 1 {
 				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
 			}
-			expected.SetGeneration(newNode.GetGeneration())
+			expected.Generation = newNode.Generation
 			if !reflect.DeepEqual(newNode, expected) {
 				t.Errorf("Failed to clone node:\n got: %+v, \n expected: %+v", newNode, expected)
 			}
 
 			// Step 3: update node attribute successfully.
 			node.Status.Allocatable[v1.ResourceMemory] = mem50m
-			allocatableResource := expected.AllocatableResource()
-			newAllocatableResource := &allocatableResource
-			newAllocatableResource.Memory = mem50m.Value()
-			expected.SetAllocatableResource(newAllocatableResource)
+			expected.Allocatable.Memory = mem50m.Value()
 
 			if err := cache.UpdateNode(nil, node); err != nil {
 				t.Error(err)
@@ -1158,10 +1125,10 @@ func TestNodeOperators(t *testing.T) {
 			if !found {
 				t.Errorf("Failed to find node %v in schedulertypes after UpdateNode.", node.Name)
 			}
-			if got.info.GetGeneration() <= expected.GetGeneration() {
-				t.Errorf("Generation is not incremented. got: %v, expected: %v", got.info.GetGeneration(), expected.GetGeneration())
+			if got.info.Generation <= expected.Generation {
+				t.Errorf("Generation is not incremented. got: %v, expected: %v", got.info.Generation, expected.Generation)
 			}
-			expected.SetGeneration(got.info.GetGeneration())
+			expected.Generation = got.info.Generation
 
 			if !reflect.DeepEqual(got.info, expected) {
 				t.Errorf("Failed to update node in schedulertypes:\n got: %+v \nexpected: %+v", got, expected)
@@ -1232,7 +1199,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 
 	// Create a few pods for tests.
 	pods := []*v1.Pod{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-pod%v", i),
@@ -1240,7 +1207,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				UID:       types.UID(fmt.Sprintf("test-puid%v", i)),
 			},
 			Spec: v1.PodSpec{
-				NodeName: fmt.Sprintf("test-node%v", i),
+				NodeName: fmt.Sprintf("test-node%v", i%10),
 			},
 		}
 		pods = append(pods, pod)
@@ -1309,6 +1276,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	addPodWithAffinity := func(i int) operation {
 		return func() {
 			if err := cache.AddPod(podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	removePod := func(i int) operation {
+		return func() {
+			if err := cache.RemovePod(pods[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1382,13 +1356,6 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected: []*v1.Node{nodes[6], nodes[5], nodes[2], nodes[0]},
 		},
 		{
-			name: "Remove non-existing node",
-			operations: []operation{
-				addNode(0), addNode(1), updateSnapshot(),
-			},
-			expected: []*v1.Node{nodes[1], nodes[0]},
-		},
-		{
 			name: "Update some nodes",
 			operations: []operation{
 				addNode(0), addNode(1), addNode(5), updateSnapshot(), updateNode(1),
@@ -1444,11 +1411,19 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected: []*v1.Node{nodes[0], nodes[4], nodes[2]},
 		},
 		{
-			name: "Remove pod from non-existing node",
+			name: "Add pod before its node",
 			operations: []operation{
-				addNode(0), addPod(0), addNode(2), updateSnapshot(),
+				addNode(0), addPod(1), updatePod(1), addNode(1),
 			},
-			expected: []*v1.Node{nodes[2], nodes[0]},
+			expected: []*v1.Node{nodes[1], nodes[0]},
+		},
+		{
+			name: "Remove node before its pods",
+			operations: []operation{
+				addNode(0), addNode(1), addPod(1), addPod(11),
+				removeNode(1), updatePod(1), updatePod(11), removePod(1), removePod(11),
+			},
+			expected: []*v1.Node{nodes[0]},
 		},
 		{
 			name: "Add Pods with affinity",
@@ -1533,13 +1508,13 @@ func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *Snapshot)
 		return fmt.Errorf("unexpected number of nodes in NodeInfoList. Expected: %v, got: %v", len(cache.nodes), len(snapshot.nodeInfoList))
 	}
 
-	expectedNodeInfoList := make([]*schedulertypes.NodeInfo, 0, cache.nodeTree.numNodes)
-	expectedHavePodsWithAffinityNodeInfoList := make([]*schedulertypes.NodeInfo, 0, cache.nodeTree.numNodes)
+	expectedNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	expectedHavePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	for i := 0; i < cache.nodeTree.numNodes; i++ {
 		nodeName := cache.nodeTree.next()
 		if n := snapshot.nodeInfoMap[nodeName]; n != nil {
 			expectedNodeInfoList = append(expectedNodeInfoList, n)
-			if len(n.PodsWithAffinity()) > 0 {
+			if len(n.PodsWithAffinity) > 0 {
 				expectedHavePodsWithAffinityNodeInfoList = append(expectedHavePodsWithAffinityNodeInfoList, n)
 			}
 		} else {

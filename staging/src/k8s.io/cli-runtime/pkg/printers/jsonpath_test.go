@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -56,6 +56,20 @@ func TestPrinters(t *testing.T) {
 				continue
 			}
 			t.Errorf("JSONPathPrinter error object '%v'; error: '%v'", oName, err)
+		}
+	}
+
+	// rerun tests with JSONOutput enabled
+	jsonpathPrinter.EnableJSONOutput(true)
+
+	for oName, obj := range objects {
+		b := &bytes.Buffer{}
+		if err := jsonpathPrinter.PrintObj(obj, b); err != nil {
+			if expectedErrors.Has(oName) {
+				// expected error
+				continue
+			}
+			t.Errorf("JSONPathPrinter jsonOutput error object '%v'; error: '%v'", oName, err)
 		}
 	}
 }

@@ -25,14 +25,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/component-base/metrics/testutil"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"github.com/prometheus/common/model"
 )
 
 // numberOfNVIDIAGPUs returns the number of GPUs advertised by a node
@@ -49,7 +50,7 @@ func numberOfNVIDIAGPUs(node *v1.Node) int64 {
 
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
 func NVIDIADevicePlugin() *v1.Pod {
-	ds, err := framework.DsFromManifest(e2egpu.GPUDevicePluginDSYAML)
+	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
 	framework.ExpectNoError(err)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -188,7 +189,7 @@ func logDevicePluginMetrics() {
 				latency := sample.Value
 				resource := string(sample.Metric["resource_name"])
 				var quantile float64
-				if val, ok := sample.Metric[model.QuantileLabel]; ok {
+				if val, ok := sample.Metric[testutil.QuantileLabel]; ok {
 					var err error
 					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
 						continue

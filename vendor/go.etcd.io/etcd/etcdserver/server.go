@@ -29,6 +29,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coreos/go-semver/semver"
+	"github.com/coreos/pkg/capnslog"
+	humanize "github.com/dustin/go-humanize"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.etcd.io/etcd/auth"
 	"go.etcd.io/etcd/etcdserver/api"
 	"go.etcd.io/etcd/etcdserver/api/membership"
@@ -57,11 +61,6 @@ import (
 	"go.etcd.io/etcd/raft/raftpb"
 	"go.etcd.io/etcd/version"
 	"go.etcd.io/etcd/wal"
-
-	"github.com/coreos/go-semver/semver"
-	"github.com/coreos/pkg/capnslog"
-	humanize "github.com/dustin/go-humanize"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -426,10 +425,19 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 				plog.Warningf("discovery token ignored since a cluster has already been initialized. Valid log found at %q", cfg.WALDir())
 			}
 		}
-		snapshot, err = ss.Load()
+
+		// Find a snapshot to start/restart a raft node
+		walSnaps, serr := wal.ValidSnapshotEntries(cfg.Logger, cfg.WALDir())
+		if serr != nil {
+			return nil, serr
+		}
+		// snapshot files can be orphaned if etcd crashes after writing them but before writing the corresponding
+		// wal log entries
+		snapshot, err = ss.LoadNewestAvailable(walSnaps)
 		if err != nil && err != snap.ErrNoSnapshot {
 			return nil, err
 		}
+
 		if snapshot != nil {
 			if err = st.Recovery(snapshot.Data); err != nil {
 				if cfg.Logger != nil {
@@ -540,7 +548,23 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 			CheckpointInterval:         cfg.LeaseCheckpointInterval,
 			ExpiredLeasesRetryInterval: srv.Cfg.ReqTimeout(),
 		})
-	srv.kv = mvcc.New(srv.getLogger(), srv.be, srv.lessor, &srv.consistIndex, mvcc.StoreConfig{CompactionBatchLimit: cfg.CompactionBatchLimit})
+
+	tp, err := auth.NewTokenProvider(cfg.Logger, cfg.AuthToken,
+		func(index uint64) <-chan struct{} {
+			return srv.applyWait.Wait(index)
+		},
+	)
+	if err != nil {
+		if cfg.Logger != nil {
+			cfg.Logger.Warn("failed to create token provider", zap.Error(err))
+		} else {
+			plog.Warningf("failed to create token provider,err is %v", err)
+		}
+		return nil, err
+	}
+	srv.authStore = auth.NewAuthStore(srv.getLogger(), srv.be, tp, int(cfg.BcryptCost))
+
+	srv.kv = mvcc.New(srv.getLogger(), srv.be, srv.lessor, srv.authStore, &srv.consistIndex, mvcc.StoreConfig{CompactionBatchLimit: cfg.CompactionBatchLimit})
 	if beExist {
 		kvindex := srv.kv.ConsistentIndex()
 		// TODO: remove kvindex != 0 checking when we do not expect users to upgrade
@@ -569,20 +593,6 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 	}()
 
 	srv.consistIndex.setConsistentIndex(srv.kv.ConsistentIndex())
-	tp, err := auth.NewTokenProvider(cfg.Logger, cfg.AuthToken,
-		func(index uint64) <-chan struct{} {
-			return srv.applyWait.Wait(index)
-		},
-	)
-	if err != nil {
-		if cfg.Logger != nil {
-			cfg.Logger.Warn("failed to create token provider", zap.Error(err))
-		} else {
-			plog.Errorf("failed to create token provider: %s", err)
-		}
-		return nil, err
-	}
-	srv.authStore = auth.NewAuthStore(srv.getLogger(), srv.be, tp, int(cfg.BcryptCost))
 	if num := cfg.AutoCompactionRetention; num != 0 {
 		srv.compactor, err = v3compactor.New(cfg.Logger, cfg.AutoCompactionMode, num, srv.kv, srv)
 		if err != nil {
@@ -2368,8 +2378,7 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 				plog.Panicf("unexpected create snapshot error %v", err)
 			}
 		}
-		// SaveSnap saves the snapshot and releases the locked wal files
-		// to the snapshot index.
+		// SaveSnap saves the snapshot to file and appends the corresponding WAL entry.
 		if err = s.r.storage.SaveSnap(snap); err != nil {
 			if lg != nil {
 				lg.Panic("failed to save snapshot", zap.Error(err))
@@ -2384,6 +2393,13 @@ func (s *EtcdServer) snapshot(snapi uint64, confState raftpb.ConfState) {
 			)
 		} else {
 			plog.Infof("saved snapshot at index %d", snap.Metadata.Index)
+		}
+		if err = s.r.storage.Release(snap); err != nil {
+			if lg != nil {
+				lg.Panic("failed to release wal", zap.Error(err))
+			} else {
+				plog.Panicf("failed to release wal %v", err)
+			}
 		}
 
 		// When sending a snapshot, etcd will pause compaction.

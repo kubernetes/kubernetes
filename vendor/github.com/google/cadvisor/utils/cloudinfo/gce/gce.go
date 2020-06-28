@@ -22,7 +22,7 @@ import (
 	"github.com/google/cadvisor/utils/cloudinfo"
 
 	"cloud.google.com/go/compute/metadata"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

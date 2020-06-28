@@ -467,3 +467,13 @@ type Utsname struct {
 	Version  [32]byte
 	Machine  [32]byte
 }
+
+const SizeofClockinfo = 0x14
+
+type Clockinfo struct {
+	Hz      int32
+	Tick    int32
+	Tickadj int32
+	Stathz  int32
+	Profhz  int32
+}

@@ -24,9 +24,10 @@ import (
 	"path/filepath"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
+	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +36,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/volume/csi"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -170,7 +172,7 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 	for _, p := range pods {
 		if kubelettypes.IsStaticPod(p) {
 			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
-				klog.V(2).Infof("status for pod %v updated to %v", p.Name, status)
+				klog.V(2).InfoS("Pod status updated", "pod", klog.KObj(p), "status", status.Phase)
 				p.Status = status
 			}
 		}
@@ -310,8 +312,22 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		if err != nil {
 			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
 		}
-		for _, volumeDir := range volumeDirs {
-			volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
+		unescapePluginName := utilstrings.UnescapeQualifiedName(volumePluginName)
+
+		if unescapePluginName != csi.CSIPluginName {
+			for _, volumeDir := range volumeDirs {
+				volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
+			}
+		} else {
+			// For CSI volumes, the mounted volume path has an extra sub path "/mount", so also add it
+			// to the list if the mounted path exists.
+			for _, volumeDir := range volumeDirs {
+				path := filepath.Join(volumePluginPath, volumeDir)
+				csimountpath := csi.GetCSIMounterPath(path)
+				if pathExists, _ := mount.PathExists(csimountpath); pathExists {
+					volumes = append(volumes, csimountpath)
+				}
+			}
 		}
 	}
 	return volumes, nil
@@ -323,10 +339,15 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 	if err != nil {
 		return mountedVolumes, err
 	}
+	// Only use IsLikelyNotMountPoint to check might not cover all cases. For CSI volumes that
+	// either: 1) don't mount or 2) bind mount in the rootfs, the mount check will not work as expected.
+	// We plan to remove this mountpoint check as a condition before deleting pods since it is
+	// not reliable and the condition might be different for different types of volumes. But it requires
+	// a reliable way to clean up unused volume dir to avoid problems during pod deletion. See discussion in issue #74650
 	for _, volumePath := range volumePaths {
 		isNotMount, err := kl.mounter.IsLikelyNotMountPoint(volumePath)
 		if err != nil {
-			return mountedVolumes, err
+			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %v", volumePath, err)
 		}
 		if !isNotMount {
 			mountedVolumes = append(mountedVolumes, volumePath)

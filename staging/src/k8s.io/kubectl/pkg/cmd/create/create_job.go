@@ -32,6 +32,7 @@ import (
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -62,12 +63,14 @@ type CreateJobOptions struct {
 	From    string
 	Command []string
 
-	Namespace      string
-	Client         batchv1client.BatchV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
-	Builder        *resource.Builder
-	Cmd            *cobra.Command
+	Namespace        string
+	EnforceNamespace bool
+	Client           batchv1client.BatchV1Interface
+	DryRunStrategy   cmdutil.DryRunStrategy
+	DryRunVerifier   *resource.DryRunVerifier
+	Builder          *resource.Builder
+	FieldManager     string
+	CreateAnnotation bool
 
 	genericclioptions.IOStreams
 }
@@ -84,10 +87,11 @@ func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOption
 func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateJobOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:     "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
-		Short:   jobLong,
-		Long:    jobLong,
-		Example: jobExample,
+		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
+		DisableFlagsInUseLine: true,
+		Short:                 jobLong,
+		Long:                  jobLong,
+		Example:               jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -102,7 +106,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
 	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
-
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
@@ -126,12 +130,13 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 	o.Builder = f.NewBuilder()
-	o.Cmd = cmd
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
@@ -201,8 +206,16 @@ func (o *CreateJobOptions) Run() error {
 
 		job = o.createJobFromCronJob(cronJob)
 	}
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, job, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(job.GroupVersionKind()); err != nil {
 				return err
@@ -220,7 +233,7 @@ func (o *CreateJobOptions) Run() error {
 }
 
 func (o *CreateJobOptions) createJob() *batchv1.Job {
-	return &batchv1.Job{
+	job := &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -241,6 +254,10 @@ func (o *CreateJobOptions) createJob() *batchv1.Job {
 			},
 		},
 	}
+	if o.EnforceNamespace {
+		job.Namespace = o.Namespace
+	}
+	return job
 }
 
 func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *batchv1.Job {
@@ -250,7 +267,7 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 		annotations[k] = v
 	}
 
-	return &batchv1.Job{
+	job := &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -258,9 +275,18 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 			Annotations: annotations,
 			Labels:      cronJob.Spec.JobTemplate.Labels,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(cronJob, cronJob.GroupVersionKind()),
+				{
+					APIVersion: batchv1beta1.SchemeGroupVersion.String(),
+					Kind:       cronJob.Kind,
+					Name:       cronJob.GetName(),
+					UID:        cronJob.GetUID(),
+				},
 			},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
+	if o.EnforceNamespace {
+		job.Namespace = o.Namespace
+	}
+	return job
 }

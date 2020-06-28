@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -73,7 +73,6 @@ type csiMountMgr struct {
 	spec                *volume.Spec
 	pod                 *api.Pod
 	podUID              types.UID
-	options             volume.VolumeOptions
 	publishContext      map[string]string
 	kubeVolHost         volume.KubeletVolumeHost
 	volume.MetricsProvider
@@ -83,7 +82,7 @@ type csiMountMgr struct {
 var _ volume.Volume = &csiMountMgr{}
 
 func (c *csiMountMgr) GetPath() string {
-	dir := filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
+	dir := GetCSIMounterPath(filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host)))
 	klog.V(4).Info(log("mounter.GetPath generated [%s]", dir))
 	return dir
 }

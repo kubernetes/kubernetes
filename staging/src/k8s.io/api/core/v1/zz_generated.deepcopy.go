@@ -3859,6 +3859,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SetHostnameAsFQDN != nil {
+		in, out := &in.SetHostnameAsFQDN, &out.SetHostnameAsFQDN
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

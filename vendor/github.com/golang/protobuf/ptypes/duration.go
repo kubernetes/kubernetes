@@ -1,102 +1,72 @@
-// Go support for Protocol Buffers - Google's data interchange format
-//
-// Copyright 2016 The Go Authors.  All rights reserved.
-// https://github.com/golang/protobuf
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 package ptypes
-
-// This file implements conversions between google.protobuf.Duration
-// and time.Duration.
 
 import (
 	"errors"
 	"fmt"
 	"time"
 
-	durpb "github.com/golang/protobuf/ptypes/duration"
+	durationpb "github.com/golang/protobuf/ptypes/duration"
 )
 
+// Range of google.protobuf.Duration as specified in duration.proto.
+// This is about 10,000 years in seconds.
 const (
-	// Range of a durpb.Duration in seconds, as specified in
-	// google/protobuf/duration.proto. This is about 10,000 years in seconds.
 	maxSeconds = int64(10000 * 365.25 * 24 * 60 * 60)
 	minSeconds = -maxSeconds
 )
 
-// validateDuration determines whether the durpb.Duration is valid according to the
-// definition in google/protobuf/duration.proto. A valid durpb.Duration
-// may still be too large to fit into a time.Duration (the range of durpb.Duration
-// is about 10,000 years, and the range of time.Duration is about 290).
-func validateDuration(d *durpb.Duration) error {
-	if d == nil {
-		return errors.New("duration: nil Duration")
-	}
-	if d.Seconds < minSeconds || d.Seconds > maxSeconds {
-		return fmt.Errorf("duration: %v: seconds out of range", d)
-	}
-	if d.Nanos <= -1e9 || d.Nanos >= 1e9 {
-		return fmt.Errorf("duration: %v: nanos out of range", d)
-	}
-	// Seconds and Nanos must have the same sign, unless d.Nanos is zero.
-	if (d.Seconds < 0 && d.Nanos > 0) || (d.Seconds > 0 && d.Nanos < 0) {
-		return fmt.Errorf("duration: %v: seconds and nanos have different signs", d)
-	}
-	return nil
-}
-
-// Duration converts a durpb.Duration to a time.Duration. Duration
-// returns an error if the durpb.Duration is invalid or is too large to be
-// represented in a time.Duration.
-func Duration(p *durpb.Duration) (time.Duration, error) {
-	if err := validateDuration(p); err != nil {
+// Duration converts a durationpb.Duration to a time.Duration.
+// Duration returns an error if dur is invalid or overflows a time.Duration.
+func Duration(dur *durationpb.Duration) (time.Duration, error) {
+	if err := validateDuration(dur); err != nil {
 		return 0, err
 	}
-	d := time.Duration(p.Seconds) * time.Second
-	if int64(d/time.Second) != p.Seconds {
-		return 0, fmt.Errorf("duration: %v is out of range for time.Duration", p)
+	d := time.Duration(dur.Seconds) * time.Second
+	if int64(d/time.Second) != dur.Seconds {
+		return 0, fmt.Errorf("duration: %v is out of range for time.Duration", dur)
 	}
-	if p.Nanos != 0 {
-		d += time.Duration(p.Nanos) * time.Nanosecond
-		if (d < 0) != (p.Nanos < 0) {
-			return 0, fmt.Errorf("duration: %v is out of range for time.Duration", p)
+	if dur.Nanos != 0 {
+		d += time.Duration(dur.Nanos) * time.Nanosecond
+		if (d < 0) != (dur.Nanos < 0) {
+			return 0, fmt.Errorf("duration: %v is out of range for time.Duration", dur)
 		}
 	}
 	return d, nil
 }
 
-// DurationProto converts a time.Duration to a durpb.Duration.
-func DurationProto(d time.Duration) *durpb.Duration {
+// DurationProto converts a time.Duration to a durationpb.Duration.
+func DurationProto(d time.Duration) *durationpb.Duration {
 	nanos := d.Nanoseconds()
 	secs := nanos / 1e9
 	nanos -= secs * 1e9
-	return &durpb.Duration{
-		Seconds: secs,
+	return &durationpb.Duration{
+		Seconds: int64(secs),
 		Nanos:   int32(nanos),
 	}
+}
+
+// validateDuration determines whether the durationpb.Duration is valid
+// according to the definition in google/protobuf/duration.proto.
+// A valid durpb.Duration may still be too large to fit into a time.Duration
+// Note that the range of durationpb.Duration is about 10,000 years,
+// while the range of time.Duration is about 290 years.
+func validateDuration(dur *durationpb.Duration) error {
+	if dur == nil {
+		return errors.New("duration: nil Duration")
+	}
+	if dur.Seconds < minSeconds || dur.Seconds > maxSeconds {
+		return fmt.Errorf("duration: %v: seconds out of range", dur)
+	}
+	if dur.Nanos <= -1e9 || dur.Nanos >= 1e9 {
+		return fmt.Errorf("duration: %v: nanos out of range", dur)
+	}
+	// Seconds and Nanos must have the same sign, unless d.Nanos is zero.
+	if (dur.Seconds < 0 && dur.Nanos > 0) || (dur.Seconds > 0 && dur.Nanos < 0) {
+		return fmt.Errorf("duration: %v: seconds and nanos have different signs", dur)
+	}
+	return nil
 }

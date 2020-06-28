@@ -26,9 +26,84 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/mocks"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestNewBackoff(t *testing.T) {
+	expected := &Backoff{Duration: time.Second, Factor: 2, Steps: 0, Cap: 3 * time.Second, Jitter: 0.5}
+	result := NewBackoff(time.Second, 2, 0.5, 0, 3*time.Second)
+	assert.Equal(t, expected, result)
+}
+
+func TestWithNonRetriableErrors(t *testing.T) {
+	bo := &Backoff{Duration: time.Second, Factor: 2, Steps: 0, Cap: 3 * time.Second, Jitter: 0.5}
+	errs := []string{"error1", "error2"}
+	expected := bo
+	expected.NonRetriableErrors = errs
+	result := bo.WithNonRetriableErrors(errs)
+	assert.Equal(t, expected, result)
+}
+
+func TestWithRetriableHTTPStatusCodes(t *testing.T) {
+	bo := &Backoff{Duration: time.Second, Factor: 2, Steps: 0, Cap: 3 * time.Second, Jitter: 0.5}
+	httpStatusCodes := []int{http.StatusOK, http.StatusTooManyRequests}
+	expected := bo
+	expected.RetriableHTTPStatusCodes = httpStatusCodes
+	result := bo.WithRetriableHTTPStatusCodes(httpStatusCodes)
+	assert.Equal(t, expected, result)
+}
+
+func TestIsNonRetriableError(t *testing.T) {
+	// false case
+	bo := &Backoff{Factor: 1.0, Steps: 3}
+	ret := bo.isNonRetriableError(nil)
+	assert.Equal(t, false, ret)
+
+	// true case
+	errs := []string{"error1", "error2"}
+	bo2 := bo
+	bo2.NonRetriableErrors = errs
+	rerr := &Error{
+		Retriable:      false,
+		HTTPStatusCode: 429,
+		RawError:       fmt.Errorf("error1"),
+	}
+
+	ret = bo2.isNonRetriableError(rerr)
+	assert.Equal(t, true, ret)
+}
+
+func TestJitterWithNegativeMaxFactor(t *testing.T) {
+	// jitter := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
+	// If maxFactor is 0.0 or less than 0.0, a suggested default value will be chosen.
+	// rand.Float64() returns, as a float64, a pseudo-random number in [0.0,1.0).
+	duration := time.Duration(time.Second)
+	maxFactor := float64(-3.0)
+	res := jitter(duration, maxFactor)
+	defaultMaxFactor := float64(1.0)
+	expected := jitter(duration, defaultMaxFactor)
+	assert.Equal(t, expected-res >= time.Duration(0.0*float64(duration)), true)
+	assert.Equal(t, expected-res < time.Duration(1.0*float64(duration)), true)
+}
+
+func TestDoExponentialBackoffRetry(t *testing.T) {
+	client := mocks.NewSender()
+	bo := &Backoff{Duration: time.Second, Factor: 2, Steps: 0, Cap: 3 * time.Second, Jitter: 0.5}
+	sender := autorest.DecorateSender(
+		client,
+		DoExponentialBackoffRetry(bo),
+	)
+
+	req := &http.Request{
+		Method: "GET",
+	}
+
+	result, err := sender.Do(req)
+	assert.Nil(t, result)
+	assert.Nil(t, err)
+}
 
 func TestStep(t *testing.T) {
 	tests := []struct {
@@ -96,6 +171,34 @@ func TestDoBackoffRetry(t *testing.T) {
 	assert.Equal(t, 500, resp.StatusCode)
 	assert.Equal(t, expectedErr.Error(), err)
 	assert.Equal(t, 3, client.Attempts())
+
+	// retries with 0 steps
+	respSteps0, errSteps0 := doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 0})
+	assert.Nil(t, respSteps0)
+	assert.Nil(t, errSteps0)
+
+	// backoff with NonRetriableErrors and RetriableHTTPStatusCodes
+	r = mocks.NewResponseWithStatus("404 StatusNotFound", http.StatusNotFound)
+	client = mocks.NewSender()
+	client.AppendAndRepeatResponseWithDelay(r, time.Second, 1)
+	client.AppendError(fmt.Errorf("HTTP status code (404)"))
+	bo := &Backoff{Factor: 1.0, Steps: 3}
+	bo.NonRetriableErrors = []string{"404 StatusNotFound"}
+	bo.RetriableHTTPStatusCodes = []int{http.StatusNotFound}
+	expectedResp := &http.Response{
+		Status:     "200 OK",
+		StatusCode: 200,
+		Proto:      "HTTP/1.0",
+		ProtoMajor: 1,
+		ProtoMinor: 0,
+		Body:       mocks.NewBody(""),
+		Request:    fakeRequest,
+	}
+
+	resp, err = doBackoffRetry(client, fakeRequest, bo)
+	assert.Nil(t, err)
+	assert.Equal(t, 3, client.Attempts())
+	assert.Equal(t, expectedResp, resp)
 
 	// returns immediately on succeed
 	r = mocks.NewResponseWithStatus("200 OK", http.StatusOK)

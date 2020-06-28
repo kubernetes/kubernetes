@@ -188,9 +188,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
 		ginkgo.By("Waiting for Pod to be deleted")
@@ -220,9 +220,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
 		ginkgo.By("Waiting for Pod to be deleted")
@@ -253,9 +253,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
 		ginkgo.By("Waiting to see if a Pod won't be deleted")
@@ -300,12 +300,12 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		// 2. Taint the node running this pod with a no-execute taint
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		taintRemoved := false
 		defer func() {
 			if !taintRemoved {
-				framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+				e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 			}
 		}()
 
@@ -322,7 +322,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 
 		// 4. Remove the taint
 		framework.Logf("Removing taint from Node")
-		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 		taintRemoved = true
 
 		// 5. See if Pod won't be evicted.
@@ -374,13 +374,13 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 
 		ginkgo.By("Trying to apply a taint on the Nodes")
 		testTaint := getTestTaint()
-		framework.AddOrUpdateTaintOnNode(cs, nodeName1, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName1, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName1, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName1, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName1, testTaint)
 		if nodeName2 != nodeName1 {
-			framework.AddOrUpdateTaintOnNode(cs, nodeName2, testTaint)
+			e2enode.AddOrUpdateTaintOnNode(cs, nodeName2, testTaint)
 			framework.ExpectNodeHasTaint(cs, nodeName2, &testTaint)
-			defer framework.RemoveTaintOffNode(cs, nodeName2, testTaint)
+			defer e2enode.RemoveTaintOffNode(cs, nodeName2, testTaint)
 		}
 
 		// Wait a bit
@@ -447,9 +447,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		// 2. Taint the nodes running those pods with a no-execute taint
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// 3. Wait to see if both pods get evicted in between [5, 25] seconds
 		ginkgo.By("Waiting for Pod1 and Pod2 to be deleted")

@@ -35,6 +35,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	"k8s.io/klog/v2"
 )
 
 type EtcdOptions struct {
@@ -238,12 +239,15 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		if err != nil {
 			return generic.RESTOptions{}, err
 		}
-		cacheSize, ok := sizes[resource]
-		if !ok {
-			cacheSize = f.Options.DefaultWatchCacheSize
+		size, ok := sizes[resource]
+		if ok && size > 0 {
+			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
 		}
-		// depending on cache size this might return an undecorated storage
-		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
+		if ok && size <= 0 {
+			ret.Decorator = generic.UndecoratedStorage
+		} else {
+			ret.Decorator = genericregistry.StorageWithCacher()
+		}
 	}
 	return ret, nil
 }
@@ -272,12 +276,15 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		if err != nil {
 			return generic.RESTOptions{}, err
 		}
-		cacheSize, ok := sizes[resource]
-		if !ok {
-			cacheSize = f.Options.DefaultWatchCacheSize
+		size, ok := sizes[resource]
+		if ok && size > 0 {
+			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
 		}
-		// depending on cache size this might return an undecorated storage
-		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
+		if ok && size <= 0 {
+			ret.Decorator = generic.UndecoratedStorage
+		} else {
+			ret.Decorator = genericregistry.StorageWithCacher()
+		}
 	}
 
 	return ret, nil

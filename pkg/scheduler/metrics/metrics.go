@@ -54,16 +54,7 @@ var (
 			Name:           "schedule_attempts_total",
 			Help:           "Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result"})
-	// PodScheduleSuccesses counts how many pods were scheduled.
-	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
-	PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
-	// PodScheduleFailures counts how many pods could not be scheduled.
-	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
-	PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
-	// PodScheduleErrors counts how many pods could not be scheduled due to a scheduler error.
-	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
-	PodScheduleErrors            = scheduleAttempts.With(metrics.Labels{"result": "error"})
+		}, []string{"result", "profile"})
 	DeprecatedSchedulingDuration = metrics.NewSummaryVec(
 		&metrics.SummaryOpts{
 			Subsystem: SchedulerSubsystem,
@@ -77,15 +68,14 @@ var (
 		},
 		[]string{OperationLabel},
 	)
-	E2eSchedulingLatency = metrics.NewHistogram(
+	e2eSchedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "e2e_scheduling_duration_seconds",
 			Help:           "E2e scheduling latency in seconds (scheduling algorithm + binding)",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		},
-	)
+		}, []string{"result", "profile"})
 	SchedulingAlgorithmLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -145,7 +135,7 @@ var (
 	PreemptionAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "total_preemption_attempts",
+			Name:           "preemption_attempts_total",
 			Help:           "Total preemption attempts in the cluster till now",
 			StabilityLevel: metrics.ALPHA,
 		})
@@ -192,7 +182,7 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"extension_point", "status"})
+		[]string{"extension_point", "status", "profile"})
 
 	PluginExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -235,7 +225,7 @@ var (
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		DeprecatedSchedulingDuration,
-		E2eSchedulingLatency,
+		e2eSchedulingLatency,
 		SchedulingAlgorithmLatency,
 		BindingLatency,
 		DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration,
@@ -261,14 +251,17 @@ var registerMetrics sync.Once
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		for _, metric := range metricsList {
-			legacyregistry.MustRegister(metric)
-		}
+		RegisterMetrics(metricsList...)
 		volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
-		PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
-		PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
-		PodScheduleErrors = scheduleAttempts.With(metrics.Labels{"result": "error"})
 	})
+}
+
+// RegisterMetrics registers a list of metrics.
+// This function is exported because it is intended to be used by out-of-tree plugins to register their custom metrics.
+func RegisterMetrics(extraMetrics ...metrics.Registerable) {
+	for _, metric := range extraMetrics {
+		legacyregistry.MustRegister(metric)
+	}
 }
 
 // GetGather returns the gatherer. It used by test case outside current package.

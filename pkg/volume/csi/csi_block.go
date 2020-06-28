@@ -77,7 +77,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -94,7 +94,6 @@ type csiBlockMapper struct {
 	readOnly   bool
 	spec       *volume.Spec
 	podUID     types.UID
-	volumeInfo map[string]string
 }
 
 var _ volume.BlockVolumeMapper = &csiBlockMapper{}

@@ -32,7 +32,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
@@ -46,7 +46,7 @@ var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 type RESTStorageProvider struct{}
 
 // PostStartHookName is the name of the post-start-hook provided by flow-control storage
-const PostStartHookName = "apiserver/bootstrap-system-flowcontrol-configuration"
+const PostStartHookName = "priority-and-fairness-config-producer"
 
 // NewRESTStorage creates a new rest storage for flow-control api models.
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {

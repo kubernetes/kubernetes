@@ -81,6 +81,9 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		VolumePath: targetPath,
 	}
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	usages := resp.GetUsage()
 	metrics := &volume.Metrics{}
 	if usages == nil {

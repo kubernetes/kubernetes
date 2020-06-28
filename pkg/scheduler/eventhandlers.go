@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
@@ -206,10 +206,6 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
-	if sched.VolumeBinder != nil {
-		// Volume binder only wants to keep unassigned pods
-		sched.VolumeBinder.DeletePodBindings(pod)
-	}
 	prof, err := sched.profileForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
@@ -244,6 +240,15 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	newPod, ok := newObj.(*v1.Pod)
 	if !ok {
 		klog.Errorf("cannot convert newObj to *v1.Pod: %v", newObj)
+		return
+	}
+
+	// A Pod delete event followed by an immediate Pod add event may be merged
+	// into a Pod update event. In this case, we should invalidate the old Pod, and
+	// then add the new Pod.
+	if oldPod.UID != newPod.UID {
+		sched.deletePodFromCache(oldObj)
+		sched.addPodToCache(newObj)
 		return
 	}
 
@@ -301,8 +306,8 @@ func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
 // skipPodUpdate checks whether the specified pod update should be ignored.
 // This function will return true if
 //   - The pod has already been assumed, AND
-//   - The pod has only its ResourceVersion, Spec.NodeName and/or Annotations
-//     updated.
+//   - The pod has only its ResourceVersion, Spec.NodeName, Annotations,
+//     ManagedFields, Finalizers and/or Conditions updated.
 func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	// Non-assumed pods should never be skipped.
 	isAssumed, err := sched.SchedulerCache.IsAssumedPod(pod)
@@ -335,6 +340,13 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 		// Annotations must be excluded for the reasons described in
 		// https://github.com/kubernetes/kubernetes/issues/52914.
 		p.Annotations = nil
+		// Same as above, when annotations are modified with ServerSideApply,
+		// ManagedFields may also change and must be excluded
+		p.ManagedFields = nil
+		// The following might be changed by external controllers, but they don't
+		// affect scheduling decisions.
+		p.Finalizers = nil
+		p.Status.Conditions = nil
 		return p
 	}
 	assumedPodCopy, podCopy := f(assumedPod), f(pod)

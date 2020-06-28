@@ -109,9 +109,16 @@ func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *ApprovalREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
+}
+
 // Update alters the approval subset of an object.
 func (r *ApprovalREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
+
+var _ = rest.Patcher(&ApprovalREST{})

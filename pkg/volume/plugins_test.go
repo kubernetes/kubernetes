@@ -116,13 +116,13 @@ func TestVolumePluginMgrFunc(t *testing.T) {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 
-	plug, err = vpm.FindPluginBySpec(nil)
+	_, err = vpm.FindPluginBySpec(nil)
 	if err == nil {
 		t.Errorf("Should return error if volume spec is nil")
 	}
 
 	volumeSpec := &Spec{}
-	plug, err = vpm.FindPluginBySpec(volumeSpec)
+	_, err = vpm.FindPluginBySpec(volumeSpec)
 	if err != nil {
 		t.Errorf("Should return test plugin if volume spec is not nil")
 	}

@@ -9,8 +9,11 @@
 
 package hcsschema
 
-type Properties struct {
+import (
+	v1 "github.com/containerd/cgroups/stats/v1"
+)
 
+type Properties struct {
 	Id string `json:"Id,omitempty"`
 
 	SystemType string `json:"SystemType,omitempty"`
@@ -44,4 +47,8 @@ type Properties struct {
 	SharedMemoryRegionInfo []SharedMemoryRegionInfo `json:"SharedMemoryRegionInfo,omitempty"`
 
 	GuestConnectionInfo *GuestConnectionInfo `json:"GuestConnectionInfo,omitempty"`
+
+	// Metrics is not part of the API for HCS but this is used for LCOW v2 to
+	// return the full cgroup metrics from the guest.
+	Metrics *v1.Metrics `json:"LCOWMetrics,omitempty"`
 }

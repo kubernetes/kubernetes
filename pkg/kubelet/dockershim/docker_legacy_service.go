@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -30,27 +32,19 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
-// DockerLegacyService interface embeds some legacy methods for backward compatibility.
-// This file/interface will be removed in the near future. Do not modify or add
-// more functions.
-type DockerLegacyService interface {
-	// GetContainerLogs gets logs for a specific container.
-	GetContainerLogs(context.Context, *v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
-
-	// IsCRISupportedLogDriver checks whether the logging driver used by docker is
-	// supported by native CRI integration.
-	// TODO(resouer): remove this when deprecating unsupported log driver
-	IsCRISupportedLogDriver() (bool, error)
-
-	kuberuntime.LegacyLogProvider
-}
+// We define `DockerLegacyService` in `pkg/kubelet/legacy`, instead of in this
+// file. We make this decision because `pkg/kubelet` depends on
+// `DockerLegacyService`, and we want to be able to build the `kubelet` without
+// relying on `github.com/docker/docker` or `pkg/kubelet/dockershim`.
+//
+// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20200205-build-kubelet-without-docker.md
+// for details.
 
 // GetContainerLogs get container logs directly from docker daemon.
 func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {

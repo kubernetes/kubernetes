@@ -60,6 +60,38 @@ func init() {
 
 type opCounts map[string]int64
 
+// migrationOpCheck validates migrated metrics.
+type migrationOpCheck struct {
+	cs         clientset.Interface
+	pluginName string
+	skipCheck  bool
+
+	// The old ops are not set if skipCheck is true.
+	oldInTreeOps   opCounts
+	oldMigratedOps opCounts
+}
+
+// BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
+var BaseSuites = []func() TestSuite{
+	InitVolumesTestSuite,
+	InitVolumeIOTestSuite,
+	InitVolumeModeTestSuite,
+	InitSubPathTestSuite,
+	InitProvisioningTestSuite,
+	InitMultiVolumeTestSuite,
+	InitVolumeExpandTestSuite,
+	InitDisruptiveTestSuite,
+	InitVolumeLimitsTestSuite,
+	InitTopologyTestSuite,
+	InitStressTestSuite,
+}
+
+// CSISuites is a list of storage test suites that work only for CSI drivers
+var CSISuites = append(BaseSuites,
+	InitEphemeralTestSuite,
+	InitSnapshottableTestSuite,
+)
+
 // TestSuite represents an interface for a set of tests which works with TestDriver
 type TestSuite interface {
 	// GetTestSuiteInfo returns the TestSuiteInfo for this TestSuite
@@ -287,15 +319,37 @@ func (r *VolumeResource) CleanupResource() error {
 					r.Pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.Pvc != nil {
+				cs := f.ClientSet
+				pv := r.Pv
+				if pv == nil && r.Pvc.Name != "" {
+					// This happens for late binding. Check whether we have a volume now that we need to wait for.
+					pvc, err := cs.CoreV1().PersistentVolumeClaims(r.Pvc.Namespace).Get(context.TODO(), r.Pvc.Name, metav1.GetOptions{})
+					switch {
+					case err == nil:
+						if pvc.Spec.VolumeName != "" {
+							pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+							if err != nil {
+								cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+							}
+						}
+					case apierrors.IsNotFound(err):
+						// Without the PVC, we cannot locate the corresponding PV. Let's
+						// hope that it is gone.
+					default:
+						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PVC %v", r.Pvc.Name))
+					}
+				}
+
 				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.Pvc.Name, f.Namespace.Name)
 				if err != nil {
 					cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete PVC %v", r.Pvc.Name))
 				}
-				if r.Pv != nil {
-					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, r.Pv.Name, 5*time.Second, 5*time.Minute)
+
+				if pv != nil {
+					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, 5*time.Minute)
 					if err != nil {
 						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err,
-							"Persistent Volume %v not deleted by dynamic provisioner", r.Pv.Name))
+							"Persistent Volume %v not deleted by dynamic provisioner", pv.Name))
 					}
 				}
 			}
@@ -511,10 +565,11 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 //
 // The output goes to log files (when using --report-dir, as in the
 // CI) or the output stream (otherwise).
-func StartPodLogs(f *framework.Framework) func() {
+func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cs := f.ClientSet
-	ns := f.Namespace
+
+	ns := driverNamespace.Name
 
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,
@@ -532,13 +587,13 @@ func StartPodLogs(f *framework.Framework) func() {
 		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
 			reg.ReplaceAllString(test.FullTestText, "_") + "/"
 	}
-	podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
+	podlogs.CopyAllLogs(ctx, cs, ns, to)
 
 	// pod events are something that the framework already collects itself
 	// after a failed test. Logging them live is only useful for interactive
 	// debugging, not when we collect reports.
 	if framework.TestContext.ReportDir == "" {
-		podlogs.WatchPods(ctx, cs, ns.Name, ginkgo.GinkgoWriter)
+		podlogs.WatchPods(ctx, cs, ns, ginkgo.GinkgoWriter)
 	}
 
 	return cancel
@@ -581,7 +636,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}
 
-	if !metricsGrabber.HasRegisteredMaster() {
+	if !metricsGrabber.HasControlPlanePods() {
 		framework.Logf("Warning: Environment does not support getting controller-manager metrics")
 		return opCounts{}
 	}
@@ -643,24 +698,18 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 	return opCounts{}, opCounts{}
 }
 
-func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, oldInTreeOps, oldMigratedOps opCounts) {
+func newMigrationOpCheck(cs clientset.Interface, pluginName string) *migrationOpCheck {
+	moc := migrationOpCheck{
+		cs:         cs,
+		pluginName: pluginName,
+	}
 	if len(pluginName) == 0 {
 		// This is a native CSI Driver and we don't check ops
-		return
+		moc.skipCheck = true
+		return &moc
 	}
 
-	if sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
-		// If this plugin is migrated based on the test flag storage.migratedPlugins
-		newInTreeOps, _ := getMigrationVolumeOpCounts(cs, pluginName)
-
-		for op, count := range newInTreeOps {
-			if count != oldInTreeOps[op] {
-				framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
-			}
-		}
-		// We don't check for migrated metrics because some negative test cases
-		// may not do any volume operations and therefore not emit any metrics
-	} else {
+	if !sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
 		// In-tree plugin is not migrated
 		framework.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
 
@@ -677,7 +726,27 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 		// and native CSI Driver metrics. This way we can check the counts for
 		// migrated version of the driver for stronger negative test case
 		// guarantees (as well as more informative metrics).
+		moc.skipCheck = true
+		return &moc
 	}
+	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, pluginName)
+	return &moc
+}
+
+func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
+	if moc.skipCheck {
+		return
+	}
+
+	newInTreeOps, _ := getMigrationVolumeOpCounts(moc.cs, moc.pluginName)
+
+	for op, count := range newInTreeOps {
+		if count != moc.oldInTreeOps[op] {
+			framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", moc.pluginName, count-moc.oldInTreeOps[op], op)
+		}
+	}
+	// We don't check for migrated metrics because some negative test cases
+	// may not do any volume operations and therefore not emit any metrics
 }
 
 // Skip skipVolTypes patterns if the driver supports dynamic provisioning

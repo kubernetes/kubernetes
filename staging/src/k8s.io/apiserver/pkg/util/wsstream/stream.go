@@ -63,7 +63,7 @@ type Reader struct {
 	protocols        map[string]ReaderProtocolConfig
 	selectedProtocol string
 
-	handleCrash func() // overridable for testing
+	handleCrash func(additionalHandlers ...func(interface{})) // overridable for testing
 }
 
 // NewReader creates a WebSocket pipe that will copy the contents of r to a provided
@@ -78,7 +78,7 @@ func NewReader(r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig
 		err:         make(chan error),
 		ping:        ping,
 		protocols:   protocols,
-		handleCrash: func() { runtime.HandleCrash() },
+		handleCrash: runtime.HandleCrash,
 	}
 }
 

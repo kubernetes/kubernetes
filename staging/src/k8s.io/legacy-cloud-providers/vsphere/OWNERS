@@ -4,7 +4,6 @@ approvers:
 - abrarshivani
 - baludontu
 - divyenpatel
-- imkin
 - frapposelli
 - dougm
 - SandeepPissay
@@ -12,7 +11,8 @@ reviewers:
 - abrarshivani
 - baludontu
 - divyenpatel
-- imkin
 - frapposelli
 - dougm
 - SandeepPissay
+emeritus_approvers:
+- imkin

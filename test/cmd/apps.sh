@@ -42,6 +42,9 @@ run_daemonset_tests() {
   kube::test::get_object_assert 'daemonsets bind' "{{${generation_field:?}}}" '3'
   kubectl set resources daemonsets/bind "${kube_flags[@]:?}" --limits=cpu=200m,memory=512Mi
   kube::test::get_object_assert 'daemonsets bind' "{{${generation_field:?}}}" '4'
+  # pod has field for kubectl set field manager
+  output_message=$(kubectl get daemonsets bind -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-set'
 
   # Rollout restart should change generation
   kubectl rollout restart daemonset/bind "${kube_flags[@]:?}"
@@ -194,7 +197,7 @@ run_deployment_tests() {
   kubectl delete deployment test-nginx-extensions "${kube_flags[@]:?}"
 
   # Test kubectl create deployment
-  kubectl create deployment test-nginx-apps --image=k8s.gcr.io/nginx:test-cmd --generator=deployment-basic/apps.v1
+  kubectl create deployment test-nginx-apps --image=k8s.gcr.io/nginx:test-cmd
   # Post-Condition: Deployment "nginx" is created.
   kube::test::get_object_assert 'deploy test-nginx-apps' "{{${container_name_field:?}}}" 'nginx'
   # and new generator was used, iow. new defaults are applied
@@ -335,6 +338,10 @@ run_deployment_tests() {
   newrs="$(kubectl describe deployment nginx | grep NewReplicaSet | awk '{print $2}')"
   rs="$(kubectl get rs "${newrs}" -o yaml)"
   kube::test::if_has_string "${rs}" "deployment.kubernetes.io/revision: \"6\""
+  # Deployment has field for kubectl rollout field manager
+  output_message=$(kubectl get deployment nginx -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-rollout'
+  # Create second deployment
   ${SED} "s/name: nginx$/name: nginx2/" hack/testdata/deployment-revision1.yaml | kubectl create -f - "${kube_flags[@]:?}"
   # Deletion of both deployments should not be blocked
   kubectl delete deployment nginx2 "${kube_flags[@]:?}"
@@ -584,6 +591,10 @@ run_rs_tests() {
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rs frontend' "{{${rs_replicas_field:?}}}" '3'
+  # Dry-run Command
+  kubectl scale --dry-run=client --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]:?}"
+  kubectl scale --dry-run=server --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'rs frontend' "{{${rs_replicas_field:?}}}" '3'
   # Command
   kubectl scale --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]:?}"
   # Post-condition: 2 replicas
@@ -593,6 +604,12 @@ run_rs_tests() {
   kubectl create -f hack/testdata/scale-deploy-1.yaml "${kube_flags[@]:?}"
   kubectl create -f hack/testdata/scale-deploy-2.yaml "${kube_flags[@]:?}"
   kubectl create -f hack/testdata/scale-deploy-3.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
+  # Test kubectl scale --all with dry run
+  kubectl scale deploy --replicas=3 --all --dry-run=client
+  kubectl scale deploy --replicas=3 --all --dry-run=server
   kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '1'
   kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '1'
   kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
@@ -643,6 +660,10 @@ run_rs_tests() {
   kubectl set serviceaccount rs/frontend "${kube_flags[@]:?}" serviceaccount1
   kube::test::get_object_assert 'rs frontend' "{{${generation_field:?}}}" '5'
 
+  # RS has field for kubectl set field manager
+  output_message=$(kubectl get rs frontend -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-set'
+
   ### Delete replica set with id
   # Pre-condition: frontend replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" 'frontend:'
@@ -682,6 +703,10 @@ run_rs_tests() {
     # autoscale 2~3 pods, no CPU utilization specified, replica set specified by name
     kubectl autoscale rs frontend "${kube_flags[@]:?}" --min=2 --max=3
     kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
+    # HorizontalPodAutoscaler has field for kubectl autoscale field manager
+    output_message=$(kubectl get hpa frontend -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" 'kubectl-autoscale'
+    # Clean up
     kubectl delete hpa frontend "${kube_flags[@]:?}"
     # autoscale without specifying --max should fail
     ! kubectl autoscale rs frontend "${kube_flags[@]:?}" || exit 1

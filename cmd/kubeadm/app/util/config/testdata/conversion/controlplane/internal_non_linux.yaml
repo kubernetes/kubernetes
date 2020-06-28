@@ -30,6 +30,7 @@ ClusterName: kubernetes
 ComponentConfigs:
   KubeProxy:
     BindAddress: 0.0.0.0
+    BindAddressHardFail: false
     ClientConnection:
       AcceptContentTypes: ""
       Burst: 10

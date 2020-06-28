@@ -29,7 +29,7 @@ import (
 	"syscall"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
 
@@ -576,13 +576,13 @@ func TestCleanSubPaths(t *testing.T) {
 				return mounts, nil
 			},
 			unmount: func(mountpath string) error {
-				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, err error) error {
+				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, _ error) error {
 					if path == mountpath {
 						// Skip top level directory
 						return nil
 					}
 
-					if err = os.Remove(path); err != nil {
+					if err := os.Remove(path); err != nil {
 						return err
 					}
 					return filepath.SkipDir

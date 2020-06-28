@@ -94,10 +94,6 @@ network_closure.sh
 # CoreOS stuff
 /cluster/libvirt-coreos/coreos_*.img
 
-# Juju Stuff
-/cluster/juju/charms/*
-/cluster/juju/bundles/local.yaml
-
 # Downloaded Kubernetes binary release
 /kubernetes/
 
@@ -115,6 +111,7 @@ zz_generated_*_test.go
 
 # TODO(roycaihw): remove this when we stop committing the generated definition
 !staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+!staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 # low-change blueprint in code-generator to notice changes
 !staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
 # low-change sample-apiserver spec to be compilable when published
@@ -128,9 +125,6 @@ zz_generated_*_test.go
 
 # This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
 !\.drone\.sec
-
-# Godeps workspace
-/Godeps/_workspace
 
 /bazel-*
 *.pyc

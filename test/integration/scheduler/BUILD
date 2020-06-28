@@ -13,7 +13,6 @@ go_test(
         "extender_test.go",
         "framework_test.go",
         "main_test.go",
-        "plugins_test.go",
         "predicates_test.go",
         "preemption_test.go",
         "priorities_test.go",
@@ -30,10 +29,10 @@ go_test(
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
+        "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/profile:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
-        "//pkg/scheduler/types:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/priority:go_default_library",
@@ -62,7 +61,7 @@ go_test(
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -23,8 +23,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -33,14 +33,7 @@ const (
 	RequestedToCapacityRatioName = "RequestedToCapacityRatio"
 	minUtilization               = 0
 	maxUtilization               = 100
-	minScore                     = 0
-	maxScore                     = framework.MaxNodeScore
 )
-
-// RequestedToCapacityRatioArgs holds the args that are used to configure the plugin.
-type RequestedToCapacityRatioArgs struct {
-	config.RequestedToCapacityRatioArguments
-}
 
 type functionShape []functionShapePoint
 
@@ -52,9 +45,13 @@ type functionShapePoint struct {
 }
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
-func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &config.RequestedToCapacityRatioArguments{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+	args, err := getRequestedToCapacityRatioArgs(plArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validation.ValidateRequestedToCapacityRatioArgs(args); err != nil {
 		return nil, err
 	}
 
@@ -69,10 +66,6 @@ func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.Frame
 		})
 	}
 
-	if err := validateFunctionShape(shape); err != nil {
-		return nil, err
-	}
-
 	resourceToWeightMap := make(resourceToWeightMap)
 	for _, resource := range args.Resources {
 		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
@@ -80,10 +73,6 @@ func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.Frame
 			// Apply the default weight.
 			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
 		}
-	}
-	if len(args.Resources) == 0 {
-		// If no resources specified, used the default set.
-		resourceToWeightMap = defaultRequestedRatioResources
 	}
 
 	return &RequestedToCapacityRatio{
@@ -94,6 +83,14 @@ func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.Frame
 			resourceToWeightMap,
 		},
 	}, nil
+}
+
+func getRequestedToCapacityRatioArgs(obj runtime.Object) (config.RequestedToCapacityRatioArgs, error) {
+	ptr, ok := obj.(*config.RequestedToCapacityRatioArgs)
+	if !ok {
+		return config.RequestedToCapacityRatioArgs{}, fmt.Errorf("want args to be of type RequestedToCapacityRatioArgs, got %T", obj)
+	}
+	return *ptr, nil
 }
 
 // RequestedToCapacityRatio is a score plugin that allow users to apply bin packing
@@ -124,54 +121,8 @@ func (pl *RequestedToCapacityRatio) ScoreExtensions() framework.ScoreExtensions 
 	return nil
 }
 
-func validateFunctionShape(shape functionShape) error {
-	if len(shape) == 0 {
-		return fmt.Errorf("at least one point must be specified")
-	}
-
-	for i := 1; i < len(shape); i++ {
-		if shape[i-1].utilization >= shape[i].utilization {
-			return fmt.Errorf("utilization values must be sorted. Utilization[%d]==%d >= Utilization[%d]==%d", i-1, shape[i-1].utilization, i, shape[i].utilization)
-		}
-	}
-
-	for i, point := range shape {
-		if point.utilization < minUtilization {
-			return fmt.Errorf("utilization values must not be less than %d. Utilization[%d]==%d", minUtilization, i, point.utilization)
-		}
-		if point.utilization > maxUtilization {
-			return fmt.Errorf("utilization values must not be greater than %d. Utilization[%d]==%d", maxUtilization, i, point.utilization)
-		}
-		if point.score < minScore {
-			return fmt.Errorf("score values must not be less than %d. Score[%d]==%d", minScore, i, point.score)
-		}
-		if int64(point.score) > maxScore {
-			return fmt.Errorf("score values not be greater than %d. Score[%d]==%d", maxScore, i, point.score)
-		}
-	}
-
-	return nil
-}
-
-func validateResourceWeightMap(resourceToWeightMap resourceToWeightMap) error {
-	if len(resourceToWeightMap) == 0 {
-		return fmt.Errorf("resourceToWeightMap cannot be nil")
-	}
-
-	for resource, weight := range resourceToWeightMap {
-		if weight < 1 {
-			return fmt.Errorf("resource %s weight %d must not be less than 1", string(resource), weight)
-		}
-	}
-	return nil
-}
-
 func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape functionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
 	rawScoringFunction := buildBrokenLinearFunction(scoringFunctionShape)
-	err := validateResourceWeightMap(resourceToWeightMap)
-	if err != nil {
-		klog.Error(err)
-	}
 	resourceScoringFunction := func(requested, capacity int64) int64 {
 		if capacity == 0 || requested > capacity {
 			return rawScoringFunction(maxUtilization)

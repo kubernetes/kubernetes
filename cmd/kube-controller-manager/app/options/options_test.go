@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -87,7 +88,7 @@ var args = []string{
 	"--enable-garbage-collector=false",
 	"--enable-hostpath-provisioner=true",
 	"--enable-taint-manager=false",
-	"--experimental-cluster-signing-duration=10h",
+	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
 	"--horizontal-pod-autoscaler-downscale-delay=2m",
 	"--horizontal-pod-autoscaler-sync-period=45s",
@@ -381,6 +382,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
+		Metrics:    &metrics.Options{},
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the

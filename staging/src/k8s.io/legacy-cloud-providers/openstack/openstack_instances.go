@@ -26,7 +26,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
@@ -60,6 +60,11 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 		compute: compute,
 		opts:    os.metadataOpts,
 	}, true
+}
+
+// InstancesV2 returns an implementation of InstancesV2 for OpenStack.
+func (os *OpenStack) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
 }
 
 // CurrentNodeName implements Instances.CurrentNodeName
@@ -150,6 +155,37 @@ func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID
 		return true, nil
 	}
 	return false, nil
+}
+
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (i *Instances) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	if providerID == "" {
+		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
+	}
+
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+	srv, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		return nil, err
+	}
+
+	instanceType, err := srvInstanceType(srv)
+	if err != nil {
+		return nil, err
+	}
+	addresses, err := nodeAddresses(srv)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		Type:          instanceType,
+		NodeAddresses: addresses,
+	}, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.

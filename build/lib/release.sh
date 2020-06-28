@@ -203,7 +203,7 @@ function kube::release::package_node_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
-    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+    cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -275,7 +275,7 @@ function kube::release::package_server_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
-    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+    cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -434,7 +434,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
-  cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   find "${src_dir}" -name 'internal-*' -exec cp {} "${dst_dir}" \;
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
@@ -559,7 +558,7 @@ EOF
 
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
-  cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
 
   echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 

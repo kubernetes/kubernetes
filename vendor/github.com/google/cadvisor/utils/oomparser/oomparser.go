@@ -22,7 +22,7 @@ import (
 
 	"github.com/euank/go-kmsg-parser/kmsgparser"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -107,23 +107,20 @@ func getProcessNamePid(line string, currentOomInstance *OomInstance) (bool, erro
 
 // uses regex to see if line is the start of a kernel oom log
 func checkIfStartOfOomMessages(line string) bool {
-	potential_oom_start := firstLineRegexp.MatchString(line)
-	if potential_oom_start {
-		return true
-	}
-	return false
+	potentialOomStart := firstLineRegexp.MatchString(line)
+	return potentialOomStart
 }
 
 // StreamOoms writes to a provided a stream of OomInstance objects representing
 // OOM events that are found in the logs.
 // It will block and should be called from a goroutine.
-func (self *OomParser) StreamOoms(outStream chan<- *OomInstance) {
-	kmsgEntries := self.parser.Parse()
-	defer self.parser.Close()
+func (p *OomParser) StreamOoms(outStream chan<- *OomInstance) {
+	kmsgEntries := p.parser.Parse()
+	defer p.parser.Close()
 
 	for msg := range kmsgEntries {
-		in_oom_kernel_log := checkIfStartOfOomMessages(msg.Message)
-		if in_oom_kernel_log {
+		isOomMessage := checkIfStartOfOomMessages(msg.Message)
+		if isOomMessage {
 			oomCurrentInstance := &OomInstance{
 				ContainerName:       "/",
 				VictimContainerName: "/",

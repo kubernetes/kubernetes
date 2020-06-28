@@ -1,4 +1,4 @@
-// +build linux
+// +build linux,!dockerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -25,11 +25,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
@@ -68,7 +69,7 @@ type containerManager struct {
 	// Name of the cgroups.
 	cgroupsName string
 	// Manager for the cgroups.
-	cgroupsManager *fs.Manager
+	cgroupsManager cgroups.Manager
 }
 
 func (m *containerManager) Start() error {
@@ -103,7 +104,7 @@ func (m *containerManager) doWork() {
 	}
 }
 
-func createCgroupManager(name string) (*fs.Manager, error) {
+func createCgroupManager(name string) (cgroups.Manager, error) {
 	var memoryLimit uint64
 
 	memoryCapacity, err := getMemoryCapacity()
@@ -118,19 +119,24 @@ func createCgroupManager(name string) (*fs.Manager, error) {
 	}
 	klog.V(2).Infof("Configure resource-only container %q with memory limit: %d", name, memoryLimit)
 
-	allowAllDevices := true
-	cm := &fs.Manager{
-		Cgroups: &configs.Cgroup{
-			Parent: "/",
-			Name:   name,
-			Resources: &configs.Resources{
-				Memory:          int64(memoryLimit),
-				MemorySwap:      -1,
-				AllowAllDevices: &allowAllDevices,
+	cg := &configs.Cgroup{
+		Parent: "/",
+		Name:   name,
+		Resources: &configs.Resources{
+			Memory:     int64(memoryLimit),
+			MemorySwap: -1,
+			Devices: []*configs.DeviceRule{
+				{
+					Minor:       configs.Wildcard,
+					Major:       configs.Wildcard,
+					Type:        'a',
+					Permissions: "rwm",
+					Allow:       true,
+				},
 			},
 		},
 	}
-	return cm, nil
+	return cgroupfs.NewManager(cg, nil, false), nil
 }
 
 // getMemoryCapacity returns the memory capacity on the machine in bytes.

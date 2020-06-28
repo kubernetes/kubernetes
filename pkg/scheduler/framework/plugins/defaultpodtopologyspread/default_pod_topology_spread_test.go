@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -375,7 +376,7 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot), framework.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(nil, nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
@@ -578,19 +579,20 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone1, labels1, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
-				buildPod(nodeMachine1Zone3, labels1, nil),
+				buildPod(nodeMachine2Zone2, labels1, nil),
 				buildPod(nodeMachine2Zone2, labels2, nil),
+				buildPod(nodeMachine1Zone3, labels1, nil),
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: 0},  // Pod on node
+				{Name: nodeMachine1Zone1, Score: 33}, // Pod on node
 				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
-				{Name: nodeMachine2Zone2, Score: 33}, // Pod in zone
-				{Name: nodeMachine1Zone3, Score: 0},  // Pod on node
-				{Name: nodeMachine2Zone3, Score: 33}, // Pod in zone
-				{Name: nodeMachine3Zone3, Score: 33}, // Pod in zone
+				{Name: nodeMachine2Zone2, Score: 0},  // Pod in zone
+				{Name: nodeMachine1Zone3, Score: 33}, // Pod on node
+				{Name: nodeMachine2Zone3, Score: 66}, // Pod in zone
+				{Name: nodeMachine3Zone3, Score: 66}, // Pod in zone
 			},
-			name: "four pods, 3 matching (z1=1, z2=1, z3=1)",
+			name: "five pods, 4 matching (z1=1, z2=2, z3=1)",
 		},
 		{
 			pod: buildPod("", labels1, controllerRef("ReplicationController", "name", "abc123")),
@@ -628,7 +630,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot), framework.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(nil, nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}

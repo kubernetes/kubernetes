@@ -56,7 +56,7 @@ func IsCorruptedMnt(err error) bool {
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.
-type MountInfo struct {
+type MountInfo struct { // nolint: golint
 	// Unique ID for the mount (maybe reused after umount).
 	ID int
 	// The ID of the parent mount (or of self for the root of this mount namespace's mount tree).

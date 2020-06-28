@@ -3,6 +3,7 @@ package hcn
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/Microsoft/hcsshim/internal/hcserror"
 	"github.com/Microsoft/hcsshim/internal/interop"
@@ -20,17 +21,41 @@ type Version struct {
 	Minor int `json:"Minor"`
 }
 
+type VersionRange struct {
+	MinVersion Version
+	MaxVersion Version
+}
+
+type VersionRanges []VersionRange
+
 var (
 	// HNSVersion1803 added ACL functionality.
-	HNSVersion1803 = Version{Major: 7, Minor: 2}
+	HNSVersion1803 = VersionRanges{VersionRange{MinVersion: Version{Major: 7, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 	// V2ApiSupport allows the use of V2 Api calls and V2 Schema.
-	V2ApiSupport = Version{Major: 9, Minor: 2}
+	V2ApiSupport = VersionRanges{VersionRange{MinVersion: Version{Major: 9, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 	// Remote Subnet allows for Remote Subnet policies on Overlay networks
-	RemoteSubnetVersion = Version{Major: 9, Minor: 2}
+	RemoteSubnetVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 9, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 	// A Host Route policy allows for local container to local host communication Overlay networks
-	HostRouteVersion = Version{Major: 9, Minor: 2}
+	HostRouteVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 9, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 	// HNS 10.2 allows for Direct Server Return for loadbalancing
-	DSRVersion = Version{Major: 10, Minor: 2}
+	DSRVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 10, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+	// HNS 9.3 through 10.0 (not included) and, 10.4+ provide support for configuring endpoints with /32 prefixes
+	Slash32EndpointPrefixesVersion = VersionRanges{
+		VersionRange{MinVersion: Version{Major: 9, Minor: 3}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 10, Minor: 4}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+	}
+	// HNS 9.3 through 10.0 (not included) and, 10.4+ allow for HNS ACL Policies to support protocol 252 for VXLAN
+	AclSupportForProtocol252Version = VersionRanges{
+		VersionRange{MinVersion: Version{Major: 9, Minor: 3}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 10, Minor: 4}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+	}
+	// HNS 12.0 allows for session affinity for loadbalancing
+	SessionAffinityVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 12, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+	// HNS 10.5 through 11 (not included) and 12.0+ supports Ipv6 dual stack.
+	IPv6DualStackVersion = VersionRanges{
+		VersionRange{MinVersion: Version{Major: 10, Minor: 5}, MaxVersion: Version{Major: 10, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 12, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+	}
 )
 
 // GetGlobals returns the global properties of the HCN Service.

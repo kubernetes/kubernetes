@@ -11,6 +11,7 @@ go_library(
         "cloud.go",
         "doc.go",
         "plugins.go",
+        "ports.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider",
     importpath = "k8s.io/cloud-provider",
@@ -20,7 +21,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -36,6 +37,10 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/cloud-provider/api:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/controllers/node:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/controllers/nodelifecycle:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/controllers/route:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/controllers/service:all-srcs",
         "//staging/src/k8s.io/cloud-provider/fake:all-srcs",
         "//staging/src/k8s.io/cloud-provider/node:all-srcs",
         "//staging/src/k8s.io/cloud-provider/service/helpers:all-srcs",

@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "convert.go",
         "doc.go",
         "fake_kuberuntime_manager.go",
         "helpers.go",
@@ -44,9 +45,9 @@ go_library(
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/runtimeclass:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//pkg/kubelet/util:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/kubelet/util/logreduction:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/parsers:go_default_library",
@@ -64,12 +65,13 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/component-base/logs/logreduction:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/google.golang.org/grpc/status:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/apis/core/v1/helper:go_default_library",
@@ -91,6 +93,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "convert_test.go",
         "helpers_linux_test.go",
         "helpers_test.go",
         "instrumented_services_test.go",

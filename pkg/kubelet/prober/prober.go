@@ -40,7 +40,7 @@ import (
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const maxProbeRetries = 3
@@ -56,17 +56,15 @@ type prober struct {
 	startupHTTP   httpprobe.Prober
 	tcp           tcpprobe.Prober
 	grpc          grpcprobe.Prober
-	runner        kubecontainer.ContainerCommandRunner
+	runner        kubecontainer.CommandRunner
 
-	refManager *kubecontainer.RefManager
-	recorder   record.EventRecorder
+	recorder record.EventRecorder
 }
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
-	runner kubecontainer.ContainerCommandRunner,
-	refManager *kubecontainer.RefManager,
+	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorder) *prober {
 
 	const followNonLocalRedirects = false
@@ -78,21 +76,16 @@ func newProber(
 		tcp:           tcpprobe.New(),
 		grpc:          grpcprobe.New(),
 		runner:        runner,
-		refManager:    refManager,
 		recorder:      recorder,
 	}
 }
 
 // recordContainerEvent should be used by the prober for all container related events.
-func (pb *prober) recordContainerEvent(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, eventType, reason, message string, args ...interface{}) {
-	var err error
-	ref, hasRef := pb.refManager.GetRef(containerID)
-	if !hasRef {
-		ref, err = kubecontainer.GenerateContainerRef(pod, container)
-		if err != nil {
-			klog.Errorf("Can't make a ref to pod %q, container %v: %v", format.Pod(pod), container.Name, err)
-			return
-		}
+func (pb *prober) recordContainerEvent(pod *v1.Pod, container *v1.Container, eventType, reason, message string, args ...interface{}) {
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		klog.Errorf("Can't make a ref to pod %q, container %v: %v", format.Pod(pod), container.Name, err)
+		return
 	}
 	pb.recorder.Eventf(ref, eventType, reason, message, args...)
 }
@@ -122,15 +115,15 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		// Probe failed in one way or another.
 		if err != nil {
 			klog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
-			pb.recordContainerEvent(pod, &container, containerID, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 		} else { // result != probe.Success
 			klog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
-			pb.recordContainerEvent(pod, &container, containerID, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %v", probeType, output)
+			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 		}
 		return results.Failure, err
 	}
 	if result == probe.Warning {
-		pb.recordContainerEvent(pod, &container, containerID, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %v", probeType, output)
+		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
 		klog.V(3).Infof("%s probe for %q succeeded with a warning: %s", probeType, ctrName, output)
 	} else {
 		klog.V(3).Infof("%s probe for %q succeeded", probeType, ctrName)
@@ -166,7 +159,7 @@ func buildHeader(headerList []v1.HTTPHeader) http.Header {
 func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
-		klog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
+		klog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod.Name, container.Name, p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
 		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
 	}

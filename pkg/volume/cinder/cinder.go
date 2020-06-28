@@ -25,7 +25,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/keymutex"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -568,6 +568,10 @@ func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopolo
 	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c, selectedNode, allowedTopologies)
 	if err != nil {
 		return nil, err
+	}
+
+	if fstype == "" {
+		fstype = "ext4"
 	}
 
 	volumeMode := c.options.PVC.Spec.VolumeMode

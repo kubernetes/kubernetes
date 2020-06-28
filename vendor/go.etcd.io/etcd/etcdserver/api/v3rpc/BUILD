@@ -22,6 +22,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
+        "//vendor/github.com/dustin/go-humanize:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/grpc-ecosystem/go-grpc-middleware:go_default_library",
         "//vendor/github.com/grpc-ecosystem/go-grpc-prometheus:go_default_library",

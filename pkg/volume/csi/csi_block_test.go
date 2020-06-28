@@ -53,40 +53,6 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	return csiMapper, spec, pv, nil
 }
 
-func prepareBlockUnmapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
-	pv := makeTestPV(specVolumeName, 10, testDriver, testVol)
-	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
-
-	// save volume data
-	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
-		t.Errorf("failed to create dir [%s]: %v", dir, err)
-	}
-
-	if err := saveVolumeData(
-		dir,
-		volDataFileName,
-		map[string]string{
-			volDataKey.specVolID:  pv.ObjectMeta.Name,
-			volDataKey.driverName: testDriver,
-			volDataKey.volHandle:  testVol,
-		},
-	); err != nil {
-		t.Fatalf("failed to save volume data: %v", err)
-	}
-
-	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
-	if err != nil {
-		t.Fatalf("failed to make a new Unmapper: %v", err)
-	}
-
-	csiUnmapper := unmapper.(*csiBlockMapper)
-	csiUnmapper.csiClient = setupClient(t, true)
-
-	return csiUnmapper, spec, pv, nil
-}
-
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 

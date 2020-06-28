@@ -27,8 +27,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
   kube::log::error "Cannot run with \$GOPROXY=off"
@@ -58,9 +58,26 @@ case "${1:-}" in
   ;;
 esac
 
+# let us log all errors before we exit
+rc=0
+
+# List of dependencies we need to avoid dragging back into kubernetes/kubernetes
+forbidden_repos=(
+  "k8s.io/klog"  # we have switched to klog v2, so avoid klog v1
+)
+for forbidden_repo in "${forbidden_repos[@]}"; do
+  deps_on_forbidden=$(go mod graph | grep " ${forbidden_repo}@" || echo "")
+  if [ -n "${deps_on_forbidden}" ]; then
+    kube::log::error "The following have transitive dependencies on ${forbidden_repo}, which is not allowed:"
+    echo "${deps_on_forbidden}"
+    echo ""
+    rc=1
+  fi
+done
+
 outdated=$(go list -m -json all | jq -r "
-  select(.Replace.Version != null) | 
-  select(.Version != .Replace.Version) | 
+  select(.Replace.Version != null) |
+  select(.Version != .Replace.Version) |
   ${filter}
   select(.Path) |
   \"\(.Path)
@@ -89,8 +106,8 @@ if [[ -n "${unused}" ]]; then
 fi
 
 if [[ -n "${unused}${outdated}" ]]; then
-  exit 1
+  rc=1
 fi
 
 echo "All pinned versions of checked dependencies match their preferred version."
-exit 0
+exit $rc

@@ -30,11 +30,12 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 
@@ -47,8 +48,10 @@ import (
 // TODO(random-liu): Support log rotation.
 
 const (
-	// timeFormat is the time format used in the log.
-	timeFormat = time.RFC3339Nano
+	// timeFormatOut is the format for writing timestamps to output.
+	timeFormatOut = types.RFC3339NanoFixed
+	// timeFormatIn is the format for parsing timestamps from other logs.
+	timeFormatIn = types.RFC3339NanoLenient
 
 	// logForceCheckPeriod is the period to check for a new read
 	logForceCheckPeriod = 1 * time.Second
@@ -128,9 +131,9 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	if idx < 0 {
 		return fmt.Errorf("timestamp is not found")
 	}
-	msg.timestamp, err = time.Parse(timeFormat, string(log[:idx]))
+	msg.timestamp, err = time.Parse(timeFormatIn, string(log[:idx]))
 	if err != nil {
-		return fmt.Errorf("unexpected timestamp format %q: %v", timeFormat, err)
+		return fmt.Errorf("unexpected timestamp format %q: %v", timeFormatIn, err)
 	}
 
 	// Parse stream type
@@ -238,7 +241,7 @@ func (w *logWriter) write(msg *logMessage) error {
 	}
 	line := msg.log
 	if w.opts.timestamp {
-		prefix := append([]byte(msg.timestamp.Format(timeFormat)), delimiter[0])
+		prefix := append([]byte(msg.timestamp.Format(timeFormatOut)), delimiter[0])
 		line = append(prefix, line...)
 	}
 	// If the line is longer than the remaining bytes, cut it.

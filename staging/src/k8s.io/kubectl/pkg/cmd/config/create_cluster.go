@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -53,7 +54,7 @@ var (
 		kubectl config set-cluster e2e --server=https://1.2.3.4
 
 		# Embed certificate authority data for the e2e cluster entry
-		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
+		kubectl config set-cluster e2e --embed-certs --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
 		# Disable cert checking for the dev cluster entry
 		kubectl config set-cluster e2e --insecure-skip-tls-verify=true
@@ -181,8 +182,8 @@ func (o createClusterOptions) validate() error {
 		if caPath == "" {
 			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
-		if _, err := ioutil.ReadFile(caPath); err != nil {
-			return fmt.Errorf("could not read %s data from %s: %v", clientcmd.FlagCAFile, caPath, err)
+		if _, err := os.Stat(caPath); err != nil {
+			return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagCAFile, caPath, err)
 		}
 	}
 

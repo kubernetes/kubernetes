@@ -16,7 +16,7 @@ limitations under the License.
 
 package scheduling
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 // FakeVolumeBinderConfig holds configurations for fake volume binder.
 type FakeVolumeBinderConfig struct {
@@ -42,27 +42,27 @@ type FakeVolumeBinder struct {
 	BindCalled   bool
 }
 
+// GetPodVolumes implements SchedulerVolumeBinder.GetPodVolumes.
+func (b *FakeVolumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
+	return nil, nil, nil, nil
+}
+
 // FindPodVolumes implements SchedulerVolumeBinder.FindPodVolumes.
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons ConflictReasons, err error) {
-	return b.config.FindReasons, b.config.FindErr
+func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, _, _ []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
+	return nil, b.config.FindReasons, b.config.FindErr
 }
 
 // AssumePodVolumes implements SchedulerVolumeBinder.AssumePodVolumes.
-func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (bool, error) {
+func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, podVolumes *PodVolumes) (bool, error) {
 	b.AssumeCalled = true
 	return b.config.AllBound, b.config.AssumeErr
 }
 
+// RevertAssumedPodVolumes implements SchedulerVolumeBinder.RevertAssumedPodVolumes
+func (b *FakeVolumeBinder) RevertAssumedPodVolumes(_ *PodVolumes) {}
+
 // BindPodVolumes implements SchedulerVolumeBinder.BindPodVolumes.
-func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
+func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) error {
 	b.BindCalled = true
 	return b.config.BindErr
 }
-
-// GetBindingsCache implements SchedulerVolumeBinder.GetBindingsCache.
-func (b *FakeVolumeBinder) GetBindingsCache() PodBindingCache {
-	return nil
-}
-
-// DeletePodBindings implements SchedulerVolumeBinder.DeletePodBindings.
-func (b *FakeVolumeBinder) DeletePodBindings(pod *v1.Pod) {}

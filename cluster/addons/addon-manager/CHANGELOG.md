@@ -1,3 +1,9 @@
+## Version 9.1.1 (Wed May 19 2020 Antoni Zawodny <zawodny@google.com>)
+ - Fix kube-addons.sh and kubectl permissions
+
+## Version 9.1.0 (Wed May 13 2020 Antoni Zawodny <zawodny@google.com>)
+ - Enable overriding the default list of whitelisted resources
+
 ### Version 9.0.2  (Thu August 1 2019 Maciej Borsz <maciejborsz@google.com>
  - Fix a bug in leader election (https://github.com/kubernetes/kubernetes/pull/80575)
 

@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
@@ -260,6 +261,7 @@ func TestGetNodeAddressses(t *testing.T) {
 		nw            *fake.FakeNetwork
 		itfAddrsPairs []InterfaceAddrsPair
 		expected      sets.String
+		expectedErr   error
 	}{
 		{ // case 0
 			cidrs: []string{"10.20.30.0/24"},
@@ -375,7 +377,8 @@ func TestGetNodeAddressses(t *testing.T) {
 					addrs: []net.Addr{fake.AddrStruct{Val: "127.0.0.1/8"}},
 				},
 			},
-			expected: sets.NewString(),
+			expected:    nil,
+			expectedErr: fmt.Errorf("no addresses found for cidrs %v", []string{"10.20.30.0/24", "100.200.201.0/24"}),
 		},
 		{ // case 8
 			cidrs: []string{},
@@ -455,9 +458,10 @@ func TestGetNodeAddressses(t *testing.T) {
 			testCases[i].nw.AddInterfaceAddr(&pair.itf, pair.addrs)
 		}
 		addrList, err := GetNodeAddresses(testCases[i].cidrs, testCases[i].nw)
-		if err != nil {
+		if !reflect.DeepEqual(err, testCases[i].expectedErr) {
 			t.Errorf("case [%d], unexpected error: %v", i, err)
 		}
+
 		if !addrList.Equal(testCases[i].expected) {
 			t.Errorf("case [%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expected, addrList)
 		}

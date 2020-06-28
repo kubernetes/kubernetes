@@ -24,7 +24,7 @@ import (
 	"regexp"
 	dstrings "strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -879,14 +879,10 @@ var _ volume.BlockVolumeMapper = &rbdDiskMapper{}
 
 type rbdDiskMapper struct {
 	*rbd
-	mon           []string
-	id            string
-	keyring       string
-	secret        string
-	adminSecret   string
-	adminID       string
-	imageFormat   string
-	imageFeatures []string
+	mon     []string
+	id      string
+	keyring string
+	secret  string
 }
 
 var _ volume.BlockVolumeUnmapper = &rbdDiskUnmapper{}

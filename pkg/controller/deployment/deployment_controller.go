@@ -26,7 +26,7 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -100,7 +100,7 @@ type DeploymentController struct {
 // NewDeploymentController creates a new DeploymentController.
 func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -481,8 +481,13 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 		return
 	}
 
+	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
+	if keyErr != nil {
+		klog.ErrorS(err, "Failed to split meta namespace cache key", "key", key)
+	}
+
 	if dc.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).Infof("Error syncing deployment %v: %v", key, err)
+		klog.V(2).InfoS("Error syncing deployment", "deployment", klog.KRef(ns, name), "err", err)
 		dc.queue.AddRateLimited(key)
 		return
 	}

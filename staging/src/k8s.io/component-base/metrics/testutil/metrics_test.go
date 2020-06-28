@@ -265,3 +265,91 @@ func TestHistogramValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestLabelsMatch(t *testing.T) {
+	cases := []struct {
+		name          string
+		metric        *dto.Metric
+		labelFilter   map[string]string
+		expectedMatch bool
+	}{
+		{name: "metric labels and labelFilter have the same labels and values", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: true},
+		{name: "metric labels contain all labelFilter labels, and labelFilter is a subset of metric labels", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+		}, expectedMatch: true},
+		{name: "metric labels don't have all labelFilter labels and value", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "The intersection of metric labels and labelFilter labels is empty", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("aa"), Value: pointer.StringPtr("11")},
+				{Name: pointer.StringPtr("bb"), Value: pointer.StringPtr("22")},
+				{Name: pointer.StringPtr("cc"), Value: pointer.StringPtr("33")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels have the same labels names but different values with labelFilter labels and value", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
+			}}, labelFilter: map[string]string{
+			"a": "11",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels contain label name but different values with labelFilter labels and value", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("33")},
+				{Name: pointer.StringPtr("d"), Value: pointer.StringPtr("4")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels is empty and labelFilter is not empty", metric: &dto.Metric{
+			Label: []*dto.LabelPair{}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels is not empty and labelFilter is empty", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+			}}, labelFilter: map[string]string{}, expectedMatch: true},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := LabelsMatch(tt.metric, tt.labelFilter)
+			if got != tt.expectedMatch {
+				t.Errorf("Expected %v, got %v instead", tt.expectedMatch, got)
+			}
+		})
+	}
+}

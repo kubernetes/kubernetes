@@ -22,11 +22,10 @@ import (
 
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 // Upgrade defines an upgrade possibility to upgrade from a current version to a new one
@@ -75,7 +74,7 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, etcdClient etcdutil.ClusterInterrogator, dnsType kubeadmapi.DNSAddOnType, client clientset.Interface) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed, externalEtcd bool, dnsType kubeadmapi.DNSAddOnType, client clientset.Interface, manifestsDir string) ([]Upgrade, error) {
 	fmt.Println("[upgrade] Fetching available versions to upgrade to")
 
 	// Collect the upgrades kubeadm can do in this list
@@ -111,10 +110,13 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		return upgrades, err
 	}
 
-	// Get current etcd version
-	etcdVersion, err := etcdClient.GetVersion()
-	if err != nil {
-		return upgrades, err
+	// Get current stacked etcd version on the local node
+	var etcdVersion string
+	if !externalEtcd {
+		etcdVersion, err = GetEtcdImageTagFromStaticPod(manifestsDir)
+		if err != nil {
+			return upgrades, err
+		}
 	}
 
 	currentDNSType, dnsVersion, err := dns.DeployedDNSAddon(client)
@@ -174,7 +176,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 						DNSType:        dnsType,
 						DNSVersion:     kubeadmconstants.GetDNSVersion(dnsType),
 						KubeadmVersion: newKubeadmVer,
-						EtcdVersion:    getSuggestedEtcdVersion(patchVersionStr),
+						EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, patchVersionStr),
 						// KubeletVersions is unset here as it is not used anywhere in .After
 					},
 				})
@@ -191,7 +193,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				DNSType:        dnsType,
 				DNSVersion:     kubeadmconstants.GetDNSVersion(dnsType),
 				KubeadmVersion: stableVersionStr,
-				EtcdVersion:    getSuggestedEtcdVersion(stableVersionStr),
+				EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, stableVersionStr),
 				// KubeletVersions is unset here as it is not used anywhere in .After
 			},
 		})
@@ -239,7 +241,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					DNSType:        dnsType,
 					DNSVersion:     kubeadmconstants.GetDNSVersion(dnsType),
 					KubeadmVersion: previousBranchLatestVersionStr,
-					EtcdVersion:    getSuggestedEtcdVersion(previousBranchLatestVersionStr),
+					EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, previousBranchLatestVersionStr),
 					// KubeletVersions is unset here as it is not used anywhere in .After
 				},
 			})
@@ -266,7 +268,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					DNSType:        dnsType,
 					DNSVersion:     unstableKubeDNSVersion,
 					KubeadmVersion: unstableKubeVersion,
-					EtcdVersion:    getSuggestedEtcdVersion(unstableKubeVersion),
+					EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, unstableKubeVersion),
 					// KubeletVersions is unset here as it is not used anywhere in .After
 				},
 			})
@@ -300,7 +302,10 @@ func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionut
 	return patchVersion.LessThan(stableVersion)
 }
 
-func getSuggestedEtcdVersion(kubernetesVersion string) string {
+func getSuggestedEtcdVersion(externalEtcd bool, kubernetesVersion string) string {
+	if externalEtcd {
+		return ""
+	}
 	etcdVersion, warning, err := kubeadmconstants.EtcdSupportedVersion(kubeadmconstants.SupportedEtcdVersion, kubernetesVersion)
 	if err != nil {
 		klog.Warningf("[upgrade/versions] could not retrieve an etcd version for the target Kubernetes version: %v", err)

@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // HealthChecker is a named healthz checker.
@@ -131,6 +131,8 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 			/* subresource = */ path,
 			/* scope = */ "",
 			/* component = */ "",
+			/* deprecated */ false,
+			/* removedRelease */ "",
 			handleRootHealthz(checks...)))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))

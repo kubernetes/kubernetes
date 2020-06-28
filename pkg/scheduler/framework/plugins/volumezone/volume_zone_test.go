@@ -25,8 +25,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
@@ -48,7 +47,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestSingleZone(t *testing.T) {
-	pvLister := fakelisters.PersistentVolumeLister{
+	pvLister := fakeframework.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -66,7 +65,7 @@ func TestSingleZone(t *testing.T) {
 		},
 	}
 
-	pvcLister := fakelisters.PersistentVolumeClaimLister{
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -208,7 +207,7 @@ func TestSingleZone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulertypes.NodeInfo{}
+			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,
@@ -224,7 +223,7 @@ func TestSingleZone(t *testing.T) {
 }
 
 func TestMultiZone(t *testing.T) {
-	pvLister := fakelisters.PersistentVolumeLister{
+	pvLister := fakeframework.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -242,7 +241,7 @@ func TestMultiZone(t *testing.T) {
 		},
 	}
 
-	pvcLister := fakelisters.PersistentVolumeClaimLister{
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -330,7 +329,7 @@ func TestMultiZone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulertypes.NodeInfo{}
+			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,
@@ -354,7 +353,7 @@ func TestWithBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	scLister := fakelisters.StorageClassLister{
+	scLister := fakeframework.StorageClassLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -364,13 +363,13 @@ func TestWithBinding(t *testing.T) {
 		},
 	}
 
-	pvLister := fakelisters.PersistentVolumeLister{
+	pvLister := fakeframework.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
-	pvcLister := fakelisters.PersistentVolumeClaimLister{
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -439,7 +438,7 @@ func TestWithBinding(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulertypes.NodeInfo{}
+			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,

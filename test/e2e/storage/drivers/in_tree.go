@@ -81,9 +81,9 @@ type nfsDriver struct {
 }
 
 type nfsVolume struct {
-	serverIP  string
-	serverPod *v1.Pod
-	f         *framework.Framework
+	serverHost string
+	serverPod  *v1.Pod
+	f          *framework.Framework
 }
 
 var _ testsuites.TestDriver = &nfsDriver{}
@@ -129,7 +129,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume test
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   nv.serverHost,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
@@ -141,7 +141,7 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   nv.serverHost,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
@@ -199,12 +199,12 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
-		c, serverPod, serverIP := e2evolume.NewNFSServer(cs, ns.Name, []string{})
+		c, serverPod, serverHost := e2evolume.NewNFSServer(cs, ns.Name, []string{})
 		config.ServerConfig = &c
 		return &nfsVolume{
-			serverIP:  serverIP,
-			serverPod: serverPod,
-			f:         f,
+			serverHost: serverHost,
+			serverPod:  serverPod,
+			f:          f,
 		}
 	case testpatterns.DynamicPV:
 		// Do nothing
@@ -1316,6 +1316,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 		Prefix:    "gcepd",
 		Framework: f,
 	}
+
 	if framework.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1328,17 +1329,18 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 }
 
 func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	zone := getInlineVolumeZone(config.Framework)
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+				v1.LabelZoneFailureDomain: zone,
 			},
 		}
 	}
 	ginkgo.By("creating a test gce pd volume")
-	vname, err := e2epv.CreatePDWithRetry()
+	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
@@ -1578,8 +1580,9 @@ func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *testsuites.Per
 	}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1592,7 +1595,17 @@ func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTe
 
 func (a *azureDiskDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
-	volumeName, err := e2epv.CreatePDWithRetry()
+	zone := getInlineVolumeZone(config.Framework)
+	if volType == testpatterns.InlineVolume {
+		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// so pods should be also scheduled there.
+		config.ClientNodeSelection = e2epod.NodeSelection{
+			Selector: map[string]string{
+				v1.LabelZoneFailureDomain: zone,
+			},
+		}
+	}
+	volumeName, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
 	return &azureDiskVolume{
 		volumeName: volumeName,
@@ -1713,6 +1726,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		Prefix:    "aws",
 		Framework: f,
 	}
+
 	if framework.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1724,17 +1738,18 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 }
 
 func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	zone := getInlineVolumeZone(config.Framework)
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+				v1.LabelZoneFailureDomain: zone,
 			},
 		}
 	}
 	ginkgo.By("creating a test aws volume")
-	vname, err := e2epv.CreatePDWithRetry()
+	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
 	return &awsVolume{
 		volumeName: vname,
@@ -1935,6 +1950,20 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 // cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
 func cleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
 	cleanUpVolumeServerWithSecret(f, serverPod, nil)
+}
+
+func getInlineVolumeZone(f *framework.Framework) string {
+	if framework.TestContext.CloudConfig.Zone != "" {
+		return framework.TestContext.CloudConfig.Zone
+	}
+	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
+	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	framework.ExpectNoError(err)
+	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
+	if ok {
+		return zone
+	}
+	return ""
 }
 
 // cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.

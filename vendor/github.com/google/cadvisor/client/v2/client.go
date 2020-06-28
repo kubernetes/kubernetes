@@ -32,7 +32,7 @@ import (
 
 // Client represents the base URL for a cAdvisor client.
 type Client struct {
-	baseUrl string
+	baseURL string
 }
 
 // NewClient returns a new client with the specified base URL.
@@ -42,17 +42,17 @@ func NewClient(url string) (*Client, error) {
 	}
 
 	return &Client{
-		baseUrl: fmt.Sprintf("%sapi/v2.1/", url),
+		baseURL: fmt.Sprintf("%sapi/v2.1/", url),
 	}, nil
 }
 
 // MachineInfo returns the JSON machine information for this client.
 // A non-nil error result indicates a problem with obtaining
 // the JSON machine information data.
-func (self *Client) MachineInfo() (minfo *v1.MachineInfo, err error) {
-	u := self.machineInfoUrl()
+func (c *Client) MachineInfo() (minfo *v1.MachineInfo, err error) {
+	u := c.machineInfoURL()
 	ret := new(v1.MachineInfo)
-	if err = self.httpGetJsonData(ret, nil, u, "machine info"); err != nil {
+	if err = c.httpGetJSONData(ret, nil, u, "machine info"); err != nil {
 		return
 	}
 	minfo = ret
@@ -62,25 +62,25 @@ func (self *Client) MachineInfo() (minfo *v1.MachineInfo, err error) {
 // MachineStats returns the JSON machine statistics for this client.
 // A non-nil error result indicates a problem with obtaining
 // the JSON machine information data.
-func (self *Client) MachineStats() ([]v2.MachineStats, error) {
+func (c *Client) MachineStats() ([]v2.MachineStats, error) {
 	var ret []v2.MachineStats
-	u := self.machineStatsUrl()
-	err := self.httpGetJsonData(&ret, nil, u, "machine stats")
+	u := c.machineStatsURL()
+	err := c.httpGetJSONData(&ret, nil, u, "machine stats")
 	return ret, err
 }
 
 // VersionInfo returns the version info for cAdvisor.
-func (self *Client) VersionInfo() (version string, err error) {
-	u := self.versionInfoUrl()
-	version, err = self.httpGetString(u, "version info")
+func (c *Client) VersionInfo() (version string, err error) {
+	u := c.versionInfoURL()
+	version, err = c.httpGetString(u, "version info")
 	return
 }
 
 // Attributes returns hardware and software attributes of the machine.
-func (self *Client) Attributes() (attr *v2.Attributes, err error) {
-	u := self.attributesUrl()
+func (c *Client) Attributes() (attr *v2.Attributes, err error) {
+	u := c.attributesURL()
 	ret := new(v2.Attributes)
-	if err = self.httpGetJsonData(ret, nil, u, "attributes"); err != nil {
+	if err = c.httpGetJSONData(ret, nil, u, "attributes"); err != nil {
 		return
 	}
 	attr = ret
@@ -88,8 +88,8 @@ func (self *Client) Attributes() (attr *v2.Attributes, err error) {
 }
 
 // Stats returns stats for the requested container.
-func (self *Client) Stats(name string, request *v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
-	u := self.statsUrl(name)
+func (c *Client) Stats(name string, request *v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
+	u := c.statsURL(name)
 	ret := make(map[string]v2.ContainerInfo)
 	data := url.Values{
 		"type":      []string{request.IdType},
@@ -98,33 +98,33 @@ func (self *Client) Stats(name string, request *v2.RequestOptions) (map[string]v
 	}
 
 	u = fmt.Sprintf("%s?%s", u, data.Encode())
-	if err := self.httpGetJsonData(&ret, nil, u, "stats"); err != nil {
+	if err := c.httpGetJSONData(&ret, nil, u, "stats"); err != nil {
 		return nil, err
 	}
 	return ret, nil
 }
 
-func (self *Client) machineInfoUrl() string {
-	return self.baseUrl + path.Join("machine")
+func (c *Client) machineInfoURL() string {
+	return c.baseURL + path.Join("machine")
 }
 
-func (self *Client) machineStatsUrl() string {
-	return self.baseUrl + path.Join("machinestats")
+func (c *Client) machineStatsURL() string {
+	return c.baseURL + path.Join("machinestats")
 }
 
-func (self *Client) versionInfoUrl() string {
-	return self.baseUrl + path.Join("version")
+func (c *Client) versionInfoURL() string {
+	return c.baseURL + path.Join("version")
 }
 
-func (self *Client) attributesUrl() string {
-	return self.baseUrl + path.Join("attributes")
+func (c *Client) attributesURL() string {
+	return c.baseURL + path.Join("attributes")
 }
 
-func (self *Client) statsUrl(name string) string {
-	return self.baseUrl + path.Join("stats", name)
+func (c *Client) statsURL(name string) string {
+	return c.baseURL + path.Join("stats", name)
 }
 
-func (self *Client) httpGetResponse(postData interface{}, urlPath, infoName string) ([]byte, error) {
+func (c *Client) httpGetResponse(postData interface{}, urlPath, infoName string) ([]byte, error) {
 	var resp *http.Response
 	var err error
 
@@ -155,16 +155,16 @@ func (self *Client) httpGetResponse(postData interface{}, urlPath, infoName stri
 	return body, nil
 }
 
-func (self *Client) httpGetString(url, infoName string) (string, error) {
-	body, err := self.httpGetResponse(nil, url, infoName)
+func (c *Client) httpGetString(url, infoName string) (string, error) {
+	body, err := c.httpGetResponse(nil, url, infoName)
 	if err != nil {
 		return "", err
 	}
 	return string(body), nil
 }
 
-func (self *Client) httpGetJsonData(data, postData interface{}, url, infoName string) error {
-	body, err := self.httpGetResponse(postData, url, infoName)
+func (c *Client) httpGetJSONData(data, postData interface{}, url, infoName string) error {
+	body, err := c.httpGetResponse(postData, url, infoName)
 	if err != nil {
 		return err
 	}

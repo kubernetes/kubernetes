@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -429,6 +429,12 @@ func TestPVCProtectionController(t *testing.T) {
 		pvcInformer := informers.Core().V1().PersistentVolumeClaims()
 		podInformer := informers.Core().V1().Pods()
 
+		// Create the controller
+		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client, test.storageObjectInUseProtectionEnabled)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
 		// Populate the informers with initial objects so the controller can
 		// Get() and List() it.
 		for _, obj := range informersObjs {
@@ -446,9 +452,6 @@ func TestPVCProtectionController(t *testing.T) {
 		for _, reactor := range test.reactors {
 			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorfn)
 		}
-
-		// Create the controller
-		ctrl := NewPVCProtectionController(pvcInformer, podInformer, client, test.storageObjectInUseProtectionEnabled)
 
 		// Start the test by simulating an event
 		if test.updatedPVC != nil {

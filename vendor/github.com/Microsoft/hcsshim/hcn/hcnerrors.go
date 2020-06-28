@@ -3,11 +3,21 @@
 package hcn
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/Microsoft/hcsshim/internal/hcs"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	errInvalidNetworkID      = errors.New("invalid network ID")
+	errInvalidEndpointID     = errors.New("invalid endpoint ID")
+	errInvalidNamespaceID    = errors.New("invalid namespace ID")
+	errInvalidLoadBalancerID = errors.New("invalid load balancer ID")
+	errInvalidRouteID        = errors.New("invalid route ID")
 )
 
 func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
@@ -26,13 +36,59 @@ func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
 	}
 
 	if errorFound {
-		returnError := hcserror.New(hr, methodName, result)
+		returnError := new(hr, methodName, result)
 		logrus.Debugf(returnError.Error()) // HCN errors logged for debugging.
 		return returnError
 	}
 
 	return nil
 }
+
+type ErrorCode uint32
+
+// For common errors, define the error as it is in windows, so we can quickly determine it later
+const (
+	ERROR_NOT_FOUND                     = 0x490
+	HCN_E_PORT_ALREADY_EXISTS ErrorCode = 0x803b0013
+)
+
+type HcnError struct {
+	*hcserror.HcsError
+	code ErrorCode
+}
+
+func (e *HcnError) Error() string {
+	return e.HcsError.Error()
+}
+
+func CheckErrorWithCode(err error, code ErrorCode) bool {
+	hcnError, ok := err.(*HcnError)
+	if ok {
+		return hcnError.code == code
+	}
+	return false
+}
+
+func IsElementNotFoundError(err error) bool {
+	return CheckErrorWithCode(err, ERROR_NOT_FOUND)
+}
+
+func IsPortAlreadyExistsError(err error) bool {
+	return CheckErrorWithCode(err, HCN_E_PORT_ALREADY_EXISTS)
+}
+
+func new(hr error, title string, rest string) error {
+	err := &HcnError{}
+	hcsError := hcserror.New(hr, title, rest)
+	err.HcsError = hcsError.(*hcserror.HcsError)
+	err.code = ErrorCode(hcserror.Win32FromError(hr))
+	return err
+}
+
+//
+// Note that the below errors are not errors returned by hcn itself
+// we wish to seperate them as they are shim usage error
+//
 
 // NetworkNotFoundError results from a failed seach for a network by Id or Name
 type NetworkNotFoundError struct {
@@ -41,10 +97,10 @@ type NetworkNotFoundError struct {
 }
 
 func (e NetworkNotFoundError) Error() string {
-	if e.NetworkName == "" {
-		return fmt.Sprintf("Network Name %s not found", e.NetworkName)
+	if e.NetworkName != "" {
+		return fmt.Sprintf("Network name %q not found", e.NetworkName)
 	}
-	return fmt.Sprintf("Network Id %s not found", e.NetworkID)
+	return fmt.Sprintf("Network ID %q not found", e.NetworkID)
 }
 
 // EndpointNotFoundError results from a failed seach for an endpoint by Id or Name
@@ -54,10 +110,10 @@ type EndpointNotFoundError struct {
 }
 
 func (e EndpointNotFoundError) Error() string {
-	if e.EndpointName == "" {
-		return fmt.Sprintf("Endpoint Name %s not found", e.EndpointName)
+	if e.EndpointName != "" {
+		return fmt.Sprintf("Endpoint name %q not found", e.EndpointName)
 	}
-	return fmt.Sprintf("Endpoint Id %s not found", e.EndpointID)
+	return fmt.Sprintf("Endpoint ID %q not found", e.EndpointID)
 }
 
 // NamespaceNotFoundError results from a failed seach for a namsepace by Id
@@ -66,7 +122,7 @@ type NamespaceNotFoundError struct {
 }
 
 func (e NamespaceNotFoundError) Error() string {
-	return fmt.Sprintf("Namespace %s not found", e.NamespaceID)
+	return fmt.Sprintf("Namespace ID %q not found", e.NamespaceID)
 }
 
 // LoadBalancerNotFoundError results from a failed seach for a loadbalancer by Id
@@ -75,13 +131,22 @@ type LoadBalancerNotFoundError struct {
 }
 
 func (e LoadBalancerNotFoundError) Error() string {
-	return fmt.Sprintf("LoadBalancer %s not found", e.LoadBalancerId)
+	return fmt.Sprintf("LoadBalancer %q not found", e.LoadBalancerId)
+}
+
+// RouteNotFoundError results from a failed seach for a route by Id
+type RouteNotFoundError struct {
+	RouteId string
+}
+
+func (e RouteNotFoundError) Error() string {
+	return fmt.Sprintf("SDN Route %q not found", e.RouteId)
 }
 
 // IsNotFoundError returns a boolean indicating whether the error was caused by
 // a resource not being found.
 func IsNotFoundError(err error) bool {
-	switch err.(type) {
+	switch pe := err.(type) {
 	case NetworkNotFoundError:
 		return true
 	case EndpointNotFoundError:
@@ -90,6 +155,10 @@ func IsNotFoundError(err error) bool {
 		return true
 	case LoadBalancerNotFoundError:
 		return true
+	case RouteNotFoundError:
+		return true
+	case *hcserror.HcsError:
+		return pe.Err == hcs.ErrElementNotFound
 	}
 	return false
 }

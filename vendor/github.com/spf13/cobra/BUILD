@@ -9,6 +9,8 @@ go_library(
         "command.go",
         "command_notwin.go",
         "command_win.go",
+        "custom_completions.go",
+        "fish_completions.go",
         "powershell_completions.go",
         "shell_completions.go",
         "zsh_completions.go",

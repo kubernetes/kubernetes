@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -63,8 +63,9 @@ type AtomicWriter struct {
 
 // FileProjection contains file Data and access Mode
 type FileProjection struct {
-	Data []byte
-	Mode int32
+	Data   []byte
+	Mode   int32
+	FsUser *int64
 }
 
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
@@ -378,14 +379,12 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 		fullPath := filepath.Join(dir, userVisiblePath)
 		baseDir, _ := filepath.Split(fullPath)
 
-		err := os.MkdirAll(baseDir, os.ModePerm)
-		if err != nil {
+		if err := os.MkdirAll(baseDir, os.ModePerm); err != nil {
 			klog.Errorf("%s: unable to create directory %s: %v", w.logContext, baseDir, err)
 			return err
 		}
 
-		err = ioutil.WriteFile(fullPath, content, mode)
-		if err != nil {
+		if err := ioutil.WriteFile(fullPath, content, mode); err != nil {
 			klog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 			return err
 		}
@@ -393,9 +392,17 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 		// open(2) to create the file, so the final mode used is "mode &
 		// ~umask". But we want to make sure the specified mode is used
 		// in the file no matter what the umask is.
-		err = os.Chmod(fullPath, mode)
-		if err != nil {
-			klog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
+		if err := os.Chmod(fullPath, mode); err != nil {
+			klog.Errorf("%s: unable to change file %s with mode %v: %v", w.logContext, fullPath, mode, err)
+			return err
+		}
+
+		if fileProjection.FsUser == nil {
+			continue
+		}
+		if err := os.Chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
+			klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, fullPath, int(*fileProjection.FsUser), err)
+			return err
 		}
 	}
 

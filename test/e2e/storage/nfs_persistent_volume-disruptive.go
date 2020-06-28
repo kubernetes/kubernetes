@@ -78,15 +78,15 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	var (
-		c                         clientset.Interface
-		ns                        string
-		nfsServerPod              *v1.Pod
-		nfsPVconfig               e2epv.PersistentVolumeConfig
-		pvcConfig                 e2epv.PersistentVolumeClaimConfig
-		nfsServerIP, clientNodeIP string
-		clientNode                *v1.Node
-		volLabel                  labels.Set
-		selector                  *metav1.LabelSelector
+		c                           clientset.Interface
+		ns                          string
+		nfsServerPod                *v1.Pod
+		nfsPVconfig                 e2epv.PersistentVolumeConfig
+		pvcConfig                   e2epv.PersistentVolumeClaimConfig
+		nfsServerHost, clientNodeIP string
+		clientNode                  *v1.Node
+		volLabel                    labels.Set
+		selector                    *metav1.LabelSelector
 	)
 
 	ginkgo.BeforeEach(func() {
@@ -99,13 +99,13 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 		// Start the NFS server pod.
-		_, nfsServerPod, nfsServerIP = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+		_, nfsServerPod, nfsServerHost = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 		nfsPVconfig = e2epv.PersistentVolumeConfig{
 			NamePrefix: "nfs-",
 			Labels:     volLabel,
 			PVSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
-					Server:   nfsServerIP,
+					Server:   nfsServerHost,
 					Path:     "/exports",
 					ReadOnly: false,
 				},

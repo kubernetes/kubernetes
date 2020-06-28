@@ -28,6 +28,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -64,6 +66,7 @@ type CreateClusterRoleOptions struct {
 	*CreateRoleOptions
 	NonResourceURLs []string
 	AggregationRule map[string]string
+	FieldManager    string
 }
 
 // NewCmdCreateClusterRole initializes and returns new ClusterRoles command
@@ -95,6 +98,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
 	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", c.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 	cmd.Flags().Var(cliflag.NewMapStringString(&c.AggregationRule), "aggregation-rule", "An aggregation label selector for combining ClusterRoles.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &c.FieldManager, "kubectl-create")
 
 	return cmd
 }
@@ -199,9 +203,16 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 		}
 	}
 
+	if err := util.CreateOrUpdateAnnotation(c.CreateAnnotation, clusterRole, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
 	// Create ClusterRole.
 	if c.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
+		if c.FieldManager != "" {
+			createOptions.FieldManager = c.FieldManager
+		}
 		if c.DryRunStrategy == cmdutil.DryRunServer {
 			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
 				return err

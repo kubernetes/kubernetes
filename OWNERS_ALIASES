@@ -124,6 +124,7 @@ aliases:
     - calebamiles # SIG Chair
     - cpanato # Branch Manager
     - feiskyer # Patch Release Team
+    - hasheddan # Branch Manager
     - hoegaarden # Patch Release Team
     - justaugustus # SIG Chair
     - saschagrunert # Branch Manager
@@ -146,14 +147,14 @@ aliases:
 
   sig-scheduling-maintainers:
     - alculquicondor
-    - bsalamat
     - k82cn
     - wojtek-t
     - ravisantoshgudimetla
     - Huang-Wei
     - ahg-g
+  # emeritus:
+  # - bsalamat
   sig-scheduling:
-    - bsalamat
     - k82cn
     - resouer
     - ravisantoshgudimetla
@@ -167,7 +168,6 @@ aliases:
     - damemi
 
   sig-cli-maintainers:
-    - adohe
     - brendandburns
     - deads2k
     - janetkuo
@@ -179,20 +179,24 @@ aliases:
     - mengqiy
     - smarterclayton
     - soltysh
+    - pwittrock
+  # emeritus:
+  # - adohe
   sig-cli:
-    - adohe
+    - brianpursley
     - deads2k
     - derekwaynecarr
     - dixudx
     - dims
-    - eparis
-    - juanvallejo
     - mengqiy
     - rootfs
     - seans3
     - shiywang
     - smarterclayton
     - soltysh
+    - pwittrock
+    - zhouya0
+
   sig-testing-reviewers:
     - bentheelder
     - cblecker
@@ -211,7 +215,6 @@ aliases:
     - Random-Liu
     - dchen1107
     - derekwaynecarr
-    - tallclair
     - vishh
     - yujuhong
   sig-node-reviewers:
@@ -225,14 +228,13 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - tallclair
     - vishh
     - yifan-gu
     - yujuhong
     - krmayankk
     - mattjmcnaughton
     - matthyx
-
+    - odinuge
   sig-network-driver-approvers:
     - dcbw
     - freehan
@@ -447,9 +449,9 @@ aliases:
     - mm4tt
     - wojtek-t
 
-  sig-scheduling-api-reviewers:
-      - bsalamat
-      - k82cn
+  # sig-scheduling-api-reviewers:
+  #   -
+  #   -
 
   sig-storage-api-reviewers:
     - saad-ali
@@ -482,6 +484,7 @@ aliases:
     - dchen1107       # Node
     - deads2k         # API Machinery
     - derekwaynecarr  # Node
+    - dims            # Architecture
     - jdumars         # Architecture, Release
     - kow3ns          # Apps
     - lavalamp        # API Machinery

@@ -144,7 +144,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		var err error
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		_, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
@@ -314,14 +314,14 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		for i := 0; i < 10; i++ {
 			testTaint := addRandomTaintToNode(cs, nodeName)
 			tolerations = append(tolerations, v1.Toleration{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect})
-			defer framework.RemoveTaintOffNode(cs, nodeName, *testTaint)
+			defer e2enode.RemoveTaintOffNode(cs, nodeName, *testTaint)
 		}
 		ginkgo.By("Adding 10 intolerable taints to all other nodes")
 		for i := 1; i < len(nodeList.Items); i++ {
 			node := nodeList.Items[i]
 			for i := 0; i < 10; i++ {
 				testTaint := addRandomTaintToNode(cs, node.Name)
-				defer framework.RemoveTaintOffNode(cs, node.Name, *testTaint)
+				defer e2enode.RemoveTaintOffNode(cs, node.Name, *testTaint)
 			}
 		}
 
@@ -465,16 +465,30 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 
 		needCreateResource[v1.ResourceMemory] = *resource.NewQuantity(int64((ratio-memFraction)*float64(memAllocatableVal)), resource.BinarySI)
 
-		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
-			*initPausePod(f, pausePodConfig{
-				Name:   "",
-				Labels: balancePodLabel,
-				Resources: &v1.ResourceRequirements{
-					Limits:   needCreateResource,
-					Requests: needCreateResource,
+		podConfig := &pausePodConfig{
+			Name:   "",
+			Labels: balancePodLabel,
+			Resources: &v1.ResourceRequirements{
+				Limits:   needCreateResource,
+				Requests: needCreateResource,
+			},
+			Affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+								},
+							},
+						},
+					},
 				},
-				NodeName: node.Name,
-			}), true, framework.Logf)
+			},
+		}
+
+		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
+			*initPausePod(f, *podConfig), true, framework.Logf)
 
 		if err != nil {
 			return err
@@ -580,7 +594,7 @@ func addRandomTaintToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 		Value:  fmt.Sprintf("testing-taint-value-%s", string(uuid.NewUUID())),
 		Effect: v1.TaintEffectPreferNoSchedule,
 	}
-	framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+	e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 	return &testTaint
 }

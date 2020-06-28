@@ -5,6 +5,7 @@ package ipvs
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -449,13 +450,26 @@ func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error)
 			d.ActiveConnections = int(native.Uint16(attr.Value))
 		case ipvsDestAttrInactiveConnections:
 			d.InactiveConnections = int(native.Uint16(attr.Value))
-		case ipvsSvcAttrStats:
+		case ipvsDestAttrStats:
 			stats, err := assembleStats(attr.Value)
 			if err != nil {
 				return nil, err
 			}
 			d.Stats = DstStats(stats)
 		}
+	}
+
+	// in older kernels (< 3.18), the destination address family attribute doesn't exist so we must
+	// assume it based on the destination address provided.
+	if d.AddressFamily == 0 {
+		// we can't check the address family using net stdlib because netlink returns
+		// IPv4 addresses as the first 4 bytes in a []byte of length 16 where as
+		// stdlib expects it as the last 4 bytes.
+		addressFamily, err := getIPFamily(addressBytes)
+		if err != nil {
+			return nil, err
+		}
+		d.AddressFamily = addressFamily
 	}
 
 	// parse Address after parse AddressFamily incase of parseIP error
@@ -468,6 +482,37 @@ func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error)
 	}
 
 	return &d, nil
+}
+
+// getIPFamily parses the IP family based on raw data from netlink.
+// For AF_INET, netlink will set the first 4 bytes with trailing zeros
+//   10.0.0.1 -> [10 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0]
+// For AF_INET6, the full 16 byte array is used:
+//   2001:db8:3c4d:15::1a00 -> [32 1 13 184 60 77 0 21 0 0 0 0 0 0 26 0]
+func getIPFamily(address []byte) (uint16, error) {
+	if len(address) == 4 {
+		return syscall.AF_INET, nil
+	}
+
+	if isZeros(address) {
+		return 0, errors.New("could not parse IP family from address data")
+	}
+
+	// assume IPv4 if first 4 bytes are non-zero but rest of the data is trailing zeros
+	if !isZeros(address[:4]) && isZeros(address[4:]) {
+		return syscall.AF_INET, nil
+	}
+
+	return syscall.AF_INET6, nil
+}
+
+func isZeros(b []byte) bool {
+	for i := 0; i < len(b); i++ {
+		if b[i] != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // parseDestination given a ipvs netlink response this function will respond with a valid destination entry, an error otherwise

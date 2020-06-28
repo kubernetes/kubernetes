@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authenticationv1client "k8s.io/client-go/kubernetes/typed/authentication/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const retryBackoff = 500 * time.Millisecond

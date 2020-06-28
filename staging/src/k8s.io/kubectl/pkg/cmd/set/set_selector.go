@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -46,6 +46,7 @@ type SetSelectorOptions struct {
 	RecordFlags          *genericclioptions.RecordFlags
 	dryRunStrategy       cmdutil.DryRunStrategy
 	dryRunVerifier       *resource.DryRunVerifier
+	fieldManager         string
 
 	// set by args
 	resources       []string
@@ -113,6 +114,7 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o.ResourceBuilderFlags.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
 
 	cmd.Flags().StringVarP(&o.resourceVersion, "resource-version", "", o.resourceVersion, "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	cmdutil.AddDryRunFlag(cmd)
@@ -175,6 +177,9 @@ func (o *SetSelectorOptions) RunSelector() error {
 	r := o.ResourceFinder.Do()
 
 	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		patch := &Patch{Info: info}
 
 		if len(o.resourceVersion) != 0 {
@@ -224,6 +229,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 		actual, err := resource.
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+			WithFieldManager(o.fieldManager).
 			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			return err

@@ -28,7 +28,6 @@ import (
 )
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
-	testTimeout := int64(0)
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
@@ -48,20 +47,17 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 				},
 			},
 		},
-		LeaderElection: config.KubeSchedulerLeaderElectionConfiguration{
-			LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-				ResourceLock:      "configmap",
-				LeaderElect:       true,
-				LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
-				RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
-				RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
-				ResourceNamespace: "name",
-				ResourceName:      "name",
-			},
+		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+			ResourceLock:      "configmap",
+			LeaderElect:       true,
+			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
+			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
+			RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
+			ResourceNamespace: "name",
+			ResourceName:      "name",
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		BindTimeoutSeconds:       testTimeout,
 		PercentageOfNodesToScore: 35,
 		Profiles: []config.KubeSchedulerProfile{
 			{

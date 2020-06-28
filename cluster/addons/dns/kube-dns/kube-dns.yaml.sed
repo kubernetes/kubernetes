@@ -90,6 +90,17 @@ spec:
       securityContext:
         supplementalGroups: [ 65534 ]
         fsGroup: 65534
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: k8s-app
+                    operator: In
+                    values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
@@ -104,7 +115,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: kubedns
-        image: k8s.gcr.io/k8s-dns-kube-dns:1.14.13
+        image: k8s.gcr.io/k8s-dns-kube-dns:1.15.10
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -160,7 +171,7 @@ spec:
           runAsUser: 1001
           runAsGroup: 1001
       - name: dnsmasq
-        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
+        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.15.10
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -207,7 +218,7 @@ spec:
               - NET_BIND_SERVICE
               - SETGID
       - name: sidecar
-        image: k8s.gcr.io/k8s-dns-sidecar:1.14.13
+        image: k8s.gcr.io/k8s-dns-sidecar:1.15.10
         livenessProbe:
           httpGet:
             path: /metrics

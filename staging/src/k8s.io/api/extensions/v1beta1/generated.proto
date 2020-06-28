@@ -316,7 +316,7 @@ message DeploymentSpec {
   // The number of old ReplicaSets to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
   // This is set to the max value of int32 (i.e. 2147483647) by default, which
-  // means "retaining all old RelicaSets".
+  // means "retaining all old ReplicaSets".
   // +optional
   optional int32 revisionHistoryLimit = 6;
 
@@ -848,7 +848,7 @@ message PodSecurityPolicySpec {
   // +optional
   repeated string allowedCapabilities = 4;
 
-  // volumes is a white list of allowed volume plugins. Empty indicates that
+  // volumes is an allowlist of volume plugins. Empty indicates that
   // no volumes may be used. To allow all volumes you may use '*'.
   // +optional
   repeated string volumes = 5;
@@ -905,18 +905,18 @@ message PodSecurityPolicySpec {
   // +optional
   optional bool allowPrivilegeEscalation = 16;
 
-  // allowedHostPaths is a white list of allowed host paths. Empty indicates
+  // allowedHostPaths is an allowlist of host paths. Empty indicates
   // that all host paths may be used.
   // +optional
   repeated AllowedHostPath allowedHostPaths = 17;
 
-  // allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+  // allowedFlexVolumes is an allowlist of Flexvolumes.  Empty or nil indicates that all
   // Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
   // is allowed in the "volumes" field.
   // +optional
   repeated AllowedFlexVolume allowedFlexVolumes = 18;
 
-  // AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
+  // AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
   // An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
   // +optional
   repeated AllowedCSIDriver allowedCSIDrivers = 23;
@@ -924,7 +924,7 @@ message PodSecurityPolicySpec {
   // allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
-  // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
+  // Kubelet has to allowlist all unsafe sysctls explicitly to avoid rejection.
   //
   // Examples:
   // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
@@ -942,7 +942,7 @@ message PodSecurityPolicySpec {
   // +optional
   repeated string forbiddenSysctls = 20;
 
-  // AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+  // AllowedProcMountTypes is an allowlist of allowed ProcMountTypes.
   // Empty or nil indicates that only the DefaultProcMountType may be used.
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
@@ -1154,7 +1154,7 @@ message RunAsUserStrategyOptions {
 // RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
 // for a pod.
 message RuntimeClassStrategyOptions {
-  // allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a pod.
+  // allowedRuntimeClassNames is an allowlist of RuntimeClass names that may be specified on a pod.
   // A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
   // list. An empty list requires the RuntimeClassName field to be unset.
   repeated string allowedRuntimeClassNames = 1;

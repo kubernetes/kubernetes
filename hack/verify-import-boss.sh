@@ -43,4 +43,4 @@ for d in staging/src/k8s.io/*/; do
   fi
 done
 
-$(kube::util::find-binary "import-boss") --verify-only "$@" --input-dirs "$(IFS=, ; echo "${packages[*]}")"
+$(kube::util::find-binary "import-boss") --include-test-files=true --verify-only --input-dirs "$(IFS=, ; echo "${packages[*]}")"

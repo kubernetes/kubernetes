@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DeletePods will delete all pods from master running on given node,
@@ -118,7 +118,7 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
-func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName string) error {
+func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
 	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
 
 	errMsg := []string{}
@@ -136,6 +136,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName s
 				if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
 					break
 				}
+
 				klog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
 				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 				if err != nil {
@@ -147,6 +148,8 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName s
 					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}
+				// record NodeNotReady event after updateStatus to make sure pod still exists
+				recorder.Event(pod, v1.EventTypeWarning, "NodeNotReady", "Node is not ready")
 				break
 			}
 		}

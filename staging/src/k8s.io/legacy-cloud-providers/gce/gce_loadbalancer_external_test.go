@@ -233,9 +233,6 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	s, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
-	// Enable the cloud.NetworkTiers feature
-	s.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
-
 	for desc, tc := range map[string]struct {
 		addrName     string
 		netTier      cloud.NetworkTier
@@ -401,8 +398,6 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	// Enable the cloud.NetworkTiers feature
-	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	svc := fakeLoadbalancerService("")
 	svc.Annotations = map[string]string{NetworkTierAnnotationKey: "Premium"}
 
@@ -460,8 +455,6 @@ func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	require.NoError(t, err)
 
-	// Enable the cloud.NetworkTiers feature
-	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	svc := fakeLoadbalancerService("")
 	svc.Annotations = map[string]string{NetworkTierAnnotationKey: wrongTier}
 
@@ -834,7 +827,6 @@ func TestDeleteWrongNetworkTieredResourcesSucceedsWhenNotFound(t *testing.T) {
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
-	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	assert.Nil(t, gce.deleteWrongNetworkTieredResources("Wrong_LB_Name", "", cloud.NetworkTier("")))
 }
 

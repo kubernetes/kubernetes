@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -387,7 +389,7 @@ func TestGetHostportChain(t *testing.T) {
 
 func TestHostportManagerIPv6(t *testing.T) {
 	iptables := NewFakeIPTables()
-	iptables.ipv6 = true
+	iptables.protocol = utiliptables.ProtocolIPv6
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
 		hostPortMap: make(map[hostport]closeable),

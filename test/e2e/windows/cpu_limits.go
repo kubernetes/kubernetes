@@ -132,7 +132,7 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}

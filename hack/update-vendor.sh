@@ -23,8 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
 # Ensure sort order doesn't depend on locale
 export LANG=C
 export LC_ALL=C
@@ -99,10 +99,10 @@ function group_replace_directives() {
      /^replace [(]/      { inreplace=1; next                   }
      inreplace && /^[)]/ { inreplace=0; next                   }
      inreplace           { print > \"${go_mod_replace}\"; next }
-     
+
      # print ungrouped replace directives with the replace directive trimmed
      /^replace [^(]/ { sub(/^replace /,\"\"); print > \"${go_mod_replace}\"; next }
-     
+
      # otherwise print to the noreplace file
      { print > \"${go_mod_noreplace}\" }
   " < go.mod
@@ -136,7 +136,7 @@ function add_generated_comments() {
     echo ""
     cat "${go_mod_nocomments}"
    } > go.mod
-  
+
   # Format
   go mod edit -fmt
 }
@@ -232,7 +232,7 @@ while IFS= read -r repo; do
       go list -tags=tools all
     } >> "${LOG_FILE}" 2>&1
 
-    # capture module dependencies 
+    # capture module dependencies
     go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all > "${tmp_go_deps}"
 
     # restore the original go.mod file
@@ -255,13 +255,13 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
 
     # prune replace directives that pin to the naturally selected version.
     # do this before tidying, since tidy removes unused modules that
-    # don't provide any relevant packages, which forgets which version of the 
+    # don't provide any relevant packages, which forgets which version of the
     # unused transitive dependency we had a require directive for,
     # and prevents pruning the matching replace directive after tidying.
     go list -m -json all |
-      jq -r 'select(.Replace != null) | 
-             select(.Path == .Replace.Path) | 
-             select(.Version == .Replace.Version) | 
+      jq -r 'select(.Replace != null) |
+             select(.Path == .Replace.Path) |
+             select(.Version == .Replace.Version) |
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
@@ -285,9 +285,9 @@ $(go mod why "${loopback_deps[@]}")"
 
     # prune replace directives that pin to the naturally selected version
     go list -m -json all |
-      jq -r 'select(.Replace != null) | 
-             select(.Path == .Replace.Path) | 
-             select(.Version == .Replace.Version) | 
+      jq -r 'select(.Replace != null) |
+             select(.Path == .Replace.Path) |
+             select(.Version == .Replace.Version) |
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
@@ -309,6 +309,8 @@ fi
 kube::log::status "go.mod: adding generated comments"
 add_generated_comments "
 // This is a generated file. Do not edit directly.
+// Ensure you've carefully read
+// https://git.k8s.io/community/contributors/devel/sig-architecture/vendor.md
 // Run hack/pin-dependency.sh to change pinned dependency versions.
 // Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 "
@@ -319,15 +321,22 @@ for repo in $(kube::util::list_staging_repos); do
 done
 
 
-# Phase 6: rebuild vendor directory
-
+# Phase 7: rebuild vendor directory
 kube::log::status "vendor: running 'go mod vendor'"
 go mod vendor >>"${LOG_FILE}" 2>&1
 
 # sort recorded packages for a given vendored dependency in modules.txt.
 # `go mod vendor` outputs in imported order, which means slight go changes (or different platforms) can result in a differently ordered modules.txt.
-# scan                 | prefix comment lines with the module name       | sort field 1  | strip leading text on comment lines
-awk '{if($1=="#") print $2 " " $0; else print}' < vendor/modules.txt | sort -k1,1 -s | sed 's/.*#/#/' > "${TMP_DIR}/modules.txt.tmp"
+# 1. prefix '#' lines with the module name and capture the module name
+# 2. prefix '##' with the most recently captured module name
+# 3. output other lines as-is
+# sort lines
+# strip anything before '#'
+awk '{
+  if($1=="#")       { current_module=$2; print $2 " " $0;      }
+  else if($1=="##") { print current_module " " $0; }
+  else              { print }
+}' < vendor/modules.txt | sort -k1,1 -s | sed 's/[^#]*#/#/' > "${TMP_DIR}/modules.txt.tmp"
 mv "${TMP_DIR}/modules.txt.tmp" vendor/modules.txt
 
 # create a symlink in vendor directory pointing to the staging components.
@@ -341,18 +350,21 @@ kube::log::status "vendor: updating BUILD files"
 # Assume that anything imported through vendor doesn't need Bazel to build.
 # Prune out any Bazel build files, since these can break the build due to
 # missing dependencies that aren't included by go mod vendor.
-find vendor/ -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) -exec rm -f {} \;
+find vendor/ -type f \
+    \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) \
+    -exec rm -f {} \;
 hack/update-bazel.sh >>"${LOG_FILE}" 2>&1
 
-kube::log::status "vendor: updating LICENSES file"
+kube::log::status "vendor: updating vendor/LICENSES"
 hack/update-vendor-licenses.sh >>"${LOG_FILE}" 2>&1
 
 kube::log::status "vendor: creating OWNERS file"
-rm -f "Godeps/OWNERS" "vendor/OWNERS"
-cat <<__EOF__ > "Godeps/OWNERS"
+rm -f "vendor/OWNERS"
+cat <<__EOF__ > "vendor/OWNERS"
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
 - dep-approvers
 __EOF__
-cp "Godeps/OWNERS" "vendor/OWNERS"
+
+kube::log::status "NOTE: don't forget to handle vendor/* files that were added or removed"

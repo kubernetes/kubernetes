@@ -24,6 +24,11 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.9
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// This API is never server served.  It is used for outbound requests from apiservers.  This will ensure it never gets served accidentally
+// and having the generator against this group will protect future APIs which may be served.
+// +k8s:prerelease-lifecycle-gen:replacement=admission.k8s.io,v1,AdmissionReview
 
 // AdmissionReview describes an admission review request/response.
 type AdmissionReview struct {

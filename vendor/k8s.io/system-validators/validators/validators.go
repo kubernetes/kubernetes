@@ -18,6 +18,7 @@ package system
 
 import (
 	"fmt"
+	"runtime"
 )
 
 // Validator is the interface for all validators.
@@ -53,23 +54,31 @@ func Validate(spec SysSpec, validators []Validator) ([]error, []error) {
 }
 
 // ValidateSpec uses all default validators to validate the system and writes to stdout.
-func ValidateSpec(spec SysSpec, runtime string) ([]error, []error) {
+func ValidateSpec(spec SysSpec, containerRuntime string) ([]error, []error) {
 	// OS-level validators.
 	var osValidators = []Validator{
 		&OSValidator{Reporter: DefaultReporter},
 		&KernelValidator{Reporter: DefaultReporter},
-		&CgroupsValidator{Reporter: DefaultReporter},
-		&packageValidator{reporter: DefaultReporter},
 	}
+
 	// Docker-specific validators.
 	var dockerValidators = []Validator{
 		&DockerValidator{Reporter: DefaultReporter},
 	}
 
 	validators := osValidators
-	switch runtime {
+	switch containerRuntime {
 	case "docker":
 		validators = append(validators, dockerValidators...)
 	}
+
+	// Linux-specific validators.
+	if runtime.GOOS == "linux" {
+		validators = append(validators,
+			&CgroupsValidator{Reporter: DefaultReporter},
+			&packageValidator{reporter: DefaultReporter},
+		)
+	}
+
 	return Validate(spec, validators)
 }

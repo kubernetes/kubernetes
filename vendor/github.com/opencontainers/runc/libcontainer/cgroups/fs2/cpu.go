@@ -13,15 +13,36 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
+func isCpuSet(cgroup *configs.Cgroup) bool {
+	return cgroup.Resources.CpuWeight != 0 || cgroup.Resources.CpuQuota != 0 || cgroup.Resources.CpuPeriod != 0
+}
+
 func setCpu(dirPath string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.CpuWeight != 0 {
-		if err := fscommon.WriteFile(dirPath, "cpu.weight", strconv.FormatUint(cgroup.Resources.CpuWeight, 10)); err != nil {
+	if !isCpuSet(cgroup) {
+		return nil
+	}
+	r := cgroup.Resources
+
+	// NOTE: .CpuShares is not used here. Conversion is the caller's responsibility.
+	if r.CpuWeight != 0 {
+		if err := fscommon.WriteFile(dirPath, "cpu.weight", strconv.FormatUint(r.CpuWeight, 10)); err != nil {
 			return err
 		}
 	}
 
-	if cgroup.Resources.CpuMax != "" {
-		if err := fscommon.WriteFile(dirPath, "cpu.max", cgroup.Resources.CpuMax); err != nil {
+	if r.CpuQuota != 0 || r.CpuPeriod != 0 {
+		str := "max"
+		if r.CpuQuota > 0 {
+			str = strconv.FormatInt(r.CpuQuota, 10)
+		}
+		period := r.CpuPeriod
+		if period == 0 {
+			// This default value is documented in
+			// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
+			period = 100000
+		}
+		str += " " + strconv.FormatUint(period, 10)
+		if err := fscommon.WriteFile(dirPath, "cpu.max", str); err != nil {
 			return err
 		}
 	}

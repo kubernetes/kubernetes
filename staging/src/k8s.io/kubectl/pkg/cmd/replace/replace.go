@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -93,6 +93,8 @@ type ReplaceOptions struct {
 	Recorder genericclioptions.Recorder
 
 	genericclioptions.IOStreams
+
+	fieldManager string
 }
 
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
@@ -129,6 +131,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmdutil.AddDryRunFlag(cmd)
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-replace")
 
 	return cmd
 }
@@ -292,6 +295,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		obj, err := resource.
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			WithFieldManager(o.fieldManager).
 			Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
@@ -382,7 +386,9 @@ func (o *ReplaceOptions) forceReplace() error {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).
+			WithFieldManager(o.fieldManager).
+			Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return err
 		}

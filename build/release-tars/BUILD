@@ -70,13 +70,20 @@ pkg_tar(
 )
 
 # Included in node and server tarballs.
-filegroup(
-    name = "license-targets",
+pkg_tar(
+    name = "license-artifacts",
     srcs = [
-        ":kubernetes-src.tar.gz",
-        "//:Godeps/LICENSES",
+        ":kubernetes-src.tar.gz",  # we want the tar file itself
+    ],
+    mode = "0755",
+    tags = [
+        "manual",
+        "no-cache",
     ],
     visibility = ["//visibility:private"],
+    deps = [
+        "//:LICENSES",  # we want to expand this
+    ],
 )
 
 pkg_tar(
@@ -119,7 +126,7 @@ pkg_tar(
 
 [[pkg_tar(
     name = "kubernetes-node-%s-%s" % (os, arch),
-    srcs = [":license-targets"],
+    srcs = [],
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
@@ -127,7 +134,9 @@ pkg_tar(
         "manual",
         "no-cache",
     ],
-    deps = select({go_platform_constraint(os, arch): [":_node-bin"]}),
+    deps = select({go_platform_constraint(os, arch): [":_node-bin"]}) + [
+        ":license-artifacts",
+    ],
 ) for arch in archs] for os, archs in NODE_PLATFORMS.items()]
 
 pkg_tar(
@@ -170,7 +179,7 @@ pkg_tar(
 
 [[pkg_tar(
     name = "kubernetes-server-%s-%s" % (os, arch),
-    srcs = [":license-targets"],
+    srcs = [],
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
@@ -183,7 +192,9 @@ pkg_tar(
             ":_server-addons",
             ":_server-bin",
         ],
-    }),
+    }) + [
+        ":license-artifacts",
+    ],
 ) for arch in archs] for os, archs in SERVER_PLATFORMS.items()]
 
 pkg_tar(
@@ -235,7 +246,6 @@ pkg_tar(
 pkg_tar(
     name = "kubernetes",
     srcs = [
-        "//:Godeps/LICENSES",
         "//:README.md",
         "//:version",
         "//cluster:all-srcs",
@@ -253,6 +263,7 @@ pkg_tar(
     tags = ["no-cache"],
     deps = [
         ":_full_server",
+        ":license-artifacts",
     ],
 )
 

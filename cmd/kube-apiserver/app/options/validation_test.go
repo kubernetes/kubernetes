@@ -95,6 +95,18 @@ func TestClusterSerivceIPRange(t *testing.T) {
 			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/108"),
 			enableDualStack: false,
 		},
+		{
+			name:            "service cidr to big",
+			expectErrors:    true,
+			options:         makeOptionsWithCIDRs("10.0.0.0/8", ""),
+			enableDualStack: true,
+		},
+		{
+			name:            "dual-stack secondary cidr to big",
+			expectErrors:    true,
+			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64"),
+			enableDualStack: true,
+		},
 		/* success cases */
 		{
 			name:            "valid primary",
@@ -126,6 +138,73 @@ func TestClusterSerivceIPRange(t *testing.T) {
 
 			if len(errs) == 0 && tc.expectErrors {
 				t.Errorf("expected errors, no errors found")
+			}
+		})
+	}
+}
+
+func getIPnetFromCIDR(cidr string) *net.IPNet {
+	_, ipnet, _ := net.ParseCIDR(cidr)
+	return ipnet
+}
+
+func TestValidateMaxCIDRRange(t *testing.T) {
+	testCases := []struct {
+		// tc.cidr, tc.maxCIDRBits, tc.cidrFlag) tc.expectedErrorMessage
+		name                 string
+		cidr                 net.IPNet
+		maxCIDRBits          int
+		cidrFlag             string
+		expectedErrorMessage string
+		expectErrors         bool
+	}{
+		{
+			name:                 "valid ipv4 cidr",
+			cidr:                 *getIPnetFromCIDR("10.92.0.0/12"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "",
+			expectErrors:         false,
+		},
+		{
+			name:                 "valid ipv6 cidr",
+			cidr:                 *getIPnetFromCIDR("3000::/108"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "",
+			expectErrors:         false,
+		},
+		{
+			name:                 "ipv4 cidr to big",
+			cidr:                 *getIPnetFromCIDR("10.92.0.0/8"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "specified --service-cluster-ip-range is too large; for 32-bit addresses, the mask must be >= 12",
+			expectErrors:         true,
+		},
+		{
+			name:                 "ipv6 cidr to big",
+			cidr:                 *getIPnetFromCIDR("3000::/64"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "specified --service-cluster-ip-range is too large; for 128-bit addresses, the mask must be >= 108",
+			expectErrors:         true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateMaxCIDRRange(tc.cidr, tc.maxCIDRBits, tc.cidrFlag)
+			if err != nil && !tc.expectErrors {
+				t.Errorf("expected no errors, error found %+v", err)
+			}
+
+			if err == nil && tc.expectErrors {
+				t.Errorf("expected errors, no errors found")
+			}
+
+			if err != nil && tc.expectErrors && err.Error() != tc.expectedErrorMessage {
+				t.Errorf("Expected error message: \"%s\"\nGot: \"%s\"", tc.expectedErrorMessage, err.Error())
 			}
 		})
 	}

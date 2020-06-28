@@ -88,7 +88,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

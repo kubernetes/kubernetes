@@ -46,8 +46,7 @@ function kfind() {
             \(                     \
                 -path ./_\* -o     \
                 -path ./.\* -o     \
-                -path ./vendor -o  \
-                -path ./Godeps     \
+                -path ./vendor     \
             \) -prune              \
         \)                         \
         \)                         \

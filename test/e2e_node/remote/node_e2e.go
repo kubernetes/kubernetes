@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/system"
@@ -98,7 +98,7 @@ func prependCOSMounterFlag(args, host, workspace string) (string, error) {
 // prependMemcgNotificationFlag prepends the flag for enabling memcg
 // notification to args and returns the result.
 func prependMemcgNotificationFlag(args string) string {
-	return "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
+	return "--kubelet-flags=--kernel-memcg-notification=true " + args
 }
 
 // updateOSSpecificKubeletFlags updates the Kubelet args with OS specific

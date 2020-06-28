@@ -27,7 +27,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"golang.org/x/crypto/pkcs12"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

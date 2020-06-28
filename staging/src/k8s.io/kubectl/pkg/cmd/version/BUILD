@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -17,6 +17,17 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["version_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
 

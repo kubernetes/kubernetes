@@ -83,6 +83,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.KubeAPIQPS < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: KubeAPIQPS (--kube-api-qps) %v must not be a negative number", kc.KubeAPIQPS))
 	}
+	if kc.NodeStatusMaxImages < -1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeStatusMaxImages (--node-status-max-images) must be -1 or greater"))
+	}
 	if kc.MaxOpenFiles < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxOpenFiles (--max-open-files) %v must not be a negative number", kc.MaxOpenFiles))
 	}
@@ -106,9 +109,6 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	if kc.RegistryPullQPS < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: RegistryPullQPS (--registry-qps) %v must not be a negative number", kc.RegistryPullQPS))
-	}
-	if kc.RotateCertificates && !localFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: RotateCertificates %v requires feature gate RotateKubeletClientCertificate", kc.RotateCertificates))
 	}
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))

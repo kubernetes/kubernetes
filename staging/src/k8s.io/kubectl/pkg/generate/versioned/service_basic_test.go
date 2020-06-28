@@ -175,7 +175,12 @@ func TestParsePorts(t *testing.T) {
 			portString:       "-5:1234",
 			expectPort:       0,
 			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 0},
-			expectErr:        "must be between 1 and 65535, inclusive",
+			expectErr:        "parsing \"-5\": invalid syntax",
+		},
+		{
+			portString:       "0:1234",
+			expectPort:       0,
+			expectTargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 1234},
 		},
 		{
 			portString:       "5:65536",

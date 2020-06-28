@@ -19,13 +19,16 @@ package network
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -61,11 +64,13 @@ func DescribeSvc(ns string) {
 // newAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
 // that behave the same, no matter the underlying OS.
 func newAgnhostPod(name string, args ...string) *v1.Pod {
+	zero := int64(0)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &zero,
 			Containers: []v1.Container{
 				{
 					Name:  "agnhost",
@@ -75,4 +80,31 @@ func newAgnhostPod(name string, args ...string) *v1.Pod {
 			},
 		},
 	}
+}
+
+// CheckSCTPModuleLoadedOnNodes checks whether any node on the list has the
+// sctp.ko module loaded
+// For security reasons, and also to allow clusters to use userspace SCTP implementations,
+// we require that just creating an SCTP Pod/Service/NetworkPolicy must not do anything
+// that would cause the sctp kernel module to be loaded.
+func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bool {
+	hostExec := utils.NewHostExec(f)
+	defer hostExec.Cleanup()
+	re := regexp.MustCompile(`^\s*sctp\s+`)
+	cmd := "lsmod | grep sctp"
+	for _, node := range nodes.Items {
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		result, err := hostExec.IssueCommandWithResult(cmd, &node)
+		if err != nil {
+			framework.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
+		}
+		for _, line := range strings.Split(result, "\n") {
+			if found := re.Find([]byte(line)); found != nil {
+				framework.Logf("the sctp module is loaded on node: %v", node.Name)
+				return true
+			}
+		}
+		framework.Logf("the sctp module is not loaded on node: %v", node.Name)
+	}
+	return false
 }

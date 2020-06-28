@@ -238,12 +238,12 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/convert",
-        "//pkg/kubectl/cmd/cp",
         "//pkg/kubectl/explain",
         "//staging/src/k8s.io/kubectl/pkg/cmd",
         "//staging/src/k8s.io/kubectl/pkg/cmd/annotate",
         "//staging/src/k8s.io/kubectl/pkg/cmd/apply",
         "//staging/src/k8s.io/kubectl/pkg/cmd/attach",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/certificates",
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo",
         "//staging/src/k8s.io/kubectl/pkg/cmd/cp",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create",
@@ -422,6 +422,20 @@ package_group(
         "//staging/src/k8s.io/kubectl/pkg/cmd/replace",
         "//staging/src/k8s.io/kubectl/pkg/cmd/testing",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util",
+    ],
+)
+
+package_group(
+    name = "vendor_githubcom_prometheus_CONSUMERS",
+    packages = [
+        "//cluster/images/etcd-version-monitor",
+        "//pkg/scheduler/framework/runtime",
+        "//pkg/volume/util/operationexecutor",
+        "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
+        "//staging/src/k8s.io/component-base/metrics/...",
+        "//test/e2e_node",
+        "//test/integration/apiserver/flowcontrol",
+        "//vendor/...",
     ],
 )
 

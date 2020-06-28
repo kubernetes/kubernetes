@@ -14,10 +14,10 @@ import (
 	"time"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
+	"github.com/moby/sys/mountinfo"
 	"github.com/mrunalp/fileutils"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/opencontainers/runc/libcontainer/mount"
 	"github.com/opencontainers/runc/libcontainer/system"
 	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -55,7 +55,7 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 			}
 		}
 		if err := mountToRootfs(m, config.Rootfs, config.MountLabel, hasCgroupns); err != nil {
-			return newSystemErrorWithCausef(err, "mounting %q to rootfs %q at %q", m.Source, config.Rootfs, m.Destination)
+			return newSystemErrorWithCausef(err, "mounting %q to rootfs at %q", m.Source, m.Destination)
 		}
 
 		for _, postcmd := range m.PostmountCmds {
@@ -96,6 +96,13 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 
 	if err := unix.Chdir(config.Rootfs); err != nil {
 		return newSystemErrorWithCausef(err, "changing dir to %q", config.Rootfs)
+	}
+
+	s := iConfig.SpecState
+	s.Pid = unix.Getpid()
+	s.Status = configs.Creating
+	if err := iConfig.Config.Hooks[configs.CreateContainer].RunHooks(s); err != nil {
+		return err
 	}
 
 	if config.NoPivotRoot {
@@ -244,7 +251,7 @@ func mountCgroupV1(m *configs.Mount, rootfs, mountLabel string, enableCgroupns b
 			}
 			cgroupmount := &configs.Mount{
 				Source:      "cgroup",
-				Device:      "cgroup",
+				Device:      "cgroup", // this is actually fstype
 				Destination: subsystemPath,
 				Flags:       flags,
 				Data:        filepath.Base(subsystemPath),
@@ -402,27 +409,9 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string, enableCgroupns b
 		}
 	case "cgroup":
 		if cgroups.IsCgroup2UnifiedMode() {
-			if err := mountCgroupV2(m, rootfs, mountLabel, enableCgroupns); err != nil {
-				return err
-			}
-		} else {
-
-			if err := mountCgroupV1(m, rootfs, mountLabel, enableCgroupns); err != nil {
-				return err
-			}
+			return mountCgroupV2(m, rootfs, mountLabel, enableCgroupns)
 		}
-		if m.Flags&unix.MS_RDONLY != 0 {
-			// remount cgroup root as readonly
-			mcgrouproot := &configs.Mount{
-				Source:      m.Destination,
-				Device:      "bind",
-				Destination: m.Destination,
-				Flags:       defaultMountFlags | unix.MS_RDONLY | unix.MS_BIND,
-			}
-			if err := remount(mcgrouproot, rootfs); err != nil {
-				return err
-			}
-		}
+		return mountCgroupV1(m, rootfs, mountLabel, enableCgroupns)
 	default:
 		// ensure that the destination of the mount is resolved of symlinks at mount time because
 		// any previous mounts can invalidate the next mount's destination.
@@ -624,11 +613,14 @@ func bindMountDeviceNode(dest string, node *configs.Device) error {
 
 // Creates the device node in the rootfs of the container.
 func createDeviceNode(rootfs string, node *configs.Device, bind bool) error {
+	if node.Path == "" {
+		// The node only exists for cgroup reasons, ignore it here.
+		return nil
+	}
 	dest := filepath.Join(rootfs, node.Path)
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return err
 	}
-
 	if bind {
 		return bindMountDeviceNode(dest, node)
 	}
@@ -646,61 +638,45 @@ func createDeviceNode(rootfs string, node *configs.Device, bind bool) error {
 func mknodDevice(dest string, node *configs.Device) error {
 	fileMode := node.FileMode
 	switch node.Type {
-	case 'c', 'u':
-		fileMode |= unix.S_IFCHR
-	case 'b':
+	case configs.BlockDevice:
 		fileMode |= unix.S_IFBLK
-	case 'p':
+	case configs.CharDevice:
+		fileMode |= unix.S_IFCHR
+	case configs.FifoDevice:
 		fileMode |= unix.S_IFIFO
 	default:
 		return fmt.Errorf("%c is not a valid device type for device %s", node.Type, node.Path)
 	}
-	if err := unix.Mknod(dest, uint32(fileMode), node.Mkdev()); err != nil {
+	dev, err := node.Mkdev()
+	if err != nil {
+		return err
+	}
+	if err := unix.Mknod(dest, uint32(fileMode), int(dev)); err != nil {
 		return err
 	}
 	return unix.Chown(dest, int(node.Uid), int(node.Gid))
 }
 
-func getMountInfo(mountinfo []*mount.Info, dir string) *mount.Info {
-	for _, m := range mountinfo {
-		if m.Mountpoint == dir {
-			return m
-		}
-	}
-	return nil
-}
-
 // Get the parent mount point of directory passed in as argument. Also return
 // optional fields.
 func getParentMount(rootfs string) (string, string, error) {
-	var path string
-
-	mountinfos, err := mount.GetMounts()
+	mi, err := mountinfo.GetMounts(mountinfo.ParentsFilter(rootfs))
 	if err != nil {
 		return "", "", err
 	}
-
-	mountinfo := getMountInfo(mountinfos, rootfs)
-	if mountinfo != nil {
-		return rootfs, mountinfo.Optional, nil
+	if len(mi) < 1 {
+		return "", "", fmt.Errorf("could not find parent mount of %s", rootfs)
 	}
 
-	path = rootfs
-	for {
-		path = filepath.Dir(path)
-
-		mountinfo = getMountInfo(mountinfos, path)
-		if mountinfo != nil {
-			return path, mountinfo.Optional, nil
-		}
-
-		if path == "/" {
-			break
+	// find the longest mount point
+	var idx, maxlen int
+	for i := range mi {
+		if len(mi[i].Mountpoint) > maxlen {
+			maxlen = len(mi[i].Mountpoint)
+			idx = i
 		}
 	}
-
-	// If we are here, we did not find parent mount. Something is wrong.
-	return "", "", fmt.Errorf("Could not find parent mount of %s", rootfs)
+	return mi[idx].Mountpoint, mi[idx].Optional, nil
 }
 
 // Make parent mount private if it was shared
@@ -825,25 +801,22 @@ func pivotRoot(rootfs string) error {
 }
 
 func msMoveRoot(rootfs string) error {
-	mountinfos, err := mount.GetMounts()
-	if err != nil {
-		return err
-	}
-
-	absRootfs, err := filepath.Abs(rootfs)
+	mountinfos, err := mountinfo.GetMounts(func(info *mountinfo.Info) (skip, stop bool) {
+		skip = false
+		stop = false
+		// Collect every sysfs and proc file systems, except those under the container rootfs
+		if (info.Fstype != "proc" && info.Fstype != "sysfs") || strings.HasPrefix(info.Mountpoint, rootfs) {
+			skip = true
+			return
+		}
+		return
+	})
 	if err != nil {
 		return err
 	}
 
 	for _, info := range mountinfos {
-		p, err := filepath.Abs(info.Mountpoint)
-		if err != nil {
-			return err
-		}
-		// Umount every syfs and proc file systems, except those under the container rootfs
-		if (info.Fstype != "proc" && info.Fstype != "sysfs") || filepath.HasPrefix(p, absRootfs) {
-			continue
-		}
+		p := info.Mountpoint
 		// Be sure umount events are not propagated to the host.
 		if err := unix.Mount("", p, "", unix.MS_SLAVE|unix.MS_REC, ""); err != nil {
 			return err

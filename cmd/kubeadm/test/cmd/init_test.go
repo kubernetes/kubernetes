@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -30,6 +32,10 @@ import (
 )
 
 func runKubeadmInit(args ...string) (string, string, int, error) {
+	const dryRunDir = "KUBEADM_INIT_DRYRUN_DIR"
+	if err := os.Setenv(dryRunDir, os.TempDir()); err != nil {
+		panic(fmt.Sprintf("could not set the %s environment variable", dryRunDir))
+	}
 	kubeadmPath := getKubeadmPath()
 	kubeadmArgs := []string{"init", "--dry-run", "--ignore-preflight-errors=all"}
 	kubeadmArgs = append(kubeadmArgs, args...)
@@ -37,11 +43,6 @@ func runKubeadmInit(args ...string) (string, string, int, error) {
 }
 
 func TestCmdInitToken(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -86,11 +87,6 @@ func TestCmdInitToken(t *testing.T) {
 }
 
 func TestCmdInitKubernetesVersion(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -130,11 +126,6 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 }
 
 func TestCmdInitConfig(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -214,11 +205,6 @@ func TestCmdInitConfig(t *testing.T) {
 }
 
 func TestCmdInitCertPhaseCSR(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	tests := []struct {
 		name          string
 		baseName      string
@@ -279,11 +265,6 @@ func TestCmdInitCertPhaseCSR(t *testing.T) {
 }
 
 func TestCmdInitAPIPort(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -338,11 +319,6 @@ func TestCmdInitAPIPort(t *testing.T) {
 // kubeadm with different feature gates is not 2.
 func TestCmdInitFeatureGates(t *testing.T) {
 	const PanicExitcode = 2
-
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
 
 	initTest := []struct {
 		name string

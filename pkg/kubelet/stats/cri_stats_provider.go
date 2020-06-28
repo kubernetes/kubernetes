@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -412,7 +412,7 @@ func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo 
 	}
 	ephemeralStats := make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
 	copy(ephemeralStats, vstats.EphemeralVolumes)
-	s.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
+	s.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
 	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, true)
 }
 
@@ -700,6 +700,7 @@ func (p *criStatsProvider) cleanupOutdatedCaches() {
 	for k, v := range p.cpuUsageCache {
 		if v == nil {
 			delete(p.cpuUsageCache, k)
+			continue
 		}
 
 		if time.Since(time.Unix(0, v.stats.Timestamp)) > defaultCachePeriod {

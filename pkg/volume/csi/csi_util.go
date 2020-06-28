@@ -29,7 +29,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	utilstrings "k8s.io/utils/strings"
@@ -170,4 +170,9 @@ func getPVSourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, err
 		return nil, fmt.Errorf("unexpected api.CSIVolumeSource found in volume.Spec")
 	}
 	return pvSrc, nil
+}
+
+// GetCSIMounterPath returns the mounter path given the base path.
+func GetCSIMounterPath(path string) string {
+	return filepath.Join(path, "/mount")
 }

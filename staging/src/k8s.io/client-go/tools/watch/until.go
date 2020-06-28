@@ -22,13 +22,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // PreconditionFunc returns true if the condition has been reached, false if it has not been reached yet,
@@ -166,71 +164,4 @@ func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (
 	}
 
 	return context.WithTimeout(parent, timeout)
-}
-
-// ListWatchUntil first lists objects, converts them into synthetic ADDED events
-// and checks conditions for those synthetic events. If the conditions have not been reached so far
-// it continues by calling Until which establishes a watch from resourceVersion of the list call
-// to evaluate those conditions based on new events.
-// ListWatchUntil provides the same guarantees as Until and replaces the old WATCH from RV "" (or "0")
-// which was mixing list and watch calls internally and having severe design issues. (see #74022)
-// There is no resourceVersion order guarantee for the initial list and those synthetic events.
-func ListWatchUntil(ctx context.Context, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
-	if len(conditions) == 0 {
-		return nil, nil
-	}
-
-	list, err := lw.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	initialItems, err := meta.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-
-	// use the initial items as simulated "adds"
-	var lastEvent *watch.Event
-	currIndex := 0
-	passedConditions := 0
-	for _, condition := range conditions {
-		// check the next condition against the previous event and short circuit waiting for the next watch
-		if lastEvent != nil {
-			done, err := condition(*lastEvent)
-			if err != nil {
-				return lastEvent, err
-			}
-			if done {
-				passedConditions = passedConditions + 1
-				continue
-			}
-		}
-
-	ConditionSucceeded:
-		for currIndex < len(initialItems) {
-			lastEvent = &watch.Event{Type: watch.Added, Object: initialItems[currIndex]}
-			currIndex++
-
-			done, err := condition(*lastEvent)
-			if err != nil {
-				return lastEvent, err
-			}
-			if done {
-				passedConditions = passedConditions + 1
-				break ConditionSucceeded
-			}
-		}
-	}
-	if passedConditions == len(conditions) {
-		return lastEvent, nil
-	}
-	remainingConditions := conditions[passedConditions:]
-
-	metaObj, err := meta.ListAccessor(list)
-	if err != nil {
-		return nil, err
-	}
-	currResourceVersion := metaObj.GetResourceVersion()
-
-	return Until(ctx, currResourceVersion, lw, remainingConditions...)
 }

@@ -18,7 +18,7 @@ REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
 
-TAG = 3.2
+TAG = 3.3
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
@@ -86,7 +86,7 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 
 container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
-	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --pull --platform linux/$(ARCH) -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --load --pull --platform linux/$(ARCH) -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
 	touch $@
 
 push: .push-$(ARCH)

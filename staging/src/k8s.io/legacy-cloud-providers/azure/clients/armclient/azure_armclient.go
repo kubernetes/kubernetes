@@ -34,7 +34,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	"k8s.io/client-go/pkg/version"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -285,7 +285,7 @@ func (c *Client) SendAsync(ctx context.Context, request *http.Request) (*azure.F
 
 	future, err := azure.NewFutureFromResponse(asyncResponse)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "sendAsync.responed", request.URL.String(), err)
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "sendAsync.respond", request.URL.String(), err)
 		return nil, asyncResponse, retry.GetError(asyncResponse, err)
 	}
 
@@ -337,7 +337,7 @@ func (c *Client) PutResource(ctx context.Context, resourceID string, parameters 
 }
 
 // PutResources puts a list of resources from resources map[resourceID]parameters.
-// Those resources sync requests are sequential while async requests are concurent. It 's especially
+// Those resources sync requests are sequential while async requests are concurrent. It's especially
 // useful when the ARM API doesn't support concurrent requests.
 func (c *Client) PutResources(ctx context.Context, resources map[string]interface{}) map[string]*PutResourcesResponse {
 	if len(resources) == 0 {

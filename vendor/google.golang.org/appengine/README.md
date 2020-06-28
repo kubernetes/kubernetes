@@ -71,3 +71,30 @@ A few APIs were cleaned up, and there are some differences:
   [blobstore package](https://google.golang.org/appengine/blobstore).
 * `appengine/socket` is not required on App Engine flexible environment / Managed VMs.
   Use the standard `net` package instead.
+
+## Key Encode/Decode compatibiltiy to help with datastore library migrations
+
+Key compatibility updates have been added to help customers transition from google.golang.org/appengine/datastore to cloud.google.com/go/datastore.
+The `EnableKeyConversion` enables automatic conversion from a key encoded with cloud.google.com/go/datastore to google.golang.org/appengine/datastore key type.
+
+### Enabling key conversion
+
+Enable key conversion by calling `EnableKeyConversion(ctx)` in the `/_ah/start` handler for basic and manual scaling or any handler in automatic scaling.
+
+#### 1. Basic or manual scaling
+
+This start handler will enable key conversion for all handlers in the service.
+
+```
+http.HandleFunc("/_ah/start", func(w http.ResponseWriter, r *http.Request) {
+    datastore.EnableKeyConversion(appengine.NewContext(r))
+})
+```
+
+#### 2. Automatic scaling
+
+`/_ah/start` is not supported for automatic scaling and `/_ah/warmup` is not guaranteed to run, so you must call `datastore.EnableKeyConversion(appengine.NewContext(r))`
+before you use code that needs key conversion.
+
+You may want to add this to each of your handlers, or introduce middleware where it's called.
+`EnableKeyConversion` is safe for concurrent use. Any call to it after the first is ignored.

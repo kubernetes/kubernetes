@@ -36,16 +36,14 @@ func TestValidateToken(t *testing.T) {
 		{"772ef5.6b6baab1d4a0a171", true},
 		{".6b6baab1d4a0a171", false},
 		{"772ef5.", false},
-		{"772ef5.6b6baab1d4a0a171", true},
-		{".6b6baab1d4a0a171", false},
-		{"772ef5.", false},
 		{"abcdef.1234567890123456@foobar", false},
 	}
 	for _, rt := range tests {
 		err := ValidateToken(rt.token, nil).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
-				"failed ValidateToken:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateToken:\n\ttoken: %q\n\t  expected: %t, got: %t",
+				rt.token,
 				rt.expected,
 				(err == nil),
 			)
@@ -101,21 +99,17 @@ func TestValidateTokenGroups(t *testing.T) {
 func TestValidateNodeRegistrationOptions(t *testing.T) {
 	var tests = []struct {
 		nodeName       string
-		criSocket      string
 		expectedErrors bool
 	}{
-		{"", "/some/path", true},                                                             // node name can't be empty
-		{"INVALID-NODENAME", "/some/path", true},                                             // Upper cases is invalid
-		{"invalid-nodename-", "/some/path", true},                                            // Can't have trailing dashes
-		{"invalid-node?name", "/some/path", true},                                            // Unsupported characters
-		{"valid-nodename", "/some/path", false},                                              // supported
-		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},        // supported, with numbers as well
-		{"valid-nodename", kubeadmapiv1beta2.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
-		{"valid-nodename", "bla:///some/path", true},                                         // unsupported url scheme
-		{"valid-nodename", ":::", true},                                                      // unparseable url
+		{"", true},                  // node name can't be empty
+		{"INVALID-NODENAME", true},  // Upper cases is invalid
+		{"invalid-nodename-", true}, // Can't have trailing dashes
+		{"invalid-node?name", true}, // Unsupported characters
+		{"valid-nodename", false},   // supported
+		// test cases for criSocket are covered in TestValidateSocketPath
 	}
 	for _, rt := range tests {
-		nro := kubeadm.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: rt.criSocket}
+		nro := kubeadm.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "/some/path"}
 		actual := ValidateNodeRegistrationOptions(&nro, field.NewPath("nodeRegistration"))
 		actualErrors := len(actual) > 0
 		if actualErrors != rt.expectedErrors {
@@ -894,6 +888,154 @@ func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
 				i,
 				rt.expected,
 				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateSocketPath(t *testing.T) {
+	var tests = []struct {
+		name           string
+		criSocket      string
+		expectedErrors bool
+	}{
+		{name: "valid path", criSocket: "/some/path", expectedErrors: false},
+		{name: "valid socket url", criSocket: kubeadmapiv1beta2.DefaultUrlScheme + "://" + "/some/path", expectedErrors: false},
+		{name: "unsupported url scheme", criSocket: "bla:///some/path", expectedErrors: true},
+		{name: "unparseable url", criSocket: ":::", expectedErrors: true},
+		{name: "invalid CRISocket (path is not absolute)", criSocket: "some/path", expectedErrors: true},
+		{name: "empty CRISocket (path is not absolute)", criSocket: "", expectedErrors: true},
+	}
+	for _, tc := range tests {
+		actual := ValidateSocketPath(tc.criSocket, field.NewPath("criSocket"))
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("error: socket path: %q\n\texpected: %t\n\t  actual: %t", tc.criSocket, tc.expectedErrors, actualErrors)
+		}
+	}
+}
+
+func TestValidateURLs(t *testing.T) {
+	var tests = []struct {
+		name           string
+		urls           []string
+		requireHTTPS   bool
+		expectedErrors bool
+	}{
+		{
+			name:           "valid urls (https not required)",
+			urls:           []string{"http://example.com", "https://example.org"},
+			requireHTTPS:   false,
+			expectedErrors: false,
+		},
+		{
+			name:           "valid urls (https required)",
+			urls:           []string{"https://example.com", "https://example.org"},
+			requireHTTPS:   true,
+			expectedErrors: false,
+		},
+		{
+			name:           "invalid url (https required)",
+			urls:           []string{"http://example.com", "https://example.org"},
+			requireHTTPS:   true,
+			expectedErrors: true,
+		},
+		{
+			name:           "URL parse error",
+			urls:           []string{"::://example.com"},
+			requireHTTPS:   false,
+			expectedErrors: true,
+		},
+		{
+			name:           "URL without scheme",
+			urls:           []string{"example.com"},
+			requireHTTPS:   false,
+			expectedErrors: true,
+		},
+	}
+	for _, tc := range tests {
+		actual := ValidateURLs(tc.urls, tc.requireHTTPS, nil)
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("error:\n\texpected: %t\n\t  actual: %t", tc.expectedErrors, actualErrors)
+		}
+	}
+}
+
+func TestValidateEtcd(t *testing.T) {
+	var tests = []struct {
+		name           string
+		etcd           *kubeadm.Etcd
+		expectedErrors bool
+	}{
+		{
+			name:           "either .Etcd.Local or .Etcd.External is required",
+			etcd:           &kubeadm.Etcd{},
+			expectedErrors: true,
+		},
+		{
+			name: ".Etcd.Local and .Etcd.External are mutually exclusive",
+			etcd: &kubeadm.Etcd{
+				Local: &kubeadm.LocalEtcd{
+					DataDir: "/some/path",
+				},
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379"},
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
+					CertFile:  "/some/file.crt",
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
+					CertFile:  "/some/file.crt",
+					KeyFile:   "/some/file.key",
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "valid external etcd",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
+					CertFile:  "/etcd.crt",
+					KeyFile:   "/etcd.key",
+					CAFile:    "/etcd-ca.crt",
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "valid external etcd (no TLS)",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"http://10.100.0.1:2379", "http://10.100.0.2:2379"},
+				},
+			},
+			expectedErrors: false,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateEtcd(tc.etcd, field.NewPath("etcd"))
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("Error: \n\texpected: %t\n\t  actual: %t",
+				tc.expectedErrors,
+				actualErrors,
 			)
 		}
 	}

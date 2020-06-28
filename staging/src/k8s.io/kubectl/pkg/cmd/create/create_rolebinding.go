@@ -69,6 +69,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
 	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the role")
 	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the role, in the format <namespace>:<name>")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.CreateSubcommandOptions.FieldManager, "kubectl-create")
 	return cmd
 }
 

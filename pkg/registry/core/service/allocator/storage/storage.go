@@ -80,17 +80,12 @@ func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource schema.Grou
 	}, nil
 }
 
-// Allocate attempts to allocate the item locally and then in etcd.
+// Allocate attempts to allocate the item.
 func (e *Etcd) Allocate(offset int) (bool, error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	ok, err := e.alloc.Allocate(offset)
-	if !ok || err != nil {
-		return ok, err
-	}
-
-	err = e.tryUpdate(func() error {
+	err := e.tryUpdate(func() error {
 		ok, err := e.alloc.Allocate(offset)
 		if err != nil {
 			return err
@@ -109,49 +104,44 @@ func (e *Etcd) Allocate(offset int) (bool, error) {
 	return true, nil
 }
 
-// AllocateNext attempts to allocate the next item locally and then in etcd.
+// AllocateNext attempts to allocate the next item.
 func (e *Etcd) AllocateNext() (int, bool, error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-
-	offset, ok, err := e.alloc.AllocateNext()
-	if !ok || err != nil {
-		return offset, ok, err
-	}
+	var offset int
+	var ok bool
+	var err error
 
 	err = e.tryUpdate(func() error {
-		ok, err := e.alloc.Allocate(offset)
+		// update the offset here
+		offset, ok, err = e.alloc.AllocateNext()
 		if err != nil {
 			return err
 		}
 		if !ok {
-			// update the offset here
-			offset, ok, err = e.alloc.AllocateNext()
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return errorUnableToAllocate
-			}
-			return nil
+			return errorUnableToAllocate
 		}
 		return nil
 	})
-	return offset, ok, err
+
+	if err != nil {
+		if err == errorUnableToAllocate {
+			return offset, false, nil
+		}
+		return offset, false, err
+	}
+	return offset, true, nil
 }
 
-// Release attempts to release the provided item locally and then in etcd.
+// Release attempts to release the provided item.
 func (e *Etcd) Release(item int) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	if err := e.alloc.Release(item); err != nil {
-		return err
-	}
-
 	return e.tryUpdate(func() error {
 		return e.alloc.Release(item)
 	})
+
 }
 
 func (e *Etcd) ForEach(fn func(int)) {
@@ -172,9 +162,9 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 				if err := e.alloc.Restore(existing.Range, existing.Data); err != nil {
 					return nil, err
 				}
-				if err := fn(); err != nil {
-					return nil, err
-				}
+			}
+			if err := fn(); err != nil {
+				return nil, err
 			}
 			e.last = existing.ResourceVersion
 			rangeSpec, data := e.alloc.Snapshot()
@@ -190,7 +180,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(context.TODO(), e.baseKey, "", existing, true); err != nil {
+	if err := e.storage.Get(context.TODO(), e.baseKey, storage.GetOptions{IgnoreNotFound: true}, existing); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.resource, "")
 	}
 	return existing, nil

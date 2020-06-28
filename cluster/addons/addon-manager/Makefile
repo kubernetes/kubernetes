@@ -15,7 +15,7 @@
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v9.0.2
+VERSION=v9.1.1
 KUBECTL_VERSION?=v1.13.2
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):v1.0.0
@@ -29,7 +29,7 @@ all: build
 build:
 	cp ./* $(TEMP_DIR)
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
-	chmod +x $(TEMP_DIR)/kubectl
+	chmod a+rx $(TEMP_DIR)/kube-addons.sh $(TEMP_DIR)/kubectl
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
 
 ifneq ($(ARCH),amd64)

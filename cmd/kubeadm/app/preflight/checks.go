@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -125,7 +125,7 @@ func (sc ServiceCheck) Name() string {
 
 // Check validates if the service is enabled and active.
 func (sc ServiceCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating if the service is enabled and active")
+	klog.V(1).Infof("validating if the %q service is enabled and active", sc.Service)
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		return []error{err}, nil
@@ -803,6 +803,7 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 				loopCount--
 				return false, err
 			}
+			//lint:ignore SA5011 If err != nil we are already returning.
 			defer r.Body.Close()
 
 			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {

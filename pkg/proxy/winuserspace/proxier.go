@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -213,7 +213,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 			return nil, fmt.Errorf("could not parse ip '%q'", listenIP)
 		}
 		// add the IP address.  Node port binds to all interfaces.
-		args := proxier.netshIpv4AddressAddArgs(serviceIP)
+		args := proxier.netshIPv4AddressAddArgs(serviceIP)
 		if existed, err := proxier.netsh.EnsureIPAddress(args, serviceIP); err != nil {
 			return nil, err
 		} else if !existed {
@@ -262,7 +262,7 @@ func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePort
 	// close the PortalProxy by deleting the service IP address
 	if info.portal.ip != allAvailableInterfaces {
 		serviceIP := net.ParseIP(info.portal.ip)
-		args := proxier.netshIpv4AddressDeleteArgs(serviceIP)
+		args := proxier.netshIPv4AddressDeleteArgs(serviceIP)
 		if err := proxier.netsh.DeleteIPAddress(args); err != nil {
 			return err
 		}
@@ -474,7 +474,7 @@ func isClosedError(err error) bool {
 	return strings.HasSuffix(err.Error(), "use of closed network connection")
 }
 
-func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
+func (proxier *Proxier) netshIPv4AddressAddArgs(destIP net.IP) []string {
 	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "add", "address",
@@ -485,7 +485,7 @@ func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 	return args
 }
 
-func (proxier *Proxier) netshIpv4AddressDeleteArgs(destIP net.IP) []string {
+func (proxier *Proxier) netshIPv4AddressDeleteArgs(destIP net.IP) []string {
 	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "delete", "address",

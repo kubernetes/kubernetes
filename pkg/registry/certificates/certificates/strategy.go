@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -94,7 +96,7 @@ func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new CSR. Validation must check for a correct signature.
 func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csr := obj.(*certificates.CertificateSigningRequest)
-	return validation.ValidateCertificateSigningRequest(csr)
+	return validation.ValidateCertificateSigningRequestCreate(csr, requestGroupVersion(ctx))
 }
 
 // Canonicalize normalizes the object after validation (which includes a signature check).
@@ -104,7 +106,7 @@ func (csrStrategy) Canonicalize(obj runtime.Object) {}
 func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	newCSR := obj.(*certificates.CertificateSigningRequest)
-	return validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR)
+	return validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR, requestGroupVersion(ctx))
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by
@@ -142,20 +144,84 @@ func (csrStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 
-	// Updating the Status should only update the Status and not the spec
-	// or approval conditions. The intent is to separate the concerns of
-	// approval and certificate issuance.
+	// Updating /status should not modify spec
 	newCSR.Spec = oldCSR.Spec
-	newCSR.Status.Conditions = oldCSR.Status.Conditions
+
+	switch requestGroupVersion(ctx) {
+	case certificatesv1beta1.SchemeGroupVersion:
+		// Specifically preserve existing Approved/Denied conditions.
+		// If we cannot (if the status update attempted to add/remove Approved/Denied conditions), revert to old conditions for backwards compatibility.
+		if !preserveConditionInstances(newCSR, oldCSR, certificates.CertificateApproved) || !preserveConditionInstances(newCSR, oldCSR, certificates.CertificateDenied) {
+			newCSR.Status.Conditions = oldCSR.Status.Conditions
+		}
+	default:
+		// Specifically preserve existing Approved/Denied conditions.
+		// Adding/removing Approved/Denied conditions will cause these to fail,
+		// and the change in Approved/Denied conditions will produce a validation error
+		preserveConditionInstances(newCSR, oldCSR, certificates.CertificateApproved)
+		preserveConditionInstances(newCSR, oldCSR, certificates.CertificateDenied)
+	}
+
+	populateConditionTimestamps(newCSR, oldCSR)
+}
+
+// preserveConditionInstances copies instances of the the specified condition type from oldCSR to newCSR.
+// or returns false if the newCSR added or removed instances
+func preserveConditionInstances(newCSR, oldCSR *certificates.CertificateSigningRequest, conditionType certificates.RequestConditionType) bool {
+	oldIndices := findConditionIndices(oldCSR, conditionType)
+	newIndices := findConditionIndices(newCSR, conditionType)
+	if len(oldIndices) != len(newIndices) {
+		// instances were added or removed, we cannot preserve the existing values
+		return false
+	}
+	// preserve the old condition values
+	for i, oldIndex := range oldIndices {
+		newCSR.Status.Conditions[newIndices[i]] = oldCSR.Status.Conditions[oldIndex]
+	}
+	return true
+}
+
+// findConditionIndices returns the indices of instances of the specified condition type
+func findConditionIndices(csr *certificates.CertificateSigningRequest, conditionType certificates.RequestConditionType) []int {
+	var retval []int
+	for i, c := range csr.Status.Conditions {
+		if c.Type == conditionType {
+			retval = append(retval, i)
+		}
+	}
+	return retval
+}
+
+// nowFunc allows overriding for unit tests
+var nowFunc = metav1.Now
+
+// populateConditionTimestamps sets LastUpdateTime and LastTransitionTime in newCSR if missing
+func populateConditionTimestamps(newCSR, oldCSR *certificates.CertificateSigningRequest) {
+	now := nowFunc()
 	for i := range newCSR.Status.Conditions {
 		if newCSR.Status.Conditions[i].LastUpdateTime.IsZero() {
-			newCSR.Status.Conditions[i].LastUpdateTime = metav1.Now()
+			newCSR.Status.Conditions[i].LastUpdateTime = now
+		}
+
+		// preserve existing lastTransitionTime if the condition with this type/status already exists,
+		// otherwise set to now.
+		if newCSR.Status.Conditions[i].LastTransitionTime.IsZero() {
+			lastTransition := now
+			for _, oldCondition := range oldCSR.Status.Conditions {
+				if oldCondition.Type == newCSR.Status.Conditions[i].Type &&
+					oldCondition.Status == newCSR.Status.Conditions[i].Status &&
+					!oldCondition.LastTransitionTime.IsZero() {
+					lastTransition = oldCondition.LastTransitionTime
+					break
+				}
+			}
+			newCSR.Status.Conditions[i].LastTransitionTime = lastTransition
 		}
 	}
 }
 
 func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCertificateSigningRequestUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
+	return validation.ValidateCertificateSigningRequestStatusUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest), requestGroupVersion(ctx))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -170,28 +236,22 @@ type csrApprovalStrategy struct {
 var ApprovalStrategy = csrApprovalStrategy{Strategy}
 
 // PrepareForUpdate prepares the new certificate signing request by limiting
-// the data that is updated to only the conditions. Also, if there is no
-// existing LastUpdateTime on a condition, the current date/time will be set.
+// the data that is updated to only the conditions and populating condition timestamps
 func (csrApprovalStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 
+	populateConditionTimestamps(newCSR, oldCSR)
+	newConditions := newCSR.Status.Conditions
+
 	// Updating the approval should only update the conditions.
 	newCSR.Spec = oldCSR.Spec
-	oldCSR.Status.Conditions = newCSR.Status.Conditions
-	for i := range newCSR.Status.Conditions {
-		// The Conditions are an array of values, some of which may be
-		// pre-existing and unaltered by this update, so a LastUpdateTime is
-		// added only if one isn't already set.
-		if newCSR.Status.Conditions[i].LastUpdateTime.IsZero() {
-			newCSR.Status.Conditions[i].LastUpdateTime = metav1.Now()
-		}
-	}
 	newCSR.Status = oldCSR.Status
+	newCSR.Status.Conditions = newConditions
 }
 
 func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCertificateSigningRequestUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
+	return validation.ValidateCertificateSigningRequestApprovalUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest), requestGroupVersion(ctx))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -210,4 +270,12 @@ func SelectableFields(obj *certificates.CertificateSigningRequest) fields.Set {
 		"spec.signerName": obj.Spec.SignerName,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, csrSpecificFieldsSet)
+}
+
+// requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version
+func requestGroupVersion(ctx context.Context) schema.GroupVersion {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	return schema.GroupVersion{}
 }

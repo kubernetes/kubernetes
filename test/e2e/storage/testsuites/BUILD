@@ -10,6 +10,7 @@ go_library(
         "multivolume.go",
         "provisioning.go",
         "snapshottable.go",
+        "stress.go",
         "subpath.go",
         "testdriver.go",
         "topology.go",

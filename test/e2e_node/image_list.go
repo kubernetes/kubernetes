@@ -23,7 +23,7 @@ import (
 	"os/user"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -31,6 +31,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -42,9 +43,9 @@ const (
 	imagePullRetryDelay = time.Second
 )
 
-// NodeImageWhiteList is a list of images used in node e2e test. These images will be prepulled
+// NodePrePullImageList is a list of images used in node e2e test. These images will be prepulled
 // before test running so that the image pulling won't fail in actual test.
-var NodeImageWhiteList = sets.NewString(
+var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	"google/cadvisor:latest",
 	"k8s.gcr.io/stress:v1",
@@ -65,8 +66,8 @@ var NodeImageWhiteList = sets.NewString(
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
 func updateImageWhiteList() {
-	// Union NodeImageWhiteList and CommonImageWhiteList into the framework image white list.
-	framework.ImageWhiteList = NodeImageWhiteList.Union(commontest.CommonImageWhiteList)
+	// Union NodePrePullImageList and CommonImageWhiteList into the framework image pre-pull list.
+	framework.ImageWhiteList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
 	framework.ImageWhiteList.Insert(getNodeProblemDetectorImage())
 	framework.ImageWhiteList.Insert(getSRIOVDevicePluginImage())
@@ -97,7 +98,11 @@ func (dp *dockerPuller) Name() string {
 }
 
 func (dp *dockerPuller) Pull(image string) ([]byte, error) {
-	return exec.Command("docker", "pull", image).CombinedOutput()
+	// TODO(random-liu): Use docker client to get rid of docker binary dependency.
+	if exec.Command("docker", "inspect", "--type=image", image).Run() != nil {
+		return exec.Command("docker", "pull", image).CombinedOutput()
+	}
+	return nil, nil
 }
 
 type remotePuller struct {
@@ -171,7 +176,7 @@ func PrePullAllImages() error {
 
 // getGPUDevicePluginImage returns the image of GPU device plugin.
 func getGPUDevicePluginImage() string {
-	ds, err := framework.DsFromManifest(e2egpu.GPUDevicePluginDSYAML)
+	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
 	if err != nil {
 		klog.Errorf("Failed to parse the device plugin image: %v", err)
 		return ""
@@ -194,7 +199,7 @@ func getSRIOVDevicePluginImage() string {
 		klog.Errorf("Failed to read the device plugin manifest: %v", err)
 		return ""
 	}
-	ds, err := framework.DsFromData(data)
+	ds, err := e2emanifest.DaemonSetFromData(data)
 	if err != nil {
 		klog.Errorf("Failed to parse the device plugin image: %v", err)
 		return ""

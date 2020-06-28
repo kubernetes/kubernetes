@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall" // only for Errno
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -21,6 +20,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
@@ -68,6 +68,7 @@ type initConfig struct {
 	ConsoleHeight    uint16                `json:"console_height"`
 	RootlessEUID     bool                  `json:"rootless_euid,omitempty"`
 	RootlessCgroups  bool                  `json:"rootless_cgroups,omitempty"`
+	SpecState        *specs.State          `json:"spec_state,omitempty"`
 }
 
 type initer interface {
@@ -272,10 +273,10 @@ func setupUser(config *initConfig) error {
 	// Rather than just erroring out later in setuid(2) and setgid(2), check
 	// that the user is mapped here.
 	if _, err := config.Config.HostUID(execUser.Uid); err != nil {
-		return fmt.Errorf("cannot set uid to unmapped user in user namespace")
+		return errors.New("cannot set uid to unmapped user in user namespace")
 	}
 	if _, err := config.Config.HostGID(execUser.Gid); err != nil {
-		return fmt.Errorf("cannot set gid to unmapped user in user namespace")
+		return errors.New("cannot set gid to unmapped user in user namespace")
 	}
 
 	if config.RootlessEUID {
@@ -284,7 +285,7 @@ func setupUser(config *initConfig) error {
 		// this check earlier, but if libcontainer.Process.User was typesafe
 		// this might work.
 		if len(addGroups) > 0 {
-			return fmt.Errorf("cannot set any additional groups in a rootless container")
+			return errors.New("cannot set any additional groups in a rootless container")
 		}
 	}
 
@@ -455,7 +456,7 @@ func isWaitable(pid int) (bool, error) {
 // isNoChildren returns true if err represents a unix.ECHILD (formerly syscall.ECHILD) false otherwise
 func isNoChildren(err error) bool {
 	switch err := err.(type) {
-	case syscall.Errno:
+	case unix.Errno:
 		if err == unix.ECHILD {
 			return true
 		}

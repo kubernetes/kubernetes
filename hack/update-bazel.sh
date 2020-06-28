@@ -24,11 +24,10 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install tools we need, but only from vendor/...
-pushd "${KUBE_ROOT}" >/dev/null
-  GO111MODULE=on GOFLAGS=-mod=vendor go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-  GO111MODULE=on GOFLAGS=-mod=vendor go install github.com/bazelbuild/buildtools/buildozer
-  GO111MODULE=on GOFLAGS=-mod=vendor go install k8s.io/repo-infra/cmd/kazel
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+  GO111MODULE=on go install github.com/bazelbuild/buildtools/buildozer
+  GO111MODULE=on go install k8s.io/repo-infra/cmd/kazel
 popd >/dev/null
 
 # Find all of the staging repos.
@@ -61,16 +60,24 @@ for repo in "${staging_repos[@]}"; do
   touch "${KUBE_ROOT}/staging/src/${repo}/BUILD"
 done
 
+# Warning: Please be careful when ignoring these pkg-config errors.
+# As gazelle doesn't support pkg-config, if we suppress these errors here, we actually need to modify the script below to handle it manually.
+# For instance, in the case of `libseccomp`, we set the link option `-lseccomp` to make it work properly.
+KNOWN_PKG_CONFIG_ERRORS=(
+  "vendor/github.com/seccomp/libseccomp-golang/seccomp(_internal)?.go: pkg-config not supported: #cgo pkg-config: libseccomp"
+  "vendor/github.com/google/cadvisor/nvm/machine_libipmctl.go: pkg-config not supported: #cgo pkg-config: libipmctl"
+)
+
 # Run gazelle to update Go rules in BUILD files.
 # filter out known pkg-config error (see buildozer workaround below)
-# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors 
+# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors
 # while preserving the exit code of gazelle
 gazelle fix \
     -external=vendored \
     -mode=fix \
     -repo_root "${KUBE_ROOT}" \
     "${KUBE_ROOT}" \
-    2>&1 | grep -Ev "vendor/github.com/seccomp/libseccomp-golang/seccomp(_internal)?.go: pkg-config not supported: #cgo pkg-config: libseccomp" || (exit "${PIPESTATUS[0]}")
+    2>&1 | grep -Ev "$(kube::util::join \| "${KNOWN_PKG_CONFIG_ERRORS[@]}")" || (exit "${PIPESTATUS[0]}")
 
 # Run kazel to update the pkg-srcs and all-srcs rules as well as handle
 # Kubernetes code generators.
@@ -93,7 +100,7 @@ fi
 
 # restrict ./vendor/github.com/prometheus/* targets visibility
 # see comment above re: buildozer exit codes
-buildozer -quiet 'set visibility //staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
+buildozer -quiet 'set visibility //build/visible_to:vendor_githubcom_prometheus_CONSUMERS' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi
@@ -104,3 +111,6 @@ buildozer -quiet 'set clinkopts select({"@io_bazel_rules_go//go/platform:linux":
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi
+
+# Avoid bazel stuff in tools/ directory
+rm hack/tools/BUILD

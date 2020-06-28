@@ -41,7 +41,6 @@ source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/exec.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
-source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/plugins.sh"
@@ -325,7 +324,6 @@ runTests() {
     exit 1
   fi
   kube::log::status "Checking kubectl version"
-  export KUBERNETES_MASTER=http://127.0.0.1:${API_PORT}
   kubectl version
 
   # Generate a random namespace name, based on the current time (to make
@@ -417,7 +415,7 @@ runTests() {
     fi
   }
 
-   if [[ -n "${WHAT-}" ]]; then
+  if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
     do
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
@@ -440,6 +438,18 @@ runTests() {
   #######################
 
   record_command run_kubectl_config_set_tests
+
+  ##############################
+  # kubectl config set-cluster #
+  ##############################
+
+  record_command run_kubectl_config_set_cluster_tests
+
+  ##################################
+  # kubectl config set-credentials #
+  ##################################
+
+  record_command run_kubectl_config_set_credentials_tests
 
   #######################
   # kubectl local proxy #

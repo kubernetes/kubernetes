@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -657,6 +657,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		for _, pod := range pods {
 			podIndexer.Add(pod)
+			ctrl.podIndexer.Add(pod)
 		}
 		ctrl.podLister = corelisters.NewPodLister(podIndexer)
 

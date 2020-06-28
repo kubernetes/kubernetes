@@ -79,15 +79,14 @@ func TestTaintNodeByCondition(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs := testCtx.ClientSet
-	informers := testCtx.InformerFactory
 	nsName := testCtx.NS.Name
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
-		informers.Coordination().V1().Leases(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().Nodes(),
-		informers.Apps().V1().DaemonSets(),
+		externalInformers.Coordination().V1().Leases(),
+		externalInformers.Core().V1().Pods(),
+		externalInformers.Core().V1().Nodes(),
+		externalInformers.Apps().V1().DaemonSets(),
 		cs,
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
@@ -103,13 +102,15 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(testCtx.Ctx.Done())
 
-	// Waiting for all controller sync.
+	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-	informers.Start(testCtx.Ctx.Done())
-	informers.WaitForCacheSync(testCtx.Ctx.Done())
+	testutils.SyncInformerFactory(testCtx)
+
+	// Run all controllers
+	go nc.Run(testCtx.Ctx.Done())
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.

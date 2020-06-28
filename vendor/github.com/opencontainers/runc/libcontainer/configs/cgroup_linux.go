@@ -1,5 +1,9 @@
 package configs
 
+import (
+	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
+)
+
 type FreezerState string
 
 const (
@@ -29,18 +33,16 @@ type Cgroup struct {
 
 	// Resources contains various cgroups settings to apply
 	*Resources
+
+	// SystemdProps are any additional properties for systemd,
+	// derived from org.systemd.property.xxx annotations.
+	// Ignored unless systemd is used for managing cgroups.
+	SystemdProps []systemdDbus.Property `json:"-"`
 }
 
 type Resources struct {
-	// If this is true allow access to any kind of device within the container.  If false, allow access only to devices explicitly listed in the allowed_devices list.
-	// Deprecated
-	AllowAllDevices *bool `json:"allow_all_devices,omitempty"`
-	// Deprecated
-	AllowedDevices []*Device `json:"allowed_devices,omitempty"`
-	// Deprecated
-	DeniedDevices []*Device `json:"denied_devices,omitempty"`
-
-	Devices []*Device `json:"devices"`
+	// Devices is the set of access rules for devices in the container.
+	Devices []*DeviceRule `json:"devices"`
 
 	// Memory limit (in bytes)
 	Memory int64 `json:"memory"`
@@ -124,7 +126,4 @@ type Resources struct {
 
 	// CpuWeight sets a proportional bandwidth limit.
 	CpuWeight uint64 `json:"cpu_weight"`
-
-	// CpuMax sets she maximum bandwidth limit (format: max period).
-	CpuMax string `json:"cpu_max"`
 }

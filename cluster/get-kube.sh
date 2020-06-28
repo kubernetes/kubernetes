@@ -183,11 +183,16 @@ release=${KUBERNETES_RELEASE:-"release/stable"}
 # Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
 set_binary_version "${release}"
 if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
-  if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+  if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+    # Use KUBERNETES_RELEASE_URL for Releases and Pre-Releases
+    # ie. 1.18.0 or 1.19.0-beta.0
+    KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
     # this will be used by get-kube-binaries.sh.
+    # ie. v1.19.0-beta.0.318+b618411f1edb98
     KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
-  elif ! [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+  else
     echo "Version doesn't match regexp" >&2
     exit 1
   fi

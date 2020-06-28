@@ -14,6 +14,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/network:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/utils:go_default_library",

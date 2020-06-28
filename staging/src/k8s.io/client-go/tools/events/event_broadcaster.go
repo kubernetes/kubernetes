@@ -34,9 +34,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/record/util"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -313,4 +317,57 @@ func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 		<-stopCh
 		stopWatcher()
 	}()
+}
+
+type eventBroadcasterAdapterImpl struct {
+	coreClient         typedv1core.EventsGetter
+	coreBroadcaster    record.EventBroadcaster
+	v1beta1Client      typedv1beta1.EventsGetter
+	v1beta1Broadcaster EventBroadcaster
+}
+
+// NewEventBroadcasterAdapter creates a wrapper around new and legacy broadcasters to simplify
+// migration of individual components to the new Event API.
+func NewEventBroadcasterAdapter(client clientset.Interface) EventBroadcasterAdapter {
+	eventClient := &eventBroadcasterAdapterImpl{}
+	if _, err := client.Discovery().ServerResourcesForGroupVersion(v1beta1.SchemeGroupVersion.String()); err == nil {
+		eventClient.v1beta1Client = client.EventsV1beta1()
+		eventClient.v1beta1Broadcaster = NewBroadcaster(&EventSinkImpl{Interface: eventClient.v1beta1Client.Events("")})
+	}
+	// Even though there can soon exist cases when coreBroadcaster won't really be needed,
+	// we create it unconditionally because its overhead is minor and will simplify using usage
+	// patterns of this library in all components.
+	eventClient.coreClient = client.CoreV1()
+	eventClient.coreBroadcaster = record.NewBroadcaster()
+	return eventClient
+}
+
+// StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
+func (e *eventBroadcasterAdapterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
+	if e.v1beta1Broadcaster != nil && e.v1beta1Client != nil {
+		e.v1beta1Broadcaster.StartRecordingToSink(stopCh)
+	}
+	if e.coreBroadcaster != nil && e.coreClient != nil {
+		e.coreBroadcaster.StartRecordingToSink(&typedv1core.EventSinkImpl{Interface: e.coreClient.Events("")})
+	}
+}
+
+func (e *eventBroadcasterAdapterImpl) NewRecorder(name string) EventRecorder {
+	if e.v1beta1Broadcaster != nil && e.v1beta1Client != nil {
+		return e.v1beta1Broadcaster.NewRecorder(scheme.Scheme, name)
+	}
+	return record.NewEventRecorderAdapter(e.DeprecatedNewLegacyRecorder(name))
+}
+
+func (e *eventBroadcasterAdapterImpl) DeprecatedNewLegacyRecorder(name string) record.EventRecorder {
+	return e.coreBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: name})
+}
+
+func (e *eventBroadcasterAdapterImpl) Shutdown() {
+	if e.coreBroadcaster != nil {
+		e.coreBroadcaster.Shutdown()
+	}
+	if e.v1beta1Broadcaster != nil {
+		e.v1beta1Broadcaster.Shutdown()
+	}
 }

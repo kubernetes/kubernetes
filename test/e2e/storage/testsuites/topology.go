@@ -45,8 +45,7 @@ type topologyTest struct {
 	config        *PerTestConfig
 	driverCleanup func()
 
-	intreeOps   opCounts
-	migratedOps opCounts
+	migrationCheck *migrationOpCheck
 
 	resource      VolumeResource
 	pod           *v1.Pod
@@ -148,7 +147,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 			StorageClassName: &(l.resource.Sc.Name),
 		}, l.config.Framework.Namespace.Name)
 
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		return l
 	}
 
@@ -158,7 +157,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
-		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	ginkgo.It("should provision a volume and schedule a pod with AllowedTopologies", func() {

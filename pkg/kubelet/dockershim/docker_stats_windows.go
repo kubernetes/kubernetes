@@ -1,4 +1,4 @@
-// +build windows
+// +build windows,!dockerless
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -24,7 +24,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
@@ -35,7 +35,13 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 
 	hcsshim_container, err := hcsshim.OpenContainer(containerID)
 	if err != nil {
-		return nil, err
+		// As we moved from using Docker stats to hcsshim directly, we may query HCS with already exited container IDs.
+		// That will typically happen with init-containers in Exited state. Docker still knows about them but the HCS does not.
+		// As we don't want to block stats retrieval for other containers, we only log errors.
+		if !hcsshim.IsNotExist(err) && !hcsshim.IsAlreadyStopped(err) {
+			klog.Errorf("Error opening container (stats will be missing) '%s': %v", containerID, err)
+		}
+		return nil, nil
 	}
 	defer func() {
 		closeErr := hcsshim_container.Close()

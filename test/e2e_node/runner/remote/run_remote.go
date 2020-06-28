@@ -43,12 +43,12 @@ import (
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/option"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|conformance")
+var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
@@ -80,7 +80,7 @@ func (e *envs) String() string {
 func (e *envs) Set(value string) error {
 	kv := strings.SplitN(value, "=", 2)
 	if len(kv) != 2 {
-		return fmt.Errorf("invalid env string")
+		return fmt.Errorf("invalid env string %s", value)
 	}
 	emap := *e
 	emap[kv[0]] = kv[1]
@@ -148,21 +148,17 @@ type Resources struct {
 	Accelerators []Accelerator `json:"accelerators,omitempty"`
 }
 
-// GCEImage contains some information about CGE Image.
+// GCEImage contains some information about GCE Image.
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
-	ImageDesc  string `json:"image_description,omitempty"`
-	Project    string `json:"project"`
-	Metadata   string `json:"metadata"`
 	ImageRegex string `json:"image_regex,omitempty"`
-	// Defaults to using only the latest image. Acceptable values are [0, # of images that match the regex).
-	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
-	PreviousImages int `json:"previous_images,omitempty"`
-	// ImageFamily is the image family to use. The latest image from the image family will be used.
-	ImageFamily string `json:"image_family,omitempty"`
-
-	Machine   string    `json:"machine,omitempty"`
-	Resources Resources `json:"resources,omitempty"`
+	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
+	ImageFamily string    `json:"image_family,omitempty"`
+	ImageDesc   string    `json:"image_description,omitempty"`
+	Project     string    `json:"project"`
+	Metadata    string    `json:"metadata"`
+	Machine     string    `json:"machine,omitempty"`
+	Resources   Resources `json:"resources,omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests,omitempty"`
 }
@@ -171,6 +167,7 @@ type internalImageConfig struct {
 	images map[string]internalGCEImage
 }
 
+// internalGCEImage is an internal GCE image representation for E2E node.
 type internalGCEImage struct {
 	image string
 	// imageDesc is the description of the image. If empty, the value in the
@@ -196,7 +193,7 @@ func main() {
 		// Use node e2e suite by default if no subcommand is specified.
 		suite = remote.InitNodeE2ERemote()
 	default:
-		klog.Fatalf("--test-suite must be one of default or conformance")
+		klog.Fatalf("--test-suite must be one of default, cadvisor, or conformance")
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -218,58 +215,54 @@ func main() {
 	gceImages := &internalImageConfig{
 		images: make(map[string]internalGCEImage),
 	}
+	// Parse images from given config file and convert them to internalGCEImage.
 	if *imageConfigFile != "" {
 		configPath := *imageConfigFile
 		if *imageConfigDir != "" {
 			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
 		}
 
-		// parse images
 		imageConfigData, err := ioutil.ReadFile(configPath)
 		if err != nil {
 			klog.Fatalf("Could not read image config file provided: %v", err)
 		}
+		// Unmarshal the given image config file. All images for this test run will be organized into a map.
+		// shortName->GCEImage, e.g cos-stable->cos-stable-81-12871-103-0.
 		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
 		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
 		if err != nil {
 			klog.Fatalf("Could not parse image config file: %v", err)
 		}
+
 		for shortName, imageConfig := range externalImageConfig.Images {
-			var images []string
-			isRegex, name := false, shortName
+			var image string
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
-				isRegex = true
-				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project, imageConfig.PreviousImages)
+				image, err = getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					klog.Fatalf("Could not retrieve list of images based on image prefix %q and family %q: %v",
+					klog.Fatalf("Could not retrieve a image based on image regex %q and family %q: %v",
 						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
-				images = []string{imageConfig.Image}
+				image = imageConfig.Image
 			}
-			for _, image := range images {
-				metadata := imageConfig.Metadata
-				if len(strings.TrimSpace(*instanceMetadata)) > 0 {
-					metadata += "," + *instanceMetadata
-				}
-				gceImage := internalGCEImage{
-					image:     image,
-					imageDesc: imageConfig.ImageDesc,
-					project:   imageConfig.Project,
-					metadata:  getImageMetadata(metadata),
-					machine:   imageConfig.Machine,
-					tests:     imageConfig.Tests,
-					resources: imageConfig.Resources,
-				}
-				if gceImage.imageDesc == "" {
-					gceImage.imageDesc = gceImage.image
-				}
-				if isRegex && len(images) > 1 {
-					// Use image name when shortName is not unique.
-					name = image
-				}
-				gceImages.images[name] = gceImage
+			// Convert the given image into an internalGCEImage.
+			metadata := imageConfig.Metadata
+			if len(strings.TrimSpace(*instanceMetadata)) > 0 {
+				metadata += "," + *instanceMetadata
 			}
+			gceImage := internalGCEImage{
+				image:     image,
+				imageDesc: imageConfig.ImageDesc,
+				project:   imageConfig.Project,
+				metadata:  getImageMetadata(metadata),
+				machine:   imageConfig.Machine,
+				tests:     imageConfig.Tests,
+				resources: imageConfig.Resources,
+			}
+			if gceImage.imageDesc == "" {
+				gceImage.imageDesc = gceImage.image
+			}
+			gceImages.images[shortName] = gceImage
 		}
 	}
 
@@ -280,21 +273,22 @@ func main() {
 			klog.Fatal("Must specify --image-project if you specify --images")
 		}
 		cliImages := strings.Split(*images, ",")
-		for _, img := range cliImages {
+		for _, image := range cliImages {
 			gceImage := internalGCEImage{
-				image:    img,
+				image:    image,
 				project:  *imageProject,
 				metadata: getImageMetadata(*instanceMetadata),
 			}
-			gceImages.images[img] = gceImage
+			gceImages.images[image] = gceImage
 		}
 	}
 
 	if len(gceImages.images) != 0 && *zone == "" {
 		klog.Fatal("Must specify --zone flag")
 	}
-	for shortName, image := range gceImages.images {
-		if image.project == "" {
+	// Make sure GCP project is set. Without a project, images can't be retrieved..
+	for shortName, imageConfig := range gceImages.images {
+		if imageConfig.project == "" {
 			klog.Fatalf("Invalid config for %v; must specify a project", shortName)
 		}
 	}
@@ -324,7 +318,7 @@ func main() {
 	running := 0
 	for shortName := range gceImages.images {
 		imageConfig := gceImages.images[shortName]
-		fmt.Printf("Initializing e2e tests using image %s.\n", shortName)
+		fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
 		running++
 		go func(image *internalGCEImage, junitFilePrefix string) {
 			results <- testImage(image, junitFilePrefix)
@@ -466,18 +460,14 @@ type imageObj struct {
 	name         string
 }
 
-func (io imageObj) string() string {
-	return fmt.Sprintf("%q created %q", io.name, io.creationTime.String())
-}
-
 type byCreationTime []imageObj
 
 func (a byCreationTime) Len() int           { return len(a) }
 func (a byCreationTime) Less(i, j int) bool { return a[i].creationTime.After(a[j].creationTime) }
 func (a byCreationTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
-// Returns a list of image names based on regex and number of previous images requested.
-func getGCEImages(imageRegex, imageFamily string, project string, previousImages int) ([]string, error) {
+// Returns an image name based on regex and given GCE project.
+func getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
 	if err := computeService.Images.List(project).Pages(context.Background(),
@@ -497,24 +487,21 @@ func getGCEImages(imageRegex, imageFamily string, project string, previousImages
 					creationTime: creationTime,
 					name:         instance.Name,
 				}
-				klog.V(4).Infof("Found image %q based on regex %q and family %q in project %q", io.string(), imageRegex, imageFamily, project)
 				imageObjs = append(imageObjs, io)
 			}
 			return nil
 		},
 	); err != nil {
-		return nil, fmt.Errorf("failed to list images in project %q: %v", project, err)
+		return "", fmt.Errorf("failed to list images in project %q: %v", project, err)
 	}
+
+	// Pick the latest image after sorting.
 	sort.Sort(byCreationTime(imageObjs))
-	images := []string{}
-	for _, imageObj := range imageObjs {
-		images = append(images, imageObj.name)
-		previousImages--
-		if previousImages < 0 {
-			break
-		}
+	if len(imageObjs) > 0 {
+		klog.V(4).Infof("found images %+v based on regex %q and family %q in project %q", imageObjs, imageRegex, imageFamily, project)
+		return imageObjs[0].name, nil
 	}
-	return images, nil
+	return "", fmt.Errorf("found zero images based on regex %q and family %q in project %q", imageRegex, imageFamily, project)
 }
 
 // Provision a gce instance using image and run the tests in archive against the instance.
@@ -681,13 +668,15 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		// TODO(random-liu): Remove the docker version check. Use some other command to check
 		// instance readiness.
 		var output string
-		output, err = remote.SSH(name, "docker", "version")
+		output, err = remote.SSH(name, "sh", "-c",
+			"'systemctl list-units  --type=service  --state=running | grep -e docker -e containerd'")
 		if err != nil {
-			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
+			err = fmt.Errorf("instance %s not running docker/containerd daemon - Command failed: %s", name, output)
 			continue
 		}
-		if !strings.Contains(output, "Server") {
-			err = fmt.Errorf("instance %s not running docker daemon - Server not found: %s", name, output)
+		if !strings.Contains(output, "docker.service") &&
+			!strings.Contains(output, "containerd.service") {
+			err = fmt.Errorf("instance %s not running docker/containerd daemon: %s", name, output)
 			continue
 		}
 		instanceRunning = true

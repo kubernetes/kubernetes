@@ -30,7 +30,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/metrics"
@@ -432,6 +432,53 @@ func (c *Client) DeleteInstances(ctx context.Context, resourceGroupName string, 
 	}
 
 	return nil
+}
+
+// DeleteInstancesAsync sends the delete request to ARM client and DOEST NOT wait on the future
+func (c *Client) DeleteInstancesAsync(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (*azure.Future, *retry.Error) {
+	mc := metrics.NewMetricContext("vmss", "delete_instances_async", resourceGroupName, c.subscriptionID, "")
+
+	// Report errors if the client is rate limited.
+	if !c.rateLimiterWriter.TryAccept() {
+		mc.RateLimitedCount()
+		return nil, retry.GetRateLimitError(true, "VMSSDeleteInstancesAsync")
+	}
+
+	// Report errors if the client is throttled.
+	if c.RetryAfterWriter.After(time.Now()) {
+		mc.ThrottledCount()
+		rerr := retry.GetThrottlingError("VMSSDeleteInstancesAsync", "client throttled", c.RetryAfterWriter)
+		return nil, rerr
+	}
+
+	resourceID := armclient.GetResourceID(
+		c.subscriptionID,
+		resourceGroupName,
+		"Microsoft.Compute/virtualMachineScaleSets",
+		vmScaleSetName,
+	)
+
+	response, rerr := c.armClient.PostResource(ctx, resourceID, "delete", vmInstanceIDs)
+	defer c.armClient.CloseResponse(ctx, response)
+
+	if rerr != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deletevms.request", resourceID, rerr.Error())
+		return nil, rerr
+	}
+
+	err := autorest.Respond(response, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deletevms.respond", resourceID, rerr.Error())
+		return nil, retry.GetError(response, err)
+	}
+
+	future, err := azure.NewFutureFromResponse(response)
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deletevms.future", resourceID, rerr.Error())
+		return nil, retry.NewError(false, err)
+	}
+
+	return &future, nil
 }
 
 // deleteVMSSInstances deletes the instances for a VirtualMachineScaleSet.

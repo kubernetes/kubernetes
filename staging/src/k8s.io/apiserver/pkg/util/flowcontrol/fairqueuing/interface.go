@@ -19,6 +19,8 @@ package fairqueuing
 import (
 	"context"
 	"time"
+
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 )
 
 // QueueSetFactory is used to create QueueSet objects.  Creation, like
@@ -66,17 +68,24 @@ type QueueSet interface {
 	IsIdle() bool
 
 	// StartRequest begins the process of handling a request.  If the
-	// request gets queued and the number of queues is greater than
-	// 1 then Wait uses the given hashValue as the source of entropy
-	// as it shuffle-shards the request into a queue.  The descr1 and
-	// descr2 values play no role in the logic but appear in log
-	// messages.  This method always returns quickly (without waiting
-	// for the request to be dequeued).  If this method returns a nil
-	// Request value then caller should reject the request and the
-	// returned bool indicates whether the QueueSet was idle at the
-	// moment of the return.  Otherwise idle==false and the client
-	// must call the Wait method of the Request exactly once.
-	StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (req Request, idle bool)
+	// request gets queued and the number of queues is greater than 1
+	// then StartRequest uses the given hashValue as the source of
+	// entropy as it shuffle-shards the request into a queue.  The
+	// descr1 and descr2 values play no role in the logic but appear
+	// in log messages.  This method always returns quickly (without
+	// waiting for the request to be dequeued).  If this method
+	// returns a nil Request value then caller should reject the
+	// request and the returned bool indicates whether the QueueSet
+	// was idle at the moment of the return.  Otherwise idle==false
+	// and the client must call the Finish method of the Request
+	// exactly once.
+	StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) (req Request, idle bool)
+
+	// Dump saves and returns the instant internal state of the queue-set.
+	// Note that dumping process will stop the queue-set from proceeding
+	// any requests.
+	// For debugging only.
+	Dump(includeRequestDetails bool) debug.QueueSetDump
 }
 
 // Request represents the remainder of the handling of one request
@@ -115,11 +124,4 @@ type QueuingConfig struct {
 type DispatchingConfig struct {
 	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
 	ConcurrencyLimit int
-}
-
-// EmptyHandler is used to notify the callee when all the queues
-// of a QueueSet have been drained.
-type EmptyHandler interface {
-	// HandleEmpty is called to deliver the notification
-	HandleEmpty()
 }

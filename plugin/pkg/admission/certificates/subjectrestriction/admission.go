@@ -23,7 +23,7 @@ import (
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 )
 
@@ -75,7 +75,7 @@ func (p *Plugin) Validate(_ context.Context, a admission.Attributes, _ admission
 		return nil
 	}
 
-	csrParsed, err := certificatesapi.ParseCSR(csr)
+	csrParsed, err := certificatesapi.ParseCSR(csr.Spec.Request)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("failed to parse CSR: %v", err))
 	}

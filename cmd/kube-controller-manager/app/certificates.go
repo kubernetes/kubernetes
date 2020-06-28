@@ -24,22 +24,22 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
-
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	kubeoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
+	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 	"k8s.io/kubernetes/pkg/features"
 )
 
 func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
-	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
 		klog.Warningf("Resource %s is not available now", gvr.String())
 		return nil, false, nil
@@ -89,24 +89,47 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 	}
 
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
+	csrInformer := ctx.InformerFactory.Certificates().V1().CertificateSigningRequests()
+	certTTL := ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
+	caFile, caKeyFile := getKubeletServingSignerFiles(ctx.ComponentConfig.CSRSigningController)
 
-	signer, err := signer.NewCSRSigningController(
-		c,
-		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile,
-		ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile,
-		ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration,
-	)
+	// TODO get different signer cert and key files for each signer when we add flags.
+
+	kubeletServingSigner, err := signer.NewKubeletServingCSRSigningController(c, csrInformer, caFile, caKeyFile, certTTL)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to start certificate controller: %v", err)
+		return nil, false, fmt.Errorf("failed to start kubernetes.io/kubelet-serving certificate controller: %v", err)
 	}
-	go signer.Run(1, ctx.Stop)
+	go kubeletServingSigner.Run(1, ctx.Stop)
+
+	kubeletClientSigner, err := signer.NewKubeletClientCSRSigningController(c, csrInformer, caFile, caKeyFile, certTTL)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client-kubelet certificate controller: %v", err)
+	}
+	go kubeletClientSigner.Run(1, ctx.Stop)
+
+	kubeAPIServerClientSigner, err := signer.NewKubeAPIServerClientCSRSigningController(c, csrInformer, caFile, caKeyFile, certTTL)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client certificate controller: %v", err)
+	}
+	go kubeAPIServerClientSigner.Run(1, ctx.Stop)
+
+	legacyUnknownSigner, err := signer.NewLegacyUnknownCSRSigningController(c, csrInformer, caFile, caKeyFile, certTTL)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to start kubernetes.io/legacy-unknown certificate controller: %v", err)
+	}
+	go legacyUnknownSigner.Run(1, ctx.Stop)
 
 	return nil, true, nil
 }
 
+// getKubeletServingSignerFiles returns the cert and key for signing.
+// TODO we will extended this for each signer so that it prefers the specific flag (to be added) and falls back to the single flag
+func getKubeletServingSignerFiles(config csrsigningconfig.CSRSigningControllerConfiguration) (string, string) {
+	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
+}
+
 func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
-	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
 		klog.Warningf("Resource %s is not available now", gvr.String())
 		return nil, false, nil
@@ -114,7 +137,7 @@ func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, err
 
 	approver := approver.NewCSRApprovingController(
 		ctx.ClientBuilder.ClientOrDie("certificate-controller"),
-		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
 	go approver.Run(1, ctx.Stop)
 
@@ -123,8 +146,8 @@ func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, err
 
 func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
-		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1beta1().CertificateSigningRequests(),
-		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
+		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
+		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
 	go cleaner.Run(1, ctx.Stop)
 	return nil, true, nil
