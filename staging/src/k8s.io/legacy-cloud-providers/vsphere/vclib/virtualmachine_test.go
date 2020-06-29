@@ -114,6 +114,26 @@ func TestVirtualMachine(t *testing.T) {
 			}
 		}
 
+		for _, turnOff := range []bool{true, false} {
+			// Turn off for checking if exist return true
+			if turnOff {
+				_, _ = vm.PowerOff(ctx)
+			}
+
+			exist, err := vm.Exists(ctx)
+			if err != nil {
+				t.Error(err)
+			}
+			if !exist {
+				t.Errorf("exist=%t, expected=%t", exist, true)
+			}
+
+			// Turn back on
+			if turnOff {
+				_, _ = vm.PowerOn(ctx)
+			}
+		}
+
 		for _, expect := range []bool{true, false} {
 			active, err := vm.IsActive(ctx)
 			if err != nil {
@@ -139,6 +159,12 @@ func TestVirtualMachine(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+		}
+
+		// Expecting Exists func to throw error if VM deleted
+		_, err = vm.Exists(ctx)
+		if err == nil {
+			t.Error("expected error")
 		}
 	}
 }

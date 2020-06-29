@@ -857,14 +857,16 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
-		isActive, err := vm.IsActive(ctx)
+
+		exists, err := vm.Exists(ctx)
 		if err != nil {
-			klog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
+			klog.Errorf("Failed to check whether node %q still exists. err: %+v.", convertToString(nodeName), err)
 			return "", err
 		}
-		if isActive {
+		if exists {
 			return vs.vmUUID, nil
 		}
+
 		klog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
 		return "", cloudprovider.InstanceNotFound
 	}
