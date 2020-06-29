@@ -756,11 +756,14 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 		return false, err
 	}
 	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
-	if err == nil {
-		return true, nil
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+		return false, err
 	}
 
-	return false, err
+	return true, nil
 }
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
