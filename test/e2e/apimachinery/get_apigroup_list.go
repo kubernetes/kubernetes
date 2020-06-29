@@ -26,7 +26,7 @@ import (
 
 var _ = SIGDescribe("get-apigroup-list", func() {
 	f := framework.NewDefaultFramework("get-apigroup-list")
-	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
+	ginkgo.It("should locate PreferredVersion for each APIGroup", func() {
 
 		// TEST BEGINS HERE
 		ginkgo.By("[status] begin")
@@ -38,7 +38,7 @@ var _ = SIGDescribe("get-apigroup-list", func() {
 		framework.ExpectNoError(err, "Failed to find /apis/")
 
 		for _, group := range list.Groups {
-			framework.Logf("Checking APIGroup:", group.Name)
+			framework.Logf("Checking APIGroup: %v", group.Name)
 
 			// hit APIGroup endpoint
 			checkGroup := &metav1.APIGroup{}
@@ -48,7 +48,7 @@ var _ = SIGDescribe("get-apigroup-list", func() {
 			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
 
 			// get PreferredVersion for endpoint
-			framework.Logf("PreferredVersion:", checkGroup.PreferredVersion)
+			framework.Logf("PreferredVersion: %v", checkGroup.PreferredVersion)
 		}
 	})
 })
