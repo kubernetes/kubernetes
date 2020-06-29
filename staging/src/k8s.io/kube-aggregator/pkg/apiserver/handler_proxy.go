@@ -143,7 +143,8 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.serveHTTPWithRetry(w, req, handlingInfo, user)
 }
 
-// TODO: doc
+// serveHTTPWithRetry serves the request with a retry mechanism for increasing high availability of the aggregator.
+// it takes into account the number of available endpoints, used HTTP method and type of an error (if any)
 func (r *proxyHandler) serveHTTPWithRetry(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, user user.Info) {
 	w = newResponseWriterInterceptor(w)
 	errRsp := newHijackErrorResponder(&responder{w: w}, req)

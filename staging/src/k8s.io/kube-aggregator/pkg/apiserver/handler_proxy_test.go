@@ -36,9 +36,11 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 )
 
@@ -96,13 +98,25 @@ func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url
 }
 
 type mockedRouterWithCounter struct {
-	delegate *mockedRouter
-	counter  int
+	delegate       *mockedRouter
+	counter        int
+	endpointsCount int
+	visitedEP      []*url.URL
 }
 
 func (r *mockedRouterWithCounter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	r.counter++
 	return r.delegate.ResolveEndpoint(name, name, port)
+}
+
+func (r *mockedRouterWithCounter) ResolveEndpointWithVisited(namespace, name string, port int32, visitedEPs []*url.URL) (*url.URL, error) {
+	r.visitedEP = visitedEPs
+	r.counter++
+	return r.delegate.ResolveEndpoint(name, name, port)
+}
+
+func (r *mockedRouterWithCounter) EndpointCount(namespace, name string, port int32) (int, error) {
+	return r.endpointsCount, nil
 }
 
 type fakeRT struct {
@@ -480,6 +494,7 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 }
 
+// TODO:
 func TestProxyRetriesIntegration(t *testing.T) {
 	testCases := map[string]struct {
 		APIService *apiregistration.APIService
@@ -594,25 +609,75 @@ func TestProxyRetries(t *testing.T) {
 		}
 	}
 
+	defaultServiceResolver := func() *mockedRouterWithCounter {
+		return &mockedRouterWithCounter{delegate: &mockedRouter{"fake.com", nil}, counter: 0, endpointsCount: 1}
+	}
+
 	testCases := map[string]struct {
 		apiService                  *apiregistration.APIService
+		serviceResolver             *mockedRouterWithCounter
 		backendError                error
 		expectedStatusCode          int
 		expectedServiceResolveCount int
+		expectedVisitedEPLen        int
 	}{
 		"single host: retry on connection reset by peer error": {
 			apiService:                  defaultAPIService(),
+			serviceResolver:             defaultServiceResolver(),
 			backendError:                errors.New("connection reset by peer"),
 			expectedStatusCode:          http.StatusServiceUnavailable,
 			expectedServiceResolveCount: 4,
 		},
 		"single host: do not retry on unknown error": {
 			apiService:                  defaultAPIService(),
+			serviceResolver:             defaultServiceResolver(),
 			backendError:                errors.New("unknown error from the backend"),
 			expectedStatusCode:          http.StatusServiceUnavailable,
 			expectedServiceResolveCount: 1,
 		},
-		// TODO: "single host: do not retry on connection refused error":
+		"single host: do not retry on connection refused": {
+			apiService:                  defaultAPIService(),
+			serviceResolver:             defaultServiceResolver(),
+			backendError:                fmt.Errorf("%v", os.SyscallError{Err: fmt.Errorf("%w", syscall.ECONNREFUSED)}),
+			expectedStatusCode:          http.StatusServiceUnavailable,
+			expectedServiceResolveCount: 1,
+		},
+		"many hosts: retry on connection reset by peer error": {
+			apiService: defaultAPIService(),
+			serviceResolver: func() *mockedRouterWithCounter {
+				sr := defaultServiceResolver()
+				sr.endpointsCount = 8
+				return sr
+			}(),
+			backendError:                errors.New("connection reset by peer"),
+			expectedStatusCode:          http.StatusServiceUnavailable,
+			expectedServiceResolveCount: 9,
+			expectedVisitedEPLen:        8,
+		},
+		"many hosts: do not retry on unknown error": {
+			apiService: defaultAPIService(),
+			serviceResolver: func() *mockedRouterWithCounter {
+				sr := defaultServiceResolver()
+				sr.endpointsCount = 8
+				return sr
+			}(),
+			backendError:                errors.New("unknown error from the backend"),
+			expectedStatusCode:          http.StatusServiceUnavailable,
+			expectedServiceResolveCount: 1,
+			expectedVisitedEPLen:        0,
+		},
+		"many hosts: retry on connection refused": {
+			apiService:                  defaultAPIService(),
+			serviceResolver: func() *mockedRouterWithCounter {
+				sr := defaultServiceResolver()
+				sr.endpointsCount = 8
+				return sr
+			}(),
+			backendError:                fmt.Errorf("%w", &net.OpError{Err: syscall.ECONNREFUSED}),
+			expectedStatusCode:          http.StatusServiceUnavailable,
+			expectedServiceResolveCount: 9,
+			expectedVisitedEPLen:        8,
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -621,9 +686,8 @@ func TestProxyRetries(t *testing.T) {
 
 		func() {
 			// set up the aggregator
-			serverURL, _ := url.Parse("https://fake.com")
 			proxyHandler := &proxyHandler{
-				serviceResolver: &mockedRouterWithCounter{&mockedRouter{destinationHost: serverURL.Host}, 0},
+				serviceResolver: testCase.serviceResolver,
 				proxyTransport:  &http.Transport{},
 			}
 			proxyHandler.updateAPIService(testCase.apiService)
@@ -679,6 +743,10 @@ func TestProxyRetries(t *testing.T) {
 			actualRetries := proxyHandler.serviceResolver.(*mockedRouterWithCounter).counter
 			if testCase.expectedServiceResolveCount != actualRetries {
 				t.Errorf("expected %d retries but got %d", testCase.expectedServiceResolveCount, actualRetries)
+			}
+
+			if len(proxyHandler.serviceResolver.(*mockedRouterWithCounter).visitedEP) != testCase.expectedVisitedEPLen {
+				t.Errorf("visited endpoints mismatch, got= %v, wanted= %v", len(proxyHandler.serviceResolver.(*mockedRouterWithCounter).visitedEP), testCase.expectedVisitedEPLen)
 			}
 		}()
 	}
