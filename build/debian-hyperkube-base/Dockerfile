@@ -14,21 +14,20 @@
 
 FROM BASEIMAGE
 
-# TODO(#69896): deprecate the shortened aliases in /
 RUN ln -s /hyperkube /apiserver \
- && ln -s /hyperkube /cloud-controller-manager \
- && ln -s /hyperkube /controller-manager \
- && ln -s /hyperkube /kubectl \
- && ln -s /hyperkube /kubelet \
- && ln -s /hyperkube /proxy \
- && ln -s /hyperkube /scheduler \
- && ln -s /hyperkube /usr/local/bin/cloud-controller-manager \
- && ln -s /hyperkube /usr/local/bin/kube-apiserver \
- && ln -s /hyperkube /usr/local/bin/kube-controller-manager \
- && ln -s /hyperkube /usr/local/bin/kube-proxy \
- && ln -s /hyperkube /usr/local/bin/kube-scheduler \
- && ln -s /hyperkube /usr/local/bin/kubectl \
- && ln -s /hyperkube /usr/local/bin/kubelet
+    && ln -s /hyperkube /cloud-controller-manager \
+    && ln -s /hyperkube /controller-manager \
+    && ln -s /hyperkube /kubectl \
+    && ln -s /hyperkube /kubelet \
+    && ln -s /hyperkube /proxy \
+    && ln -s /hyperkube /scheduler \
+    && ln -s /hyperkube /usr/local/bin/cloud-controller-manager \
+    && ln -s /hyperkube /usr/local/bin/kube-apiserver \
+    && ln -s /hyperkube /usr/local/bin/kube-controller-manager \
+    && ln -s /hyperkube /usr/local/bin/kube-proxy \
+    && ln -s /hyperkube /usr/local/bin/kube-scheduler \
+    && ln -s /hyperkube /usr/local/bin/kubectl \
+    && ln -s /hyperkube /usr/local/bin/kubelet
 
 RUN clean-install bash
 
@@ -42,15 +41,16 @@ RUN clean-install \
     ceph-common \
     cifs-utils \
     e2fsprogs \
-    xfsprogs \
     ethtool \
     git \
     glusterfs-client \
+    iproute2 \
     jq \
-    openssh-client \
     nfs-common \
+    openssh-client \
     socat \
     udev \
-    util-linux
+    util-linux \
+    xfsprogs
 
 COPY cni-bin/bin /opt/cni/bin
