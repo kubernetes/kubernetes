@@ -57,7 +57,7 @@ func init() {
 	credentialprovider.RegisterCredentialProvider("azure",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider:    NewACRProvider(flagConfigFile),
-			Lifetime:    1 * time.Minute,
+			Lifetime:    5 * time.Second,
 			ShouldCache: func(d credentialprovider.DockerConfig) bool { return len(d) > 0 },
 		})
 }
