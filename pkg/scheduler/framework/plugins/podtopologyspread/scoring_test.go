@@ -70,8 +70,11 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}:                    pointer.Int64Ptr(0),
+					{key: "zone", value: "zone2"}:                    pointer.Int64Ptr(0),
+					{key: "kubernetes.io/hostname", value: "node-a"}: pointer.Int64Ptr(0),
+					{key: "kubernetes.io/hostname", value: "node-b"}: pointer.Int64Ptr(0),
+					{key: "kubernetes.io/hostname", value: "node-x"}: pointer.Int64Ptr(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
 			},
@@ -102,7 +105,9 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}:                    pointer.Int64Ptr(0),
+					{key: "kubernetes.io/hostname", value: "node-a"}: pointer.Int64Ptr(0),
+					{key: "kubernetes.io/hostname", value: "node-b"}: pointer.Int64Ptr(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
 			},
@@ -136,7 +141,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "planet", value: "mars"}: pointer.Int64Ptr(0),
+					{key: "planet", value: "mars"}:                   pointer.Int64Ptr(0),
+					{key: "kubernetes.io/hostname", value: "node-a"}: pointer.Int64Ptr(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
 			},
@@ -181,7 +187,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{"planet", "mars"}: pointer.Int64Ptr(0),
+					{key: "planet", value: "mars"}: pointer.Int64Ptr(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
 			},

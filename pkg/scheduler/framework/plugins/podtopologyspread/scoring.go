@@ -81,10 +81,6 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 			continue
 		}
 		for i, constraint := range s.Constraints {
-			// per-node counts are calculated during Score.
-			if constraint.TopologyKey == v1.LabelHostname {
-				continue
-			}
 			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
 			if s.TopologyPairToPodCounts[pair] == nil {
 				s.TopologyPairToPodCounts[pair] = new(int64)
@@ -94,11 +90,8 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	}
 
 	s.TopologyNormalizingWeight = make([]float64, len(s.Constraints))
-	for i, c := range s.Constraints {
+	for i := range s.Constraints {
 		sz := topoSize[i]
-		if c.TopologyKey == v1.LabelHostname {
-			sz = len(filteredNodes) - len(s.IgnoredNodes)
-		}
 		s.TopologyNormalizingWeight[i] = topologyNormalizingWeight(sz)
 	}
 	return nil
@@ -151,10 +144,9 @@ func (pl *PodTopologySpread) PreScore(
 
 		for _, c := range state.Constraints {
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
-			// If current topology pair is not associated with any candidate node,
-			// continue to avoid unnecessary calculation.
-			// Per-node counts are also skipped, as they are done during Score.
 			tpCount := state.TopologyPairToPodCounts[pair]
+			// If current topology pair is not associated with the processed node,
+			// continue to avoid unnecessary calculation.
 			if tpCount == nil {
 				continue
 			}
@@ -194,12 +186,8 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 	for i, c := range s.Constraints {
 		if tpVal, ok := node.Labels[c.TopologyKey]; ok {
 			var cnt int64
-			if c.TopologyKey == v1.LabelHostname {
-				cnt = int64(countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace))
-			} else {
-				pair := topologyPair{key: c.TopologyKey, value: tpVal}
-				cnt = *s.TopologyPairToPodCounts[pair]
-			}
+			pair := topologyPair{key: c.TopologyKey, value: tpVal}
+			cnt = *s.TopologyPairToPodCounts[pair]
 			score += scoreForCount(cnt, c.MaxSkew, s.TopologyNormalizingWeight[i])
 		}
 	}
