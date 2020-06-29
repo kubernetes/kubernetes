@@ -26,6 +26,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/util/slice:go_default_library",
