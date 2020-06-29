@@ -889,6 +889,61 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	}
 }
 
+func TestPodEligibleToPreemptOthers(t *testing.T) {
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		pods                []*v1.Pod
+		nodes               []string
+		nominatedNodeStatus *framework.Status
+		expected            bool
+	}{
+		{
+			name:                "Pod with nominated node",
+			pod:                 st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods:                []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
+			nodes:               []string{"node1"},
+			nominatedNodeStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
+			expected:            true,
+		},
+		{
+			name:                "Pod with nominated node, but without nominated node status",
+			pod:                 st.MakePod().Name("p_without_status").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods:                []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
+			nodes:               []string{"node1"},
+			nominatedNodeStatus: nil,
+			expected:            false,
+		},
+		{
+			name:                "Pod without nominated node",
+			pod:                 st.MakePod().Name("p_without_nominated_node").UID("p").Priority(highPriority).Obj(),
+			pods:                []*v1.Pod{},
+			nodes:               []string{},
+			nominatedNodeStatus: nil,
+			expected:            true,
+		},
+		{
+			name:                "Pod with 'PreemptNever' preemption policy",
+			pod:                 st.MakePod().Name("p_with_preempt_never_policy").UID("p").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
+			pods:                []*v1.Pod{},
+			nodes:               []string{},
+			nominatedNodeStatus: nil,
+			expected:            false,
+		},
+	}
+
+	for _, test := range tests {
+		var nodes []*v1.Node
+		for _, n := range test.nodes {
+			nodes = append(nodes, st.MakeNode().Name(n).Obj())
+		}
+		snapshot := internalcache.NewSnapshot(test.pods, nodes)
+		if got := podEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
+			t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
+		}
+	}
+}
+
 func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	// Prepare 4 nodes names.
 	nodeNames := []string{"node1", "node2", "node3", "node4"}

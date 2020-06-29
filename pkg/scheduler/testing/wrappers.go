@@ -244,6 +244,12 @@ func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
 	return p
 }
 
+// NominatedNodeName sets `n` as the .Status.NominatedNodeName of the inner pod.
+func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
+	p.Status.NominatedNodeName = n
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
