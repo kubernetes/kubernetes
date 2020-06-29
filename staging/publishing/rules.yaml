@@ -1664,3 +1664,16 @@ rules:
       branch: master
       dir: staging/src/k8s.io/mount-utils
     name: master
+
+- destination: component-helpers
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/component-helpers
+    name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
