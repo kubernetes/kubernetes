@@ -592,6 +592,7 @@ func TestEmptySubsets(t *testing.T) {
 }
 
 func TestCreateOrUpdateMasterService(t *testing.T) {
+	singleStack := corev1.IPFamilyPolicySingleStack
 	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
@@ -619,6 +620,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 					},
 					Selector:        nil,
 					ClusterIP:       "1.2.3.4",
+					IPFamilyPolicy:  &singleStack,
 					SessionAffinity: corev1.ServiceAffinityNone,
 					Type:            corev1.ServiceTypeClusterIP,
 				},

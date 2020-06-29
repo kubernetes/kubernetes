@@ -292,6 +292,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		}
 		return nil
 	}
+	singleStack := corev1.IPFamilyPolicySingleStack
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -303,6 +304,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
+			IPFamilyPolicy:  &singleStack,
 			SessionAffinity: corev1.ServiceAffinityNone,
 			Type:            serviceType,
 		},
