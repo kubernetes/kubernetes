@@ -1,6 +1,6 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.14
+go 1.13
 
 require (
 	github.com/bazelbuild/bazel-gazelle v0.19.1-0.20191105222053-70208cbdc798
