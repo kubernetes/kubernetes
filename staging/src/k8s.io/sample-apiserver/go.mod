@@ -2,7 +2,7 @@
 
 module k8s.io/sample-apiserver
 
-go 1.14
+go 1.13
 
 require (
 	github.com/go-openapi/spec v0.19.3
