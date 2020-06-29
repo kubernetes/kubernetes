@@ -55,9 +55,12 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	}
 
 	// Secondary IP validation
+	// while api-server dualstack bits does not have dependency on EndPointSlice, its
+	// a good idea to have validation consistent across all components (ControllerManager
+	// needs EndPointSlice + DualStack feature flags).
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		errs = append(errs, fmt.Errorf("--secondary-service-cluster-ip-range can only be used if %v feature is enabled", string(features.IPv6DualStack)))
+	if secondaryServiceClusterIPRangeUsed && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
+		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v and %v feature is enabled", string(features.IPv6DualStack), string(features.EndpointSlice)))
 	}
 
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
@@ -68,14 +71,14 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		// Should be dualstack IPFamily(PrimaryServiceClusterIPRange) != IPFamily(SecondaryServiceClusterIPRange)
 		dualstack, err := netutils.IsDualStackCIDRs([]*net.IPNet{&options.PrimaryServiceClusterIPRange, &options.SecondaryServiceClusterIPRange})
 		if err != nil {
-			errs = append(errs, errors.New("error attempting to validate dualstack for --service-cluster-ip-range and --secondary-service-cluster-ip-range"))
+			errs = append(errs, fmt.Errorf("error attempting to validate dualstack for --service-cluster-ip-range value error:%v", err))
 		}
 
 		if !dualstack {
-			errs = append(errs, errors.New("--service-cluster-ip-range and --secondary-service-cluster-ip-range must be of different IP family"))
+			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
 
-		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--secondary-service-cluster-ip-range"); err != nil {
+		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
 			errs = append(errs, err)
 		}
 	}
