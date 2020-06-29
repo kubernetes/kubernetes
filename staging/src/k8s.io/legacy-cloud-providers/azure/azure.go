@@ -253,7 +253,7 @@ type Cloud struct {
 	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
 	ipv6DualStackEnabled bool
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
-	nodeCachesLock sync.Mutex
+	nodeCachesLock sync.RWMutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
 	// it is updated by the nodeInformer
 	nodeZones map[string]sets.String
@@ -812,8 +812,8 @@ func (az *Cloud) GetActiveZones() (sets.String, error) {
 		return nil, fmt.Errorf("Azure cloud provider doesn't have informers set")
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetActiveZones")
 	}
@@ -839,8 +839,8 @@ func (az *Cloud) GetNodeResourceGroup(nodeName string) (string, error) {
 		return az.ResourceGroup, nil
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return "", fmt.Errorf("node informer is not synced when trying to GetNodeResourceGroup")
 	}
@@ -861,8 +861,8 @@ func (az *Cloud) GetResourceGroups() (sets.String, error) {
 		return sets.NewString(az.ResourceGroup), nil
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetResourceGroups")
 	}
@@ -882,8 +882,8 @@ func (az *Cloud) GetUnmanagedNodes() (sets.String, error) {
 		return nil, nil
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetUnmanagedNodes")
 	}
