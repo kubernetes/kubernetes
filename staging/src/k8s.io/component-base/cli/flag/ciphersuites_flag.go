@@ -46,10 +46,6 @@ var ciphers = map[string]uint16{
 	"TLS_AES_128_GCM_SHA256":                  tls.TLS_AES_128_GCM_SHA256,
 	"TLS_CHACHA20_POLY1305_SHA256":            tls.TLS_CHACHA20_POLY1305_SHA256,
 	"TLS_AES_256_GCM_SHA384":                  tls.TLS_AES_256_GCM_SHA384,
-
-	// support official IANA names as well
-	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256": tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-	"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256":   tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 }
 
 // to be replaced by tls.InsecureCipherSuites() when the project migrates to go1.14.
