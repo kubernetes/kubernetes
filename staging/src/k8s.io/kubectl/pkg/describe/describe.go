@@ -3501,7 +3501,7 @@ func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string,
 			return
 		}
 		w.Write(LEVEL_0, prefix+name+":\t")
-		w.Write(LEVEL_0, strings.Join(values, "\n"+prefix+"\t"))
+		w.Write(LEVEL_0, "%q", strings.Join(values, "\n"+prefix+"\t"))
 		w.Write(LEVEL_0, "\n")
 	}
 
@@ -3518,8 +3518,8 @@ func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string,
 		w.Write(LEVEL_0, "Status:\t%s\n", status)
 
 		w.Write(LEVEL_0, "Subject:\n")
-		w.Write(LEVEL_0, "\tCommon Name:\t%s\n", cr.Subject.CommonName)
-		w.Write(LEVEL_0, "\tSerial Number:\t%s\n", cr.Subject.SerialNumber)
+		w.Write(LEVEL_0, "\tCommon Name:\t%q\n", cr.Subject.CommonName)
+		w.Write(LEVEL_0, "\tSerial Number:\t%q\n", cr.Subject.SerialNumber)
 		printListHelper(w, "\t", "Organization", cr.Subject.Organization)
 		printListHelper(w, "\t", "Organizational Unit", cr.Subject.OrganizationalUnit)
 		printListHelper(w, "\t", "Country", cr.Subject.Country)
