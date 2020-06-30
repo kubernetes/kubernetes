@@ -103,7 +103,10 @@ func connectSCTP(dest string, timeout time.Duration) {
 		os.Exit(1)
 	}
 
-	timeoutCh := time.After(timeout)
+	timeoutCh := make(<-chan time.Time)
+	if timeout != time.Duration(0) {
+		timeoutCh = time.After(timeout)
+	}
 	errCh := make(chan (error))
 
 	go func() {
