@@ -58,7 +58,7 @@ func (o *Options) Validate() []error {
 		allFlags := unsupportedLoggingFlags()
 		for _, fname := range allFlags {
 			if flagIsSet(fname) {
-				errs = append(errs, fmt.Errorf("Non-default logging format doesn't honor flag: %s\n", fname))
+				errs = append(errs, fmt.Errorf("non-default logging format doesn't honor flag: %s", fname))
 			}
 		}
 	}
