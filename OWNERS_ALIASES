@@ -240,6 +240,8 @@ aliases:
     - derekwaynecarr
     - vishh
     - yujuhong
+    - dashpole
+    - sjenning
   sig-node-reviewers:
     - Random-Liu
     - dashpole
