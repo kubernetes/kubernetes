@@ -405,9 +405,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 // not be generated.
 func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate, stopCh <-chan struct{}) error {
 	logOption := logs.NewOptions()
-	if s.Logging.Format != "" {
-		logOption.LogFormat = s.Logging.Format
-	}
+	logOption.LogFormat = s.Logging.Format
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
