@@ -609,11 +609,8 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		rsc.expectations.ExpectDeletions(rsKey, getPodKeys(podsToDelete))
 
 		errCh := make(chan error, diff)
-		var wg sync.WaitGroup
-		wg.Add(diff)
 		for _, pod := range podsToDelete {
 			go func(targetPod *v1.Pod) {
-				defer wg.Done()
 				if err := rsc.podControl.DeletePod(rs.Namespace, targetPod.Name, rs); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					podKey := controller.PodKey(targetPod)
@@ -625,7 +622,6 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 				}
 			}(pod)
 		}
-		wg.Wait()
 
 		select {
 		case err := <-errCh:
@@ -633,7 +629,6 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 			if err != nil {
 				return err
 			}
-		default:
 		}
 	}
 
