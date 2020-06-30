@@ -297,7 +297,7 @@ const (
 	// alpha: v1.19
 	//
 	// Enables the use of PodTopologySpread scheduling plugin to do default
-	// spreading and disables legacy DefaultPodTopologySpread plugin.
+	// spreading and disables legacy SelectorSpread plugin.
 	DefaultPodTopologySpread featuregate.Feature = "DefaultPodTopologySpread"
 
 	// owner: @tallclair

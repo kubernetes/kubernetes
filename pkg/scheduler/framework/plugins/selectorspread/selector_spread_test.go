@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package defaultpodtopologyspread
+package selectorspread
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func controllerRef(kind, name, uid string) []metav1.OwnerReference {
 	//}
 }
 
-func TestDefaultPodTopologySpreadScore(t *testing.T) {
+func TestSelectorSpreadScore(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
 		"baz": "blah",
@@ -383,7 +383,7 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 
 			state := framework.NewCycleState()
 
-			plugin := &DefaultPodTopologySpread{
+			plugin := &SelectorSpread{
 				handle: fh,
 			}
 
@@ -635,7 +635,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
 
-			plugin := &DefaultPodTopologySpread{
+			plugin := &SelectorSpread{
 				handle: fh,
 			}
 

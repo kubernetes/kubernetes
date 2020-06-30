@@ -199,7 +199,7 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
 	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		// When feature is disabled, the default spreading is done by legacy
-		// DefaultPodTopologySpread plugin.
+		// SelectorSpread plugin.
 		return
 	}
 	if obj.DefaultConstraints == nil {

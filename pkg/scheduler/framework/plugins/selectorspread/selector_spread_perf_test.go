@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package defaultpodtopologyspread
+package selectorspread
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 				}
 			}
 			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
-			plugin := &DefaultPodTopologySpread{handle: fh}
+			plugin := &SelectorSpread{handle: fh}
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
