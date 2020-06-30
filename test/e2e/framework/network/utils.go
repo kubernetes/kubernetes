@@ -673,6 +673,13 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	} else {
 		config.NodeIP = e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
 	}
+
+	ginkgo.By("Waiting for NodePort service to expose endpoint")
+	err = framework.WaitForServiceEndpointsNum(config.f.ClientSet, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", nodePortServiceName, config.Namespace)
+	ginkgo.By("Waiting for Session Affinity service to expose endpoint")
+	err = framework.WaitForServiceEndpointsNum(config.f.ClientSet, config.Namespace, sessionAffinityServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", sessionAffinityServiceName, config.Namespace)
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
