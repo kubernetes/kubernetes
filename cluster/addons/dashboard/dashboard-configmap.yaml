@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    k8s-app: kubernetes-dashboard
-    # Allows editing resource and makes sure it is created first.
-    addonmanager.kubernetes.io/mode: EnsureExists
-  name: kubernetes-dashboard-settings
-  namespace: kube-system
