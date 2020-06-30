@@ -29,6 +29,7 @@ const (
 	MilliCPUToCPU = 0
 
 	MinQuotaPeriod = 0
+	QuotaPeriod    = 0
 )
 
 // MilliCPUToQuota converts milliCPU and period to CFS quota values.

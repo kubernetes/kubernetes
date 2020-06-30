@@ -633,12 +633,16 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 				if container.Resources.Limits == nil || len(pod.Status.ContainerStatuses) == 0 {
 					continue
 				}
+				// Determine if the *running* container needs resource update by comparing Spec.Resources (desired)
+				// with Status.Resources (last known actual). This check is done when kubelet has accepted the
+				// resize a.k.a Resources.Requests == ResourcesAllocated.
+				// Skip if runtime container ID does not match pod.Status containerID as container may be restarting
 				apiContainerStatus, exists := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
 				if !exists || apiContainerStatus.State.Running == nil ||
 					containerStatus.State != kubecontainer.ContainerStateRunning ||
 					containerStatus.ID.String() != apiContainerStatus.ContainerID ||
 					len(diff.ObjectDiff(container.Resources.Requests, container.ResourcesAllocated)) != 0 ||
-					len(diff.ObjectDiff(apiContainerStatus.Resources.Limits, container.Resources.Limits)) == 0 {
+					len(diff.ObjectDiff(apiContainerStatus.Resources, container.Resources)) == 0 {
 					continue
 				}
 				resizePolicy := make(map[v1.ResourceName]v1.ContainerResizePolicy)

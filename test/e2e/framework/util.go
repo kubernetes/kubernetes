@@ -506,6 +506,17 @@ func LookForStringInPodExec(ns, podName string, command []string, expectedString
 	})
 }
 
+// LookForStringInPodExecToContainer looks for the given string in the output of a command
+// executed in a specific pod container.
+func LookForStringInPodExecToContainer(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		// use the first container
+		args := []string{"exec", podName, "-c", containerName, fmt.Sprintf("--namespace=%v", ns), "--"}
+		args = append(args, command...)
+		return RunKubectlOrDie(ns, args...)
+	})
+}
+
 // lookForString looks for the given string in the output of fn, repeatedly calling fn until
 // the timeout is reached or the string is found. Returns last log and possibly
 // error if the string was not found.
