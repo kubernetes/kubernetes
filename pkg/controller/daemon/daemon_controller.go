@@ -197,8 +197,7 @@ func NewDaemonSetsController(
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addNode,
 		UpdateFunc: dsc.updateNode,
-	},
-	)
+	})
 	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
 	dsc.nodeLister = nodeInformer.Lister()
 
