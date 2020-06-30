@@ -22,7 +22,7 @@ ARCH?=amd64
 OUT_DIR?=_output
 HYPERKUBE_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE?=us.gcr.io/k8s-artifacts-prod/build-image/debian-hyperkube-base-$(ARCH):v1.1.0
+BASEIMAGE?=us.gcr.io/k8s-artifacts-prod/build-image/debian-hyperkube-base-$(ARCH):v1.1.1
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
