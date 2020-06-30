@@ -59,7 +59,7 @@ popd >/dev/null
 cd "${KUBE_ROOT}"
 
 # Check that the file is in alphabetical order
-failure_file="${KUBE_ROOT}/hack/.staticcheck_failures"
+failure_file="${KUBE_ROOT}/hack/.hack-components/.staticcheck_failures"
 kube::util::check-file-in-alphabetical-order "${failure_file}"
 
 all_packages=()
@@ -134,7 +134,7 @@ fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
   {
-    echo "Some packages in hack/.staticcheck_failures are passing staticcheck. Please remove them."
+    echo "Some packages in hack/.hack-components/.staticcheck_failures are passing staticcheck. Please remove them."
     echo
     for p in "${not_failing[@]}"; do
       echo "  $p"
@@ -146,7 +146,7 @@ fi
 
 if [[ ${#gone[@]} -gt 0 ]]; then
   {
-    echo "Some packages in hack/.staticcheck_failures do not exist anymore. Please remove them."
+    echo "Some packages in hack/.hack-components/.staticcheck_failures do not exist anymore. Please remove them."
     echo
     for p in "${gone[@]}"; do
       echo "  $p"

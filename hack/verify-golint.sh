@@ -43,7 +43,7 @@ popd >/dev/null
 cd "${KUBE_ROOT}"
 
 # Check that the file is in alphabetical order
-failure_file="${KUBE_ROOT}/hack/.golint_failures"
+failure_file="${KUBE_ROOT}/hack/.hack-components/.golint_failures"
 kube::util::check-file-in-alphabetical-order "${failure_file}"
 
 export IFS=$'\n'
@@ -97,7 +97,8 @@ else
     echo
     echo 'Please review the above warnings. You can test via "golint" and commit the result.'
     echo 'If the above warnings do not make sense, you can exempt this package from golint'
-    echo 'checking by adding it to hack/.golint_failures (if your reviewer is okay with it).'
+    echo 'checking by adding it to hack/.hack-components/.golint_failures (if your reviewer'
+    echo 'is okay with it).'
     echo
   } >&2
   exit 1
@@ -105,7 +106,7 @@ fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
   {
-    echo "Some packages in hack/.golint_failures are passing golint. Please remove them."
+    echo "Some packages in hack/.hack-components/.golint_failures are passing golint. Please remove them."
     echo
     for p in "${not_failing[@]}"; do
       echo "  $p"
@@ -117,7 +118,7 @@ fi
 
 if [[ ${#gone[@]} -gt 0 ]]; then
   {
-    echo "Some packages in hack/.golint_failures do not exist anymore. Please remove them."
+    echo "Some packages in hack/.hack-components/.golint_failures do not exist anymore. Please remove them."
     echo
     for p in "${gone[@]}"; do
       echo "  $p"

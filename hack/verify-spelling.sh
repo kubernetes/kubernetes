@@ -35,7 +35,7 @@ pushd "${KUBE_ROOT}/hack/tools" >/dev/null
 popd >/dev/null
 
 # Spell checking
-# All the skipping files are defined in hack/.spelling_failures
-skipping_file="${KUBE_ROOT}/hack/.spelling_failures"
+# All the skipping files are defined in hack/.hack-components/.spelling_failures
+skipping_file="${KUBE_ROOT}/hack/.hack-components/.spelling_failures"
 failing_packages=$(sed "s| | -e |g" "${skipping_file}")
 git ls-files | grep -v -e "${failing_packages}" | xargs misspell -i "Creater,creater,ect" -error -o stderr

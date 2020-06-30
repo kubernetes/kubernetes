@@ -88,7 +88,7 @@ done < <(find . -name "*.sh" \
   \))
 
 # make sure known failures are sorted
-failure_file="${KUBE_ROOT}/hack/.shellcheck_failures"
+failure_file="${KUBE_ROOT}/hack/.hack-components/.shellcheck_failures"
 kube::util::check-file-in-alphabetical-order "${failure_file}"
 
 # load known failure files
@@ -168,7 +168,7 @@ done
 
 # Check to be sure all the files that should pass lint are.
 if [ ${#errors[@]} -eq 0 ]; then
-  echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
+  echo 'Congratulations! All shell files are passing lint (excluding those in hack/.hack-components/.shellcheck_failures).'
 else
   {
     echo "Errors from shellcheck:"
@@ -178,7 +178,8 @@ else
     echo
     echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck.sh"'
     echo 'If the above warnings do not make sense, you can exempt this package from shellcheck'
-    echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
+    echo 'checking by adding it to hack/.hack-components/.shellcheck_failures (if your reviewer'
+    echo 'is okay with it).'
     echo
   } >&2
   exit 1
@@ -186,7 +187,7 @@ fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
   {
-    echo "Some files in hack/.shellcheck_failures are passing shellcheck. Please remove them."
+    echo "Some files in hack/.hack-components/.shellcheck_failures are passing shellcheck. Please remove them."
     echo
     for f in "${not_failing[@]}"; do
       echo "  $f"
@@ -204,7 +205,7 @@ done
 
 if [[ ${#gone[@]} -gt 0 ]]; then
   {
-    echo "Some files in hack/.shellcheck_failures do not exist anymore. Please remove them."
+    echo "Some files in hack/.hack-components/.shellcheck_failures do not exist anymore. Please remove them."
     echo
     for f in "${gone[@]}"; do
       echo "  $f"

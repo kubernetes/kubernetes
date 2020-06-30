@@ -1,0 +1,67 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+# 
+# This directory contains lists of components that are not compliant with code verification tools.
+# All SIGs approvers should be able to approve edits in these lists.
+# 
+
+approvers:
+  - sig-auth-audit-approvers
+  - sig-auth-authenticators-approvers
+  - sig-auth-authorizers-approvers
+  - sig-auth-certificates-approvers
+  - sig-auth-encryption-at-rest-approvers
+  - sig-auth-node-isolation-approvers
+  - sig-auth-policy-approvers
+  - sig-auth-serviceaccounts-approvers
+  - sig-release-approvers
+  - release-engineering-approvers
+  - build-image-approvers
+  - sig-storage-reviewers
+  - sig-node-approvers
+  - sig-network-driver-approvers
+  - sig-network-approvers
+  - sig-apps-approvers
+  - sig-instrumentation-approvers
+  - api-approvers
+  - sig-api-machinery-api-approvers
+  - sig-apps-api-approvers
+  - sig-auth-api-approvers
+  - sig-cli-api-approvers
+  - sig-cloud-provider-api-approvers
+  - sig-cluster-lifecycle-api-approvers
+  - sig-network-api-approvers
+  - sig-node-api-approvers
+  - sig-scheduling-api-approvers
+  - sig-storage-api-approvers
+  - sig-windows-api-approvers
+  - sig-scalability-approvers
+  - dep-approvers
+  - feature-approvers
+  - conformance-behavior-approvers
+
+reviewers:
+  - sig-auth-audit-reviewers
+  - sig-auth-authenticators-reviewers
+  - sig-auth-authorizers-reviewers
+  - sig-auth-certificates-reviewers
+  - sig-auth-encryption-at-rest-reviewers
+  - sig-auth-node-isolation-reviewers
+  - sig-auth-policy-reviewers
+  - sig-auth-serviceaccounts-reviewers
+  - release-engineering-reviewers
+  - build-image-reviewers
+  - sig-node-reviewers
+  - sig-testing-reviewers
+  - sig-network-reviewers
+  - sig-apps-reviewers
+  - sig-instrumentation-reviewers
+  - sig-network-api-reviewers
+  - api-reviewers
+  - sig-api-machinery-api-reviewers
+  - sig-auth-api-reviewers
+  - sig-cli-api-reviewers
+  - sig-cloud-provider-api-reviewers
+  - sig-node-api-reviewers
+  - sig-scalability-reviewers
+  - sig-storage-api-reviewers
+  - sig-windows-api-reviewers
