@@ -3,14 +3,13 @@
 # Disable inheritance as this is owned by sig-node (should mirror same contents as pkg/kubelet/OWNERS)
 options:
   no_parent_owners: true
+
 approvers:
-- Random-Liu
-- dchen1107
-- derekwaynecarr
-- vishh
-- yujuhong
+- sig-node-approvers # see https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dapprovers
+
 reviewers:
-- sig-node-reviewers
+- sig-node-reviewers # see https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dreviewers
+
 labels:
 - area/kubelet
 - sig/node
