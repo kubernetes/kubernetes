@@ -19,6 +19,7 @@ package apimachinery
 import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"regexp"
 
 	"github.com/onsi/ginkgo"
 )
@@ -34,11 +35,18 @@ var _ = SIGDescribe("get-code-version", func() {
 		framework.ExpectNoError(err, "Fail to access ServerVersion")
 
 		ginkgo.By("Confirm major version")
-		framework.ExpectEqual(version.Major, "1", "unable to find major version")
+		re := regexp.MustCompile("[1-9]")
+		framework.ExpectEqual(re.FindString(version.Major), version.Major, "unable to find major version")
 		framework.Logf("Major version: %v", version.Major)
 
 		ginkgo.By("Confirm minor version")
-		framework.ExpectEqual(version.Minor, "19+", "unable to find minor version")
+
+		re = regexp.MustCompile("[^0-9]+")
+		cleanMinorVersion := re.ReplaceAllString(version.Minor, "")
+		framework.Logf("cleanMinorVersion: %v", cleanMinorVersion)
+
+		re = regexp.MustCompile("[0-9]+")
+		framework.ExpectEqual(re.FindString(version.Minor), cleanMinorVersion, "unable to find minor version")
 		framework.Logf("Minor version: %v", version.Minor)
 	})
 })
