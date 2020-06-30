@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -460,6 +461,141 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, dsw)
 }
 
+func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	quantity1Gi := resource.MustParse("1Gi")
+	quantity2Gi := resource.MustParse("2Gi")
+	quantity3Gi := resource.MustParse("3Gi")
+
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: quantity1Gi,
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: quantity1Gi,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "emptyDir1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity1Gi,
+						},
+					},
+				},
+				{
+					Name: "emptyDir2",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity2Gi,
+						},
+					},
+				},
+				{
+					Name: "emptyDir3",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity3Gi,
+						},
+					},
+				},
+				{
+					Name: "emptyDir4",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	pod1Name := util.GetUniquePodName(pod1)
+	pod1DesiredSizeLimitMap := map[string]*resource.Quantity{
+		"emptyDir1": &quantity1Gi,
+		"emptyDir2": &quantity2Gi,
+		"emptyDir3": &quantity2Gi,
+		"emptyDir4": &quantity2Gi,
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod2",
+			UID:  "pod2uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "emptyDir5",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity1Gi,
+						},
+					},
+				},
+				{
+					Name: "emptyDir6",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity2Gi,
+						},
+					},
+				},
+				{
+					Name: "emptyDir7",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity3Gi,
+						},
+					},
+				},
+				{
+					Name: "emptyDir8",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	pod2Name := util.GetUniquePodName(pod2)
+	pod2DesiredSizeLimitMap := map[string]*resource.Quantity{
+		"emptyDir5": &quantity1Gi,
+		"emptyDir6": &quantity2Gi,
+		"emptyDir7": &quantity3Gi,
+		"emptyDir8": resource.NewQuantity(0, resource.BinarySI),
+	}
+	for i := range pod1.Spec.Volumes {
+		volumeSpec := &volume.Spec{Volume: &pod1.Spec.Volumes[i]}
+		_, err := dsw.AddPodToVolume(pod1Name, pod1, volumeSpec, volumeSpec.Name(), "")
+		if err != nil {
+			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+		}
+	}
+	for i := range pod2.Spec.Volumes {
+		volumeSpec := &volume.Spec{Volume: &pod2.Spec.Volumes[i]}
+		_, err := dsw.AddPodToVolume(pod2Name, pod2, volumeSpec, volumeSpec.Name(), "")
+		if err != nil {
+			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+		}
+	}
+	verifyDesiredSizeLimitInVolumeDsw(t, pod1Name, pod1DesiredSizeLimitMap, dsw)
+	verifyDesiredSizeLimitInVolumeDsw(t, pod2Name, pod2DesiredSizeLimitMap, dsw)
+}
+
 func verifyVolumeExistsDsw(
 	t *testing.T, expectedVolumeName v1.UniqueVolumeName, dsw DesiredStateOfWorld) {
 	volumeExists := dsw.VolumeExists(expectedVolumeName)
@@ -569,5 +705,33 @@ func verifyVolumeDoesntExistWithSpecNameInVolumeDsw(
 		t.Fatalf(
 			"DSW VolumeExistsWithSpecNam returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
+	}
+}
+
+func verifyDesiredSizeLimitInVolumeDsw(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedDesiredSizeMap map[string]*resource.Quantity,
+	dsw DesiredStateOfWorld) {
+	volumesToMount := dsw.GetVolumesToMount()
+	for volumeName, expectedDesiredSize := range expectedDesiredSizeMap {
+		if podExistsInVolume := dsw.VolumeExistsWithSpecName(
+			expectedPodName, volumeName); !podExistsInVolume {
+			t.Fatalf(
+				"DSW VolumeExistsWithSpecName returned incorrect value. Expected: <true> Actual: <%v>",
+				podExistsInVolume)
+		}
+		for _, v := range volumesToMount {
+			if v.VolumeSpec.Name() == volumeName && v.PodName == expectedPodName {
+				if v.DesiredSizeLimit == nil || v.DesiredSizeLimit.Value() != expectedDesiredSize.Value() {
+					t.Fatalf(
+						"Found volume %v in the list of VolumesToMount, but DesiredSizeLimit incorrect. Expected: <%v> Actual: <%v>",
+						volumeName,
+						expectedDesiredSize,
+						v.DesiredSizeLimit)
+
+				}
+			}
+		}
 	}
 }
