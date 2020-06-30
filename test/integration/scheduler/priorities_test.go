@@ -40,7 +40,7 @@ func TestNodeAffinity(t *testing.T) {
 	testCtx := initTest(t, "node-affinity")
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
-	nodes, err := createNodes(testCtx.ClientSet, "testnode", nil, 5)
+	nodes, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 5)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -97,23 +97,11 @@ func TestPodAffinity(t *testing.T) {
 	testCtx := initTest(t, "pod-affinity")
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
-	nodesInTopology, err := createNodes(testCtx.ClientSet, "in-topology", nil, 5)
-	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
-	}
 	topologyKey := "node-topologykey"
 	topologyValue := "topologyvalue"
-	nodeLabels := map[string]string{
-		topologyKey: topologyValue,
-	}
-	for _, node := range nodesInTopology {
-		// Add topology key to all the nodes.
-		if err = utils.AddLabelsToNode(testCtx.ClientSet, node.Name, nodeLabels); err != nil {
-			t.Fatalf("Cannot add labels to node %v: %v", node.Name, err)
-		}
-		if err = waitForNodeLabels(testCtx.ClientSet, node.Name, nodeLabels); err != nil {
-			t.Fatalf("Adding labels to node %v didn't succeed: %v", node.Name, err)
-		}
+	nodesInTopology, err := createNodes(testCtx.ClientSet, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
 	}
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
@@ -127,7 +115,7 @@ func TestPodAffinity(t *testing.T) {
 		t.Fatalf("Error running the attractor pod: %v", err)
 	}
 	// Add a few more nodes without the topology label.
-	_, err = createNodes(testCtx.ClientSet, "other-node", nil, 5)
+	_, err = createNodes(testCtx.ClientSet, "other-node", st.MakeNode(), 5)
 	if err != nil {
 		t.Fatalf("Cannot create the second set of nodes: %v", err)
 	}
@@ -187,22 +175,20 @@ func TestImageLocality(t *testing.T) {
 	testCtx := initTest(t, "image-locality")
 	defer testutils.CleanupTest(t, testCtx)
 
-	// We use a fake large image as the test image used by the pod, which has relatively large image size.
-	image := v1.ContainerImage{
-		Names: []string{
-			"fake-large-image:v1",
-		},
-		SizeBytes: 3000 * 1024 * 1024,
-	}
-
 	// Create a node with the large image.
-	nodeWithLargeImage, err := createNodeWithImages(testCtx.ClientSet, "testnode-large-image", nil, []v1.ContainerImage{image})
+	// We use a fake large image as the test image used by the pod, which has
+	// relatively large image size.
+	imageName := "fake-large-image:v1"
+	nodeWithLargeImage, err := createNode(
+		testCtx.ClientSet,
+		st.MakeNode().Name("testnode-large-image").Images(map[string]int64{imageName: 3000 * 1024 * 1024}).Obj(),
+	)
 	if err != nil {
 		t.Fatalf("cannot create node with a large image: %v", err)
 	}
 
 	// Add a few nodes.
-	_, err = createNodes(testCtx.ClientSet, "testnode", nil, 10)
+	_, err = createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 10)
 	if err != nil {
 		t.Fatalf("cannot create nodes: %v", err)
 	}
@@ -212,7 +198,7 @@ func TestImageLocality(t *testing.T) {
 	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &podWithContainersConfig{
 		Name:       podName,
 		Namespace:  testCtx.NS.Name,
-		Containers: makeContainersWithImages(image.Names),
+		Containers: makeContainersWithImages([]string{imageName}),
 	}))
 	if err != nil {
 		t.Fatalf("error running pod with images: %v", err)
@@ -249,7 +235,7 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 	ns := testCtx.NS.Name
 	defer testutils.CleanupTest(t, testCtx)
 	// Add 4 nodes.
-	nodes, err := createNodes(cs, "node", nil, 4)
+	nodes, err := createNodes(cs, "node", st.MakeNode(), 4)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}

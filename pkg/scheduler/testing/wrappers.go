@@ -19,7 +19,8 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -362,7 +363,8 @@ type NodeWrapper struct{ v1.Node }
 
 // MakeNode creates a Node wrapper.
 func MakeNode() *NodeWrapper {
-	return &NodeWrapper{v1.Node{}}
+	w := &NodeWrapper{v1.Node{}}
+	return w.Capacity(nil)
 }
 
 // Obj returns the inner Node.
@@ -388,5 +390,30 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 		n.Labels = make(map[string]string)
 	}
 	n.Labels[k] = v
+	return n
+}
+
+// Capacity sets the capacity and the allocatable resources of the inner node.
+// Each entry in `resources` corresponds to a resource name and its quantity.
+// By default, the capacity and allocatable number of pods are set to 32.
+func (n *NodeWrapper) Capacity(resources map[v1.ResourceName]string) *NodeWrapper {
+	res := v1.ResourceList{
+		v1.ResourcePods: resource.MustParse("32"),
+	}
+	for name, value := range resources {
+		res[name] = resource.MustParse(value)
+	}
+	n.Status.Capacity, n.Status.Allocatable = res, res
+	return n
+}
+
+// Images sets the images of the inner node. Each entry in `images` corresponds
+// to an image name and its size in bytes.
+func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
+	var containerImages []v1.ContainerImage
+	for name, size := range images {
+		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
+	}
+	n.Status.Images = containerImages
 	return n
 }

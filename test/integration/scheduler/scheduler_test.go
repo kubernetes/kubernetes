@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -697,12 +698,12 @@ func TestAllocatable(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	// 2. create a node without allocatable awareness
-	nodeRes := &v1.ResourceList{
-		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-		v1.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "30m",
+		v1.ResourceMemory: "30",
 	}
-	allocNode, err := createNode(testCtx.ClientSet, "node-allocatable-scheduler-test-node", nodeRes)
+	allocNode, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node-allocatable-scheduler-test-node").Capacity(nodeRes).Obj())
 	if err != nil {
 		t.Fatalf("Failed to create node: %v", err)
 	}
@@ -775,15 +776,15 @@ func TestSchedulerInformers(t *testing.T) {
 		v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
 	}
-	defaultNodeRes := &v1.ResourceList{
-		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
-		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(500, resource.BinarySI),
+	defaultNodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
 	}
 
 	type nodeConfig struct {
 		name string
-		res  *v1.ResourceList
+		res  map[v1.ResourceName]string
 	}
 
 	tests := []struct {
@@ -826,7 +827,7 @@ func TestSchedulerInformers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			for _, nodeConf := range test.nodes {
-				_, err := createNode(cs, nodeConf.name, nodeConf.res)
+				_, err := createNode(cs, st.MakeNode().Name(nodeConf.name).Capacity(nodeConf.res).Obj())
 				if err != nil {
 					t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
 				}
