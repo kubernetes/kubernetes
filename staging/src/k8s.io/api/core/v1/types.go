@@ -1764,6 +1764,7 @@ type ContainerPort struct {
 	ContainerPort int32 `json:"containerPort" protobuf:"varint,3,opt,name=containerPort"`
 	// Protocol for port. Must be UDP, TCP, or SCTP.
 	// Defaults to "TCP".
+	// +kubebuilder:default="TCP"
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`
 	// What host IP to bind the external port to.
@@ -4031,6 +4032,7 @@ type ServicePort struct {
 
 	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
 	// Default is TCP.
+	// +kubebuilder:default="TCP"
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
