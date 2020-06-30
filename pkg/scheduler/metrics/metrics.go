@@ -154,7 +154,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"work"})
 
-	PodSchedulingDuration = metrics.NewHistogram(
+	PodSchedulingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "pod_scheduling_duration_seconds",
@@ -162,7 +162,8 @@ var (
 			// Start with 1ms with the last bucket being [~16s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		})
+		},
+		[]string{"attempts"})
 
 	PodSchedulingAttempts = metrics.NewHistogram(
 		&metrics.HistogramOpts{
