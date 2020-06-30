@@ -518,8 +518,16 @@ WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSche
 export GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
 export GCE_PRIVATE_CLUSTER_PORTS_PER_VM="${KUBE_GCE_PRIVATE_CLUSTER_PORTS_PER_VM:-}"
 
-# Optional: Create apiserver konnectivity server and agent.
-export ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE="${KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}"
+# When KUBE_ENABLE_KONNECTIVITY_SERVICE is enabled, the two variables below will
+# will default to true to enable the konnectivity network proxy and start the required pods.
+# Their values can be overridden for more granular control of the proxy.
+
+# Optional: Whether to use konnectivity network proxy for all egress from apiserver.
+export EGRESS_VIA_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+# Optional: Whether to start the konnectivity server and agent pods.
+export RUN_KONNECTIVITY_SERVICE_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+# Proxy Protocol Mode determines the protocol to use to communicate between apiserver and network proxy.
+# Valid options are grpc and http-connect. Default is grpc.
 export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
 
 # Optional: Enable Windows CSI-Proxy
