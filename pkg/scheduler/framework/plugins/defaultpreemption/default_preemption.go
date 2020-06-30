@@ -89,9 +89,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
 // schedule. It chooses one of the nodes and preempts the pods on the node and
-// returns 1) the node, 2) the list of preempted pods if such a node is found,
-// 3) A list of pods whose nominated node name should be cleared, and 4) any
-// possible error.
+// returns 1) the node name which is picked up for preemption, 2) any possible error.
 // preempt does not update its snapshot. It uses the same snapshot used in the
 // scheduling cycle. This is to avoid a scenario where preempt finds feasible
 // nodes without preempting any pod. When there are many pending pods in the
