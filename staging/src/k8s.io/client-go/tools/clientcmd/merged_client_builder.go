@@ -71,10 +71,14 @@ func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, e
 		return nil, err
 	}
 
+	var currentContext string
+	if config.overrides != nil {
+		currentContext = config.overrides.CurrentContext
+	}
 	if config.fallbackReader != nil {
-		config.clientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loader)
+		config.clientConfig = NewInteractiveClientConfig(*mergedConfig, currentContext, config.overrides, config.fallbackReader, config.loader)
 	} else {
-		config.clientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loader)
+		config.clientConfig = NewNonInteractiveClientConfig(*mergedConfig, currentContext, config.overrides, config.loader)
 	}
 	return config.clientConfig, nil
 }

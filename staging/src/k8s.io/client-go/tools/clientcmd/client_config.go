@@ -159,7 +159,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		clientConfig.Proxy = http.ProxyURL(u)
 	}
 
-	if len(config.overrides.Timeout) > 0 {
+	if config.overrides != nil && len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)
 		if err != nil {
 			return nil, err
@@ -381,7 +381,7 @@ func (config *DirectClientConfig) ConfirmUsable() error {
 // getContextName returns the default, or user-set context name, and a boolean that indicates
 // whether the default context name has been overwritten by a user-set flag, or left as its default value
 func (config *DirectClientConfig) getContextName() (string, bool) {
-	if len(config.overrides.CurrentContext) != 0 {
+	if config.overrides != nil && len(config.overrides.CurrentContext) != 0 {
 		return config.overrides.CurrentContext, true
 	}
 	if len(config.contextName) != 0 {
@@ -395,7 +395,7 @@ func (config *DirectClientConfig) getContextName() (string, bool) {
 // and a boolean indicating  whether the default authInfo name is overwritten by a user-set flag, or
 // left as its default value
 func (config *DirectClientConfig) getAuthInfoName() (string, bool) {
-	if len(config.overrides.Context.AuthInfo) != 0 {
+	if config.overrides != nil && len(config.overrides.Context.AuthInfo) != 0 {
 		return config.overrides.Context.AuthInfo, true
 	}
 	context, _ := config.getContext()
@@ -406,7 +406,7 @@ func (config *DirectClientConfig) getAuthInfoName() (string, bool) {
 // indicating whether the default clusterName has been overwritten by a user-set flag, or left as
 // its default value
 func (config *DirectClientConfig) getClusterName() (string, bool) {
-	if len(config.overrides.Context.Cluster) != 0 {
+	if config.overrides != nil && len(config.overrides.Context.Cluster) != 0 {
 		return config.overrides.Context.Cluster, true
 	}
 	context, _ := config.getContext()
@@ -424,7 +424,9 @@ func (config *DirectClientConfig) getContext() (clientcmdapi.Context, error) {
 	} else if required {
 		return clientcmdapi.Context{}, fmt.Errorf("context %q does not exist", contextName)
 	}
-	mergo.MergeWithOverwrite(mergedContext, config.overrides.Context)
+	if config.overrides != nil {
+		mergo.MergeWithOverwrite(mergedContext, config.overrides.Context)
+	}
 
 	return *mergedContext, nil
 }
@@ -440,7 +442,9 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 	} else if required {
 		return clientcmdapi.AuthInfo{}, fmt.Errorf("auth info %q does not exist", authInfoName)
 	}
-	mergo.MergeWithOverwrite(mergedAuthInfo, config.overrides.AuthInfo)
+	if config.overrides != nil {
+		mergo.MergeWithOverwrite(mergedAuthInfo, config.overrides.AuthInfo)
+	}
 
 	return *mergedAuthInfo, nil
 }
@@ -451,30 +455,37 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 	clusterInfoName, required := config.getClusterName()
 
 	mergedClusterInfo := clientcmdapi.NewCluster()
-	mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterDefaults)
+	if config.overrides != nil {
+		mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterDefaults)
+	}
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
 		mergo.MergeWithOverwrite(mergedClusterInfo, configClusterInfo)
 	} else if required {
 		return clientcmdapi.Cluster{}, fmt.Errorf("cluster %q does not exist", clusterInfoName)
 	}
-	mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterInfo)
+	if config.overrides != nil {
+		mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterInfo)
+	}
+
 	// * An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
 	// otherwise, a kubeconfig containing a CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set".
 	// * An override of --certificate-authority should also override TLS skip settings and CA data, otherwise existing CA data will take precedence.
-	caLen := len(config.overrides.ClusterInfo.CertificateAuthority)
-	caDataLen := len(config.overrides.ClusterInfo.CertificateAuthorityData)
-	if config.overrides.ClusterInfo.InsecureSkipTLSVerify || caLen > 0 || caDataLen > 0 {
-		mergedClusterInfo.InsecureSkipTLSVerify = config.overrides.ClusterInfo.InsecureSkipTLSVerify
-		mergedClusterInfo.CertificateAuthority = config.overrides.ClusterInfo.CertificateAuthority
-		mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
-	}
+	if config.overrides != nil {
+		caLen := len(config.overrides.ClusterInfo.CertificateAuthority)
+		caDataLen := len(config.overrides.ClusterInfo.CertificateAuthorityData)
+		if config.overrides.ClusterInfo.InsecureSkipTLSVerify || caLen > 0 || caDataLen > 0 {
+			mergedClusterInfo.InsecureSkipTLSVerify = config.overrides.ClusterInfo.InsecureSkipTLSVerify
+			mergedClusterInfo.CertificateAuthority = config.overrides.ClusterInfo.CertificateAuthority
+			mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
+		}
 
-	// if the --tls-server-name has been set in overrides, use that value.
-	// if the --server has been set in overrides, then use the value of --tls-server-name specified on the CLI too.  This gives the property
-	// that setting a --server will effectively clear the KUBECONFIG value of tls-server-name if it is specified on the command line which is
-	// usually correct.
-	if config.overrides.ClusterInfo.TLSServerName != "" || config.overrides.ClusterInfo.Server != "" {
-		mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
+		// if the --tls-server-name has been set in overrides, use that value.
+		// if the --server has been set in overrides, then use the value of --tls-server-name specified on the CLI too.  This gives the property
+		// that setting a --server will effectively clear the KUBECONFIG value of tls-server-name if it is specified on the command line which is
+		// usually correct.
+		if config.overrides.ClusterInfo.TLSServerName != "" || config.overrides.ClusterInfo.Server != "" {
+			mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
+		}
 	}
 
 	return *mergedClusterInfo, nil
