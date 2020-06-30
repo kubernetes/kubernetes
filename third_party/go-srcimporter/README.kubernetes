@@ -1,4 +1,0 @@
-Files copied from https://github.com/golang/go/blob/5f0a9ba1342674b3209c13035b5aa39a96dbd80c/src/go/internal/srcimporter/srcimporter.go at commit 5f0a9ba1342674b3209c13035b5aa39a96dbd80c.
-
-Used in k8s.io/kubernetes/test/typecheck. Need to copy here, as it's marked as a go/internal library.
-Only modification is to remove the go/internal/srcimporter import alias.
