@@ -286,7 +286,7 @@ type realIPGetter struct {
 // 172.17.0.1 dev docker0  scope host  src 172.17.0.1
 // 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
 // Then filter out dev==kube-ipvs0, and cut the unique src IP fields,
-// Node IP set: [100.106.89.164, 127.0.0.1, 192.168.122.1]
+// Node IP set: [100.106.89.164, 127.0.0.1, 172.17.0.1, 192.168.122.1]
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	// Pass in empty filter device name for list all LOCAL type addresses.
 	nodeAddress, err := r.nl.GetLocalAddresses("", DefaultDummyDevice)
