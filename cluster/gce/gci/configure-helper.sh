@@ -2548,7 +2548,7 @@ EOF
     base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-80m}"
     nanny_memory="90Mi"
     local heapster_min_cluster_size="16"
-    local metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
+    local metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-8}"
     local -r metrics_cpu_per_node="${HEAPSTER_GCP_CPU_PER_NODE:-0.5}"
     local -r eventer_memory_per_node="500"
     local -r nanny_memory_per_node="200"
