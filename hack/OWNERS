@@ -3,7 +3,6 @@
 reviewers:
   - bentheelder
   - cblecker
-  - eparis
   - fejta
   - ixdy
   - juanvallejo
@@ -20,7 +19,6 @@ approvers:
   - cblecker
   - deads2k
   - dims # for local-up-cluster related files
-  - eparis
   - fejta
   - ixdy
   - lavalamp
@@ -33,5 +31,6 @@ approvers:
   - vishh
   - mikedanese
 emeritus_approvers:
+  - eparis
   - jbeda
   - zmerlynn
