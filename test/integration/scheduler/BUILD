@@ -58,7 +58,6 @@ go_test(
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/integration/util:go_default_library",
-        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",

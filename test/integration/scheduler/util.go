@@ -126,28 +126,6 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 	return err
 }
 
-// nodeHasLabels returns a function that checks if a node has all the given labels.
-func nodeHasLabels(cs clientset.Interface, nodeName string, labels map[string]string) wait.ConditionFunc {
-	return func() (bool, error) {
-		node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			// This could be a connection error so we want to retry.
-			return false, nil
-		}
-		for k, v := range labels {
-			if node.Labels == nil || node.Labels[k] != v {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-// waitForNodeLabels waits for the given node to have all the given labels.
-func waitForNodeLabels(cs clientset.Interface, nodeName string, labels map[string]string) error {
-	return wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, nodeHasLabels(cs, nodeName, labels))
-}
-
 func createNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 	return cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 }
