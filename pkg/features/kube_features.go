@@ -286,7 +286,7 @@ const (
 	// Enables CSI to use raw block storage volumes
 	CSIBlockVolume featuregate.Feature = "CSIBlockVolume"
 
-	// owner: @vladimirvivien
+	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
 	//
