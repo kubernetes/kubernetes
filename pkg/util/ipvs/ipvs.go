@@ -87,6 +87,8 @@ const (
 	KernelModuleNfConntrackIPV4 string = "nf_conntrack_ipv4"
 	// KernelModuleNfConntrack is the kernel module "nf_conntrack"
 	KernelModuleNfConntrack string = "nf_conntrack"
+	// KernelModuleIPVSSED is the kernel module "ip_vs_sed"
+	KernelModuleIPVSSED string = "ip_vs_sed"
 )
 
 // Equal check the equality of virtual server.
@@ -129,9 +131,9 @@ func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
 	// "nf_conntrack_ipv4" has been removed since v4.19
 	// see https://github.com/torvalds/linux/commit/a0ae2562c6c4b2721d9fddba63b7286c13517d9f
 	if kernelVersion.LessThan(version.MustParseGeneric("4.19")) {
-		return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4}
+		return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4, KernelModuleIPVSSED}
 	}
-	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack}
+	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack, KernelModuleIPVSSED}
 
 }
 

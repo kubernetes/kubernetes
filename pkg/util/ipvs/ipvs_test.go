@@ -394,12 +394,12 @@ func TestGetRequiredIPVSModules(t *testing.T) {
 		{
 			name:          "kernel version < 4.19",
 			kernelVersion: version.MustParseGeneric("4.18"),
-			want:          []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4},
+			want:          []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4, KernelModuleIPVSSED},
 		},
 		{
 			name:          "kernel version 4.19",
 			kernelVersion: version.MustParseGeneric("4.19"),
-			want:          []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack},
+			want:          []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack, KernelModuleIPVSSED},
 		},
 	}
 	for _, test := range Tests {

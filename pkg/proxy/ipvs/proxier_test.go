@@ -299,21 +299,21 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		},
 		// case 5, ok for linux kernel 4.19
 		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_sed"},
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
 		},
 		// case 6, ok for linux kernel 4.18
 		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4", "ip_vs_sed"},
 			kernelVersion: "4.18",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
 		},
 		// case 7. ok when module list has extra modules
 		{
-			mods:          []string{"foo", "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "bar"},
+			mods:          []string{"foo", "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_sed", "bar"},
 			kernelVersion: "4.19",
 			ipsetVersion:  "6.19",
 			ok:            true,
