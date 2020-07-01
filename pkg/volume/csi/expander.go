@@ -108,7 +108,11 @@ func (c *csiPlugin) nodeExpandWithClient(
 		accessMode:        api.ReadWriteOnce,
 		mountOptions:      pv.Spec.MountOptions,
 	}
+
 	if !fsVolume {
+		// for block volumes the volumePath in CSI NodeExpandvolumeRequest is
+		// basically same as DevicePath because block devices are not mounted and hence
+		// DeviceMountPath does not get populated in resizeOptions.DeviceMountPath
 		opts.volumePath = resizeOptions.DevicePath
 		opts.fsType = fsTypeBlockName
 	}

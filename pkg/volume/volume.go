@@ -183,6 +183,10 @@ type CustomBlockVolumeMapper interface {
 	// If empty string is returned, the path retuned by attacher.Attach() and
 	// attacher.WaitForAttach() will be used.
 	MapPodDevice() (publishPath string, err error)
+
+	// GetStagingPath returns path that was used for staging the volume
+	// it is mainly used by CSI plugins
+	GetStagingPath() string
 }
 
 // BlockVolumeUnmapper interface is an unmapper interface for block volume.

@@ -107,9 +107,9 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 	return dir, nil
 }
 
-// getStagingPath returns a staging path for a directory (on the node) that should be used on NodeStageVolume/NodeUnstageVolume
+// GetStagingPath returns a staging path for a directory (on the node) that should be used on NodeStageVolume/NodeUnstageVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{specName}
-func (m *csiBlockMapper) getStagingPath() string {
+func (m *csiBlockMapper) GetStagingPath() string {
 	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
 }
 
@@ -143,7 +143,7 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 ) (string, error) {
 	klog.V(4).Infof(log("blockMapper.stageVolumeForBlock called"))
 
-	stagingPath := m.getStagingPath()
+	stagingPath := m.GetStagingPath()
 	klog.V(4).Infof(log("blockMapper.stageVolumeForBlock stagingPath set [%s]", stagingPath))
 
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
@@ -237,7 +237,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		ctx,
 		m.volumeID,
 		m.readOnly,
-		m.getStagingPath(),
+		m.GetStagingPath(),
 		publishPath,
 		accessMode,
 		publishVolumeInfo,
@@ -435,7 +435,7 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 	}
 
 	// Call NodeUnstageVolume
-	stagingPath := m.getStagingPath()
+	stagingPath := m.GetStagingPath()
 	if _, err := os.Stat(stagingPath); err != nil {
 		if os.IsNotExist(err) {
 			klog.V(4).Infof(log("blockMapper.TearDownDevice stagingPath(%s) has already been deleted, skip calling NodeUnstageVolume", stagingPath))
@@ -471,7 +471,7 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 
 	// Remove artifacts of NodeStage.
 	// stagingPath: xxx/plugins/kubernetes.io/csi/volumeDevices/staging/<volume name>
-	stagingPath := m.getStagingPath()
+	stagingPath := m.GetStagingPath()
 	if err := os.Remove(stagingPath); err != nil && !os.IsNotExist(err) {
 		return errors.New(log("failed to delete volume staging path [%s]: %v", stagingPath, err))
 	}

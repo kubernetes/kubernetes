@@ -1498,41 +1498,64 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		var simpleErr, detailedErr error
 		resizeOptions := volume.NodeResizeOptions{
 			VolumeSpec: volumeToMount.VolumeSpec,
+			DevicePath: volumeToMount.DevicePath,
+		}
+		fsVolume, err := util.CheckVolumeModeFilesystem(volumeToMount.VolumeSpec)
+		if err != nil {
+			return volumeToMount.GenerateError("NodeExpandvolume.CheckVolumeModeFilesystem failed", err)
 		}
 
-		attachableVolumePlugin, _ :=
-			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+		if fsVolume {
+			volumeMounter, newMounterErr := volumePlugin.NewMounter(
+				volumeToMount.VolumeSpec,
+				volumeToMount.Pod,
+				volume.VolumeOptions{})
+			if newMounterErr != nil {
+				return volumeToMount.GenerateError("NodeExpandVolume.NewMounter initialization failed", newMounterErr)
+			}
 
-		if attachableVolumePlugin != nil {
-			volumeAttacher, _ := attachableVolumePlugin.NewAttacher()
-			if volumeAttacher != nil {
-				resizeOptions.CSIVolumePhase = volume.CSIVolumeStaged
-				resizeOptions.DevicePath = volumeToMount.DevicePath
-				dmp, err := volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
+			resizeOptions.DeviceMountPath = volumeMounter.GetPath()
+
+			deviceMountableVolumePlugin, _ := og.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeToMount.VolumeSpec)
+			var volumeDeviceMounter volume.DeviceMounter
+			if deviceMountableVolumePlugin != nil {
+				volumeDeviceMounter, _ = deviceMountableVolumePlugin.NewDeviceMounter()
+			}
+
+			if volumeDeviceMounter != nil {
+				deviceStagePath, err := volumeDeviceMounter.GetDeviceMountPath(volumeToMount.VolumeSpec)
 				if err != nil {
 					return volumeToMount.GenerateError("NodeExpandVolume.GetDeviceMountPath failed", err)
 				}
-				resizeOptions.DeviceMountPath = dmp
-				resizeOptions.DeviceStagePath = dmp
-				resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
-				if simpleErr != nil || detailedErr != nil {
-					return simpleErr, detailedErr
-				}
-				if resizeDone {
-					return nil, nil
-				}
+				resizeOptions.DeviceStagePath = deviceStagePath
+			}
+		} else {
+			// Get block volume mapper plugin
+			blockVolumePlugin, err :=
+				og.volumePluginMgr.FindMapperPluginBySpec(volumeToMount.VolumeSpec)
+			if err != nil {
+				return volumeToMount.GenerateError("MapVolume.FindMapperPluginBySpec failed", err)
+			}
+
+			if blockVolumePlugin == nil {
+				return volumeToMount.GenerateError("MapVolume.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
+			}
+
+			blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
+				volumeToMount.VolumeSpec,
+				volumeToMount.Pod,
+				volume.VolumeOptions{})
+			if newMapperErr != nil {
+				return volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
+			}
+
+			// if plugin supports custom mappers lets add DeviceStagePath
+			if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
+				resizeOptions.DeviceStagePath = customBlockVolumeMapper.GetStagingPath()
 			}
 		}
-		// if we are here that means volume plugin does not support attach interface
-		volumeMounter, newMounterErr := volumePlugin.NewMounter(
-			volumeToMount.VolumeSpec,
-			volumeToMount.Pod,
-			volume.VolumeOptions{})
-		if newMounterErr != nil {
-			return volumeToMount.GenerateError("NodeExpandVolume.NewMounter initialization failed", newMounterErr)
-		}
 
-		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
+		// if we are doing online expansion then volume is already published
 		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 		resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
 		if simpleErr != nil || detailedErr != nil {

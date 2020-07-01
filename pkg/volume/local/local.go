@@ -621,6 +621,11 @@ func (m *localVolumeMapper) MapPodDevice() (string, error) {
 	return globalPath, nil
 }
 
+// GetStagingPath returns
+func (m *localVolumeMapper) GetStagingPath() string {
+	return ""
+}
+
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
 type localVolumeUnmapper struct {
 	*localVolume

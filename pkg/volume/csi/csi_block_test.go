@@ -123,7 +123,7 @@ func TestBlockMapperGetStagingPath(t *testing.T) {
 			t.Fatalf("Failed to make a new Mapper: %v", err)
 		}
 
-		path := csiMapper.getStagingPath()
+		path := csiMapper.GetStagingPath()
 
 		if tc.path != path {
 			t.Errorf("expecting path %s, got %s", tc.path, path)

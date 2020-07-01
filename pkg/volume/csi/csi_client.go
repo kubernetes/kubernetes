@@ -282,16 +282,22 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 	defer closer.Close()
 
 	req := &csipbv1.NodeExpandVolumeRequest{
-		VolumeId:          opts.volumeID,
-		VolumePath:        opts.volumePath,
-		StagingTargetPath: opts.stagingTargetPath,
-		CapacityRange:     &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},
+		VolumeId:      opts.volumeID,
+		VolumePath:    opts.volumePath,
+		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},
 		VolumeCapability: &csipbv1.VolumeCapability{
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
 				Mode: asCSIAccessModeV1(opts.accessMode),
 			},
 		},
 	}
+
+	// not all CSI drivers support NodeStageUnstage and hence the StagingTargetPath
+	// should only be set when available
+	if opts.stagingTargetPath != "" {
+		req.StagingTargetPath = opts.stagingTargetPath
+	}
+
 	if opts.fsType == fsTypeBlockName {
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Block{
 			Block: &csipbv1.VolumeCapability_BlockVolume{},

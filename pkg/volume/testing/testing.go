@@ -998,6 +998,10 @@ func (fv *FakeVolume) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (fv *FakeVolume) GetStagingPath() string {
+	return filepath.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "staging", fv.VolName)
+}
+
 // Block volume support
 func (fv *FakeVolume) GetSetUpDeviceCallCount() int {
 	fv.RLock()
