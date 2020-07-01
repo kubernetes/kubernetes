@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	typedeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
+	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 
@@ -35,9 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func newTestEvent(namespace, name, label string) *eventsv1beta1.Event {
+func newTestEvent(namespace, name, label string) *eventsv1.Event {
 	someTime := metav1.MicroTime{Time: time.Unix(1505828956, 0)}
-	return &eventsv1beta1.Event{
+	return &eventsv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -57,7 +57,7 @@ func newTestEvent(namespace, name, label string) *eventsv1beta1.Event {
 	}
 }
 
-func eventExistsInList(client typedeventsv1beta1.EventInterface, namespace, name string) bool {
+func eventExistsInList(client typedeventsv1.EventInterface, namespace, name string) bool {
 	eventsList, err := client.List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "testevent-constant=true",
 	})
@@ -73,12 +73,12 @@ func eventExistsInList(client typedeventsv1beta1.EventInterface, namespace, name
 
 var _ = common.SIGDescribe("Events API", func() {
 	f := framework.NewDefaultFramework("events")
-	var client typedeventsv1beta1.EventInterface
-	var clientAllNamespaces typedeventsv1beta1.EventInterface
+	var client typedeventsv1.EventInterface
+	var clientAllNamespaces typedeventsv1.EventInterface
 
 	ginkgo.BeforeEach(func() {
-		client = f.ClientSet.EventsV1beta1().Events(f.Namespace.Name)
-		clientAllNamespaces = f.ClientSet.EventsV1beta1().Events(metav1.NamespaceAll)
+		client = f.ClientSet.EventsV1().Events(f.Namespace.Name)
+		clientAllNamespaces = f.ClientSet.EventsV1().Events(metav1.NamespaceAll)
 	})
 
 	/*
