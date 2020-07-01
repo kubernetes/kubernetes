@@ -61,7 +61,7 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			currPartIndex += len(strings.Split(nextPart, "."))
 			currType = mapValueType
 
-		case reflect.Struct:
+		case reflect.Struct, reflect.Ptr:
 			nextPart := individualParts[currPartIndex]
 
 			options, err := getPotentialTypeValues(currType)

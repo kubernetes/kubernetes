@@ -147,6 +147,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 	actualCurrValue := curr
 	if curr.Kind() == reflect.Ptr {
 		actualCurrValue = curr.Elem()
+		if actualCurrValue.Kind() == reflect.Ptr {
+			actualCurrValue = actualCurrValue.Elem()
+		}
 	}
 
 	switch actualCurrValue.Kind() {

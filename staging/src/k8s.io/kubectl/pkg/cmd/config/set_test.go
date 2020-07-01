@@ -54,6 +54,26 @@ func TestSetConfigCurrentContext(t *testing.T) {
 	test.run(t)
 }
 
+func TestSetConfigUserExecCommand(t *testing.T) {
+	execConfig := clientcmdapi.ExecConfig{Command: "bar"}
+	conf := clientcmdapi.Config{
+		Kind:       "Config",
+		APIVersion: "v1",
+		AuthInfos:  map[string]*clientcmdapi.AuthInfo{"foo": &clientcmdapi.AuthInfo{Exec: &execConfig}},
+	}
+	expectedConfig := *clientcmdapi.NewConfig()
+	expectedExecConfig := clientcmdapi.ExecConfig{Command: "baz"}
+	expectedConfig.AuthInfos = map[string]*clientcmdapi.AuthInfo{"foo": &clientcmdapi.AuthInfo{Exec: &expectedExecConfig}}
+	test := setConfigTest{
+		description:    "Testing for kubectl config set user exec command",
+		config:         conf,
+		args:           []string{"users.foo.exec.command", "baz"},
+		expected:       `Property "users.foo.exec.command" set.` + "\n",
+		expectedConfig: expectedConfig,
+	}
+	test.run(t)
+}
+
 func (test setConfigTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile("", "")
 	if err != nil {
