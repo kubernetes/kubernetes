@@ -121,7 +121,6 @@ func TestResolveWithSeenEndpoints(t *testing.T) {
 			expectedValues: expectation{sets.NewString(), true},
 			seenURLs:       []*url.URL{{Scheme: "https", Host: "192.168.1.1:1443"}, {Scheme: "https", Host: "192.168.1.2:1443"}, {Scheme: "https", Host: "192.168.1.3:1443"}},
 		},
-		// TODO: add more cases
 	}
 
 	for _, scenario := range scenarios {

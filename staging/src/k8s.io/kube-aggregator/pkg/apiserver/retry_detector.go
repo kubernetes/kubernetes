@@ -44,8 +44,7 @@ func newResponseWriterInterceptor(w http.ResponseWriter) http.ResponseWriter {
 }
 
 type responseWriterInterceptor interface {
-	WasHijacked() bool
-	StatusCode() int
+	StatusCode() (hijacked bool, code int)
 }
 
 type responseWriterExtended struct {
@@ -96,12 +95,8 @@ func (w *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return requestHijacker.Hijack()
 }
 
-func (w *responseWriter) WasHijacked() bool {
-	return w.wasHijacked
-}
-
-func (w *responseWriter) StatusCode() int {
-	return w.statusCode
+func (w *responseWriter) StatusCode() (hijacked bool, code int) {
+	return w.wasHijacked, w.statusCode
 }
 
 type retriable interface {
@@ -130,7 +125,7 @@ func newRetryDecorator(rw responseWriterInterceptor, errRsp *retriableHijackErro
 // RetryIfNeeded returns true if the request failed and can be safely retried otherwise it returns false
 func (p *retryDecorator) RetryIfNeeded() bool {
 	// do not retry if the request has been hijacked or a response has already been sent to a client
-	if p.rw.WasHijacked() || p.rw.StatusCode() != 0 {
+	if wasHijacked, code := p.rw.StatusCode(); wasHijacked || code != 0 {
 		return false
 	}
 
@@ -163,7 +158,7 @@ func (r *maxRetries) retry() bool {
 }
 
 type backOff struct {
-	key string
+	key     string
 	manager *flowcontrol.Backoff
 	retriable
 }
@@ -171,7 +166,7 @@ type backOff struct {
 var _ retriable = &backOff{}
 
 func withBackOff(delegate retriable) retriable {
-	return &backOff{"static-key-for-single-host", flowcontrol.NewBackOff(4 * time.Second, 30 * time.Second), delegate}
+	return &backOff{"static-key-for-single-host", flowcontrol.NewBackOff(4*time.Second, 30*time.Second), delegate}
 }
 
 func (b *backOff) retry() bool {

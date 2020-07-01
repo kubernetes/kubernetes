@@ -156,8 +156,7 @@ func (r *proxyHandler) serveHTTPWithRetry(w http.ResponseWriter, req *http.Reque
 
 	visitedURLs := []*url.URL{}
 	for {
-		visitedURL := serveHTTP(w, utilnet.CloneRequest(req), handlingInfo, errRsp, user, r.serviceResolverWrapper(visitedURLs, endpointsCount))
-		if visitedURL != nil {
+		if visitedURL, success := serveHTTP(w, utilnet.CloneRequest(req), handlingInfo, errRsp, user, r.serviceResolverWrapper(visitedURLs, endpointsCount)); success {
 			visitedURLs = append(visitedURLs, visitedURL)
 		}
 
@@ -167,12 +166,13 @@ func (r *proxyHandler) serveHTTPWithRetry(w http.ResponseWriter, req *http.Reque
 	}
 
 	// if an error is not retriable and we haven't sent a response to the client return StatusServiceUnavailable
-	if w.(responseWriterInterceptor).StatusCode() == 0 && !w.(responseWriterInterceptor).WasHijacked() {
+	wasHijacked, code := w.(responseWriterInterceptor).StatusCode()
+	if code == 0 && !wasHijacked {
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 	}
 }
 
-func serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, errResponder proxy.ErrorResponder, user user.Info, serviceResolverFn func(namespace, name string, port int32) (*url.URL, error)) *url.URL {
+func serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandlingInfo, errResponder proxy.ErrorResponder, user user.Info, serviceResolverFn func(namespace, name string, port int32) (*url.URL, error)) (*url.URL, bool) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
@@ -180,7 +180,7 @@ func serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandl
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
-		return nil
+		return nil, false
 	}
 	location.Host = rloc.Host
 	location.Path = req.URL.Path
@@ -191,14 +191,14 @@ func serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandl
 
 	if handlingInfo.proxyRoundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
-		return nil
+		return nil, false
 	}
 
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
 	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
 	if err != nil {
 		proxyError(w, req, err.Error(), http.StatusInternalServerError)
-		return nil
+		return nil, false
 	}
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
@@ -212,7 +212,7 @@ func serveHTTP(w http.ResponseWriter, req *http.Request, handlingInfo proxyHandl
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, errResponder)
 	handler.ServeHTTP(w, newReq)
-	return rloc
+	return rloc, true
 }
 
 // newRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests

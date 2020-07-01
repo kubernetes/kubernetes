@@ -494,104 +494,6 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 }
 
-// TODO:
-func TestProxyRetriesIntegration(t *testing.T) {
-	testCases := map[string]struct {
-		APIService *apiregistration.APIService
-	}{
-		"happy path: HTTP/2.0 established test->aggregator->backend": {
-			APIService: &apiregistration.APIService{
-				Spec: apiregistration.APIServiceSpec{
-					CABundle: testCACrt,
-					Group:    "mygroup",
-					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
-				},
-				Status: apiregistration.APIServiceStatus{
-					Conditions: []apiregistration.APIServiceCondition{
-						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
-					},
-				},
-			},
-		},
-	}
-
-	for name, testCase := range testCases {
-		testCaseName := name
-		path := "/apis/" + testCase.APIService.Spec.Group + "/" + testCase.APIService.Spec.Version + "/foo"
-
-		func() {
-			// set up the backend server
-			backendHandler := &targetHTTPHandler{}
-			backendServer := httptest.NewUnstartedServer(backendHandler)
-			backendCert, err := tls.X509KeyPair(svcCrt, svcKey)
-			if err != nil {
-				t.Fatalf("backend: invalid x509/key pair: %v", err)
-			}
-			backendServer.TLS = &tls.Config{
-				Certificates: []tls.Certificate{backendCert},
-				NextProtos:   []string{http2.NextProtoTLS},
-			}
-			backendServer.StartTLS()
-			defer backendServer.Close()
-
-			// set up the aggregator
-			serverURL, _ := url.Parse(backendServer.URL)
-			proxyHandler := &proxyHandler{
-				serviceResolver: &mockedRouter{destinationHost: serverURL.Host},
-				proxyTransport:  &http.Transport{},
-			}
-			proxyHandler.updateAPIService(testCase.APIService)
-
-			aggregator := httptest.NewUnstartedServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
-			aggregatorCert, err := tls.X509KeyPair(aggregatorCrt, aggregatorKey)
-			if err != nil {
-				t.Fatalf("aggregator: invalid x509/key pair: %v", err)
-			}
-			aggregator.TLS = &tls.Config{
-				Certificates: []tls.Certificate{aggregatorCert},
-				NextProtos:   []string{http2.NextProtoTLS},
-			}
-			aggregator.StartTLS()
-			defer aggregator.Close()
-
-			clientCACertPool := x509.NewCertPool()
-			clientCACertPool.AppendCertsFromPEM(aggregatorCrt)
-			clientTLSConfig := &tls.Config{
-				RootCAs:    clientCACertPool,
-				NextProtos: []string{http2.NextProtoTLS},
-			}
-			client := &http.Client{}
-			client.Transport = &http2.Transport{
-				TLSClientConfig: clientTLSConfig,
-			}
-
-			// act
-			resp, err := client.Get(fmt.Sprintf("https://localhost:%d%s", aggregator.Listener.Addr().(*net.TCPAddr).Port, path))
-			if err != nil {
-				t.Fatalf("%s: %v", testCaseName, err)
-			}
-
-			// validate
-			defer resp.Body.Close()
-			_, err = ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatalf("%s: %v", testCaseName, err)
-			}
-			if resp.StatusCode != 200 {
-				t.Errorf("unexpected HTTP staus: %v, expected: 200", resp.Proto)
-			}
-			expectedProto := "HTTP/2.0"
-			if resp.Proto != expectedProto {
-				t.Errorf("unexpected response proto: %v, expected: %v", resp.Proto, expectedProto)
-			}
-			if backendHandler.proto != expectedProto {
-				t.Errorf("unexpected backend (aggregator->backend) proto: %v, expected: %v", backendHandler.proto, expectedProto)
-			}
-		}()
-	}
-}
-
 func TestProxyRetries(t *testing.T) {
 	defaultAPIService := func() *apiregistration.APIService {
 		return &apiregistration.APIService{
@@ -667,7 +569,7 @@ func TestProxyRetries(t *testing.T) {
 			expectedVisitedEPLen:        0,
 		},
 		"many hosts: retry on connection refused": {
-			apiService:                  defaultAPIService(),
+			apiService: defaultAPIService(),
 			serviceResolver: func() *mockedRouterWithCounter {
 				sr := defaultServiceResolver()
 				sr.endpointsCount = 8
