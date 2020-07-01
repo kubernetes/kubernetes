@@ -45,6 +45,12 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPat
 	case metav1.LabelSelectorOpIn, metav1.LabelSelectorOpNotIn:
 		if len(sr.Values) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
+		} else {
+			for _, v := range sr.Values {
+				for _, msg := range validation.IsValidLabelValue(v) {
+					allErrs = append(allErrs, field.Invalid(fldPath, v, msg))
+				}
+			}
 		}
 	case metav1.LabelSelectorOpExists, metav1.LabelSelectorOpDoesNotExist:
 		if len(sr.Values) > 0 {
