@@ -186,6 +186,45 @@ if [ -f "${LICENSE_ROOT}/LICENSE" ]; then
   mv "${TMP_LICENSE_FILE}" "${TMP_LICENSES_DIR}/LICENSE"
 fi
 
+# only_contains_submodules will check whether a package is empty of files
+# and its subdirectories are all modules, which indicates we do not need
+# a LICENSE for this module as it is an indirect transitive dependency.
+only_contains_submodules () {
+  package="$1"
+  if [[ -z "$(find "${DEPS_DIR}/${package}/" -mindepth 1 -maxdepth 1 -type f)" ]]; then
+    # If the package does not contain files, check whether all subdirectories
+    # only contain modules.
+    while read -d "" -r SUBDIR; do
+      # Because we have a trailing '/' on the 'find' command's argument, we
+      # must strip off two '/' from the end of the package path before the
+      # sub-packages name.
+      subpackage="${package}/${SUBDIR#"${DEPS_DIR}/${package}//"}"
+
+      # If the subdirectory is already a module, don't recurse into deeper
+      # subdirectories of this subpackage.
+      if go list -m "${subpackage}"; then
+        continue
+      fi
+
+      # If the subdirectory is not a module, check if the subdirectory only_contains_submodules
+      if only_contains_submodules "${subpackage}"; then
+        continue
+      fi
+
+      # If the subdirectory is not a module, and its subdirectories contain files and
+      # are not themselves (or their parents) modules, then this package does not
+      # contain only submodules
+      return 1
+    done < <(find "${DEPS_DIR}/${package}/" -mindepth 1 -maxdepth 1 -type d -print0)
+  else
+    # If the package contains files, it does not only contain submodules.
+    return 1
+  fi
+
+  # Otherwise, this package only contains submodules
+  return 0
+}
+
 # Loop through every vendored package
 for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
   if [[ -e "staging/src/${PACKAGE}" ]]; then
@@ -196,20 +235,12 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
     echo "${PACKAGE} doesn't exist in ${DEPS_DIR}, skipping" >&2
     continue
   fi
-  # Skip a directory if 1) it has no files and 2) all the subdirectories contain a go.mod file.
-  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type f)" ]]; then
-      misses_go_mod=false
-      while read -d "" -r SUBDIR; do
-          if [[ ! -e "${SUBDIR}/go.mod" ]]; then
-              misses_go_mod=true
-              break
-          fi
-      done < <(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d -print0)
-      if [[ $misses_go_mod = false ]]; then
-          echo "${PACKAGE} has no files, skipping" >&2
-          continue
-      fi
+  # Skip a directory if 1) it has no files and 2) all its non-empty subdirectories are modules
+  if only_contains_submodules "${PACKAGE}"; then
+    echo "${PACKAGE} is empty and only contains submodules, skipping" >&2
+    continue
   fi
+
   echo "${PACKAGE}"
 
   process_content "${PACKAGE}" LICENSE
