@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 )
@@ -167,7 +166,6 @@ func TestIsProxyableHostname(t *testing.T) {
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service
-		svcName    types.NamespacedName
 		shouldSkip bool
 	}{
 		{
@@ -178,7 +176,6 @@ func TestShouldSkipService(t *testing.T) {
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: true,
 		},
 		{
@@ -189,7 +186,6 @@ func TestShouldSkipService(t *testing.T) {
 					ClusterIP: "",
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: true,
 		},
 		{
@@ -201,7 +197,6 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeExternalName,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: true,
 		},
 		{
@@ -213,7 +208,6 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeClusterIP,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: false,
 		},
 		{
@@ -225,7 +219,6 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeNodePort,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: false,
 		},
 		{
@@ -237,13 +230,12 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeLoadBalancer,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: false,
 		},
 	}
 
 	for i := range testCases {
-		skip := ShouldSkipService(testCases[i].svcName, testCases[i].service)
+		skip := ShouldSkipService(testCases[i].service)
 		if skip != testCases[i].shouldSkip {
 			t.Errorf("case %d: expect %v, got %v", i, testCases[i].shouldSkip, skip)
 		}
