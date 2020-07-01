@@ -737,7 +737,6 @@ template:
         schedulerName: "425"
         securityContext:
           fsGroup: -5265121980497361308
-          fsGroupChangePolicy: ɱďW賁Ě
           runAsGroup: 2006200781539567705
           runAsNonRoot: true
           runAsUser: 1287380841622288898
@@ -751,6 +750,7 @@ template:
           sysctls:
           - name: "380"
             value: "381"
+          volumeChangePolicy: ɱďW賁Ě
           windowsOptions:
             gmsaCredentialSpec: "378"
             gmsaCredentialSpecName: "377"

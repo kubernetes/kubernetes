@@ -701,7 +701,6 @@ spec:
       schedulerName: "416"
       securityContext:
         fsGroup: 7124276984274024394
-        fsGroupChangePolicy: 蹔ŧ
         runAsGroup: -779972051078659613
         runAsNonRoot: false
         runAsUser: 2179199799235189619
@@ -715,6 +714,7 @@ spec:
         sysctls:
         - name: "371"
           value: "372"
+        volumeChangePolicy: 蹔ŧ
         windowsOptions:
           gmsaCredentialSpec: "369"
           gmsaCredentialSpecName: "368"

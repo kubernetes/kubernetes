@@ -3285,14 +3285,14 @@ message PodSecurityContext {
   // +optional
   repeated Sysctl sysctls = 7;
 
-  // fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
-  // before being exposed inside Pod. This field will only apply to
-  // volume types which support fsGroup based ownership(and permissions).
+  // volumeChangePolicy defines behavior of changing ownership, permission and SELinux
+  // label of the volume before being exposed inside Pod. This field will only apply to
+  // volume types which support fsGroup based ownership(and permissions) or SELinux.
   // It will have no effect on ephemeral volume types such as: secret, configmaps
   // and emptydir.
   // Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
   // +optional
-  optional string fsGroupChangePolicy = 9;
+  optional string volumeChangePolicy = 10;
 }
 
 // Describes the class of pods that should avoid this node.

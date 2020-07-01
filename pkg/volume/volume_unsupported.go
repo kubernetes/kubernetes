@@ -22,6 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, seLinuxOptions *v1.SELinuxOptions, seLinuxSupported bool, volumeChangePolicy *v1.PodVolumeChangePolicy) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, seLinuxOptions *v1.SELinuxOptions, seLinuxSupported bool, volumeChangePolicy *v1.PodVolumeChangePolicyZZz) error {
 	return nil
 }
