@@ -19,32 +19,16 @@ package globalflag
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/component-base/logs"
-	"k8s.io/klog/v2"
 )
 
-// AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
-// against the global flagsets from "flag" and "k8s.io/klog/v2".
+// AddGlobalFlags explicitly registers flags that libraries (verflag, etc.) register
+// against the global flagsets from "flag".
 // We do this in order to prevent unwanted flags from leaking into the component's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet, name string) {
-	addKlogFlags(fs)
-	logs.AddFlags(fs)
-
 	fs.BoolP("help", "h", false, fmt.Sprintf("help for %s", name))
-}
-
-// addKlogFlags adds flags from k8s.io/klog
-func addKlogFlags(fs *pflag.FlagSet) {
-	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	klog.InitFlags(local)
-	local.VisitAll(func(fl *flag.Flag) {
-		fl.Name = normalize(fl.Name)
-		fs.AddGoFlag(fl)
-	})
 }
 
 // normalize replaces underscores with hyphens
