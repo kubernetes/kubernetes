@@ -1160,7 +1160,7 @@
               "value": "368"
             }
           ],
-          "fsGroupChangePolicy": "展}硐庰%皧V垾现葢ŵ橨鬶l獕;跣"
+          "volumeChangePolicy": "展}硐庰%皧V垾现葢ŵ橨鬶l獕;跣"
         },
         "imagePullSecrets": [
           {
