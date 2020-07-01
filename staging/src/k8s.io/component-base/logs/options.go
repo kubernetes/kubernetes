@@ -50,12 +50,34 @@ func NewOptions() *Options {
 	}
 }
 
-// Validate check LogFormat in registry or not
+// Validate verifies if any unsupported flag is set
+// for non-default logging format
 func (o *Options) Validate() []error {
-	if _, err := o.Get(); err != nil {
-		return []error{fmt.Errorf("unsupported log format: %s", o.LogFormat)}
+	errs := []error{}
+	if o.LogFormat != defaultLogFormat {
+		allFlags := unsupportedLoggingFlags()
+		for _, fname := range allFlags {
+			if flagIsSet(fname) {
+				errs = append(errs, fmt.Errorf("non-default logging format doesn't honor flag: %s", fname))
+			}
+		}
 	}
-	return nil
+	if _, err := o.Get(); err != nil {
+		errs = append(errs, fmt.Errorf("unsupported log format: %s", o.LogFormat))
+	}
+	return errs
+}
+
+func flagIsSet(name string) bool {
+	f := flag.Lookup(name)
+	if f != nil {
+		return f.DefValue != f.Value.String()
+	}
+	pf := pflag.Lookup(name)
+	if pf != nil {
+		return pf.DefValue != pf.Value.String()
+	}
+	panic("failed to lookup unsupported log flag")
 }
 
 // AddFlags add logging-format flag
