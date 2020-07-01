@@ -232,6 +232,12 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
+	if h.Responder != nil {
+		// if an optional error interceptor/responder was provided wire it
+		// the custom responder might be used for providing a unified error reporting
+		// or supporting retry mechanisms by not sending non-fatal errors to the clients
+		proxy.ErrorHandler = h.Responder.Error
+	}
 	proxy.ServeHTTP(w, newReq)
 }
 
