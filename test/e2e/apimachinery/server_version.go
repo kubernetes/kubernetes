@@ -24,8 +24,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("get-server-version", func() {
-	f := framework.NewDefaultFramework("get-server-version")
+var _ = SIGDescribe("server version", func() {
+	f := framework.NewDefaultFramework("server version")
 	ginkgo.It("should find the server version", func() {
 
 		ginkgo.By("Request ServerVersion")
