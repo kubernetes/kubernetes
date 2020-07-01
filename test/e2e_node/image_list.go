@@ -61,16 +61,16 @@ var NodePrePullImageList = sets.NewString(
 	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
 )
 
-// updateImageWhiteList updates the framework.ImageWhiteList with
+// updateImageAllowList updates the framework.ImagePrePullList with
 // 1. the hard coded lists
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
-func updateImageWhiteList() {
-	// Union NodePrePullImageList and CommonImageWhiteList into the framework image pre-pull list.
-	framework.ImageWhiteList = NodePrePullImageList.Union(commontest.PrePulledImages)
+func updateImageAllowList() {
+	// Union NodePrePullImageList and PrePulledImages into the framework image pre-pull list.
+	framework.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
-	framework.ImageWhiteList.Insert(getNodeProblemDetectorImage())
-	framework.ImageWhiteList.Insert(getSRIOVDevicePluginImage())
+	framework.ImagePrePullList.Insert(getNodeProblemDetectorImage())
+	framework.ImagePrePullList.Insert(getSRIOVDevicePluginImage())
 }
 
 func getNodeProblemDetectorImage() string {
@@ -149,7 +149,7 @@ func PrePullAllImages() error {
 	if err != nil {
 		return err
 	}
-	images := framework.ImageWhiteList.List()
+	images := framework.ImagePrePullList.List()
 	klog.V(4).Infof("Pre-pulling images with %s %+v", puller.Name(), images)
 	for _, image := range images {
 		var (
