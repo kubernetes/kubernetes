@@ -102,6 +102,25 @@ func TestSyncServiceNoSelector(t *testing.T) {
 	assert.Len(t, client.Actions(), 0)
 }
 
+// Ensure SyncService for service with pending deletion results in no action
+func TestSyncServicePendingDeletion(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	deletionTimestamp := metav1.Now()
+	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	esController.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns, DeletionTimestamp: &deletionTimestamp},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+		},
+	})
+
+	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.Nil(t, err)
+	assert.Len(t, client.Actions(), 0)
+}
+
 // Ensure SyncService for service with selector but no pods results in placeholder EndpointSlice
 func TestSyncServiceWithSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
