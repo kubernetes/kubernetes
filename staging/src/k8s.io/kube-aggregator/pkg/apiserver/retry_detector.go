@@ -24,9 +24,11 @@ import (
 	"net/http"
 	"os"
 	"syscall"
+	"time"
 
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 // newResponseWriterInterceptor wraps http.ResponseWriter for detecting Hijacked connections
@@ -119,7 +121,6 @@ func newRetryDecorator(rw responseWriterInterceptor, errRsp *retriableHijackErro
 	if singleEndpoint {
 		delegate = withBackOff(withHijackErrorResponderForSingleEndpoint(errRsp))
 	} else {
-		// TODO: withJiter (random vs consistent)
 		delegate = withHijackErrorResponderForMultipleEndpoints(errRsp)
 	}
 
@@ -162,18 +163,24 @@ func (r *maxRetries) retry() bool {
 }
 
 type backOff struct {
+	key string
+	manager *flowcontrol.Backoff
 	retriable
 }
 
 var _ retriable = &backOff{}
 
 func withBackOff(delegate retriable) retriable {
-	return &backOff{delegate}
+	return &backOff{"static-key-for-single-host", flowcontrol.NewBackOff(4 * time.Second, 30 * time.Second), delegate}
 }
 
 func (b *backOff) retry() bool {
-	// TODO: implement back off
-	return b.retriable.retry()
+	if b.retriable.retry() {
+		b.manager.Next(b.key, b.manager.Clock.Now())
+		b.manager.Clock.Sleep(b.manager.Get(b.key))
+		return true
+	}
+	return false
 }
 
 // retriableHijackErrorResponder wraps proxy.ErrorResponder and prevents errors from being written to the client if they can be retried
@@ -197,6 +204,7 @@ func newHijackErrorResponder(delegate proxy.ErrorResponder, req *http.Request) *
 func (hr *retriableHijackErrorResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
 	// if we can retry the request do not send a response to the client
 	hr.lastKnownError = err
+	hr.req = r
 	if !hr.isRetriable(hr.req, err) {
 		hr.delegate.Error(w, r, err) // this might send a response to a client
 	}
