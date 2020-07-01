@@ -856,7 +856,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		// wait as required for all 3 pods to be found
-		framework.Logf("waiting for all 3 pods to be located")
+		ginkgo.By("waiting for all 3 pods to be located")
 		err := wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 3))
 		framework.ExpectNoError(err, "3 pods not found")
 
@@ -864,14 +864,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
 		framework.ExpectNoError(err, "failed to delete collection of pods")
-		framework.Logf("DeleteCollection processed")
 
 		// wait for all pods to be deleted
-		framework.Logf("waiting for all pods to be deleted")
+		ginkgo.By("waiting for all pods to be deleted")
 		err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 0))
 		framework.ExpectNoError(err, "found a pod(s)")
-
-		ginkgo.By("Collection of pods deleted")
 	})
 })
 
