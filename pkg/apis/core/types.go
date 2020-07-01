@@ -2790,20 +2790,27 @@ type Sysctl struct {
 	Value string
 }
 
-// PodFSGroupChangePolicy holds policies that will be used for applying fsGroup to a volume
-// when volume is mounted.
-type PodFSGroupChangePolicy string
+// PodVolumeChangePolicy holds policies that will be used for applying fsGroup and SELinux
+// label to a volume when volume is mounted.
+type PodVolumeChangePolicy string
 
 const (
-	// FSGroupChangeOnRootMismatch indicates that volume's ownership and permissions will be changed
-	// only when permission and ownership of root directory does not match with expected
-	// permissions on the volume. This can help shorten the time it takes to change
-	// ownership and permissions of a volume.
-	FSGroupChangeOnRootMismatch PodFSGroupChangePolicy = "OnRootMismatch"
-	// FSGroupChangeAlways indicates that volume's ownership and permissions
-	// should always be changed whenever volume is mounted inside a Pod. This the default
+	// VolumeChangeOnRootMismatch indicates that volume's ownership, permissions and
+	// SELinux label will be changed only when permission, ownership or SELinux label
+	// of root directory does not match with expected permissions/label on the volume.
+	// This can help shorten the time it takes to change ownership and permissions of
+	// a volume.
+	// Permission and ownership are changed only for pods that have fsGroup assigned.
+	// SELinux label is changed only for pods that have at least Multi-Category Security
+	// (MCS; pod.spec.securityContext.selinuxOptions.level) set. Otherwise the container
+	// runtime assigns a new random MCS level on pod startup and relabels the volume
+	// on its own.
+	VolumeChangeOnRootMismatch PodVolumeChangePolicy = "OnRootMismatch"
+	// VolumeChangeAlways indicates that volume's ownership and permissions
+	// should always be changed whenever volume is mounted inside a Pod and
+	// SELinux label will be changed by th container runtime. This the default
 	// behavior.
-	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
+	VolumeChangeAlways PodVolumeChangePolicy = "Always"
 )
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -2885,14 +2892,14 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
-	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
-	// before being exposed inside Pod. This field will only apply to
-	// volume types which support fsGroup based ownership(and permissions).
+	// volumeChangePolicy defines behavior of changing ownership, permission and SELinux
+	// label of the volume before being exposed inside Pod. This field will only apply to
+	// volume types which support fsGroup based ownership(and permissions) or SELinux.
 	// It will have no effect on ephemeral volume types such as: secret, configmaps
 	// and emptydir.
 	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
 	// +optional
-	FSGroupChangePolicy *PodFSGroupChangePolicy
+	VolumeChangePolicy *PodVolumeChangePolicy
 	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional

@@ -39,22 +39,22 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, volumeChangePolicy *v1.PodVolumeChangePolicy) error {
 	if fsGroup == nil {
 		return nil
 	}
 
-	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
+	volumeChangePolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableVolumeChangePolicy)
 
 	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
 
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
 	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
-	if !fsGroupPolicyEnabled {
+	if !volumeChangePolicyEnabled {
 		return legacyOwnershipChange(mounter, fsGroup)
 	}
 
-	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
+	if skipPermissionChange(mounter, fsGroup, volumeChangePolicy) {
 		klog.V(3).Infof("skipping permission and ownership change for volume %s", mounter.GetPath())
 		return nil
 	}
@@ -122,10 +122,10 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 	return nil
 }
 
-func skipPermissionChange(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) bool {
+func skipPermissionChange(mounter Mounter, fsGroup *int64, volumeChangePolicy *v1.PodVolumeChangePolicy) bool {
 	dir := mounter.GetPath()
 
-	if fsGroupChangePolicy == nil || *fsGroupChangePolicy != v1.FSGroupChangeOnRootMismatch {
+	if volumeChangePolicy == nil || *volumeChangePolicy != v1.VolumeChangeOnRootMismatch {
 		klog.V(4).Infof("perform recursive ownership change for %s", dir)
 		return false
 	}

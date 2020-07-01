@@ -6554,9 +6554,9 @@ func TestValidatePodSpec(t *testing.T) {
 	maxUserID := int64(2147483647)
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
-	goodfsGroupChangePolicy := core.FSGroupChangeAlways
-	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
-	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
+	goodfsGroupChangePolicy := core.VolumeChangeAlways
+	badfsGroupChangePolicy1 := core.PodVolumeChangePolicy("invalid")
+	badfsGroupChangePolicy2 := core.PodVolumeChangePolicy("")
 
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
@@ -6707,7 +6707,7 @@ func TestValidatePodSpec(t *testing.T) {
 		{
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				FSGroupChangePolicy: &goodfsGroupChangePolicy,
+				VolumeChangePolicy: &goodfsGroupChangePolicy,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -6902,7 +6902,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad empty fsGroupchangepolicy": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				FSGroupChangePolicy: &badfsGroupChangePolicy2,
+				VolumeChangePolicy: &badfsGroupChangePolicy2,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -6910,7 +6910,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad invalid fsgroupchangepolicy": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				FSGroupChangePolicy: &badfsGroupChangePolicy1,
+				VolumeChangePolicy: &badfsGroupChangePolicy1,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -8292,7 +8292,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		activeDeadlineSecondsNegative = int64(-30)
 		activeDeadlineSecondsPositive = int64(30)
 		activeDeadlineSecondsLarger   = int64(31)
-		validfsGroupChangePolicy      = core.FSGroupChangeOnRootMismatch
+		validfsGroupChangePolicy      = core.VolumeChangeOnRootMismatch
 
 		now    = metav1.Now()
 		grace  = int64(30)
@@ -8779,7 +8779,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					},
 					SecurityContext: &core.PodSecurityContext{
-						FSGroupChangePolicy: &validfsGroupChangePolicy,
+						VolumeChangePolicy: &validfsGroupChangePolicy,
 					},
 				},
 			},
@@ -8792,7 +8792,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						},
 					},
 					SecurityContext: &core.PodSecurityContext{
-						FSGroupChangePolicy: nil,
+						VolumeChangePolicy: nil,
 					},
 				},
 			},

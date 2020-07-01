@@ -542,14 +542,16 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		var fsGroup *int64
-		var fsGroupChangePolicy *v1.PodFSGroupChangePolicy
+		var volumeChangePolicy *v1.PodVolumeChangePolicy
+		var seLinuxOptions *v1.SELinuxOptions
 		if podSc := volumeToMount.Pod.Spec.SecurityContext; podSc != nil {
 			if podSc.FSGroup != nil {
 				fsGroup = podSc.FSGroup
 			}
-			if podSc.FSGroupChangePolicy != nil {
-				fsGroupChangePolicy = podSc.FSGroupChangePolicy
+			if podSc.VolumeChangePolicy != nil {
+				volumeChangePolicy = podSc.VolumeChangePolicy
 			}
+			seLinuxOptions = podSc.SELinuxOptions
 		}
 
 		devicePath := volumeToMount.DevicePath
@@ -627,10 +629,11 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		// Execute mount
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
-			FsUser:              ioutil.FsUserFrom(volumeToMount.Pod),
-			FsGroup:             fsGroup,
-			DesiredSize:         volumeToMount.DesiredSizeLimit,
-			FSGroupChangePolicy: fsGroupChangePolicy,
+			FsUser:             ioutil.FsUserFrom(volumeToMount.Pod),
+			FsGroup:            fsGroup,
+			DesiredSize:        volumeToMount.DesiredSizeLimit,
+			VolumeChangePolicy: volumeChangePolicy,
+			SELinuxOptions:     seLinuxOptions,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{

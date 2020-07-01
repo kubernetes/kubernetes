@@ -2819,12 +2819,12 @@ func validateDNSPolicy(dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.Err
 	return allErrors
 }
 
-var validFSGroupChangePolicies = sets.NewString(string(core.FSGroupChangeOnRootMismatch), string(core.FSGroupChangeAlways))
+var validVolumeChangePolicies = sets.NewString(string(core.VolumeChangeOnRootMismatch), string(core.VolumeChangeAlways))
 
-func validateFSGroupChangePolicy(fsGroupPolicy *core.PodFSGroupChangePolicy, fldPath *field.Path) field.ErrorList {
+func validateVolumeChangePolicy(fsGroupPolicy *core.PodVolumeChangePolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
-	if !validFSGroupChangePolicies.Has(string(*fsGroupPolicy)) {
-		allErrors = append(allErrors, field.NotSupported(fldPath, fsGroupPolicy, validFSGroupChangePolicies.List()))
+	if !validVolumeChangePolicies.Has(string(*fsGroupPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath, fsGroupPolicy, validVolumeChangePolicies.List()))
 	}
 	return allErrors
 }
@@ -3680,8 +3680,8 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
 		}
 
-		if securityContext.FSGroupChangePolicy != nil {
-			allErrs = append(allErrs, validateFSGroupChangePolicy(securityContext.FSGroupChangePolicy, fldPath.Child("fsGroupChangePolicy"))...)
+		if securityContext.VolumeChangePolicy != nil {
+			allErrs = append(allErrs, validateVolumeChangePolicy(securityContext.VolumeChangePolicy, fldPath.Child("volumeChangePolicy"))...)
 		}
 
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
