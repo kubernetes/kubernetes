@@ -114,7 +114,10 @@ func newRetryDecorator(rw responseWriterInterceptor, errRsp *retriableHijackErro
 	var delegate retriable
 
 	if singleEndpoint {
-		delegate = withBackOff(withHijackErrorResponderForSingleEndpoint(errRsp))
+		errRsp.isRetriable = func(req *http.Request, err error) bool {
+			return false
+		}
+		delegate = withBackOff(errRsp)
 	} else {
 		delegate = withHijackErrorResponderForMultipleEndpoints(errRsp)
 	}
@@ -213,20 +216,8 @@ func (hr *retriableHijackErrorResponder) retry() bool {
 	return hr.isRetriable(hr.req, hr.lastKnownError)
 }
 
-// withHijackErrorResponderForSingleEndpoint is used by the ErrorResponder to determine
-// if the given error along with the request is safe to retry when only single endpoint is available
-func withHijackErrorResponderForSingleEndpoint(hr *retriableHijackErrorResponder) retriable {
-	hr.isRetriable = func(req *http.Request, err error) bool {
-		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsProbableEOF(err) || isExperimental(err)) {
-			return true
-		}
-		return false
-	}
-	return hr
-}
-
 // withHijackErrorResponderForMultipleEndpoints is used by the ErrorResponder to determine
-// if the given error along with the request is safe to retry when more than one endpoint is available
+// if the given error is safe to retry when more than one endpoint is available
 func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorResponder) retriable {
 	hr.isRetriable = func(req *http.Request, err error) bool {
 		// we always want to retry connection refused errors as the aggregator will pick up a different host on the next try.
@@ -236,10 +227,7 @@ func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorRespon
 		// 	StreamsWithID <= LastStreamID might be fully processed because the server waits until all current streams are done or the timeout expires.
 		// 	in case of the timeout, we will get "http2: server sent GOAWAY and closed the connection" error which is handled by IsProbableEOF() and it is safe to retry only for particular verbs (check isHTTPVerbRetriable method)
 		// 	on the next try a new connection will be opened to the same host and will fail with "connection refused" error because the remote host stopped listening on the port.
-		if knet.IsConnectionRefused(err) {
-			return true
-		}
-		if isHTTPVerbRetriable(req) && (knet.IsConnectionReset(err) || knet.IsProbableEOF(err) || isExperimental(err)) {
+		if knet.IsConnectionRefused(err) || isNoRouteToHost(err) {
 			return true
 		}
 		return false
@@ -247,13 +235,8 @@ func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorRespon
 	return hr
 }
 
-// isHTTPVerbRetriable determines if the given HTTP method is idempotent, that is it doesn't have side effects and it is safe to retry.
-// be cautious about extending this list, retries can amplify the load and confuse clients
-func isHTTPVerbRetriable(req *http.Request) bool {
-	return req.Method == "GET"
-}
-
-func isExperimental(err error) bool {
+// IsNoRouteToHost returns true if the given error is "no route to host"
+func isNoRouteToHost(err error) bool {
 	var osErr *os.SyscallError
 	if errors.As(err, &osErr) {
 		err = osErr.Err

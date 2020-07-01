@@ -523,12 +523,12 @@ func TestProxyRetries(t *testing.T) {
 		expectedServiceResolveCount int
 		expectedVisitedEPLen        int
 	}{
-		"single host: retry on connection reset by peer error": {
+		"single host: do not retry on connection reset by peer error": {
 			apiService:                  defaultAPIService(),
 			serviceResolver:             defaultServiceResolver(),
 			backendError:                errors.New("connection reset by peer"),
 			expectedStatusCode:          http.StatusServiceUnavailable,
-			expectedServiceResolveCount: 4,
+			expectedServiceResolveCount: 1,
 		},
 		"single host: do not retry on unknown error": {
 			apiService:                  defaultAPIService(),
@@ -553,8 +553,7 @@ func TestProxyRetries(t *testing.T) {
 			}(),
 			backendError:                errors.New("connection reset by peer"),
 			expectedStatusCode:          http.StatusServiceUnavailable,
-			expectedServiceResolveCount: 9,
-			expectedVisitedEPLen:        8,
+			expectedServiceResolveCount: 1,
 		},
 		"many hosts: do not retry on unknown error": {
 			apiService: defaultAPIService(),
