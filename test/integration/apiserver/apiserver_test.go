@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -545,6 +546,20 @@ func TestListResourceVersion0(t *testing.T) {
 				rs.Name = fmt.Sprintf("test-%d", i)
 				if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
+				}
+			}
+
+			if tc.watchCacheEnabled {
+				// poll until the watch cache has the full list in memory
+				err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+					list, err := clientSet.AppsV1().ReplicaSets(ns.Name).List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+					if err != nil {
+						return false, err
+					}
+					return len(list.Items) == 10, nil
+				})
+				if err != nil {
+					t.Fatalf("error waiting for watch cache to observe the full list: %v", err)
 				}
 			}
 
