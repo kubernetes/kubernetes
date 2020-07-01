@@ -874,6 +874,18 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		klog.V(2).Info("Starting client certificate rotation.")
 		clientCertificateManager.Start()
 
+		// we should wait certificate manager to finish client certificate bootstrap, otherwise Kubelet always try to connect
+		// to API Server anonymously before client certificate bootstrap finished.
+		if err := wait.PollImmediateUntil(100*time.Millisecond, func() (done bool, err error) {
+			if clientCertificateManager.Current() != nil {
+				return true, nil
+			}
+
+			return false, nil
+		}, ctx.Done()); err != nil {
+			return nil, nil, fmt.Errorf("bootstrap Kubelet client certificate timeout: %v", err)
+		}
+
 		return transportConfig, closeAllConns, nil
 	}
 
