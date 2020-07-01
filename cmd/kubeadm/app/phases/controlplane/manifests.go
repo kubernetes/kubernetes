@@ -322,6 +322,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	caFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
 
 	defaultArguments := map[string]string{
+		"port":                             "0",
 		"bind-address":                     "127.0.0.1",
 		"leader-elect":                     "true",
 		"kubeconfig":                       kubeconfigFile,
@@ -392,6 +393,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	defaultArguments := map[string]string{
+		"port":                      "0",
 		"bind-address":              "127.0.0.1",
 		"leader-elect":              "true",
 		"kubeconfig":                kubeconfigFile,
