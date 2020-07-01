@@ -704,6 +704,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 	volumeSpecMapByPlugin := make(map[string]map[*volume.Spec]v1.UniqueVolumeName)
 
 	for node, nodeAttachedVolumes := range attachedVolumes {
+		needIndividualVerifyVolumes := []AttachedVolume{}
 		for _, volumeAttached := range nodeAttachedVolumes {
 			if volumeAttached.VolumeSpec == nil {
 				klog.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName)
@@ -757,12 +758,12 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 				volumeSpecMapByPlugin[pluginName] = volumeSpecMap
 				continue
 			}
-
 			// If node doesn't support Bulk volume polling it is best to poll individually
-			nodeError := oe.VerifyVolumesAreAttachedPerNode(nodeAttachedVolumes, node, actualStateOfWorld)
-			if nodeError != nil {
-				klog.Errorf("VerifyVolumesAreAttached failed for volumes %v, node %q with error %v", nodeAttachedVolumes, node, nodeError)
-			}
+			needIndividualVerifyVolumes = append(needIndividualVerifyVolumes, volumeAttached)
+		}
+		nodeError := oe.VerifyVolumesAreAttachedPerNode(needIndividualVerifyVolumes, node, actualStateOfWorld)
+		if nodeError != nil {
+			klog.Errorf("VerifyVolumesAreAttached failed for volumes %v, node %q with error %v", needIndividualVerifyVolumes, node, nodeError)
 		}
 	}
 
