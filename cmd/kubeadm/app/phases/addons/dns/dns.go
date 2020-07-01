@@ -51,7 +51,6 @@ const (
 	KubeDNSServiceAccountName  = "kube-dns"
 	kubeDNSStubDomain          = "stubDomains"
 	kubeDNSUpstreamNameservers = "upstreamNameservers"
-	kubeDNSFederation          = "federations"
 	unableToDecodeCoreDNS      = "unable to decode CoreDNS"
 	coreDNSReplicas            = 2
 	kubeDNSReplicas            = 1
@@ -226,16 +225,11 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return err
 	}
 	coreDNSDomain := cfg.Networking.DNSDomain
-	federations, err := translateFederationsofKubeDNSToCoreDNS(kubeDNSFederation, coreDNSDomain, kubeDNSConfigMap)
-	if err != nil {
-		return err
-	}
 
 	// Get the config file for CoreDNS
-	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, UpstreamNameserver, Federation, StubDomain string }{
+	coreDNSConfigMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, UpstreamNameserver, StubDomain string }{
 		DNSDomain:          coreDNSDomain,
 		UpstreamNameserver: upstreamNameserver,
-		Federation:         federations,
 		StubDomain:         stubDomain,
 	})
 	if err != nil {
@@ -578,47 +572,6 @@ func translateUpstreamNameServerOfKubeDNSToUpstreamForwardCoreDNS(dataField stri
 		return coreDNSProxyStanzaList, nil
 	}
 	return "/etc/resolv.conf", nil
-}
-
-// translateFederationsofKubeDNSToCoreDNS translates Federations Data in kube-dns ConfigMap
-// to Federation for CoreDNS Corefile.
-func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
-	if kubeDNSConfigMap == nil {
-		return "", nil
-	}
-
-	if federation, ok := kubeDNSConfigMap.Data[dataField]; ok {
-		var (
-			federationStanza []interface{}
-			body             [][]string
-		)
-		federationData := make(map[string]string)
-
-		err := json.Unmarshal([]byte(federation), &federationData)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to parse JSON from kube-dns ConfigMap")
-		}
-		fStanza := map[string]interface{}{}
-
-		for name, domain := range federationData {
-			body = append(body, []string{name, domain})
-		}
-		federationStanza = append(federationStanza, fStanza)
-		fStanza["keys"] = []string{"federation " + coreDNSDomain}
-		fStanza["body"] = body
-		stanzasBytes, err := json.Marshal(federationStanza)
-		if err != nil {
-			return "", err
-		}
-
-		corefileStanza, err := caddyfile.FromJSON(stanzasBytes)
-		if err != nil {
-			return "", err
-		}
-
-		return prepCorefileFormat(string(corefileStanza), 8), nil
-	}
-	return "", nil
 }
 
 // prepCorefileFormat indents the output of the Corefile caddytext and replaces tabs with spaces
