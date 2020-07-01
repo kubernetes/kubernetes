@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"time"
 
 	knet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	"k8s.io/client-go/util/flowcontrol"
 )
 
 // newResponseWriterInterceptor wraps http.ResponseWriter for detecting Hijacked connections
@@ -108,18 +106,11 @@ type retryDecorator struct {
 
 // newRetryDecorator wraps delegate for detecting Hijacked connections
 func newRetryDecorator(rw responseWriterInterceptor, errRsp *retriableHijackErrorResponder, singleEndpoint bool, retry int) *retryDecorator {
-	var delegate retriable
-
-	if singleEndpoint {
-		errRsp.isRetriable = func(req *http.Request, err error) bool {
-			return false
-		}
-		delegate = withBackOff(errRsp)
-	} else {
-		delegate = withHijackErrorResponderForMultipleEndpoints(errRsp)
+	if !singleEndpoint {
+		withHijackErrorResponderForMultipleEndpoints(errRsp)
 	}
 
-	return &retryDecorator{withMaxRetries(delegate, retry), rw}
+	return &retryDecorator{withMaxRetries(errRsp, retry), rw}
 }
 
 // RetryIfNeeded returns true if the request failed and can be safely retried otherwise it returns false
@@ -157,50 +148,29 @@ func (r *maxRetries) retry() bool {
 	return r.retriable.retry()
 }
 
-type backOff struct {
-	key     string
-	manager *flowcontrol.Backoff
-	retriable
-}
-
-var _ retriable = &backOff{}
-
-func withBackOff(delegate retriable) retriable {
-	return &backOff{"static-key-for-single-host", flowcontrol.NewBackOff(4*time.Second, 30*time.Second), delegate}
-}
-
-func (b *backOff) retry() bool {
-	if b.retriable.retry() {
-		b.manager.Next(b.key, b.manager.Clock.Now())
-		b.manager.Clock.Sleep(b.manager.Get(b.key))
-		return true
-	}
-	return false
-}
-
 // retriableHijackErrorResponder wraps proxy.ErrorResponder and prevents errors from being written to the client if they can be retried
 type retriableHijackErrorResponder struct {
 	// delegate knows how to write errors to the client
 	delegate       proxy.ErrorResponder
-	req            *http.Request
 	lastKnownError error
-	isRetriable    func(req *http.Request, err error) bool
+	isRetriable    func(err error) bool
 }
 
 var _ proxy.ErrorResponder = &retriableHijackErrorResponder{}
 var _ retriable = &retriableHijackErrorResponder{}
 
 // newHijackErrorResponder creates a new ErrorResponder that wraps the delegate for supporting reties
-func newHijackErrorResponder(delegate proxy.ErrorResponder, req *http.Request) *retriableHijackErrorResponder {
-	return &retriableHijackErrorResponder{delegate: delegate, req: req}
+func newHijackErrorResponder(delegate proxy.ErrorResponder) *retriableHijackErrorResponder {
+	return &retriableHijackErrorResponder{delegate: delegate, isRetriable: func(err error) bool {
+		return false
+	}}
 }
 
 // Error reports the err to the client or suppress it if it's not retriable
 func (hr *retriableHijackErrorResponder) Error(w http.ResponseWriter, r *http.Request, err error) {
 	// if we can retry the request do not send a response to the client
 	hr.lastKnownError = err
-	hr.req = r
-	if !hr.isRetriable(hr.req, err) {
+	if !hr.isRetriable(err) {
 		hr.delegate.Error(w, r, err) // this might send a response to a client
 	}
 }
@@ -210,13 +180,12 @@ func (hr *retriableHijackErrorResponder) reset() {
 }
 
 func (hr *retriableHijackErrorResponder) retry() bool {
-	return hr.isRetriable(hr.req, hr.lastKnownError)
+	return hr.isRetriable(hr.lastKnownError)
 }
 
-// withHijackErrorResponderForMultipleEndpoints is used by the ErrorResponder to determine
-// if the given error is safe to retry when more than one endpoint is available
-func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorResponder) retriable {
-	hr.isRetriable = func(req *http.Request, err error) bool {
+// withHijackErrorResponderForMultipleEndpoints is used by the ErrorResponder to determine if the given error is safe to retry when more than one endpoint is available
+func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorResponder) *retriableHijackErrorResponder {
+	hr.isRetriable = func(err error) bool {
 		// we always want to retry connection refused errors as the aggregator will pick up a different host on the next try.
 		// the error is of particular interest during graceful shutdown of the backend server:
 		// 	net/http2 library automatically retries requests/streams after receiving a GOAWAY frame.
