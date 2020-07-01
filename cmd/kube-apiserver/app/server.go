@@ -694,10 +694,15 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
 	var serviceResolver webhook.ServiceResolver
 	if enabledAggregatorRouting {
-		// TODO: wire NewExtendedEndpointServiceResolver
-		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(
+		// resolve kubernetes.default.svc locally
+		var loopbackResolver aggregatorapiserver.ServiceResolver
+		if localHost, err := url.Parse(hostname); err == nil {
+			loopbackResolver = aggregatorapiserver.NewLoopbackServiceResolver(nil, localHost)
+		}
+		return aggregatorapiserver.NewExtendedEndpointServiceResolver(
 			informer.Core().V1().Services().Lister(),
 			informer.Core().V1().Endpoints().Lister(),
+			loopbackResolver,
 		)
 	} else {
 		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolver(

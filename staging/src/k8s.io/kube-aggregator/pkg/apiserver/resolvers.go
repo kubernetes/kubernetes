@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 
@@ -94,13 +93,16 @@ func (r *loopbackResolver) ResolveEndpoint(namespace, name string, port int32) (
 	if namespace == "default" && name == "kubernetes" && port == 443 {
 		return r.host, nil
 	}
+	if r.delegate == nil {
+		return nil, nil
+	}
 	return r.delegate.ResolveEndpoint(namespace, name, port)
 }
 
 type fakeLoopbackResolver struct{}
 
 func (f *fakeLoopbackResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
-	return nil, errors.New("a lookback resolver hasn't been provided")
+	return nil, nil
 }
 
 // NewExtendedEndpointServiceResolver returns a service resolver that extends ServiceResolver interface by providing a few additional methods for supporting requests retries
@@ -126,7 +128,10 @@ type serviceResolver struct {
 // Note: Kube uses one service resolver for webhooks and the aggregator this method satisfies webhook.ServiceResolver interface
 func (r *serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	localEndpoint, err := r.loopbackResolver.ResolveEndpoint(namespace, name, port)
-	if err == nil && localEndpoint != nil {
+	if err != nil {
+		return nil, err
+	}
+	if localEndpoint != nil {
 		return localEndpoint, nil
 	}
 
