@@ -864,7 +864,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
 		framework.ExpectNoError(err, "failed to delete collection of pods")
-		fmt.Println("DeleteCollection processed")
+		framework.Logf("DeleteCollection processed")
 
 		// wait for all pods to be deleted
 		framework.Logf("waiting for all pods to be deleted")
