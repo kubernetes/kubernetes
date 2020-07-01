@@ -861,8 +861,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "3 pods not found")
 
 		// delete Collection of pods with a label in the current namespace
-		_ = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
+		framework.ExpectNoError(err, "failed to delete collection of pods")
 		fmt.Println("DeleteCollection processed")
 
 		// wait for all pods to be deleted
@@ -878,8 +879,6 @@ func checkPodListQuantity(f *framework.Framework, label string, quantity int) fu
 	return func() (bool, error) {
 		var err error
 
-		framework.Logf("requesting list of pods to confirm quantity")
-
 		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: label})
 
@@ -888,6 +887,7 @@ func checkPodListQuantity(f *framework.Framework, label string, quantity int) fu
 		}
 
 		if len(list.Items) != quantity {
+			framework.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
 			return false, err
 		}
 		return true, nil
