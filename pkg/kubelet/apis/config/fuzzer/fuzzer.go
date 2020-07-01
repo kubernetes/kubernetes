@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"k8s.io/component-base/logs/options"
 	"time"
 
 	"github.com/google/gofuzz"
@@ -101,7 +102,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.AllowedUnsafeSysctls = []string{}
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
 			if obj.Logging.Format == "" {
-				obj.Logging.Format = "text"
+				obj.Logging.Format = options.DefaultLogFormat
 			}
 		},
 	}

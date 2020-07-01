@@ -17,8 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"flag"
+	"fmt"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/config/options"
 )
 
 // ValidateClientConnectionConfiguration ensures validation of the ClientConnectionConfiguration struct
@@ -58,4 +62,32 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceName"), cc.ResourceName, "resourceName is required"))
 	}
 	return allErrs
+}
+
+func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.Format != options.DefaultLogFormat {
+		allFlags := options.UnsupportedLoggingFlags()
+		for _, fname := range allFlags {
+			if flagIsSet(fname) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("Format"), c.Format, fmt.Sprintf("Non-default format doesn't honor flag: %s", fname)))
+			}
+		}
+	}
+	if _, err := options.LogRegistry.Get(c.Format); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("Format"), c.Format, "Unsupported format"))
+	}
+	return allErrs
+}
+
+func flagIsSet(name string) bool {
+	f := flag.Lookup(name)
+	if f != nil {
+		return f.DefValue != f.Value.String()
+	}
+	pf := pflag.Lookup(name)
+	if pf != nil {
+		return pf.DefValue != pf.Value.String()
+	}
+	panic("failed to lookup unsupported log flag")
 }

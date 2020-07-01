@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"k8s.io/component-base/logs/options"
 	"net"
 	"reflect"
 	"testing"
@@ -25,8 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
-	"k8s.io/component-base/logs"
-
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -304,7 +303,7 @@ func TestAddFlags(t *testing.T) {
 		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
 		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
 		Metrics:                 &metrics.Options{},
-		Logs:                    logs.NewOptions(),
+		Logs:                    options.NewOptions(),
 	}
 
 	if !reflect.DeepEqual(expected, s) {

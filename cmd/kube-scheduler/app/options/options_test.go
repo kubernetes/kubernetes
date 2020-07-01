@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/component-base/logs/options"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/component-base/logs"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
@@ -294,7 +294,7 @@ profiles:
 					RemoteKubeConfigFileOptional: true,
 					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 				},
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -339,7 +339,7 @@ profiles:
 					}
 					return *cfg
 				}(),
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\"",
 		},
@@ -348,7 +348,7 @@ profiles:
 			name: "unknown version kubescheduler.config.k8s.io/unknown",
 			options: &Options{
 				ConfigFile: unknownVersionConfig,
-				Logs:       logs.NewOptions(),
+				Logs:       options.NewOptions(),
 			},
 			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"kubescheduler.config.k8s.io/unknown\"",
 		},
@@ -356,7 +356,7 @@ profiles:
 			name: "config file with no version",
 			options: &Options{
 				ConfigFile: noVersionConfig,
-				Logs:       logs.NewOptions(),
+				Logs:       options.NewOptions(),
 			},
 			expectedError: "Object 'apiVersion' is missing",
 		},
@@ -391,7 +391,7 @@ profiles:
 					RemoteKubeConfigFileOptional: true,
 					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 				},
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -456,7 +456,7 @@ profiles:
 					RemoteKubeConfigFileOptional: true,
 					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 				},
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
@@ -494,7 +494,7 @@ profiles:
 			name: "plugin config",
 			options: &Options{
 				ConfigFile: pluginConfigFile,
-				Logs:       logs.NewOptions(),
+				Logs:       options.NewOptions(),
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -568,7 +568,7 @@ profiles:
 			name: "multiple profiles",
 			options: &Options{
 				ConfigFile: multiProfilesConfig,
-				Logs:       logs.NewOptions(),
+				Logs:       options.NewOptions(),
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -629,7 +629,7 @@ profiles:
 		{
 			name: "no config",
 			options: &Options{
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedError: "no configuration has been provided",
 		},
@@ -644,7 +644,7 @@ profiles:
 				Deprecated: &DeprecatedOptions{
 					HardPodAffinitySymmetricWeight: 5,
 				},
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -696,7 +696,7 @@ profiles:
 					SchedulerName:                  "my-nice-scheduler",
 					HardPodAffinitySymmetricWeight: 1,
 				},
-				Logs: logs.NewOptions(),
+				Logs: options.NewOptions(),
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -752,7 +752,7 @@ profiles:
 			name: "unknown field",
 			options: &Options{
 				ConfigFile: unknownFieldConfig,
-				Logs:       logs.NewOptions(),
+				Logs:       options.NewOptions(),
 			},
 			expectedError: "found unknown field: foo",
 			checkErrFn:    runtime.IsStrictDecodingError,
@@ -761,7 +761,7 @@ profiles:
 			name: "duplicate fields",
 			options: &Options{
 				ConfigFile: duplicateFieldConfig,
-				Logs:       logs.NewOptions(),
+				Logs:       options.NewOptions(),
 			},
 			expectedError: `key "leaderElect" already set`,
 			checkErrFn:    runtime.IsStrictDecodingError,

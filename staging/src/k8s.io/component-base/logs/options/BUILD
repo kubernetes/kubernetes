@@ -2,17 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "leaderelectionconfig.go",
-        "loggingconfig.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/config/options",
-    importpath = "k8s.io/component-base/config/options",
+    srcs = ["options.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/logs/options",
+    importpath = "k8s.io/component-base/logs/options",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/component-base/config:go_default_library",
-        "//staging/src/k8s.io/component-base/logs:go_default_library",
-        "//staging/src/k8s.io/component-base/logs/json:go_default_library",
+        "//staging/src/k8s.io/component-base/config/options:go_default_library",
+        "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/component-base/config/validation:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
