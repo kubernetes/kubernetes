@@ -78,3 +78,18 @@ func IsConnectionRefused(err error) bool {
 	}
 	return false
 }
+
+// IsNoRouteToHost returns true if the given error is "no route to host"
+func IsNoRouteToHost(err error) bool {
+	var osErr *os.SyscallError
+	if errors.As(err, &osErr) {
+		err = osErr.Err
+	}
+
+	// blocking the network traffic to a node gives: dial tcp 10.129.0.31:8443: connect: no route to host
+	// no rsp has been sent to the client so it's okay to retry and pick up a different EP
+	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EHOSTUNREACH {
+		return true
+	}
+	return false
+}

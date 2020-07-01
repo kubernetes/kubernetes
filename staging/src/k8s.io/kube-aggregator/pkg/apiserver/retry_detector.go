@@ -18,12 +18,9 @@ package apiserver
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"syscall"
 	"time"
 
 	knet "k8s.io/apimachinery/pkg/util/net"
@@ -227,25 +224,10 @@ func withHijackErrorResponderForMultipleEndpoints(hr *retriableHijackErrorRespon
 		// 	StreamsWithID <= LastStreamID might be fully processed because the server waits until all current streams are done or the timeout expires.
 		// 	in case of the timeout, we will get "http2: server sent GOAWAY and closed the connection" error which is handled by IsProbableEOF() and it is safe to retry only for particular verbs (check isHTTPVerbRetriable method)
 		// 	on the next try a new connection will be opened to the same host and will fail with "connection refused" error because the remote host stopped listening on the port.
-		if knet.IsConnectionRefused(err) || isNoRouteToHost(err) {
+		if knet.IsConnectionRefused(err) || knet.IsNoRouteToHost(err) {
 			return true
 		}
 		return false
 	}
 	return hr
-}
-
-// IsNoRouteToHost returns true if the given error is "no route to host"
-func isNoRouteToHost(err error) bool {
-	var osErr *os.SyscallError
-	if errors.As(err, &osErr) {
-		err = osErr.Err
-	}
-
-	// blocking the network traffic to a node gives: dial tcp 10.129.0.31:8443: connect: no route to host
-	// no rsp has been sent to the client so it's okay to retry and pick up a different EP
-	if errno, ok := err.(syscall.Errno); ok && errno == syscall.EHOSTUNREACH {
-		return true
-	}
-	return false
 }
