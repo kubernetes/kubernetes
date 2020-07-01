@@ -477,35 +477,35 @@ function update-coredns-config() {
   case "$(uname -m)" in
       x86_64*)
         host_arch=amd64
-        corefile_tool_SHA="b902651aa26434f9aa087cadb634a1c26e9808571d48241e4d3c4ecf21a773ff"
+        corefile_tool_SHA="2e1da3d2a27e103597438ccc99be5cf909fd1be038c4770ddac3985e7df18fa2"
         ;;
       i?86_64*)
         host_arch=amd64
-        corefile_tool_SHA="b902651aa26434f9aa087cadb634a1c26e9808571d48241e4d3c4ecf21a773ff"
+        corefile_tool_SHA="2e1da3d2a27e103597438ccc99be5cf909fd1be038c4770ddac3985e7df18fa2"
         ;;
       amd64*)
         host_arch=amd64
-        corefile_tool_SHA="b902651aa26434f9aa087cadb634a1c26e9808571d48241e4d3c4ecf21a773ff"
+        corefile_tool_SHA="2e1da3d2a27e103597438ccc99be5cf909fd1be038c4770ddac3985e7df18fa2"
         ;;
       aarch64*)
         host_arch=arm64
-        corefile_tool_SHA="d8be194de0f430e364da9de148693b11bcbaf31751f6aa77ea2c8a4e2418503a"
+        corefile_tool_SHA="12a08dfa9f01b806ab46902c1e6c909fdf93264f8c6aac3d951e7ac30d9c7f9b"
         ;;
       arm64*)
         host_arch=arm64
-        corefile_tool_SHA="d8be194de0f430e364da9de148693b11bcbaf31751f6aa77ea2c8a4e2418503a"
+        corefile_tool_SHA="12a08dfa9f01b806ab46902c1e6c909fdf93264f8c6aac3d951e7ac30d9c7f9b"
         ;;
       arm*)
         host_arch=arm
-        corefile_tool_SHA="d7ba2ebe740382ed7c5f00bc00eda3d383b2bbbe3554ffb12b912946d28ceb59"
+        corefile_tool_SHA="b5d83f5e29a2900cc345de8e7b5b25c4e5534e57d61bf52395343d76e64026e3"
         ;;
       s390x*)
         host_arch=s390x
-        corefile_tool_SHA="77eac119aef08fcf1541f3594138838fbfe4669e309b20d530247dff408a67c0"
+        corefile_tool_SHA="29754c9966f5215260562eed1db1017e86462dbaba1c0ee9801f0f9cdae3bd2f"
         ;;
       ppc64le*)
         host_arch=ppc64le
-         corefile_tool_SHA="f1bd00d9f3846c3fbedb4dd53fd61c5daf6d09a75c0d24fe8744f4f7b7252acb"
+        corefile_tool_SHA="c4271ddc80345ed7b3a3d41b706c5c7abb4ad6a3e3e9f20fe8849699e399adc8"
         ;;
       *)
         echo "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le." >&2
@@ -515,7 +515,7 @@ function update-coredns-config() {
 
   # Download the CoreDNS migration tool
   echo "== Downloading the CoreDNS migration tool =="
-  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.6/corefile-tool-${host_arch}" >/dev/null 2>&1
+  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.10/corefile-tool-${host_arch}" >/dev/null 2>&1
 
   local -r checkSHA=$(sha256sum "${download_dir}/corefile-tool-${host_arch}" | cut -d " " -f 1)
   if [[ "${checkSHA}" != "${corefile_tool_SHA}" ]]; then

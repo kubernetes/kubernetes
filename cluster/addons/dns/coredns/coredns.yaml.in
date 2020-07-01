@@ -73,7 +73,9 @@ data:
             ttl 30
         }
         prometheus :9153
-        forward . /etc/resolv.conf
+        forward . /etc/resolv.conf {
+            max_concurrent 1000
+        }
         cache 30
         loop
         reload
@@ -118,7 +120,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.6.7
+        image: k8s.gcr.io/coredns:1.7.0
         imagePullPolicy: IfNotPresent
         resources:
           limits:
