@@ -1348,7 +1348,7 @@ func TestSingleConstraint(t *testing.T) {
 		{
 			// only node-a and node-y are considered, so pods spread as 2/~1~/~0~/3
 			// ps: '~num~' is a markdown symbol to denote a crossline through 'num'
-			// but in this unit test, we don't run NodeAffinityPredicate, so node-b and node-x are
+			// but in this unit test, we don't run NodeAffinity Predicate, so node-b and node-x are
 			// still expected to be fits;
 			// the fact that node-a fits can prove the underlying logic works
 			name: "incoming pod has nodeAffinity, pods spread as 2/~1~/~0~/3, hence node-a fits",
@@ -1488,7 +1488,7 @@ func TestMultipleConstraints(t *testing.T) {
 		},
 		{
 			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone2 (node-x or node-y)
-			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b or node-x
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-a, node-b or node-x
 			// intersection of (1) and (2) returns node-x
 			name: "Constraints hold different labelSelectors, spreads = [1/0, 1/0/0/1]",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
