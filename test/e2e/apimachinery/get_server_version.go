@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("get-code-version", func() {
-	f := framework.NewDefaultFramework("get-code-version")
+var _ = SIGDescribe("get-server-version", func() {
+	f := framework.NewDefaultFramework("get-server-version")
 	ginkgo.It("should find the server version", func() {
 
 		ginkgo.By("Request ServerVersion")
