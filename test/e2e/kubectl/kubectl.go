@@ -210,7 +210,11 @@ func assertCleanup(ns string, selectors ...string) {
 }
 
 func readTestFileOrDie(file string) []byte {
-	return e2etestfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+	data, err := e2etestfiles.Read(path.Join(kubeCtlManifestPath, file))
+	if err != nil {
+		framework.Fail(err.Error(), 1)
+	}
+	return data
 }
 
 func runKubectlRetryOrDie(ns string, args ...string) string {
@@ -302,7 +306,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var nautilus string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
+			data, err := e2etestfiles.Read(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))
+			if err != nil {
+				framework.Fail(err.Error())
+			}
+			nautilus = commonutils.SubstituteImageName(string(data))
 		})
 		/*
 			Release : v1.9
@@ -350,7 +358,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"agnhost-primary-deployment.yaml.in",
 				"agnhost-replica-deployment.yaml.in",
 			} {
-				contents := commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
+				data, err := e2etestfiles.Read(filepath.Join(guestbookRoot, gbAppFile))
+				if err != nil {
+					framework.Fail(err.Error())
+				}
+				contents := commonutils.SubstituteImageName(string(data))
 				run(contents)
 			}
 		}
