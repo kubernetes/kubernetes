@@ -36,3 +36,14 @@ func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
 func SetFileLabel(path string, label string) error {
 	return nil
 }
+
+// GetDefaultContainerFileLabel returns the system default label applied to container files.
+func GetSELinuxLabelString(label SELinuxLabel) (string, error) {
+	return "", nil
+}
+
+// GetSELinuxLabelString converts given label into a string, filling empty label
+// components from OS defaults.
+func GetSELinuxLabelString(user, role, sType, level string) (string, error) {
+	return "", nil
+}

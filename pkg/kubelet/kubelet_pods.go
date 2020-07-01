@@ -60,6 +60,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -155,7 +156,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		// relabel it and mark it as labeled
 		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
 			vol.SELinuxLabeled = true
-			relabelVolume = true
+			relabelVolume = volume.VolumeNeedsRelabel(pod.Spec.SecurityContext)
 		}
 		hostPath, err := volumeutil.GetPath(vol.Mounter)
 		if err != nil {

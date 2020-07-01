@@ -429,7 +429,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.VolumeChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.SELinuxOptions, true, mounterArgs.VolumeChangePolicy)
 	}
 	return nil
 }

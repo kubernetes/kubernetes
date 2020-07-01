@@ -40,7 +40,7 @@ type diskManager interface {
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64, volumeChangePolicy *v1.PodVolumeChangePolicy) error {
+func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64, seLinuxOptions *v1.SELinuxOptions, volumeChangePolicy *v1.PodVolumeChangePolicy) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.fcDisk)
 	noMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 
@@ -91,7 +91,7 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(&b, fsGroup, volumeChangePolicy)
+		volume.SetVolumeOwnership(&b, fsGroup, seLinuxOptions, true, volumeChangePolicy)
 	}
 
 	return nil

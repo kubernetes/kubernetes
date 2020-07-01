@@ -399,7 +399,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64, seLinuxOptions
 		}
 	}
 
-	err := volume.SetVolumeOwnership(c, fsGroup, volumeChangePolicy)
+	err := volume.SetVolumeOwnership(c, fsGroup, seLinuxOptions, supportsSELinux, volumeChangePolicy)
 	if err != nil {
 		return err
 	}

@@ -429,7 +429,7 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, mounterArgs volume.Mou
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.VolumeChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.SELinuxOptions, true, mounterArgs.VolumeChangePolicy)
 	}
 
 	klog.V(4).Infof("Successfully mounted %s", dir)

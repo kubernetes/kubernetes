@@ -328,7 +328,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 		return err
 	}
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.VolumeChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil, false, mounterArgs.VolumeChangePolicy)
 	}
 	klog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil

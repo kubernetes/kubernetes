@@ -19,6 +19,8 @@ limitations under the License.
 package selinux
 
 import (
+	"fmt"
+
 	selinux "github.com/opencontainers/selinux/go-selinux"
 )
 
@@ -54,4 +56,37 @@ func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
 // SetFileLabel applies the SELinux label on the path or returns an error.
 func SetFileLabel(path string, label string) error {
 	return selinux.SetFileLabel(path, label)
+}
+
+// GetSELinuxLabelString converts given label into a string, filling empty label
+// components from OS defaults.
+func GetSELinuxLabelString(user, role, sType, level string) (string, error) {
+	if !SELinuxEnabled() {
+		return "", nil
+	}
+
+	_, defaultLabel := selinux.ContainerLabels()
+	// New MCS level has been allocated in ContainerLabels. Release it,
+	// kubelet needs only the default user/role/type.
+	selinux.ReleaseLabel(defaultLabel)
+
+	ctx, err := selinux.NewContext(defaultLabel)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse SELinux context %s: %s", defaultLabel, err)
+	}
+	// Overwrite defaults only when known by the caller
+	if user != "" {
+		ctx["user"] = user
+	}
+	if role != "" {
+		ctx["role"] = role
+	}
+	if sType != "" {
+		ctx["type"] = sType
+	}
+	// Always set level
+	ctx["level"] = level
+
+	// Convert to string
+	return ctx.Get(), nil
 }

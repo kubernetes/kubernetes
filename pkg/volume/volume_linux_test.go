@@ -62,64 +62,64 @@ func (l *localFakeMounter) GetMetrics() (*Metrics, error) {
 }
 
 func TestSkipPermissionChange(t *testing.T) {
-	always := v1.VolumeChangeAlways
-	onrootMismatch := v1.VolumeChangeOnRootMismatch
+	always := v1.FSGroupChangeAlways
+	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	tests := []struct {
-		description        string
-		volumeChangePolicy *v1.PodVolumeChangePolicy
-		gidOwnerMatch      bool
-		permissionMatch    bool
-		sgidMatch          bool
-		skipPermssion      bool
+		description         string
+		fsGroupChangePolicy *v1.PodFSGroupChangePolicy
+		gidOwnerMatch       bool
+		permissionMatch     bool
+		sgidMatch           bool
+		skipPermssion       bool
 	}{
 		{
 			description:   "skippermission=false, policy=nil",
 			skipPermssion: false,
 		},
 		{
-			description:        "skippermission=false, policy=always",
-			volumeChangePolicy: &always,
-			skipPermssion:      false,
+			description:         "skippermission=false, policy=always",
+			fsGroupChangePolicy: &always,
+			skipPermssion:       false,
 		},
 		{
-			description:        "skippermission=false, policy=always, gidmatch=true",
-			volumeChangePolicy: &always,
-			skipPermssion:      false,
-			gidOwnerMatch:      true,
+			description:         "skippermission=false, policy=always, gidmatch=true",
+			fsGroupChangePolicy: &always,
+			skipPermssion:       false,
+			gidOwnerMatch:       true,
 		},
 		{
-			description:        "skippermission=false, policy=nil, gidmatch=true",
-			volumeChangePolicy: nil,
-			skipPermssion:      false,
-			gidOwnerMatch:      true,
+			description:         "skippermission=false, policy=nil, gidmatch=true",
+			fsGroupChangePolicy: nil,
+			skipPermssion:       false,
+			gidOwnerMatch:       true,
 		},
 		{
-			description:        "skippermission=false, policy=onrootmismatch, gidmatch=false",
-			volumeChangePolicy: &onrootMismatch,
-			gidOwnerMatch:      false,
-			skipPermssion:      false,
+			description:         "skippermission=false, policy=onrootmismatch, gidmatch=false",
+			fsGroupChangePolicy: &onrootMismatch,
+			gidOwnerMatch:       false,
+			skipPermssion:       false,
 		},
 		{
-			description:        "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=false",
-			volumeChangePolicy: &onrootMismatch,
-			gidOwnerMatch:      true,
-			permissionMatch:    false,
-			skipPermssion:      false,
+			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=false",
+			fsGroupChangePolicy: &onrootMismatch,
+			gidOwnerMatch:       true,
+			permissionMatch:     false,
+			skipPermssion:       false,
 		},
 		{
-			description:        "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true",
-			volumeChangePolicy: &onrootMismatch,
-			gidOwnerMatch:      true,
-			permissionMatch:    true,
-			skipPermssion:      false,
+			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true",
+			fsGroupChangePolicy: &onrootMismatch,
+			gidOwnerMatch:       true,
+			permissionMatch:     true,
+			skipPermssion:       false,
 		},
 		{
-			description:        "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true, sgidmatch=true",
-			volumeChangePolicy: &onrootMismatch,
-			gidOwnerMatch:      true,
-			permissionMatch:    true,
-			sgidMatch:          true,
-			skipPermssion:      true,
+			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true, sgidmatch=true",
+			fsGroupChangePolicy: &onrootMismatch,
+			gidOwnerMatch:       true,
+			permissionMatch:     true,
+			sgidMatch:           true,
+			skipPermssion:       true,
 		},
 	}
 
@@ -172,7 +172,7 @@ func TestSkipPermissionChange(t *testing.T) {
 			}
 
 			mounter := &localFakeMounter{path: tmpDir}
-			ok = skipPermissionChange(mounter, &expectedGid, test.volumeChangePolicy)
+			ok = skipPermissionChange(mounter, &expectedGid, test.fsGroupChangePolicy)
 			if ok != test.skipPermssion {
 				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermssion, ok)
 			}
@@ -182,13 +182,13 @@ func TestSkipPermissionChange(t *testing.T) {
 }
 
 func TestSetVolumeOwnership(t *testing.T) {
-	always := v1.VolumeChangeAlways
-	onrootMismatch := v1.VolumeChangeOnRootMismatch
+	always := v1.FSGroupChangeAlways
+	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	expectedMask := rwMask | os.ModeSetgid | execMask
 
 	tests := []struct {
 		description         string
-		fsGroupChangePolicy *v1.PodVolumeChangePolicy
+		fsGroupChangePolicy *v1.PodFSGroupChangePolicy
 		setupFunc           func(path string) error
 		assertFunc          func(path string) error
 		featureGate         bool

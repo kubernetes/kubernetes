@@ -239,7 +239,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
+	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, mounterArgs.SELinuxOptions, true, nil /*fsGroupChangePolicy*/)
 	if err != nil {
 		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err

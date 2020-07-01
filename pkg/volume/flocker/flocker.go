@@ -361,7 +361,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.VolumeChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil, false, mounterArgs.VolumeChangePolicy)
 	}
 
 	klog.V(4).Infof("successfully mounted %s", dir)

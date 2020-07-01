@@ -430,7 +430,7 @@ func (b *storageosMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.VolumeChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.SELinuxOptions, true, mounterArgs.VolumeChangePolicy)
 	}
 	klog.V(4).Infof("StorageOS volume setup complete on %s", dir)
 	return nil

@@ -19,6 +19,7 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
 	"path/filepath"
 	"syscall"
 
@@ -28,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
 const (
@@ -37,35 +39,126 @@ const (
 )
 
 // SetVolumeOwnership modifies the given volume to be owned by
-// fsGroup, and sets SetGid so that newly created files are owned by
-// fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, volumeChangePolicy *v1.PodVolumeChangePolicy) error {
-	if fsGroup == nil {
-		return nil
-	}
+// fsGroup, sets SetGid so that newly created files are owned by
+// fsGroup and sets SELinux context of the volumes in a single
+// recursive sweep through the volume.
+// If fsGroup is nil, no ownership change is done.
+// If seLinuxOptions is nil or the filesystem does not support
+// SELinux or the SELinux context is not known, no label change is
+// done.
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, seLinuxOptions *v1.SELinuxOptions, seLinuxSupported bool, volumeChangePolicy *v1.PodVolumeChangePolicy) error {
+	var needFSGroup, needSELinux bool
+	var seLinuxLabel string
+	var err error
 
 	volumeChangePolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableVolumeChangePolicy)
+
+	// Quick checks for skipping FSGroup / SELinux relabeling
+	if fsGroup != nil {
+		needFSGroup = true
+	}
+	if volumeChangePolicyEnabled {
+		if seLinuxSupported && seLinuxOptions != nil && seLinuxOptions.Level != "" && selinux.SELinuxEnabled() {
+			needSELinux = true
+		}
+	}
+
+	if !needFSGroup && !needSELinux {
+		// Nothing to do
+		return nil
+	}
 
 	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
 
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
-	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
+	// TODO: remove this when ConfigurableVolumeChangePolicy turns GA.
 	if !volumeChangePolicyEnabled {
 		return legacyOwnershipChange(mounter, fsGroup)
 	}
 
-	if skipPermissionChange(mounter, fsGroup, volumeChangePolicy) {
-		klog.V(3).Infof("skipping permission and ownership change for volume %s", mounter.GetPath())
+	// Slow checks for skipping FSGroup / SELinux relabeling
+	if needFSGroup {
+		if skipPermissionChange(mounter, fsGroup, volumeChangePolicy) {
+			klog.V(3).Infof("skipping permission and ownership change for volume %s", mounter.GetPath())
+			needFSGroup = false
+		}
+	}
+
+	if needSELinux {
+		seLinuxLabel, needSELinux, err = computeSELinuxLabel(seLinuxOptions)
+		if err != nil {
+			return fmt.Errorf("failed get SELinux label for pod: %s", err)
+		}
+		if skipLabelChange(mounter, seLinuxLabel, volumeChangePolicy) {
+			klog.V(3).Infof("skipping SELinux label change for volume %s", mounter.GetPath())
+			needSELinux = false
+		}
+	}
+
+	if !needSELinux && !needFSGroup {
+		// Nothing to do
 		return nil
+	}
+
+	// Do not change SELinux label if the root already has the right label.
+	if !needSELinux {
+		seLinuxLabel = ""
+	}
+	// Do not change FSGroup if the root already has the right owner.
+	if !needFSGroup {
+		fsGroup = nil
 	}
 
 	return walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
+		return changeFilePermission(path, fsGroup, seLinuxLabel, mounter.GetAttributes().ReadOnly, info)
 	})
 
+}
+
+// VolumeNeedsRelabel returns true if a pod's volume with given security
+// context can be assumed to have already the right SELinux context.
+func VolumeNeedsRelabel(ctx *v1.PodSecurityContext) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableVolumeChangePolicy) {
+		return true
+	}
+	if ctx.VolumeChangePolicy == nil || *ctx.VolumeChangePolicy != v1.VolumeChangeOnRootMismatch {
+		// VolumeChangePolicy requires relabeling in the container runtime
+		return true
+	}
+	if ctx == nil || ctx.SELinuxOptions == nil || ctx.SELinuxOptions.Level == "" {
+		// Kubelet does not know the context, so the container runtime must
+		// allocate a new random one and do relabeling there.
+		return true
+	}
+	return false
+}
+
+func computeSELinuxLabel(seLinuxOptions *v1.SELinuxOptions) (string, bool, error) {
+	if seLinuxOptions == nil {
+		return "", false, nil
+	}
+	if !selinux.SELinuxEnabled() {
+		return "", false, nil
+	}
+
+	if seLinuxOptions.Level == "" {
+		// The container runtime will assign a random MCS level for this pod,
+		// kubelet can't relabel the pod's volumes.
+		return "", false, nil
+	}
+
+	label, err := selinux.GetSELinuxLabelString(seLinuxOptions.User, seLinuxOptions.Role, seLinuxOptions.Type, seLinuxOptions.Level)
+	if err != nil {
+		return "", false, err
+	}
+	if label == "" {
+		// In theory unreachable, because SELinux must be supported at this point.
+		return "", false, nil
+	}
+	return label, true, nil
 }
 
 func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
@@ -73,11 +166,23 @@ func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
 		if err != nil {
 			return err
 		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
+		return changeFilePermission(path, fsGroup, "", mounter.GetAttributes().ReadOnly, info)
 	})
 }
 
-func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
+func changeFilePermission(filename string, fsGroup *int64, seLinuxLabel string, readonly bool, info os.FileInfo) error {
+	// Apply SELinux label if needed
+	if seLinuxLabel != "" {
+		if err := selinux.SetFileLabel(filename, seLinuxLabel); err != nil {
+			return err
+		}
+	}
+
+	// Apply FSGroup ownership if needed
+	if fsGroup == nil {
+		return nil
+	}
+
 	// chown and chmod pass through to the underlying file for symlinks.
 	// Symlinks have a mode of 777 but this really doesn't mean anything.
 	// The permissions of the underlying file are what matter.
@@ -130,6 +235,33 @@ func skipPermissionChange(mounter Mounter, fsGroup *int64, volumeChangePolicy *v
 		return false
 	}
 	return !requiresPermissionChange(mounter.GetPath(), fsGroup, mounter.GetAttributes().ReadOnly)
+}
+
+func skipLabelChange(mounter Mounter, seLinuxLabel string, volumeChangePolicy *v1.PodVolumeChangePolicy) bool {
+	dir := mounter.GetPath()
+
+	if volumeChangePolicy == nil || *volumeChangePolicy != v1.VolumeChangeOnRootMismatch {
+		klog.V(4).Infof("skipping recursive SELinux label change for %s, it will be relabeled by the container runtime", dir)
+		return true
+	}
+	if seLinuxLabel != "" {
+		return !requireLabelChange(mounter.GetPath(), seLinuxLabel)
+	}
+	return false
+
+}
+func requireLabelChange(rootDir string, label string) bool {
+	existingLabel, err := selinux.NewSELinuxRunner().Getfilecon(rootDir)
+	if err != nil {
+		klog.Errorf("performing recursive SELinux label change on %s because reading label of root volume failed: %v", rootDir, err)
+		return true
+	}
+	if existingLabel != label {
+		klog.V(4).Infof("performing recursive SELinux label change on %s because the volume label %q does not match %q", rootDir, existingLabel, label)
+		return true
+	}
+	klog.V(4).Infof("skipping recursive SELinux label change")
+	return false
 }
 
 func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) bool {
