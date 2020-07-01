@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package crdfeature
 
 import (
@@ -241,7 +242,7 @@ func TestCRDFeatureUpdateToValid(t *testing.T) {
 }
 
 func TestCRDMatchesGVR(t *testing.T) {
-	featureWatcher := Watcher{gvr: testCRDAlphaGVR}
+	featureWatcher := watcher{gvr: testCRDAlphaGVR}
 	if !featureWatcher.crdMatchesGVR(testCRDAlpha) {
 		t.Errorf("Expected match for GVR %v: %#v", featureWatcher.gvr, testCRDAlpha)
 	}

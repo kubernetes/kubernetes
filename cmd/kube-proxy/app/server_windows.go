@@ -74,7 +74,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		metrics.SetShowHidden()
 	}
 
-	client, eventClient, err := createClients(config.ClientConnection, master)
+	client, eventClient, _, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}

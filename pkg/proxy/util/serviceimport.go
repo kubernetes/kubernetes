@@ -26,22 +26,18 @@ import (
 	mcsv1alpha1 "k8s.io/mcs-api/pkg/apis/multicluster/v1alpha1"
 )
 
-const (
-	// ServiceImportPrefix is used to identify imported services
-	// and separate them from traditional clusters local services
-	// that may have the same name. This prefix intentionally
-	// makes a service name invalid to guarantee that there are
-	// never collisions with same-named cluster local services.
-	// The new service name may be used in log messages and other
-	// user-facing strings.
-	ServiceImportPrefix = "import:"
-)
-
 // ServiceImportName returns an import name for the supplied  service,
 // formatted to avoid conflicts with same-named regular services. This
 // name is not a valid K8s Service name and is for internal use only.
+//
+// This name is used to identify imported services and separate them
+// from traditional clusters local services that may have the same
+// name. A G/V prefix intentionally makes a service name invalid to
+// guarantee that there are never collisions with same-named cluster
+// local services. The new service name may be used in log messages and
+// other user-facing strings.
 func ServiceImportName(serviceName string) string {
-	return ServiceImportPrefix + serviceName
+	return mcsv1alpha1.SchemeGroupVersion.String() + ":" + serviceName
 }
 
 // ServiceFromImport converts a ServiceImport to a Service resource

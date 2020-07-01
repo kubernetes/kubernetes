@@ -23,12 +23,16 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ServiceExport declares that the associated service should be exported to
-// other clusters.
+// ServiceExport declares that the Service with the same name and namespace
+// as this export should be consumable from other clusters.
 type ServiceExport struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// status describes the current state of an exported service.
+	// Service configuration comes from the Service that had the same
+	// name and namespace as this ServiceExport.
+	// Populated by the multi-cluster service implementation's controller.
 	// +optional
 	Status ServiceExportStatus `json:"status,omitempty"`
 }
@@ -64,8 +68,8 @@ const (
 // ServiceExportCondition contains details for the current condition of this
 // service export.
 //
-// Once [#1624](https://github.com/kubernetes/enhancements/pull/1624) is
-// merged, this will be replaced by metav1.Condition.
+// Once [KEP-1623](https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/1623-standardize-conditions) is
+// implemented, this will be replaced by metav1.Condition.
 type ServiceExportCondition struct {
 	Type ServiceExportConditionType `json:"type"`
 	// Status is one of {"True", "False", "Unknown"}
@@ -85,8 +89,11 @@ type ServiceImport struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// spec defines the behavior of a ServiceImport.
 	// +optional
 	Spec ServiceImportSpec `json:"spec,omitempty"`
+	// status contains information about the exported services that form
+	// the multi-cluster service referenced by this ServiceImport.
 	// +optional
 	Status ServiceImportStatus `json:"status,omitempty"`
 }
@@ -105,12 +112,21 @@ const (
 type ServiceImportSpec struct {
 	// +listType=atomic
 	Ports []ServicePort `json:"ports"`
+	// ip will be used as the VIP for this service when type is SuperclusteriP.
 	// +optional
 	IP string `json:"ip,omitempty"`
-	// +optional
+	// type defines the type of this service.
+	// Must be SuperclusterIP or Headless.
 	Type ServiceImportType `json:"type"`
+	// Supports "ClientIP" and "None". Used to maintain session affinity.
+	// Enable client IP based session affinity.
+	// Must be ClientIP or None.
+	// Defaults to None.
+	// Ignored when type is Headless
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
 	SessionAffinity v1.ServiceAffinity `json:"sessionAffinity"`
+	// sessionAffinityConfig contains session affinity configuration.
 	// +optional
 	SessionAffinityConfig *v1.SessionAffinityConfig `json:"sessionAffinityConfig"`
 }
@@ -146,6 +162,8 @@ type ServicePort struct {
 
 // ServiceImportStatus describes derived state of an imported service.
 type ServiceImportStatus struct {
+	// clusters is the list of exporting clusters from which this service
+	// was derived.
 	// +optional
 	// +patchStrategy=merge
 	// +patchMergeKey=cluster
@@ -156,6 +174,8 @@ type ServiceImportStatus struct {
 
 // ClusterStatus contains service configuration mapped to a specific source cluster
 type ClusterStatus struct {
+	// cluster is the name of the exporting cluster. Must be a valid RFC-1123 DNS
+	// label.
 	Cluster string `json:"cluster"`
 }
 

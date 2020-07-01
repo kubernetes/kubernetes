@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package crdfeature contains tools for enabling and disabling features based on
+// Package crdfeature contains tools for enabling and disabling features based on
 // the presence of a required CRD.
 package crdfeature
 
@@ -48,8 +48,18 @@ func toCRD(obj interface{}) (*crdv1.CustomResourceDefinition, error) {
 	return &crd, nil
 }
 
+// Feature defines a feature that can be registered with the Watcher.
+// It will be enabled and disabled when the corresponding CRD is added
+// or removed.
 type Feature interface {
+	// Enable will be called when a compatible CRD is first detected.
+	// This may mean that a new CRD was added, or an existing CRD was
+	// updated to begin serving the requested version.
 	Enable()
+	// Disable will be called when a compatible CRD is no longer
+	// available. This may mean that the CRD was deleted, or an
+	// existing CRD was updated to no longer serve the requested
+	// version.
 	Disable()
 }
 
@@ -98,7 +108,17 @@ func WithChan(enable func(<-chan struct{})) Feature {
 	return &chanFeature{enable: enable}
 }
 
-type Watcher struct {
+// Watcher defines the interface for a CRD feature watcher. The watcher will
+// enable and disable the specified feature based on the presence of a
+// compatible CRD.
+type Watcher interface {
+	// Start begins watching for the configured CRD to be added or removed.
+	// The watcher will continue watching until the supplied channel is
+	// closed.
+	Start(stopCh <-chan struct{})
+}
+
+type watcher struct {
 	sync.Mutex
 	gvr             schema.GroupVersionResource
 	feature         Feature
@@ -106,8 +126,11 @@ type Watcher struct {
 	enabled         bool
 }
 
-func NewWatcher(client dynamic.Interface, gvr schema.GroupVersionResource, resyncPeriod time.Duration, feature Feature) *Watcher {
-	watcher := Watcher{
+// NewWatcher creates a new Watcher for the supplied Feature. It will enable
+// the feature based on the presence of a CRD compatible with the desired
+// GroupVersionResource.
+func NewWatcher(client dynamic.Interface, gvr schema.GroupVersionResource, resyncPeriod time.Duration, feature Feature) Watcher {
+	w := watcher{
 		gvr:     gvr,
 		feature: feature,
 		informerFactory: dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, resyncPeriod, metav1.NamespaceAll,
@@ -116,22 +139,25 @@ func NewWatcher(client dynamic.Interface, gvr schema.GroupVersionResource, resyn
 			}),
 	}
 
-	watcher.informerFactory.ForResource(crdv1.SchemeGroupVersion.WithResource("customresourcedefinitions")).Informer().AddEventHandlerWithResyncPeriod(
+	w.informerFactory.ForResource(crdv1.SchemeGroupVersion.WithResource("customresourcedefinitions")).Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    watcher.handleAdd,
-			UpdateFunc: watcher.handleUpdate,
-			DeleteFunc: watcher.handleDelete,
+			AddFunc:    w.handleAdd,
+			UpdateFunc: w.handleUpdate,
+			DeleteFunc: w.handleDelete,
 		},
 		resyncPeriod,
 	)
-	return &watcher
+	return &w
 }
 
-func (w *Watcher) Start(stopCh <-chan struct{}) {
+// Start begins watching for the configured CRD to be added or removed.
+// The watcher will continue watching until the supplied channel is
+// closed.
+func (w *watcher) Start(stopCh <-chan struct{}) {
 	w.informerFactory.Start(stopCh)
 }
 
-func (w *Watcher) enableFeature() {
+func (w *watcher) enableFeature() {
 	w.Lock()
 	defer w.Unlock()
 	if w.enabled {
@@ -143,7 +169,7 @@ func (w *Watcher) enableFeature() {
 	klog.V(2).Infof("Enabled feature for%v", w.gvr)
 }
 
-func (w *Watcher) disableFeature() {
+func (w *watcher) disableFeature() {
 	w.Lock()
 	defer w.Unlock()
 	if !w.enabled {
@@ -155,7 +181,7 @@ func (w *Watcher) disableFeature() {
 	klog.Infof("Disabled feature for %v", w.gvr)
 }
 
-func (w *Watcher) crdMatchesGVR(crd *crdv1.CustomResourceDefinition) bool {
+func (w *watcher) crdMatchesGVR(crd *crdv1.CustomResourceDefinition) bool {
 	if crd.Name != w.gvr.GroupResource().String() {
 		return false
 	}
@@ -167,7 +193,7 @@ func (w *Watcher) crdMatchesGVR(crd *crdv1.CustomResourceDefinition) bool {
 	return false
 }
 
-func (w *Watcher) handleAdd(obj interface{}) {
+func (w *watcher) handleAdd(obj interface{}) {
 	crd, err := toCRD(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -180,7 +206,7 @@ func (w *Watcher) handleAdd(obj interface{}) {
 	w.enableFeature()
 }
 
-func (w *Watcher) handleUpdate(oldObj, newObj interface{}) {
+func (w *watcher) handleUpdate(oldObj, newObj interface{}) {
 	crd, err := toCRD(newObj)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -196,6 +222,6 @@ func (w *Watcher) handleUpdate(oldObj, newObj interface{}) {
 	}
 }
 
-func (w *Watcher) handleDelete(obj interface{}) {
+func (w *watcher) handleDelete(obj interface{}) {
 	w.disableFeature()
 }
