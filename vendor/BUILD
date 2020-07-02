@@ -83,7 +83,6 @@ filegroup(
         "//vendor/github.com/coreos/go-systemd/v22/dbus:all-srcs",
         "//vendor/github.com/coreos/pkg/capnslog:all-srcs",
         "//vendor/github.com/coreos/pkg/dlopen:all-srcs",
-        "//vendor/github.com/cpuguy83/go-md2man/md2man:all-srcs",
         "//vendor/github.com/cpuguy83/go-md2man/v2/md2man:all-srcs",
         "//vendor/github.com/cyphar/filepath-securejoin:all-srcs",
         "//vendor/github.com/davecgh/go-spew/spew:all-srcs",
