@@ -315,13 +315,6 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 	var minNodes1 []string
 	lenNodes1 := 0
 	for node, victims := range nodesToVictims {
-		if len(victims.Pods) == 0 {
-			// We found a node that doesn't need any preemption. Return it!
-			// This should happen rarely when one or more pods are terminated between
-			// the time that scheduler tries to schedule the pod and the time that
-			// preemption logic tries to find nodes for preemption.
-			return node
-		}
 		numPDBViolatingPods := victims.NumPDBViolations
 		if numPDBViolatingPods < minNumPDBViolatingPods {
 			minNumPDBViolatingPods = numPDBViolatingPods
@@ -488,6 +481,12 @@ func selectVictimsOnNode(
 			}
 		}
 	}
+
+	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
+	if len(potentialVictims) == 0 {
+		return nil, 0, false
+	}
+
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption. The only
 	// condition that we could check is if the "pod" is failing to schedule due to
