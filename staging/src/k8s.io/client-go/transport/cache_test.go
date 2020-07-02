@@ -19,14 +19,92 @@ package transport
 import (
 	"context"
 	"crypto/tls"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 )
 
 func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that don't affect the tls config don't affect the cache key
+	rand.Seed(time.Now().UTC().UnixNano())
+	getRandBytes := func() []byte {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			panic(err) // rand should never fail
+		}
+		return b
+	}
+	getCertDynamic := func() (*tls.Certificate, error) { return &tls.Certificate{OCSPStaple: getRandBytes()}, nil }
+	getCertIdenticalConfigurations := map[string]*Config{
+		"getCertDynamic1": {
+			TLS: TLSConfig{
+				KeyData:    []byte{3},
+				GetCert:    getCertDynamic,
+				ServerName: "2",
+				NextProtos: []string{"h2", "http/1.1"},
+			},
+		},
+		"getCertDynamic2": {
+			TLS: TLSConfig{
+				KeyData:    []byte{3},
+				GetCert:    getCertDynamic,
+				ServerName: "2",
+				NextProtos: []string{"h2", "http/1.1"},
+			},
+		},
+		"getCertDynamic3": {
+			TLS: TLSConfig{
+				KeyData:    []byte{3},
+				GetCert:    getCertDynamic,
+				ServerName: "2",
+				NextProtos: []string{"h2", "http/1.1"},
+			},
+		},
+		"getCertDynamic4": {
+			TLS: TLSConfig{
+				KeyData:    []byte{3},
+				GetCert:    getCertDynamic,
+				ServerName: "2",
+				NextProtos: []string{"h2", "http/1.1"},
+			},
+		},
+		"getCertDynamic5": {
+			TLS: TLSConfig{
+				KeyData:    []byte{3},
+				GetCert:    getCertDynamic,
+				ServerName: "2",
+				NextProtos: []string{"h2", "http/1.1"},
+			},
+		},
+	}
+	for nameA, valueA := range getCertIdenticalConfigurations {
+		for nameB, valueB := range getCertIdenticalConfigurations {
+			keyA, err := tlsConfigKey(valueA)
+			if err != nil {
+				t.Errorf("Unexpected error for %q: %v", nameA, err)
+				continue
+			}
+			keyB, err := tlsConfigKey(valueB)
+			if err != nil {
+				t.Errorf("Unexpected error for %q: %v", nameB, err)
+				continue
+			}
+			if keyA != keyB {
+				t.Errorf("Expected identical cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
+				continue
+			}
+			getCertA, _ := valueA.TLS.GetCert()
+			getCertB, _ := valueB.TLS.GetCert()
+			if getCertA == getCertB {
+				t.Errorf("Expected different values returned from GetCert function for %q and %q", nameA, nameB)
+				continue
+			}
+		}
+	}
+
 	identicalConfigurations := map[string]*Config{
 		"empty":          {},
 		"basic":          {Username: "bob", Password: "password"},
