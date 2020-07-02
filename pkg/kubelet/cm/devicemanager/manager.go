@@ -43,7 +43,6 @@ import (
 	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -662,15 +661,30 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if _, ok := m.healthyDevices[resource]; !ok {
 		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
-	devices = sets.NewString()
-	// Allocates from reusableDevices list first.
-	for device := range reusableDevices {
-		devices.Insert(device)
-		needed--
-		if needed == 0 {
-			return devices, nil
+
+	// Declare the list of allocated devices.
+	// This will be populated and returned below.
+	allocated := sets.NewString()
+
+	// Create a closure to help with device allocation
+	// Returns 'true' once no more devices need to be allocated.
+	allocateRemainingFrom := func(devices sets.String) bool {
+		for device := range devices.Difference(allocated) {
+			m.allocatedDevices[resource].Insert(device)
+			allocated.Insert(device)
+			needed--
+			if needed == 0 {
+				return true
+			}
 		}
+		return false
 	}
+
+	// Allocates from reusableDevices list first.
+	if allocateRemainingFrom(reusableDevices) {
+		return allocated, nil
+	}
+
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
@@ -683,25 +697,67 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
-	// By default, pull devices from the unsorted list of available devices.
-	allocated := available.UnsortedList()[:needed]
-	// If topology alignment is desired, update allocated to the set of devices
-	// with the best alignment.
-	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
-	if m.deviceHasTopologyAlignment(resource) && hint.NUMANodeAffinity != nil {
-		allocated = m.takeByTopology(resource, available, hint.NUMANodeAffinity, needed)
+
+	// Filters available Devices based on NUMA affinity.
+	aligned, unaligned, noAffinity := m.filterByAffinity(podUID, contName, resource, available)
+
+	// If we can allocate all remaining devices from the set of aligned ones, then
+	// give the plugin the chance to influence which ones to allocate from that set.
+	if needed < aligned.Len() {
+		// First allocate from the preferred devices list (if available).
+		preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, aligned.Union(allocated), allocated, required)
+		if err != nil {
+			return nil, err
+		}
+		if allocateRemainingFrom(preferred.Intersection(aligned.Union(allocated))) {
+			return allocated, nil
+		}
+		// Then fallback to allocate from the aligned set if no preferred list
+		// is returned (or not enough devices are returned in that list).
+		if allocateRemainingFrom(aligned) {
+			return allocated, nil
+		}
+
+		return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
 	}
-	// Updates m.allocatedDevices with allocated devices to prevent them
-	// from being allocated to other pods/containers, given that we are
-	// not holding lock during the rpc call.
-	for _, device := range allocated {
-		m.allocatedDevices[resource].Insert(device)
-		devices.Insert(device)
+
+	// If we can't allocate all remaining devices from the set of aligned ones,
+	// then start by first allocating all of the  aligned devices (to ensure
+	// that the alignment guaranteed by the TopologyManager is honored).
+	if allocateRemainingFrom(aligned) {
+		return allocated, nil
 	}
-	return devices, nil
+
+	// Then give the plugin the chance to influence the decision on any
+	// remaining devices to allocate.
+	preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, available.Union(devices), devices, required)
+	if err != nil {
+		return nil, err
+	}
+	if allocateRemainingFrom(preferred.Intersection(available.Union(allocated))) {
+		return allocated, nil
+	}
+
+	// Finally, if the plugin did not return a preferred allocation (or didn't
+	// return a large enough one), then fall back to allocating the remaining
+	// devices from the 'unaligned' and 'noAffinity' sets.
+	if allocateRemainingFrom(unaligned) {
+		return allocated, nil
+	}
+	if allocateRemainingFrom(noAffinity) {
+		return allocated, nil
+	}
+
+	return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
 }
 
-func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity bitmask.BitMask, request int) []string {
+func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.String) (sets.String, sets.String, sets.String) {
+	// If alignment information is not available, just pass the available list back.
+	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	if !m.deviceHasTopologyAlignment(resource) || hint.NUMANodeAffinity == nil {
+		return sets.NewString(), sets.NewString(), available
+	}
+
 	// Build a map of NUMA Nodes to the devices associated with them. A
 	// device may be associated to multiple NUMA nodes at the same time. If an
 	// available device does not have any NUMA Nodes associated with it, add it
@@ -755,7 +811,7 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 			if perNodeDevices[n].Has(d) {
 				if n == nodeWithoutTopology {
 					withoutTopology = append(withoutTopology, d)
-				} else if affinity.IsSet(n) {
+				} else if hint.NUMANodeAffinity.IsSet(n) {
 					fromAffinity = append(fromAffinity, d)
 				} else {
 					notFromAffinity = append(notFromAffinity, d)
@@ -765,8 +821,8 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 		}
 	}
 
-	// Concatenate the lists above return the first 'request' devices from it..
-	return append(append(fromAffinity, notFromAffinity...), withoutTopology...)[:request]
+	// Return all three lists containing the full set of devices across them.
+	return sets.NewString(fromAffinity...), sets.NewString(notFromAffinity...), sets.NewString(withoutTopology...)
 }
 
 // allocateContainerResources attempts to allocate all of required device
