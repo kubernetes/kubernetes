@@ -898,13 +898,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicyConfigMapSource":                                        schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyConfigMapSource(ref),
 		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicyFileSource":                                             schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyFileSource(ref),
 		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicySource":                                                 schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerConfiguration":                                            schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerConfiguration(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerLeaderElectionConfiguration":                              schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerLeaderElectionConfiguration(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerProfile":                                                  schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerProfile(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.Plugin":                                                                schema_k8sio_kube_scheduler_config_v1alpha2_Plugin(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.PluginConfig":                                                          schema_k8sio_kube_scheduler_config_v1alpha2_PluginConfig(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.PluginSet":                                                             schema_k8sio_kube_scheduler_config_v1alpha2_PluginSet(ref),
-		"k8s.io/kube-scheduler/config/v1alpha2.Plugins":                                                               schema_k8sio_kube_scheduler_config_v1alpha2_Plugins(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerConfiguration":                                             schema_k8sio_kube_scheduler_config_v1beta1_KubeSchedulerConfiguration(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerLeaderElectionConfiguration":                               schema_k8sio_kube_scheduler_config_v1beta1_KubeSchedulerLeaderElectionConfiguration(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerProfile":                                                   schema_k8sio_kube_scheduler_config_v1beta1_KubeSchedulerProfile(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.Plugin":                                                                 schema_k8sio_kube_scheduler_config_v1beta1_Plugin(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.PluginConfig":                                                           schema_k8sio_kube_scheduler_config_v1beta1_PluginConfig(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.PluginSet":                                                              schema_k8sio_kube_scheduler_config_v1beta1_PluginSet(ref),
+		"k8s.io/kube-scheduler/config/v1beta1.Plugins":                                                                schema_k8sio_kube_scheduler_config_v1beta1_Plugins(ref),
 		"k8s.io/kubelet/config/v1beta1.KubeletAnonymousAuthentication":                                                schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref),
 		"k8s.io/kubelet/config/v1beta1.KubeletAuthentication":                                                         schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref),
 		"k8s.io/kubelet/config/v1beta1.KubeletAuthorization":                                                          schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref),
@@ -43123,7 +43123,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref commo
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_KubeSchedulerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43147,7 +43147,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerConfiguration(ref 
 					"leaderElection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LeaderElection defines the configuration of leader election client.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerLeaderElectionConfiguration"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerLeaderElectionConfiguration"),
 						},
 					},
 					"clientConnection": {
@@ -43234,7 +43234,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerConfiguration(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerProfile"),
+										Ref: ref("k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerProfile"),
 									},
 								},
 							},
@@ -43263,11 +43263,11 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerConfiguration(ref 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/kube-scheduler/config/v1.Extender", "k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerLeaderElectionConfiguration", "k8s.io/kube-scheduler/config/v1alpha2.KubeSchedulerProfile"},
+			"k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/kube-scheduler/config/v1.Extender", "k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerLeaderElectionConfiguration", "k8s.io/kube-scheduler/config/v1beta1.KubeSchedulerProfile"},
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerLeaderElectionConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_KubeSchedulerLeaderElectionConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43329,7 +43329,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerLeaderElectionConf
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerProfile(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_KubeSchedulerProfile(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43346,7 +43346,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerProfile(ref common
 					"plugins": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the ones that should be enabled in addition to the default plugins. Disabled plugins are any of the default plugins that should be disabled. When no enabled or disabled plugin is specified for an extension point, default plugins for that extension point will be used if there is any. If a QueueSort plugin is specified, the same QueueSort Plugin and PluginConfig must be specified for all profiles.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.Plugins"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.Plugins"),
 						},
 					},
 					"pluginConfig": {
@@ -43364,7 +43364,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerProfile(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/kube-scheduler/config/v1alpha2.PluginConfig"),
+										Ref: ref("k8s.io/kube-scheduler/config/v1beta1.PluginConfig"),
 									},
 								},
 							},
@@ -43374,11 +43374,11 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_KubeSchedulerProfile(ref common
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-scheduler/config/v1alpha2.PluginConfig", "k8s.io/kube-scheduler/config/v1alpha2.Plugins"},
+			"k8s.io/kube-scheduler/config/v1beta1.PluginConfig", "k8s.io/kube-scheduler/config/v1beta1.Plugins"},
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_Plugin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_Plugin(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43406,7 +43406,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_Plugin(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_PluginConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_PluginConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43435,7 +43435,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_PluginConfig(ref common.Referen
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_PluginSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_PluginSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43454,7 +43454,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_PluginSet(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/kube-scheduler/config/v1alpha2.Plugin"),
+										Ref: ref("k8s.io/kube-scheduler/config/v1beta1.Plugin"),
 									},
 								},
 							},
@@ -43475,7 +43475,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_PluginSet(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/kube-scheduler/config/v1alpha2.Plugin"),
+										Ref: ref("k8s.io/kube-scheduler/config/v1beta1.Plugin"),
 									},
 								},
 							},
@@ -43485,11 +43485,11 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_PluginSet(ref common.ReferenceC
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-scheduler/config/v1alpha2.Plugin"},
+			"k8s.io/kube-scheduler/config/v1beta1.Plugin"},
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha2_Plugins(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1beta1_Plugins(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -43499,74 +43499,74 @@ func schema_k8sio_kube_scheduler_config_v1alpha2_Plugins(ref common.ReferenceCal
 					"queueSort": {
 						SchemaProps: spec.SchemaProps{
 							Description: "QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"preFilter": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PreFilter is a list of plugins that should be invoked at \"PreFilter\" extension point of the scheduling framework.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"filter": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"preScore": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PreScore is a list of plugins that are invoked before scoring.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"score": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"reserve": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Reserve is a list of plugins invoked when reserving a node to run the pod.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"permit": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"preBind": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PreBind is a list of plugins that should be invoked before a pod is bound.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"bind": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Bind is a list of plugins that should be invoked at \"Bind\" extension point of the scheduling framework. The scheduler call these plugins in order. Scheduler skips the rest of these plugins as soon as one returns success.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"postBind": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PostBind is a list of plugins that should be invoked after a pod is successfully bound.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 					"unreserve": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Unreserve is a list of plugins invoked when a pod that was previously reserved is rejected in a later phase.",
-							Ref:         ref("k8s.io/kube-scheduler/config/v1alpha2.PluginSet"),
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta1.PluginSet"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kube-scheduler/config/v1alpha2.PluginSet"},
+			"k8s.io/kube-scheduler/config/v1beta1.PluginSet"},
 	}
 }
 

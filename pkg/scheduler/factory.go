@@ -151,7 +151,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 
 	// If there are any extended resources found from the Extenders, append them to the pluginConfig for each profile.
-	// This should only have an effect on ComponentConfig v1alpha2, where it is possible to configure Extenders and
+	// This should only have an effect on ComponentConfig v1beta1, where it is possible to configure Extenders and
 	// plugin args (and in which case the extender ignored resources take precedence).
 	// For earlier versions, using both policy and custom plugin config is disallowed, so this should be the only
 	// plugin config for this plugin.

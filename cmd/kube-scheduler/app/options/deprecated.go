@@ -18,12 +18,12 @@ package options
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
@@ -87,14 +87,14 @@ func (o *DeprecatedOptions) Validate() []error {
 	return errs
 }
 
-// ApplyTo sets cfg.AlgorithmSource from flags passed on the command line in the following precedence order:
+// ApplyAlgorithmSourceTo sets cfg.AlgorithmSource from flags passed on the command line in the following precedence order:
 //
 // 1. --use-legacy-policy-config to use a policy file.
 // 2. --policy-configmap to use a policy config map value.
 // 3. --algorithm-provider to use a named algorithm provider.
-func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) error {
+func (o *DeprecatedOptions) ApplyAlgorithmSourceTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
 	if o == nil {
-		return nil
+		return
 	}
 
 	switch {
@@ -120,6 +120,17 @@ func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfig
 			Provider: &o.AlgorithmProvider,
 		}
 	}
+}
+
+// ApplyTo sets a default profile plugin config if no config file is specified
+// It also calls ApplyAlgorithmSourceTo to set Policy settings in AlgorithmSource, if applicable.
+// Deprecated flags have an effect iff no config file was provided, in which
+// case this function expects a default KubeSchedulerConfiguration instance,
+// which has a single profile.
+func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
+	if o == nil {
+		return
+	}
 
 	// The following deprecated options affect the only existing profile that is
 	// added by default.
@@ -133,6 +144,5 @@ func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfig
 		}
 		profile.PluginConfig = append(profile.PluginConfig, plugins.NewPluginConfig(interpodaffinity.Name, args))
 	}
-
-	return nil
+	o.ApplyAlgorithmSourceTo(cfg)
 }
