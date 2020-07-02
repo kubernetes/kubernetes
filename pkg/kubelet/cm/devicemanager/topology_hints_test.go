@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -431,13 +432,15 @@ func TestGetTopologyHints(t *testing.T) {
 
 func TestTopologyAlignedAllocation(t *testing.T) {
 	tcases := []struct {
-		description       string
-		resource          string
-		request           int
-		devices           []pluginapi.Device
-		allocatedDevices  []string
-		hint              topologymanager.TopologyHint
-		expectedAlignment map[int]int
+		description                 string
+		resource                    string
+		request                     int
+		devices                     []pluginapi.Device
+		allocatedDevices            []string
+		hint                        topologymanager.TopologyHint
+		getPreferredAllocationFunc  func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
+		expectedPreferredAllocation []string
+		expectedAlignment           map[int]int
 	}{
 		{
 			description: "Single Request, no alignment",
@@ -583,6 +586,152 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			},
 			expectedAlignment: map[int]int{1: 2, 3: 2},
 		},
+		{
+			description: "Request for 5, socket 0, preferred aligned accepted",
+			resource:    "resource",
+			request:     5,
+			devices: func() []pluginapi.Device {
+				devices := []pluginapi.Device{}
+				for i := 0; i < 100; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 0))
+				}
+				for i := 100; i < 200; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 1))
+				}
+				return devices
+			}(),
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				return &pluginapi.PreferredAllocationResponse{
+					ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+						{DeviceIDs: []string{"Dev0", "Dev19", "Dev83", "Dev42", "Dev77"}},
+					},
+				}, nil
+			},
+			expectedPreferredAllocation: []string{"Dev0", "Dev19", "Dev83", "Dev42", "Dev77"},
+			expectedAlignment:           map[int]int{0: 5},
+		},
+		{
+			description: "Request for 5, socket 0, preferred aligned accepted, unaligned ignored",
+			resource:    "resource",
+			request:     5,
+			devices: func() []pluginapi.Device {
+				devices := []pluginapi.Device{}
+				for i := 0; i < 100; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 0))
+				}
+				for i := 100; i < 200; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 1))
+				}
+				return devices
+			}(),
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				return &pluginapi.PreferredAllocationResponse{
+					ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+						{DeviceIDs: []string{"Dev0", "Dev19", "Dev83", "Dev150", "Dev186"}},
+					},
+				}, nil
+			},
+			expectedPreferredAllocation: []string{"Dev0", "Dev19", "Dev83"},
+			expectedAlignment:           map[int]int{0: 5},
+		},
+		{
+			description: "Request for 5, socket 1, preferred aligned accepted, bogus ignored",
+			resource:    "resource",
+			request:     5,
+			devices: func() []pluginapi.Device {
+				devices := []pluginapi.Device{}
+				for i := 0; i < 100; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 1))
+				}
+				return devices
+			}(),
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(1),
+				Preferred:        true,
+			},
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				return &pluginapi.PreferredAllocationResponse{
+					ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+						{DeviceIDs: []string{"Dev0", "Dev19", "Dev83", "bogus0", "bogus1"}},
+					},
+				}, nil
+			},
+			expectedPreferredAllocation: []string{"Dev0", "Dev19", "Dev83"},
+			expectedAlignment:           map[int]int{1: 5},
+		},
+		{
+			description: "Request for 5, multisocket, preferred accepted",
+			resource:    "resource",
+			request:     5,
+			devices: func() []pluginapi.Device {
+				devices := []pluginapi.Device{}
+				for i := 0; i < 3; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 0))
+				}
+				for i := 3; i < 100; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 1))
+				}
+				return devices
+			}(),
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				return &pluginapi.PreferredAllocationResponse{
+					ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+						{DeviceIDs: []string{"Dev0", "Dev1", "Dev2", "Dev42", "Dev83"}},
+					},
+				}, nil
+			},
+			expectedPreferredAllocation: []string{"Dev0", "Dev1", "Dev2", "Dev42", "Dev83"},
+			expectedAlignment:           map[int]int{0: 3, 1: 2},
+		},
+		{
+			description: "Request for 5, multisocket, preferred unaligned accepted, bogus ignored",
+			resource:    "resource",
+			request:     5,
+			devices: func() []pluginapi.Device {
+				devices := []pluginapi.Device{}
+				for i := 0; i < 3; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 0))
+				}
+				for i := 3; i < 100; i++ {
+					id := fmt.Sprintf("Dev%d", i)
+					devices = append(devices, makeNUMADevice(id, 1))
+				}
+				return devices
+			}(),
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				return &pluginapi.PreferredAllocationResponse{
+					ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+						{DeviceIDs: []string{"Dev0", "Dev1", "Dev2", "Dev42", "bogus0"}},
+					},
+				}, nil
+			},
+			expectedPreferredAllocation: []string{"Dev0", "Dev1", "Dev2", "Dev42"},
+			expectedAlignment:           map[int]int{0: 3, 1: 2},
+		},
 	}
 	for _, tc := range tcases {
 		m := ManagerImpl{
@@ -605,6 +754,15 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			m.healthyDevices[tc.resource].Insert(d.ID)
 		}
 
+		if tc.getPreferredAllocationFunc != nil {
+			m.endpoints[tc.resource] = endpointInfo{
+				e: &MockEndpoint{
+					getPreferredAllocationFunc: tc.getPreferredAllocationFunc,
+				},
+				opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
+			}
+		}
+
 		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.NewString())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -613,6 +771,10 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 
 		if len(allocated) != tc.request {
 			t.Errorf("%v. expected allocation size: %v but got: %v", tc.description, tc.request, len(allocated))
+		}
+
+		if !allocated.HasAll(tc.expectedPreferredAllocation...) {
+			t.Errorf("%v. expected preferred allocation: %v but not present in: %v", tc.description, tc.expectedPreferredAllocation, allocated.UnsortedList())
 		}
 
 		alignment := make(map[int]int)
