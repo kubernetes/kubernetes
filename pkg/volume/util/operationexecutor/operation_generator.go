@@ -1443,6 +1443,11 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 			}
 
 			klog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
+		} else {
+			cancelled, err := cancelControlPlaneExpansion(pvc, pv, og.kubeClient)
+			if cancelled {
+				return err, err
+			}
 		}
 
 		fsVolume, _ := util.CheckVolumeModeFilesystem(volumeSpec)
@@ -1669,6 +1674,10 @@ func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOp
 			}
 			return true, nil
 		}
+		cancelled, err := cancelNodeExpansion(pvc, pv, og.kubeClient)
+		if cancelled {
+			return false, err
+		}
 	}
 	return true, nil
 }
@@ -1719,4 +1728,66 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 		}
 	}
 	return deviceOpened, nil
+}
+
+// cancelControlPlaneExpansion verifies if PVC already satisfies user requested size and returns
+//   - true if expansion has been canceled
+//   - false if volume expansion has not been canceled and should be retried.
+func cancelControlPlaneExpansion(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, client clientset.Interface) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		return false, nil
+	}
+
+	newSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+	statusSize := pvc.Status.Capacity[v1.ResourceStorage]
+	pvSize := pv.Spec.Capacity[v1.ResourceStorage]
+	// if pvc's status size is greater or equal to user requested size(newSize via pvc.Spec.Resources)
+	// then we should consider volume expansion operation as finished.
+	// We additionally also check if
+	if statusSize.Cmp(newSize) >= 0 && pvSize.Cmp(newSize) >= 0 {
+		klog.Infof("PVC %s already is of requested size", util.GetPersistentVolumeClaimQualifiedName(pvc))
+		err := util.MarkResizeFinished(pvc, newSize, client)
+		if err != nil {
+			detailedErr := fmt.Errorf("Error marking pvc %s as resized : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+			return true, detailedErr
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// cancelNodeExpansion marks PVC as resized assuming PVC already satisfies user
+// requested size and has FileSystemResizePending condition. The caller must verify
+// that PVC already satisfies user requested size before calling this function.
+func cancelNodeExpansion(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, client clientset.Interface) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		return false, nil
+	}
+
+	// Just to be safe we should only cancel node expansion of volumes which already have
+	// filesystem resize pending condition
+	if !hasFileSystemResizePendingCondition(pvc) {
+		return false, nil
+	}
+
+	pvSpecCap := pv.Spec.Capacity[v1.ResourceStorage]
+	// if we are here that means PVC status already is of size greater or equal to
+	// PV capacity and hence no node expansion is necessary.
+	err := util.MarkFSResizeFinished(pvc, pvSpecCap, client)
+	if err != nil {
+		// On retry, NodeExpandVolume will be called again but do nothing
+		return true, fmt.Errorf("MountVolume.NodeExpandVolume update PVC status failed : %v", err)
+	}
+	return true, nil
+}
+
+// hasFileSystemResizePendingCondition returns true if a pvc has a FileSystemResizePending condition.
+// This means the controller side resize operation is finished, and kublete side operation is in progress.
+func hasFileSystemResizePendingCondition(pvc *v1.PersistentVolumeClaim) bool {
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == v1.PersistentVolumeClaimFileSystemResizePending && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }

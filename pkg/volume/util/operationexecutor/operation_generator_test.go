@@ -17,23 +17,29 @@ limitations under the License.
 package operationexecutor
 
 import (
-	"github.com/prometheus/client_model/go"
+	"fmt"
+	"os"
+	"testing"
+
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/csi-translation-lib/plugins"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"os"
-	"testing"
 )
 
 // this method just tests the volume plugin name that's used in CompleteFunc, the same plugin is also used inside the
@@ -106,6 +112,156 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			assert.Equal(t, float64(1), metricValueDiff, tc.name)
 		}
 	}
+}
+
+func TestCancelControlPlaneExpansion(t *testing.T) {
+	tests := []struct {
+		name           string
+		recoverFeature bool
+		pvc            *v1.PersistentVolumeClaim
+		pv             *v1.PersistentVolume
+		expectedValue  bool
+	}{
+		{
+			name:           "when feature gate is disabled",
+			recoverFeature: false,
+			expectedValue:  false,
+			pv:             getFakePersistentVolume("5G"),
+			pvc:            getFakePersistentVolumeClaim("5G", "5G"),
+		},
+		{
+			name:           "feature:enabled, pvc.status bigger than pvc.size",
+			recoverFeature: true,
+			expectedValue:  true,
+			pv:             getFakePersistentVolume("10G"),
+			pvc:            getFakePersistentVolumeClaim("5G", "10G"),
+		},
+		{
+			name:           "feature:enabled, pvc.status smaller than pvc.size",
+			recoverFeature: true,
+			expectedValue:  false,
+			pv:             getFakePersistentVolume("7G"),
+			pvc:            getFakePersistentVolumeClaim("10G", "7G"),
+		},
+		{
+			name:           "feature:enabled, pv.size is smaller than pvc.size",
+			recoverFeature: true,
+			expectedValue:  false,
+			pv:             getFakePersistentVolume("7G"),
+			pvc:            getFakePersistentVolumeClaim("10G", "20G"),
+		},
+		{
+			name:           "feature:enabled, pv.size is bigger than newSize and pvc.Status.Capacity is bigger than pv size",
+			recoverFeature: true,
+			expectedValue:  true,
+			pv:             getFakePersistentVolume("7G"),
+			pvc:            getFakePersistentVolumeClaim("5G", "20G"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoverFeature)()
+			fakeKubeClient := fakeclient.NewSimpleClientset()
+			result, _ := cancelControlPlaneExpansion(test.pvc, test.pv, fakeKubeClient)
+			if result != test.expectedValue {
+				t.Errorf("for %s: expected %v got %v", test.name, test.expectedValue, result)
+			}
+		})
+
+		fmt.Println(test.recoverFeature)
+	}
+}
+
+func TestCancelNodeExpansion(t *testing.T) {
+	tests := []struct {
+		name           string
+		recoverFeature bool
+		pvc            *v1.PersistentVolumeClaim
+		pv             *v1.PersistentVolume
+		expectedValue  bool
+	}{
+		{
+			name:           "when feature gate is disabled",
+			recoverFeature: false,
+			pvc:            getFakePersistentVolumeClaim("5G", "5G"),
+			pv:             getFakePersistentVolume("5G"),
+			expectedValue:  false,
+		},
+		{
+			name:           "feature:enabled, no fsresize condition",
+			recoverFeature: true,
+			pvc:            getFakePersistentVolumeClaim("5G", "5G"),
+			pv:             getFakePersistentVolume("5G"),
+			expectedValue:  false,
+		},
+		{
+			name:           "feature:enabled, has resize condition",
+			recoverFeature: true,
+			pv:             getFakePersistentVolume("10G"),
+			pvc:            pvcWithCondition(getFakePersistentVolumeClaim("10G", "10G"), v1.PersistentVolumeClaimFileSystemResizePending),
+			expectedValue:  true,
+		},
+		{
+			name:           "feature: enabled, has resizing condition",
+			recoverFeature: true,
+			pv:             getFakePersistentVolume("10G"),
+			pvc:            pvcWithCondition(getFakePersistentVolumeClaim("10G", "10G"), v1.PersistentVolumeClaimResizing),
+			expectedValue:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, tc.recoverFeature)()
+			fakeKubeClient := fakeclient.NewSimpleClientset()
+			result, _ := cancelNodeExpansion(tc.pvc, tc.pv, fakeKubeClient)
+			if result != tc.expectedValue {
+				t.Errorf("for %s: expected %v got %v", tc.name, tc.expectedValue, result)
+			}
+		})
+	}
+}
+
+func getFakePersistentVolume(q string) *v1.PersistentVolume {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pv"},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceStorage: resource.MustParse(q),
+			},
+		},
+	}
+	return pv
+}
+
+func getFakePersistentVolumeClaim(size, statusSize string) *v1.PersistentVolumeClaim {
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pvc", Namespace: "default", UID: "foobar"},
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: resource.MustParse(size),
+				},
+			},
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceStorage: resource.MustParse(statusSize),
+			},
+		},
+	}
+	return pvc
+}
+
+func pvcWithCondition(pvc *v1.PersistentVolumeClaim, condition v1.PersistentVolumeClaimConditionType) *v1.PersistentVolumeClaim {
+	pvc.Status.Conditions = []v1.PersistentVolumeClaimCondition{
+		{
+			Type:   condition,
+			Status: v1.ConditionTrue,
+		},
+	}
+	return pvc
 }
 
 func findMetricWithNameAndLabels(metricFamilyName string, labelFilter map[string]string) *io_prometheus_client.Metric {
