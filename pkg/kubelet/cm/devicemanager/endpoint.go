@@ -35,6 +35,7 @@ import (
 type endpoint interface {
 	run()
 	stop()
+	getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
 	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
 	callback(resourceName string, devices []pluginapi.Device)
@@ -136,6 +137,22 @@ func (e *endpointImpl) setStopTime(t time.Time) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	e.stopTime = t
+}
+
+// getPreferredAllocation issues GetPreferredAllocation gRPC call to the device plugin.
+func (e *endpointImpl) getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+	if e.isStopped() {
+		return nil, fmt.Errorf(errEndpointStopped, e)
+	}
+	return e.client.GetPreferredAllocation(context.Background(), &pluginapi.PreferredAllocationRequest{
+		ContainerRequests: []*pluginapi.ContainerPreferredAllocationRequest{
+			{
+				AvailableDeviceIDs:   available,
+				MustIncludeDeviceIDs: mustInclude,
+				AllocationSize:       int32(size),
+			},
+		},
+	})
 }
 
 // allocate issues Allocate gRPC call to the device plugin.
