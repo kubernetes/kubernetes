@@ -27,6 +27,8 @@ service Registration {
 message DevicePluginOptions {
 	// Indicates if PreStartContainer call is required before each container start
 	bool pre_start_required = 1;
+	// Indicates if GetPreferredAllocation is implemented and available for calling
+	bool get_preferred_allocation_available = 2;
 }
 
 message RegisterRequest {
@@ -54,6 +56,13 @@ service DevicePlugin {
 	// Whenever a Device state change or a Device disappears, ListAndWatch
 	// returns the new list
 	rpc ListAndWatch(Empty) returns (stream ListAndWatchResponse) {}
+
+	// GetPreferredAllocation returns a preferred set of devices to allocate
+	// from a list of available ones. The resulting preferred allocation is not
+	// guaranteed to be the allocation ultimately performed by the
+	// devicemanager. It is only designed to help the devicemanager make a more
+	// informed allocation decision when possible.
+	rpc GetPreferredAllocation(PreferredAllocationRequest) returns (PreferredAllocationResponse) {}
 
 	// Allocate is called during container creation so that the Device
 	// Plugin can run device specific operations and instruct Kubelet
@@ -110,6 +119,34 @@ message PreStartContainerRequest {
 
 // PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
 message PreStartContainerResponse {
+}
+
+// PreferredAllocationRequest is passed via a call to GetPreferredAllocation()
+// at pod admission time. The device plugin should take the list of
+// `available_deviceIDs` and calculate a preferred allocation of size
+// 'allocation_size' from them, making sure to include the set of devices
+// listed in 'must_include_deviceIDs'.
+message PreferredAllocationRequest {
+	repeated ContainerPreferredAllocationRequest container_requests = 1;
+}
+
+message ContainerPreferredAllocationRequest {
+	// List of available deviceIDs from which to choose a preferred allocation
+	repeated string available_deviceIDs = 1;
+	// List of deviceIDs that must be included in the preferred allocation
+	repeated string must_include_deviceIDs = 2;
+	// Number of devices to include in the preferred allocation
+	int32 allocation_size = 3;
+}
+
+// PreferredAllocationResponse returns a preferred allocation,
+// resulting from a PreferredAllocationRequest.
+message PreferredAllocationResponse {
+	repeated ContainerPreferredAllocationResponse container_responses = 1;
+}
+
+message ContainerPreferredAllocationResponse {
+	repeated string deviceIDs = 1;
 }
 
 // - Allocate is expected to be called during pod creation since allocation
