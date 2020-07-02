@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aggregator.go",
+        "apigroup_list.go",
         "certs.go",
         "chunking.go",
         "crd_conversion_webhook.go",
@@ -21,7 +22,6 @@ go_library(
         "framework.go",
         "garbage_collector.go",
         "generated_clientset.go",
-        "apigroup_list.go",
         "namespace.go",
         "protocol.go",
         "resource_quota.go",
