@@ -956,46 +956,50 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 }
 
 // Block volume support
-func (fv *FakeVolume) SetUpDevice() error {
+func (fv *FakeVolume) SetUpDevice() (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	if fv.VolName == TimeoutOnMountDeviceVolumeName {
 		fv.DeviceMountState[fv.VolName] = deviceMountUncertain
-		return volumetypes.NewUncertainProgressError("mount failed")
+		return "", volumetypes.NewUncertainProgressError("mount failed")
 	}
 	if fv.VolName == FailMountDeviceVolumeName {
 		fv.DeviceMountState[fv.VolName] = deviceNotMounted
-		return fmt.Errorf("error mapping disk: %s", fv.VolName)
+		return "", fmt.Errorf("error mapping disk: %s", fv.VolName)
 	}
 
 	if fv.VolName == TimeoutAndFailOnMountDeviceVolumeName {
 		_, ok := fv.DeviceMountState[fv.VolName]
 		if !ok {
 			fv.DeviceMountState[fv.VolName] = deviceMountUncertain
-			return volumetypes.NewUncertainProgressError("timed out mounting error")
+			return "", volumetypes.NewUncertainProgressError("timed out mounting error")
 		}
 		fv.DeviceMountState[fv.VolName] = deviceNotMounted
-		return fmt.Errorf("error mapping disk: %s", fv.VolName)
+		return "", fmt.Errorf("error mapping disk: %s", fv.VolName)
 	}
 
 	if fv.VolName == SuccessAndTimeoutDeviceName {
 		_, ok := fv.DeviceMountState[fv.VolName]
 		if ok {
 			fv.DeviceMountState[fv.VolName] = deviceMountUncertain
-			return volumetypes.NewUncertainProgressError("error mounting state")
+			return "", volumetypes.NewUncertainProgressError("error mounting state")
 		}
 	}
 	if fv.VolName == SuccessAndFailOnMountDeviceName {
 		_, ok := fv.DeviceMountState[fv.VolName]
 		if ok {
-			return fmt.Errorf("error mapping disk: %s", fv.VolName)
+			return "", fmt.Errorf("error mapping disk: %s", fv.VolName)
 		}
 	}
 
 	fv.DeviceMountState[fv.VolName] = deviceMounted
 	fv.SetUpDeviceCallCount++
 
-	return nil
+	return "", nil
+}
+
+func (fv *FakeVolume) GetStagingPath() string {
+	return filepath.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "staging", fv.VolName)
 }
 
 // Block volume support

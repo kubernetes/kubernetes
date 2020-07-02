@@ -26,24 +26,26 @@ import (
 
 func TestNodeExpand(t *testing.T) {
 	tests := []struct {
-		name          string
-		nodeExpansion bool
-		nodeStageSet  bool
-		volumePhase   volume.CSIVolumePhaseType
-		success       bool
-		fsVolume      bool
+		name            string
+		nodeExpansion   bool
+		nodeStageSet    bool
+		volumePhase     volume.CSIVolumePhaseType
+		success         bool
+		fsVolume        bool
+		deviceStagePath string
 	}{
 		{
 			name:    "when node expansion is not set",
 			success: false,
 		},
 		{
-			name:          "when nodeExpansion=on, nodeStage=on, volumePhase=staged",
-			nodeExpansion: true,
-			nodeStageSet:  true,
-			volumePhase:   volume.CSIVolumeStaged,
-			success:       true,
-			fsVolume:      true,
+			name:            "when nodeExpansion=on, nodeStage=on, volumePhase=staged",
+			nodeExpansion:   true,
+			nodeStageSet:    true,
+			volumePhase:     volume.CSIVolumeStaged,
+			success:         true,
+			fsVolume:        true,
+			deviceStagePath: "/foo/bar",
 		},
 		{
 			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=staged",
@@ -88,21 +90,42 @@ func TestNodeExpand(t *testing.T) {
 				VolumeSpec:      spec,
 				NewSize:         newSize,
 				DeviceMountPath: "/foo/bar",
+				DeviceStagePath: "/foo/bar",
 				DevicePath:      "/mnt/foobar",
 				CSIVolumePhase:  tc.volumePhase,
 			}
 			csiSource, _ := getCSISourceFromSpec(resizeOptions.VolumeSpec)
-
 			csClient := setupClientWithExpansion(t, tc.nodeStageSet, tc.nodeExpansion)
 
+			fakeCSIClient, _ := csClient.(*fakeCsiDriverClient)
+			fakeNodeClient := fakeCSIClient.nodeClient
 			ok, err := plug.nodeExpandWithClient(resizeOptions, csiSource, csClient, tc.fsVolume)
+
+			// verify device staging targer path
+			stagingTargetPath := fakeNodeClient.FakeNodeExpansionRequest.GetStagingTargetPath()
+			if tc.deviceStagePath != "" && tc.deviceStagePath != stagingTargetPath {
+				t.Errorf("For %s: expected staging path %s got %s", tc.name, tc.deviceStagePath, stagingTargetPath)
+			}
+
 			if ok != tc.success {
 				if err != nil {
 					t.Errorf("For %s : expected %v got %v with %v", tc.name, tc.success, ok, err)
 				} else {
 					t.Errorf("For %s : expected %v got %v", tc.name, tc.success, ok)
 				}
-
+			}
+			// verify volume capability received by node expansion request
+			if tc.success {
+				capability := fakeNodeClient.FakeNodeExpansionRequest.GetVolumeCapability()
+				if tc.fsVolume {
+					if capability.GetMount() == nil {
+						t.Errorf("For %s: expected mount accesstype got: %v", tc.name, capability)
+					}
+				} else {
+					if capability.GetBlock() == nil {
+						t.Errorf("For %s: expected block accesstype got: %v", tc.name, capability)
+					}
+				}
 			}
 		})
 	}

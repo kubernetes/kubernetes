@@ -94,12 +94,34 @@ func (c *csiPlugin) nodeExpandWithClient(
 		return false, nil
 	}
 
-	volumeTargetPath := resizeOptions.DeviceMountPath
-	if !fsVolume {
-		volumeTargetPath = resizeOptions.DevicePath
+	pv := resizeOptions.VolumeSpec.PersistentVolume
+	if pv == nil {
+		return false, fmt.Errorf("Expander.NodeExpand failed to find associated PersistentVolume for plugin %s", c.GetPluginName())
 	}
 
-	_, err = csClient.NodeExpandVolume(ctx, csiSource.VolumeHandle, volumeTargetPath, resizeOptions.NewSize)
+	opts := csiResizeOptions{
+		volumePath:        resizeOptions.DeviceMountPath,
+		stagingTargetPath: resizeOptions.DeviceStagePath,
+		volumeID:          csiSource.VolumeHandle,
+		newSize:           resizeOptions.NewSize,
+		fsType:            csiSource.FSType,
+		accessMode:        api.ReadWriteOnce,
+		mountOptions:      pv.Spec.MountOptions,
+	}
+
+	if !fsVolume {
+		// for block volumes the volumePath in CSI NodeExpandvolumeRequest is
+		// basically same as DevicePath because block devices are not mounted and hence
+		// DeviceMountPath does not get populated in resizeOptions.DeviceMountPath
+		opts.volumePath = resizeOptions.DevicePath
+		opts.fsType = fsTypeBlockName
+	}
+
+	if pv.Spec.AccessModes != nil {
+		opts.accessMode = pv.Spec.AccessModes[0]
+	}
+
+	_, err = csClient.NodeExpandVolume(ctx, opts)
 	if err != nil {
 		return false, fmt.Errorf("Expander.NodeExpand failed to expand the volume : %v", err)
 	}
