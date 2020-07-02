@@ -658,7 +658,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, nil
 	}
 	klog.V(3).Infof("Needs to allocate %d %q for pod %q container %q", needed, resource, podUID, contName)
-	// Needs to allocate additional devices.
+	// Check if resource registered with devicemanager
 	if _, ok := m.healthyDevices[resource]; !ok {
 		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
@@ -675,9 +675,10 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
 	}
+
 	// Gets Devices in use.
 	devicesInUse := m.allocatedDevices[resource]
-	// Gets a list of available devices.
+	// Gets Available devices.
 	available := m.healthyDevices[resource].Difference(devicesInUse)
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
