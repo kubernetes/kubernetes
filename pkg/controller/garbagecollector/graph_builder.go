@@ -24,9 +24,11 @@ import (
 
 	"k8s.io/klog/v2"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -346,6 +348,10 @@ func (gb *GraphBuilder) enqueueVirtualDeleteEvent(ref objectReference) {
 // the owner. The "virtual" node will be enqueued to the attemptToDelete, so that
 // attemptToDeleteItem() will verify if the owner exists according to the API server.
 func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
+	// track if some of the referenced owners already exist in the graph and have been observed,
+	// and the dependent's ownerRef does not match their observed coordinates
+	hasPotentiallyInvalidOwnerReference := false
+
 	for _, owner := range owners {
 		ownerNode, ok := gb.uidToNode.Read(owner.UID)
 		if !ok {
@@ -369,8 +375,66 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 			// event to delete it from the graph if API server confirms this
 			// owner doesn't exist.
 			gb.attemptToDelete.Add(ownerNode)
+		} else if !hasPotentiallyInvalidOwnerReference {
+			ownerIsNamespaced := len(ownerNode.identity.Namespace) > 0
+			if ownerIsNamespaced && ownerNode.identity.Namespace != n.identity.Namespace {
+				if ownerNode.isObserved() {
+					// The owner node has been observed via an informer
+					// the dependent's namespace doesn't match the observed owner's namespace, this is definitely wrong.
+					// cluster-scoped owners can be referenced as an owner from any namespace or cluster-scoped object.
+					klog.V(2).Infof("node %s references an owner %s but does not match namespaces", n.identity, ownerNode.identity)
+					gb.reportInvalidNamespaceOwnerRef(n, owner.UID)
+				}
+				hasPotentiallyInvalidOwnerReference = true
+			} else if !ownerReferenceMatchesCoordinates(owner, ownerNode.identity.OwnerReference) {
+				if ownerNode.isObserved() {
+					// The owner node has been observed via an informer
+					// n's owner reference doesn't match the observed identity, this might be wrong.
+					klog.V(2).Infof("node %s references an owner %s with coordinates that do not match the observed identity", n.identity, ownerNode.identity)
+				}
+				hasPotentiallyInvalidOwnerReference = true
+			}
 		}
 	}
+
+	if hasPotentiallyInvalidOwnerReference {
+		// Enqueue the potentially invalid dependent node into attemptToDelete.
+		// The garbage processor will verify whether the owner references are dangling
+		// and delete the dependent if all owner references are confirmed absent.
+		gb.attemptToDelete.Add(n)
+	}
+}
+
+func (gb *GraphBuilder) reportInvalidNamespaceOwnerRef(n *node, invalidOwnerUID types.UID) {
+	var invalidOwnerRef metav1.OwnerReference
+	var found = false
+	for _, ownerRef := range n.owners {
+		if ownerRef.UID == invalidOwnerUID {
+			invalidOwnerRef = ownerRef
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	ref := &v1.ObjectReference{
+		Kind:       n.identity.Kind,
+		APIVersion: n.identity.APIVersion,
+		Namespace:  n.identity.Namespace,
+		Name:       n.identity.Name,
+		UID:        n.identity.UID,
+	}
+	invalidIdentity := objectReference{
+		OwnerReference: metav1.OwnerReference{
+			Kind:       invalidOwnerRef.Kind,
+			APIVersion: invalidOwnerRef.APIVersion,
+			Name:       invalidOwnerRef.Name,
+			UID:        invalidOwnerRef.UID,
+		},
+		Namespace: n.identity.Namespace,
+	}
+	gb.eventRecorder.Eventf(ref, v1.EventTypeWarning, "OwnerRefInvalidNamespace", "ownerRef %s does not exist in namespace %q", invalidIdentity, n.identity.Namespace)
 }
 
 // insertNode insert the node to gb.uidToNode; then it finds all owners as listed

@@ -178,6 +178,12 @@ func ownerReferenceCoordinates(ref metav1.OwnerReference) metav1.OwnerReference 
 	}
 }
 
+// ownerReferenceMatchesCoordinates returns true if all of the coordinate fields match
+// between the two references (uid, name, kind, apiVersion)
+func ownerReferenceMatchesCoordinates(a, b metav1.OwnerReference) bool {
+	return a.UID == b.UID && a.Name == b.Name && a.Kind == b.Kind && a.APIVersion == b.APIVersion
+}
+
 // String renders node as a string using fmt. Acquires a read lock to ensure the
 // reflective dump of dependents doesn't race with any concurrent writes.
 func (n *node) String() string {
