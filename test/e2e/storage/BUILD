@@ -36,6 +36,7 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
+        "//pkg/controller/volume/scheduling:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/util/slice:go_default_library",
