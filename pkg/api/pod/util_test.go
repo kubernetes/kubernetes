@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -511,7 +511,7 @@ func TestDropFSGroupFields(t *testing.T) {
 	}
 
 	var podFSGroup int64 = 100
-	changePolicy := api.FSGroupChangeAlways
+	changePolicy := api.VolumeChangeAlways
 
 	fsGroupPod := func() *api.Pod {
 		return &api.Pod{
@@ -523,8 +523,8 @@ func TestDropFSGroupFields(t *testing.T) {
 					},
 				},
 				SecurityContext: &api.PodSecurityContext{
-					FSGroup:             &podFSGroup,
-					FSGroupChangePolicy: &changePolicy,
+					FSGroup:            &podFSGroup,
+					VolumeChangePolicy: &changePolicy,
 				},
 			},
 		}
@@ -537,49 +537,49 @@ func TestDropFSGroupFields(t *testing.T) {
 		expectPolicyInPod            bool
 	}{
 		{
-			description:                  "oldPod.FSGroupChangePolicy=nil, feature=true, newPod.FSGroupChangePolicy=true",
+			description:                  "oldPod.VolumeChangePolicy=nil, feature=true, newPod.VolumeChangePolicy=true",
 			featureEnabled:               true,
 			pod:                          nofsGroupPod,
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            true,
 		},
 		{
-			description:                  "oldPod=nil, feature=false, newPod.FSGroupChangePolicy=true",
+			description:                  "oldPod=nil, feature=false, newPod.VolumeChangePolicy=true",
 			featureEnabled:               false,
 			pod:                          func() *api.Pod { return nil },
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            false,
 		},
 		{
-			description:                  "oldPod=nil, feature=true, newPod.FSGroupChangePolicy=true",
+			description:                  "oldPod=nil, feature=true, newPod.VolumeChangePolicy=true",
 			featureEnabled:               true,
 			pod:                          func() *api.Pod { return nil },
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            true,
 		},
 		{
-			description:                  "oldPod.FSGroupChangePolicy=nil, feature=false, newPod.FSGroupChangePolicy=true",
+			description:                  "oldPod.VolumeChangePolicy=nil, feature=false, newPod.VolumeChangePolicy=true",
 			featureEnabled:               false,
 			pod:                          nofsGroupPod,
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            false,
 		},
 		{
-			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=true",
+			description:                  "oldPod.VolumeChangePolicy=true, feature=false, newPod.VolumeChangePolicy=true",
 			featureEnabled:               false,
 			pod:                          fsGroupPod,
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            true,
 		},
 		{
-			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=false",
+			description:                  "oldPod.VolumeChangePolicy=true, feature=false, newPod.VolumeChangePolicy=false",
 			featureEnabled:               false,
 			pod:                          fsGroupPod,
 			newPodHasFSGroupChangePolicy: false,
 			expectPolicyInPod:            false,
 		},
 		{
-			description:                  "oldPod.FSGroupChangePolicy=true, feature=true, newPod.FSGroupChangePolicy=false",
+			description:                  "oldPod.VolumeChangePolicy=true, feature=true, newPod.VolumeChangePolicy=false",
 			featureEnabled:               true,
 			pod:                          fsGroupPod,
 			newPodHasFSGroupChangePolicy: false,
@@ -588,7 +588,7 @@ func TestDropFSGroupFields(t *testing.T) {
 	}
 	for _, podInfo := range podInfos {
 		t.Run(podInfo.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, podInfo.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableVolumeChangePolicy, podInfo.featureEnabled)()
 			oldPod := podInfo.pod()
 			newPod := oldPod.DeepCopy()
 			if oldPod == nil && podInfo.newPodHasFSGroupChangePolicy {
@@ -598,8 +598,8 @@ func TestDropFSGroupFields(t *testing.T) {
 			if oldPod != nil {
 				if podInfo.newPodHasFSGroupChangePolicy {
 					newPod.Spec.SecurityContext = &api.PodSecurityContext{
-						FSGroup:             &podFSGroup,
-						FSGroupChangePolicy: &changePolicy,
+						FSGroup:            &podFSGroup,
+						VolumeChangePolicy: &changePolicy,
 					}
 				} else {
 					newPod.Spec.SecurityContext = &api.PodSecurityContext{}
@@ -609,12 +609,12 @@ func TestDropFSGroupFields(t *testing.T) {
 
 			if podInfo.expectPolicyInPod {
 				secContext := newPod.Spec.SecurityContext
-				if secContext == nil || secContext.FSGroupChangePolicy == nil {
+				if secContext == nil || secContext.VolumeChangePolicy == nil {
 					t.Errorf("for %s, expected fsGroupChangepolicy found none", podInfo.description)
 				}
 			} else {
 				secConext := newPod.Spec.SecurityContext
-				if secConext != nil && secConext.FSGroupChangePolicy != nil {
+				if secConext != nil && secConext.VolumeChangePolicy != nil {
 					t.Errorf("for %s, unexpected fsGroupChangepolicy set", podInfo.description)
 				}
 			}

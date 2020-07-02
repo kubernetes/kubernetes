@@ -427,7 +427,7 @@ const (
 	// alpha: v1.18
 	// Allows user to configure volume permission change policy for fsGroups when mounting
 	// a volume in a Pod.
-	ConfigurableFSGroupPolicy featuregate.Feature = "ConfigurableFSGroupPolicy"
+	ConfigurableVolumeChangePolicy featuregate.Feature = "ConfigurableVolumeChangePolicy"
 
 	// owner: @RobertKrawitz
 	// beta: v1.15
@@ -660,7 +660,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
 	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
-	ConfigurableFSGroupPolicy:      {Default: false, PreRelease: featuregate.Alpha},
+	ConfigurableVolumeChangePolicy: {Default: false, PreRelease: featuregate.Alpha},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},

@@ -19,7 +19,7 @@ package pod
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -480,11 +480,11 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 }
 
 func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
-		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
-		// if ConfigurableFSGroupPolicy feature is disabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableVolumeChangePolicy) && !fsGroupPolicyInUse(oldPodSpec) {
+		// if oldPodSpec had no VolumeChangePolicy set then we should prevent new pod from having this field
+		// if ConfigurableVolumeChangePolicy feature is disabled
 		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.FSGroupChangePolicy = nil
+			podSpec.SecurityContext.VolumeChangePolicy = nil
 		}
 	}
 }
@@ -511,7 +511,7 @@ func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	securityContext := podSpec.SecurityContext
-	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
+	if securityContext != nil && securityContext.VolumeChangePolicy != nil {
 		return true
 	}
 	return false
