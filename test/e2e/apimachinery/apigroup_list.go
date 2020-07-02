@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("get-apigroup-list", func() {
-	f := framework.NewDefaultFramework("get-apigroup-list")
+var _ = SIGDescribe("apigroup list", func() {
+	f := framework.NewDefaultFramework("apigroup-list")
 	ginkgo.It("should locate PreferredVersion for each APIGroup", func() {
 
 		// TEST BEGINS HERE
