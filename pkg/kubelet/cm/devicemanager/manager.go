@@ -921,6 +921,30 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 	return nil
 }
 
+// callGetPreferredAllocationIfAvailable issues GetPreferredAllocation grpc
+// call for device plugin resource with GetPreferredAllocationAvailable option set.
+func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, resource string, available, mustInclude sets.String, size int) (sets.String, error) {
+	eI, ok := m.endpoints[resource]
+	if !ok {
+		return nil, fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)
+	}
+
+	if eI.opts == nil || !eI.opts.GetPreferredAllocationAvailable {
+		klog.V(4).Infof("Plugin options indicate to skip GetPreferredAllocation for resource: %s", resource)
+		return nil, nil
+	}
+
+	m.mutex.Unlock()
+	klog.V(4).Infof("Issuing a GetPreferredAllocation call for container, %s, of pod %s", contName, podUID)
+	resp, err := eI.e.getPreferredAllocation(available.UnsortedList(), mustInclude.UnsortedList(), size)
+	m.mutex.Lock()
+	if err != nil {
+		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %v", err)
+	}
+	// TODO: Add metrics support for init RPC
+	return sets.NewString(resp.ContainerResponses[0].DeviceIDs...), nil
+}
+
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager
 // and if necessary, updates allocatableResource in nodeInfo to at least equal to
 // the allocated capacity. This allows pods that have already been scheduled on
