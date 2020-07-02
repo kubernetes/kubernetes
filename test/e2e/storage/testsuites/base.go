@@ -578,14 +578,24 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
 		test := ginkgo.CurrentGinkgoTestDescription()
+		// Clean up each individual component text such that
+		// it contains only characters that are valid as file
+		// name.
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
+		var components []string
+		for _, component := range test.ComponentTexts {
+			components = append(components, reg.ReplaceAllString(component, "_"))
+		}
 		// We end the prefix with a slash to ensure that all logs
 		// end up in a directory named after the current test.
 		//
-		// TODO: use a deeper directory hierarchy once gubernator
-		// supports that (https://github.com/kubernetes/test-infra/issues/10289).
+		// Each component name maps to a directory. This
+		// avoids cluttering the root artifact directory and
+		// keeps each directory name smaller (the full test
+		// name at one point exceeded 256 characters, which was
+		// too much for some filesystems).
 		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
-			reg.ReplaceAllString(test.FullTestText, "_") + "/"
+			strings.Join(components, "/") + "/"
 	}
 	podlogs.CopyAllLogs(ctx, cs, ns, to)
 
