@@ -303,8 +303,9 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 // NewCmdConfigView returns cobra.Command for "kubeadm config view" command
 func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "view",
-		Short: "View the kubeadm configuration stored inside the cluster",
+		Use:        "view",
+		Short:      "View the kubeadm configuration stored inside the cluster",
+		Deprecated: "This command is deprecated and will be removed in a future release, please use 'kubectl get cm -o yaml -n kube-system kubeadm-config' to get the kubeadm config directly.",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
 
