@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -226,6 +227,9 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
 			klog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, v, h.Name, err)
 		}
+	}
+	for _, w := range result.Warnings {
+		warning.AddWarning(ctx, "", w)
 	}
 	if result.Allowed {
 		return nil
