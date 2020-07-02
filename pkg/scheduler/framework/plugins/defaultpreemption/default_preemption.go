@@ -106,8 +106,10 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	nodeLister := pl.fh.SnapshotSharedLister().NodeInfos()
 
 	// 0) Fetch the latest version of <pod>.
-	// TODO(Huang-Wei): get pod from informer cache instead of API server.
-	pod, err := util.GetUpdatedPod(cs, pod)
+	// It's safe to directly fetch pod here. Because the informer cache has already been
+	// initialized when creating the Scheduler obj, i.e., factory.go#MakeDefaultErrorFunc().
+	// However, tests may need to manually initialize the shared pod informer.
+	pod, err := pl.fh.SharedInformerFactory().Core().V1().Pods().Lister().Pods(pod.Namespace).Get(pod.Name)
 	if err != nil {
 		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
 		return "", err

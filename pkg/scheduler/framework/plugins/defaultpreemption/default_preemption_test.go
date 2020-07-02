@@ -85,17 +85,6 @@ var (
 	epochTime6 = metav1.NewTime(time.Unix(0, 6))
 )
 
-func mergeObjs(pod *v1.Pod, pods []*v1.Pod) []runtime.Object {
-	var objs []runtime.Object
-	if pod != nil {
-		objs = append(objs, pod)
-	}
-	for i := range pods {
-		objs = append(objs, pods[i])
-	}
-	return objs
-}
-
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	tests := []struct {
@@ -110,9 +99,9 @@ func TestPostFilter(t *testing.T) {
 	}{
 		{
 			name: "pod with higher priority can be made schedulable",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
@@ -125,9 +114,9 @@ func TestPostFilter(t *testing.T) {
 		},
 		{
 			name: "pod with tied priority is still unschedulable",
-			pod:  st.MakePod().Name("p").UID("p").Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
@@ -140,9 +129,9 @@ func TestPostFilter(t *testing.T) {
 		},
 		{
 			name: "preemption should respect filteredNodesStatuses",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
@@ -155,10 +144,10 @@ func TestPostFilter(t *testing.T) {
 		},
 		{
 			name: "pod can be made schedulable on one node",
-			pod:  st.MakePod().Name("p").UID("p").Priority(midPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(midPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Priority(highPriority).Node("node1").Obj(),
-				st.MakePod().Name("p2").UID("p2").Priority(lowPriority).Node("node2").Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(highPriority).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node2").Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
@@ -173,10 +162,10 @@ func TestPostFilter(t *testing.T) {
 		},
 		{
 			name: "preemption result filtered out by extenders",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").Obj(),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
@@ -196,9 +185,18 @@ func TestPostFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			apiObjs := mergeObjs(tt.pod, tt.pods /*, tt.nodes */)
-			cs := clientsetfake.NewSimpleClientset(apiObjs...)
+			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			podInformer.GetStore().Add(tt.pod)
+			for i := range tt.pods {
+				podInformer.GetStore().Add(tt.pods[i])
+			}
+			// As we use a bare clientset above, it's needed to add a reactor here
+			// to not fail Victims deletion logic.
+			cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
+			})
 			// Register NodeResourceFit as the Filter & PreFilter plugin.
 			registeredPlugins := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1105,7 +1103,7 @@ func TestPreempt(t *testing.T) {
 	}{
 		{
 			name: "basic preemption logic",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
 				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
@@ -1119,16 +1117,16 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "preemption for topology spread constraints",
-			pod: st.MakePod().Name("p").UID("p").Label("foo", "").Priority(highPriority).
+			pod: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Label("foo", "").Priority(highPriority).
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, "hostname", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p-a1").UID("p-a1").Node("node-a").Label("foo", "").Priority(highPriority).Obj(),
-				st.MakePod().Name("p-a2").UID("p-a2").Node("node-a").Label("foo", "").Priority(highPriority).Obj(),
-				st.MakePod().Name("p-b1").UID("p-b1").Node("node-b").Label("foo", "").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p-x1").UID("p-x1").Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
-				st.MakePod().Name("p-x2").UID("p-x2").Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
+				st.MakePod().Name("p-a1").UID("p-a1").Namespace(v1.NamespaceDefault).Node("node-a").Label("foo", "").Priority(highPriority).Obj(),
+				st.MakePod().Name("p-a2").UID("p-a2").Namespace(v1.NamespaceDefault).Node("node-a").Label("foo", "").Priority(highPriority).Obj(),
+				st.MakePod().Name("p-b1").UID("p-b1").Namespace(v1.NamespaceDefault).Node("node-b").Label("foo", "").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p-x1").UID("p-x1").Namespace(v1.NamespaceDefault).Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
+				st.MakePod().Name("p-x2").UID("p-x2").Namespace(v1.NamespaceDefault).Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
 			},
 			nodeNames:      []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
 			registerPlugin: st.RegisterPluginAsExtensions(podtopologyspread.Name, podtopologyspread.New, "PreFilter", "Filter"),
@@ -1137,11 +1135,11 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "Scheduler extenders allow only node1, otherwise node3 would have been chosen",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("node3").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
@@ -1154,11 +1152,11 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "Scheduler extenders do not allow any preemption",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
@@ -1170,11 +1168,11 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "One scheduler extender allows only node1, the other returns error but ignorable. Only node1 would be chosen",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
@@ -1187,11 +1185,11 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "One scheduler extender allows only node1, but it is not interested in given pod, otherwise node1 would have been chosen",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			nodeNames: []string{"node1", "node2"},
 			extenders: []*st.FakeExtender{
@@ -1205,12 +1203,12 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "no preempting in pod",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptNever).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptNever).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(highPriority).Req(largeRes).Obj(),
-				st.MakePod().Name("p3.1").UID("p3.1").Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(highPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p3.1").UID("p3.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
 			nodeNames:      []string{"node1", "node2", "node3"},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
@@ -1219,12 +1217,12 @@ func TestPreempt(t *testing.T) {
 		},
 		{
 			name: "PreemptionPolicy is nil",
-			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(highPriority).Req(largeRes).Obj(),
-				st.MakePod().Name("p3.1").UID("p3.1").Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Namespace(v1.NamespaceDefault).Node("node2").Priority(highPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p3.1").UID("p3.1").Namespace(v1.NamespaceDefault).Node("node3").Priority(midPriority).Req(mediumRes).Obj(),
 			},
 			nodeNames:      []string{"node1", "node2", "node3"},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
@@ -1236,8 +1234,14 @@ func TestPreempt(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			apiObjs := mergeObjs(test.pod, test.pods)
-			client := clientsetfake.NewSimpleClientset(apiObjs...)
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			podInformer.GetStore().Add(test.pod)
+			for i := range test.pods {
+				podInformer.GetStore().Add(test.pods[i])
+			}
+
 			deletedPodNames := make(sets.String)
 			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				deletedPodNames.Insert(action.(clienttesting.DeleteAction).GetName())
@@ -1277,7 +1281,6 @@ func TestPreempt(t *testing.T) {
 				extenders = append(extenders, extender)
 			}
 
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
@@ -1332,7 +1335,6 @@ func TestPreempt(t *testing.T) {
 				}
 			}
 			test.pod.Status.NominatedNodeName = node
-			client.CoreV1().Pods(test.pod.Namespace).Update(context.TODO(), test.pod, metav1.UpdateOptions{})
 
 			// Manually set the deleted Pods' deletionTimestamp to non-nil.
 			for _, pod := range test.pods {
