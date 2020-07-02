@@ -248,14 +248,15 @@ github.com/containerd/containerd/pkg/dialer
 github.com/containerd/ttrpc
 # github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.0
 # github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.0
-# github.com/containernetworking/cni v0.7.1 => github.com/containernetworking/cni v0.7.1
+# github.com/containernetworking/cni v0.8.0 => github.com/containernetworking/cni v0.8.0
 ## explicit
-# github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
+# github.com/containernetworking/cni => github.com/containernetworking/cni v0.8.0
 github.com/containernetworking/cni/libcni
 github.com/containernetworking/cni/pkg/invoke
 github.com/containernetworking/cni/pkg/types
 github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
+github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
 # github.com/coredns/corefile-migration v1.0.8 => github.com/coredns/corefile-migration v1.0.8
 ## explicit
