@@ -23,7 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -57,8 +59,9 @@ func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obje
 }
 
 func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	return validation.ValidateEventCreate(event, groupVersion)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -70,8 +73,10 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (eventStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	oldEvent := obj.(*api.Event)
+	return validation.ValidateEventUpdate(event, oldEvent, groupVersion)
 }
 
 func (eventStrategy) AllowUnconditionalUpdate() bool {
@@ -112,4 +117,12 @@ func ToSelectableFields(event *api.Event) fields.Set {
 		"type":                           event.Type,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+// requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version.
+func requestGroupVersion(ctx context.Context) schema.GroupVersion {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	return schema.GroupVersion{}
 }

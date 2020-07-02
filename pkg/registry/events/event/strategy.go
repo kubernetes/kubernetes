@@ -23,13 +23,15 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	coreapi "k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // eventStrategy implements verification logic for Pod Presets.
@@ -56,8 +58,9 @@ func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obje
 
 // Validate validates a new Event.
 func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	groupVersion := requestGroupVersion(ctx)
+	event := obj.(*coreapi.Event)
+	return corevalidation.ValidateEventCreate(event, groupVersion)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -70,8 +73,10 @@ func (eventStrategy) Canonicalize(obj runtime.Object) {}
 
 // ValidateUpdate is the default update validation for an end user.
 func (eventStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	groupVersion := requestGroupVersion(ctx)
+	event := obj.(*coreapi.Event)
+	oldEvent := old.(*coreapi.Event)
+	return corevalidation.ValidateEventUpdate(event, oldEvent, groupVersion)
 }
 
 // AllowUnconditionalUpdate is the default update policy for Event objects.
@@ -80,13 +85,13 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // SelectableFields returns a field set that represents the object.
-func SelectableFields(pip *api.Event) fields.Set {
+func SelectableFields(pip *coreapi.Event) fields.Set {
 	return generic.ObjectMetaFieldsSet(&pip.ObjectMeta, true)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pip, ok := obj.(*api.Event)
+	pip, ok := obj.(*coreapi.Event)
 	if !ok {
 		return nil, nil, fmt.Errorf("given object is not a Event")
 	}
@@ -101,4 +106,12 @@ func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionP
 		Field:    field,
 		GetAttrs: GetAttrs,
 	}
+}
+
+// requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version.
+func requestGroupVersion(ctx context.Context) schema.GroupVersion {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	return schema.GroupVersion{}
 }

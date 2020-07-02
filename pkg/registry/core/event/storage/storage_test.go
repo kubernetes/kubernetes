@@ -18,6 +18,7 @@ package storage
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,15 +47,25 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 }
 
 func validNewEvent(namespace string) *api.Event {
+	someTime := metav1.MicroTime{Time: time.Unix(1505828956, 0)}
 	return &api.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: namespace,
 		},
-		Reason: "forTesting",
 		InvolvedObject: api.ObjectReference{
 			Name:      "bar",
 			Namespace: namespace,
+		},
+		EventTime:           someTime,
+		ReportingController: "test-controller",
+		ReportingInstance:   "test-node",
+		Action:              "Do",
+		Reason:              "forTesting",
+		Type:                "Normal",
+		Series: &api.EventSeries{
+			Count:            2,
+			LastObservedTime: someTime,
 		},
 	}
 }
@@ -85,13 +96,13 @@ func TestUpdate(t *testing.T) {
 		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Event)
-			object.Reason = "forDifferentTesting"
+			object.Series.Count = 100
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.Event)
-			object.InvolvedObject.Namespace = "different-namespace"
+			object.ReportingController = ""
 			return object
 		},
 	)

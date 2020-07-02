@@ -19,6 +19,7 @@
   "k8s.io/api/core/v1": "v1",
   "k8s.io/api/discovery/v1alpha1": "discoveryv1alpha1",
   "k8s.io/api/discovery/v1beta1": "discoveryv1beta1",
+  "k8s.io/api/events/v1": "eventsv1",
   "k8s.io/api/events/v1beta1": "eventsv1beta1",
   "k8s.io/api/extensions/v1beta1": "extensionsv1beta1",
   "k8s.io/api/imagepolicy/v1alpha1": "imagepolicyv1alpha1",
