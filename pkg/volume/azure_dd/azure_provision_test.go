@@ -41,16 +41,6 @@ func TestParseZoned(t *testing.T) {
 			expected: true,
 		},
 		{
-			msg:      "shared blob disk should default to un-zoned",
-			diskKind: v1.AzureSharedBlobDisk,
-			expected: false,
-		},
-		{
-			msg:      "shared dedicated disk should default to un-zoned",
-			diskKind: v1.AzureDedicatedBlobDisk,
-			expected: false,
-		},
-		{
 			msg:        "managed disk should support zoned=true",
 			diskKind:   v1.AzureManagedDisk,
 			zoneString: "true",
@@ -61,30 +51,6 @@ func TestParseZoned(t *testing.T) {
 			diskKind:   v1.AzureManagedDisk,
 			zoneString: "false",
 			expected:   false,
-		},
-		{
-			msg:        "shared blob disk should support zoned=false",
-			diskKind:   v1.AzureSharedBlobDisk,
-			zoneString: "false",
-			expected:   false,
-		},
-		{
-			msg:         "shared blob disk shouldn't support zoned=true",
-			diskKind:    v1.AzureSharedBlobDisk,
-			zoneString:  "true",
-			expectError: true,
-		},
-		{
-			msg:        "shared dedicated disk should support zoned=false",
-			diskKind:   v1.AzureDedicatedBlobDisk,
-			zoneString: "false",
-			expected:   false,
-		},
-		{
-			msg:         "dedicated blob disk shouldn't support zoned=true",
-			diskKind:    v1.AzureDedicatedBlobDisk,
-			zoneString:  "true",
-			expectError: true,
 		},
 	}
 

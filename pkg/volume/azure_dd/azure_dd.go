@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,9 +37,6 @@ import (
 
 // DiskController interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
-	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
-	DeleteBlobDisk(diskUri string) error
-
 	CreateManagedDisk(options *azure.ManagedDiskOptions) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
@@ -56,11 +52,6 @@ type DiskController interface {
 	GetDiskLun(diskName, diskUri string, nodeName types.NodeName) (int32, error)
 	// Get the next available LUN number to attach a new VHD
 	GetNextDiskLun(nodeName types.NodeName) (int32, error)
-
-	// Create a VHD blob
-	CreateVolume(name, storageAccount, storageAccountType, location string, requestGB int) (string, string, int, error)
-	// Delete a VHD blob
-	DeleteVolume(diskURI string) error
 
 	// Expand the disk to new size
 	ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)

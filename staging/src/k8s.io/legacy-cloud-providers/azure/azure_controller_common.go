@@ -40,11 +40,6 @@ import (
 )
 
 const (
-	// for limits check https://docs.microsoft.com/en-us/azure/azure-subscription-service-limits#storage-limits
-	maxStorageAccounts                     = 100 // max # is 200 (250 with special request). this allows 100 for everything else including stand alone disks
-	maxDisksPerStorageAccounts             = 60
-	storageAccountUtilizationBeforeGrowing = 0.5
-
 	maxLUN               = 64 // max number of LUNs per VM
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"

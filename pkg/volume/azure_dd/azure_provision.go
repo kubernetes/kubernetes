@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,13 +68,7 @@ func (d *azureDiskDeleter) Delete() error {
 		return err
 	}
 
-	managed := (*volumeSource.Kind == v1.AzureManagedDisk)
-
-	if managed {
-		return diskController.DeleteManagedDisk(volumeSource.DataDiskURI)
-	}
-
-	return diskController.DeleteBlobDisk(volumeSource.DataDiskURI)
+	return diskController.DeleteManagedDisk(volumeSource.DataDiskURI)
 }
 
 // parseZoned parsed 'zoned' for storage class. If zoned is not specified (empty string),
@@ -104,7 +97,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	}
 
 	var (
-		location, account          string
 		storageAccountType, fsType string
 		cachingMode                v1.AzureDataDiskCachingMode
 		strKind                    string
@@ -139,10 +131,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		switch strings.ToLower(k) {
 		case "skuname":
 			storageAccountType = v
-		case "location":
-			location = v
-		case "storageaccount":
-			account = v
 		case "storageaccounttype":
 			storageAccountType = v
 		case "kind":
@@ -302,18 +290,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		labels, err = diskController.GetAzureDiskLabels(diskURI)
 		if err != nil {
 			return nil, err
-		}
-	} else {
-		if kind == v1.AzureDedicatedBlobDisk {
-			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGiB)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			diskURI, err = diskController.CreateBlobDisk(name, storage.SkuName(skuName), requestGiB)
-			if err != nil {
-				return nil, err
-			}
 		}
 	}
 

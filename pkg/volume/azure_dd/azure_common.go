@@ -58,10 +58,7 @@ var (
 		string(api.AzureDataDiskCachingReadOnly),
 		string(api.AzureDataDiskCachingReadWrite))
 
-	supportedDiskKinds = sets.NewString(
-		string(api.AzureSharedBlobDisk),
-		string(api.AzureDedicatedBlobDisk),
-		string(api.AzureManagedDisk))
+	supportedDiskKinds = sets.NewString(string(api.AzureManagedDisk))
 
 	// only for Windows node
 	winDiskNumRE = regexp.MustCompile(`/dev/disk(.+)`)
