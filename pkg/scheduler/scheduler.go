@@ -612,15 +612,23 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			if klog.V(2).Enabled() {
 				klog.InfoS("Successfully bound pod to node", "pod", klog.KObj(pod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
 			}
-
 			metrics.PodScheduled(prof.Name, metrics.SinceInSeconds(start))
 			metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
-			metrics.PodSchedulingDuration.Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
+			metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(podInfo)).Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
 
 			// Run "postbind" plugins.
 			prof.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
+}
+
+func getAttemptsLabel(p *framework.QueuedPodInfo) string {
+	// We breakdown the pod scheduling duration by attempts capped to a limit
+	// to avoid ending up with a high cardinality metric.
+	if p.Attempts >= 15 {
+		return "15+"
+	}
+	return string(p.Attempts)
 }
 
 func (sched *Scheduler) profileForPod(pod *v1.Pod) (*profile.Profile, error) {
