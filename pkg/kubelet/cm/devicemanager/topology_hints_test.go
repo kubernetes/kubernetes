@@ -599,6 +599,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			allDevices:            make(map[string]map[string]pluginapi.Device),
 			healthyDevices:        make(map[string]sets.String),
 			allocatedDevices:      make(map[string]sets.String),
+			endpoints:             make(map[string]endpointInfo),
 			podDevices:            make(podDevices),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
@@ -607,6 +608,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 
 		m.allDevices[tc.resource] = make(map[string]pluginapi.Device)
 		m.healthyDevices[tc.resource] = sets.NewString()
+		m.endpoints[tc.resource] = endpointInfo{}
 
 		for _, d := range tc.devices {
 			m.allDevices[tc.resource][d.ID] = d

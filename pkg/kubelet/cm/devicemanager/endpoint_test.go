@@ -160,7 +160,7 @@ func TestAllocate(t *testing.T) {
 }
 
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
-	p := NewDevicePluginStub(devs, socket, resourceName, false)
+	p := NewDevicePluginStub(devs, socket, resourceName, false, false)
 
 	err := p.Start()
 	require.NoError(t, err)
