@@ -74,6 +74,7 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/kubeapiserver/insecurereadyz"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 	"k8s.io/kubernetes/pkg/master"
@@ -132,6 +133,8 @@ cluster's shared state through which all other components interact.`,
 			return nil
 		},
 	}
+
+	cmd.AddCommand(insecurereadyz.NewInsecureReadyzCommand())
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
