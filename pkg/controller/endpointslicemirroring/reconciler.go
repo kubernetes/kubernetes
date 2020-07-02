@@ -36,11 +36,25 @@ import (
 // reconciler is responsible for transforming current EndpointSlice state into
 // desired state
 type reconciler struct {
-	client                clientset.Interface
+	client clientset.Interface
+
+	// endpointSliceTracker tracks the list of EndpointSlices and associated
+	// resource versions expected for each Endpoints resource. It can help
+	// determine if a cached EndpointSlice is out of date.
+	endpointSliceTracker *endpointSliceTracker
+
+	// eventRecorder allows reconciler to record an event if it finds an invalid
+	// IP address in an Endpoints resource.
+	eventRecorder record.EventRecorder
+
+	// maxEndpointsPerSubset references the maximum number of endpoints that
+	// should be added to an EndpointSlice for an EndpointSubset. This allows
+	// for a simple 1:1 mapping between EndpointSubset and EndpointSlice.
 	maxEndpointsPerSubset int32
-	endpointSliceTracker  *endpointSliceTracker
-	metricsCache          *metrics.Cache
-	eventRecorder         record.EventRecorder
+
+	// metricsCache tracks values for total numbers of desired endpoints as well
+	// as the efficiency of EndpointSlice endpoints distribution
+	metricsCache *metrics.Cache
 }
 
 // reconcile takes an Endpoints resource and ensures that corresponding
@@ -50,38 +64,65 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	// Calculate desired state.
 	d := newDesiredCalc()
 
+	numInvalidAddresses := 0
+	addressesSkipped := 0
+
 	for _, subset := range endpoints.Subsets {
 		multiKey := d.initPorts(subset.Ports)
 
-		totalAddresses := 0
-		numInvalidAddresses := 0
+		totalAddresses := len(subset.Addresses) + len(subset.NotReadyAddresses)
+		totalAddressesAdded := 0
 
 		for _, address := range subset.Addresses {
-			totalAddresses++
-			if totalAddresses > int(r.maxEndpointsPerSubset) {
+			// Break if we've reached the max number of addresses to mirror
+			// per EndpointSubset. This allows for a simple 1:1 mapping between
+			// EndpointSubset and EndpointSlice.
+			if totalAddressesAdded >= int(r.maxEndpointsPerSubset) {
 				break
 			}
-			if ok := d.addAddress(address, multiKey, true); !ok {
+			if ok := d.addAddress(address, multiKey, true); ok {
+				totalAddressesAdded++
+			} else {
 				numInvalidAddresses++
 				klog.Warningf("Address in %s/%s Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice: %s", endpoints.Namespace, endpoints.Name, address.IP)
 			}
 		}
 
 		for _, address := range subset.NotReadyAddresses {
-			totalAddresses++
-			if totalAddresses > int(r.maxEndpointsPerSubset) {
+			// Break if we've reached the max number of addresses to mirror
+			// per EndpointSubset. This allows for a simple 1:1 mapping between
+			// EndpointSubset and EndpointSlice.
+			if totalAddressesAdded >= int(r.maxEndpointsPerSubset) {
 				break
 			}
-			if ok := d.addAddress(address, multiKey, false); !ok {
+			if ok := d.addAddress(address, multiKey, true); ok {
+				totalAddressesAdded++
+			} else {
 				numInvalidAddresses++
 				klog.Warningf("Address in %s/%s Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice: %s", endpoints.Namespace, endpoints.Name, address.IP)
 			}
 		}
 
-		if numInvalidAddresses > 0 {
-			r.eventRecorder.Eventf(endpoints, corev1.EventTypeWarning, InvalidIPAddress,
-				"Skipped %d invalid IP addresses when mirroring to EndpointSlices", numInvalidAddresses)
-		}
+		addressesSkipped += totalAddresses - totalAddressesAdded
+	}
+
+	// This metric includes addresses skipped for being invalid or exceeding
+	// MaxEndpointsPerSubset.
+	metrics.AddressesSkippedPerSync.WithLabelValues().Observe(float64(addressesSkipped))
+
+	// Record an event on the Endpoints resource if we skipped mirroring for any
+	// invalid IP addresses.
+	if numInvalidAddresses > 0 {
+		r.eventRecorder.Eventf(endpoints, corev1.EventTypeWarning, InvalidIPAddress,
+			"Skipped %d invalid IP addresses when mirroring to EndpointSlices", numInvalidAddresses)
+	}
+
+	// Record a separate event if we skipped mirroring due to the number of
+	// addresses exceeding MaxEndpointsPerSubset.
+	if addressesSkipped > numInvalidAddresses {
+		klog.Warningf("%d addresses in %s/%s Endpoints were skipped due to exceeding MaxEndpointsPerSubset", addressesSkipped, endpoints.Namespace, endpoints.Name)
+		r.eventRecorder.Eventf(endpoints, corev1.EventTypeWarning, TooManyAddressesToMirror,
+			"A max of %d addresses can be mirrored to EndpointSlices per Endpoints subset. %d addresses were skipped", r.maxEndpointsPerSubset, addressesSkipped)
 	}
 
 	// Build data structures for existing state.

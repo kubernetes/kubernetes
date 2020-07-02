@@ -533,7 +533,7 @@ func TestReconcile(t *testing.T) {
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      2,
 		expectedClientActions:  2,
-		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 3, addedPerSync: 3, numCreated: 2},
+		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 3, addedPerSync: 3, skippedPerSync: 2, numCreated: 2},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports, all invalid addresses",
 		subsets: []corev1.EndpointSubset{{
@@ -582,9 +582,9 @@ func TestReconcile(t *testing.T) {
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      0,
 		expectedClientActions:  0,
-		expectedMetrics:        &expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, numCreated: 0},
+		expectedMetrics:        &expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, skippedPerSync: 5, numCreated: 0},
 	}, {
-		testName: "Endpoints with 2 subsets, multiple ports and addresses, existing EndpointSlice with some addresses",
+		testName: "Endpoints with 2 subsets, 1 exceeding maxEndpointsPerSubset",
 		subsets: []corev1.EndpointSubset{{
 			Ports: []corev1.EndpointPort{{
 				Name:     "http",
@@ -632,7 +632,7 @@ func TestReconcile(t *testing.T) {
 		expectedNumSlices:      2,
 		expectedClientActions:  2,
 		maxEndpointsPerSubset:  2,
-		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 4, addedPerSync: 4, updatedPerSync: 0, removedPerSync: 0, numCreated: 2, numUpdated: 0},
+		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 4, addedPerSync: 4, updatedPerSync: 0, removedPerSync: 0, skippedPerSync: 1, numCreated: 2, numUpdated: 0},
 	}}
 
 	for _, tc := range testCases {
@@ -885,6 +885,7 @@ type expectedMetrics struct {
 	addedPerSync     int
 	updatedPerSync   int
 	removedPerSync   int
+	skippedPerSync   int
 	numCreated       int
 	numUpdated       int
 	numDeleted       int
@@ -929,6 +930,12 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected endpointsRemovedPerSync to be %d, got %v", em.removedPerSync, actualRemovedPerSync)
 	}
 
+	actualSkippedPerSync, err := testutil.GetHistogramMetricValue(metrics.AddressesSkippedPerSync.WithLabelValues())
+	handleErr(t, err, "addressesSkippedPerSync")
+	if actualSkippedPerSync != float64(em.skippedPerSync) {
+		t.Errorf("Expected addressesSkippedPerSync to be %d, got %v", em.skippedPerSync, actualSkippedPerSync)
+	}
+
 	actualCreated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("create"))
 	handleErr(t, err, "endpointSliceChangesCreated")
 	if actualCreated != float64(em.numCreated) {
@@ -962,6 +969,7 @@ func setupMetrics() {
 	metrics.EndpointsAddedPerSync.Delete(map[string]string{})
 	metrics.EndpointsUpdatedPerSync.Delete(map[string]string{})
 	metrics.EndpointsRemovedPerSync.Delete(map[string]string{})
+	metrics.AddressesSkippedPerSync.Delete(map[string]string{})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})

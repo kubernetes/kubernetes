@@ -172,7 +172,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 1,
+		expectedNumActions: 2, // extra action for creating warning event
 		expectedNumSlices:  1,
 	}}
 

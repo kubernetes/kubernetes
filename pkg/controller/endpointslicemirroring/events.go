@@ -26,4 +26,8 @@ const (
 	// InvalidIPAddress indicates that an IP address found in an Endpoints
 	// resource is invalid.
 	InvalidIPAddress = "InvalidIPAddress"
+	// TooManyAddressesToMirror indicates that some addresses were not mirrored
+	// due to an EndpointSubset containing more addresses to mirror than
+	// MaxEndpointsPerSubset allows.
+	TooManyAddressesToMirror = "TooManyAddressesToMirror"
 )

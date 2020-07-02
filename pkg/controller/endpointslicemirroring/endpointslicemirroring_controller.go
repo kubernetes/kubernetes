@@ -161,6 +161,7 @@ type Controller struct {
 	// has been synced at least once. Added as a member to the struct to allow
 	// injection for testing.
 	endpointSlicesSynced cache.InformerSynced
+
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.

@@ -64,6 +64,18 @@ var (
 		},
 		[]string{},
 	)
+	// AddressesSkippedPerSync tracks the number of addresses skipped on each
+	// Endpoints sync due to being invalid or exceeding MaxEndpointsPerSubset.
+	AddressesSkippedPerSync = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      EndpointSliceMirroringSubsystem,
+			Name:           "addresses_skipped_per_sync",
+			Help:           "Number of addresses skipped on each Endpoints sync due to being invalid or exceeding MaxEndpointsPerSubset",
+			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBuckets(2, 2, 15),
+		},
+		[]string{},
+	)
 	// EndpointsSyncDuration tracks how long syncEndpoints() takes in a number
 	// of Seconds.
 	EndpointsSyncDuration = metrics.NewHistogramVec(
@@ -127,6 +139,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(EndpointsAddedPerSync)
 		legacyregistry.MustRegister(EndpointsUpdatedPerSync)
 		legacyregistry.MustRegister(EndpointsRemovedPerSync)
+		legacyregistry.MustRegister(AddressesSkippedPerSync)
 		legacyregistry.MustRegister(EndpointsSyncDuration)
 		legacyregistry.MustRegister(EndpointsDesired)
 		legacyregistry.MustRegister(NumEndpointSlices)
