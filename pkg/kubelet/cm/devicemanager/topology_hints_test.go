@@ -431,14 +431,13 @@ func TestGetTopologyHints(t *testing.T) {
 
 func TestTopologyAlignedAllocation(t *testing.T) {
 	tcases := []struct {
-		description        string
-		resource           string
-		request            int
-		devices            []pluginapi.Device
-		allocatedDevices   []string
-		hint               topologymanager.TopologyHint
-		expectedAllocation int
-		expectedAlignment  map[int]int
+		description       string
+		resource          string
+		request           int
+		devices           []pluginapi.Device
+		allocatedDevices  []string
+		hint              topologymanager.TopologyHint
+		expectedAlignment map[int]int
 	}{
 		{
 			description: "Single Request, no alignment",
@@ -452,8 +451,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(0, 1),
 				Preferred:        true,
 			},
-			expectedAllocation: 1,
-			expectedAlignment:  map[int]int{},
+			expectedAlignment: map[int]int{},
 		},
 		{
 			description: "Request for 1, partial alignment",
@@ -467,8 +465,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(1),
 				Preferred:        true,
 			},
-			expectedAllocation: 1,
-			expectedAlignment:  map[int]int{1: 1},
+			expectedAlignment: map[int]int{1: 1},
 		},
 		{
 			description: "Single Request, socket 0",
@@ -482,8 +479,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(0),
 				Preferred:        true,
 			},
-			expectedAllocation: 1,
-			expectedAlignment:  map[int]int{0: 1},
+			expectedAlignment: map[int]int{0: 1},
 		},
 		{
 			description: "Single Request, socket 1",
@@ -497,8 +493,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(1),
 				Preferred:        true,
 			},
-			expectedAllocation: 1,
-			expectedAlignment:  map[int]int{1: 1},
+			expectedAlignment: map[int]int{1: 1},
 		},
 		{
 			description: "Request for 2, socket 0",
@@ -514,8 +509,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(0),
 				Preferred:        true,
 			},
-			expectedAllocation: 2,
-			expectedAlignment:  map[int]int{0: 2},
+			expectedAlignment: map[int]int{0: 2},
 		},
 		{
 			description: "Request for 2, socket 1",
@@ -531,8 +525,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(1),
 				Preferred:        true,
 			},
-			expectedAllocation: 2,
-			expectedAlignment:  map[int]int{1: 2},
+			expectedAlignment: map[int]int{1: 2},
 		},
 		{
 			description: "Request for 4, unsatisfiable, prefer socket 0",
@@ -550,8 +543,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(0),
 				Preferred:        true,
 			},
-			expectedAllocation: 4,
-			expectedAlignment:  map[int]int{0: 3, 1: 1},
+			expectedAlignment: map[int]int{0: 3, 1: 1},
 		},
 		{
 			description: "Request for 4, unsatisfiable, prefer socket 1",
@@ -569,8 +561,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(1),
 				Preferred:        true,
 			},
-			expectedAllocation: 4,
-			expectedAlignment:  map[int]int{0: 1, 1: 3},
+			expectedAlignment: map[int]int{0: 1, 1: 3},
 		},
 		{
 			description: "Request for 4, multisocket",
@@ -590,8 +581,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				NUMANodeAffinity: makeSocketMask(1, 3),
 				Preferred:        true,
 			},
-			expectedAllocation: 4,
-			expectedAlignment:  map[int]int{1: 2, 3: 2},
+			expectedAlignment: map[int]int{1: 2, 3: 2},
 		},
 	}
 	for _, tc := range tcases {
@@ -621,8 +611,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			continue
 		}
 
-		if len(allocated) != tc.expectedAllocation {
-			t.Errorf("%v. expected allocation: %v but got: %v", tc.description, tc.expectedAllocation, len(allocated))
+		if len(allocated) != tc.request {
+			t.Errorf("%v. expected allocation size: %v but got: %v", tc.description, tc.request, len(allocated))
 		}
 
 		alignment := make(map[int]int)
