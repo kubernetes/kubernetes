@@ -411,13 +411,13 @@ const (
 	CSIMigrationAzureFileComplete featuregate.Feature = "CSIMigrationAzureFileComplete"
 
 	// owner: @divyenpatel
-	// alpha: v1.19
+	// beta: v1.19 (requires: vSphere vCenter/ESXi Version: 7.0u1, HW Version: VM version 15)
 	//
 	// Enables the vSphere in-tree driver to vSphere CSI Driver migration feature.
 	CSIMigrationvSphere featuregate.Feature = "CSIMigrationvSphere"
 
 	// owner: @divyenpatel
-	// alpha: v1.19
+	// beta: v1.19 (requires: vSphere vCenter/ESXi Version: 7.0u1, HW Version: VM version 15)
 	//
 	// Disables the vSphere in-tree driver.
 	// Expects vSphere CSI Driver to be installed and configured on all nodes.
@@ -654,8 +654,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationAzureDiskComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFile:          {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFileComplete:  {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationvSphere:            {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationvSphereComplete:    {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationvSphere:            {Default: false, PreRelease: featuregate.Beta},
+	CSIMigrationvSphereComplete:    {Default: false, PreRelease: featuregate.Beta},
 	RunAsGroup:                     {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
 	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},
