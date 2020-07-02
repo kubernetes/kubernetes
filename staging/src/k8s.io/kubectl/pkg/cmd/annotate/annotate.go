@@ -364,7 +364,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(o.ErrOut, "Listing annotations for %s.%s/%s:\n", gvks[0].Kind, gvks[0].Group, info.Name)
+				fmt.Fprintf(o.Out, "Listing annotations for %s.%s/%s:\n", gvks[0].Kind, gvks[0].Group, info.Name)
 			}
 			for k, v := range accessor.GetAnnotations() {
 				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)
