@@ -19,7 +19,6 @@ github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-04-01/cont
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network
 github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources
 github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage
-github.com/Azure/azure-sdk-for-go/storage
 github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 github.com/Azure/go-ansiterm
@@ -307,7 +306,6 @@ github.com/daviddengcn/go-colortext
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible => github.com/dgrijalva/jwt-go v3.2.0+incompatible
 github.com/dgrijalva/jwt-go
 # github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v3.2.0+incompatible
-# github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 # github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1+incompatible
 ## explicit
 # github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible
@@ -956,18 +954,12 @@ github.com/robfig/cron
 # github.com/robfig/cron => github.com/robfig/cron v1.1.0
 # github.com/rogpeppe/fastuuid => github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 # github.com/rogpeppe/go-internal => github.com/rogpeppe/go-internal v1.3.0
-# github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
-# github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
-github.com/rubiojr/go-vhd/vhd
 # github.com/russross/blackfriday v1.5.2 => github.com/russross/blackfriday v1.5.2
 github.com/russross/blackfriday
 # github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
 # github.com/russross/blackfriday/v2 v2.0.1 => github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
 # github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
-# github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
-github.com/satori/go.uuid
-# github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
 # github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
