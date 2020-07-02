@@ -162,19 +162,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
 		scTest := testsuites.StorageClassTest{
-			Name:         m.driver.GetDriverInfo().Name,
-			Provisioner:  sc.Provisioner,
-			Parameters:   sc.Parameters,
-			ClaimSize:    "1Gi",
-			ExpectedSize: "1Gi",
-			DelayBinding: m.tp.lateBinding,
-		}
-		if m.tp.scName != "" {
-			scTest.StorageClassName = m.tp.scName
-		}
-
-		if m.tp.enableResizing {
-			scTest.AllowVolumeExpansion = true
+			Name:                 m.driver.GetDriverInfo().Name,
+			Provisioner:          sc.Provisioner,
+			Parameters:           sc.Parameters,
+			ClaimSize:            "1Gi",
+			ExpectedSize:         "1Gi",
+			DelayBinding:         m.tp.lateBinding,
+			AllowVolumeExpansion: m.tp.enableResizing,
 		}
 
 		// The mock driver only works when everything runs on a single node.
@@ -354,7 +348,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.It(t.name, func() {
 				init(testParameters{
 					registerDriver: test.deployClusterRegistrar,
-					scName:         "csi-mock-sc-" + f.UniqueName,
 					podInfo:        test.podInfoOnMount})
 
 				defer cleanup()
@@ -682,7 +675,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{
 					disableAttach:   true,
 					registerDriver:  true,
-					scName:          "csi-mock-sc-" + f.UniqueName,
 					javascriptHooks: scripts,
 				})
 				defer cleanup()
