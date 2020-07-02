@@ -35,32 +35,23 @@ var (
 	timeNow = time.Now
 )
 
-type noopInfoLogger struct{}
-
-// Enabled func in noopInfoLogger always return false
-func (l *noopInfoLogger) Enabled() bool {
-	return false
-}
-
-func (l *noopInfoLogger) Info(_ string, _ ...interface{}) {}
-
-var disabledInfoLogger = &noopInfoLogger{}
-
-type infoLogger struct {
-	lvl zapcore.Level
+// zapLogger is a logr.Logger that uses Zap to record log.
+type zapLogger struct {
+	// NB: this looks very similar to zap.SugaredLogger, but
+	// deals with our desire to have multiple verbosity levels.
 	l   *zap.Logger
+	lvl zapcore.Level
 }
 
-// implement logr.InfoLogger
-var _ logr.InfoLogger = &infoLogger{}
+// implement logr.Logger
+var _ logr.Logger = &zapLogger{}
 
-// Enabled always return true
-func (l *infoLogger) Enabled() bool {
-	return true
+func (l *zapLogger) Enabled() bool {
+	return l.l.Core().Enabled(l.lvl)
 }
 
 // Info write message to error level log
-func (l *infoLogger) Info(msg string, keysAndVals ...interface{}) {
+func (l *zapLogger) Info(msg string, keysAndVals ...interface{}) {
 	if checkedEntry := l.l.Check(l.lvl, msg); checkedEntry != nil {
 		checkedEntry.Time = timeNow()
 		checkedEntry.Write(l.handleFields(keysAndVals)...)
@@ -70,7 +61,7 @@ func (l *infoLogger) Info(msg string, keysAndVals ...interface{}) {
 // dPanic write message to DPanicLevel level log
 // we need implement this because unit test case need stub time.Now
 // otherwise the ts field always changed
-func (l *infoLogger) dPanic(msg string, keysAndVals ...interface{}) {
+func (l *zapLogger) dPanic(msg string, keysAndVals ...interface{}) {
 	entry := zapcore.Entry{
 		Level:   zapcore.DPanicLevel,
 		Time:    timeNow(),
@@ -83,7 +74,7 @@ func (l *infoLogger) dPanic(msg string, keysAndVals ...interface{}) {
 // handleFields converts a bunch of arbitrary key-value pairs into Zap fields.  It takes
 // additional pre-converted Zap fields, for use with automatically attached fields, like
 // `error`.
-func (l *infoLogger) handleFields(args []interface{}, additional ...zap.Field) []zap.Field {
+func (l *zapLogger) handleFields(args []interface{}, additional ...zap.Field) []zap.Field {
 	// a slightly modified version of zap.SugaredLogger.sweetenFields
 	if len(args) == 0 {
 		// fast-return if we have no suggared fields.
@@ -118,17 +109,6 @@ func (l *infoLogger) handleFields(args []interface{}, additional ...zap.Field) [
 	return append(fields, additional...)
 }
 
-// zapLogger is a logr.Logger that uses Zap to record log.
-type zapLogger struct {
-	// NB: this looks very similar to zap.SugaredLogger, but
-	// deals with our desire to have multiple verbosity levels.
-	l *zap.Logger
-	infoLogger
-}
-
-// implement logr.Logger
-var _ logr.Logger = &zapLogger{}
-
 // Error write log message to error level
 func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
 	entry := zapcore.Entry{
@@ -141,15 +121,11 @@ func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
 }
 
 // V return info logr.Logger with specified level
-func (l *zapLogger) V(level int) logr.InfoLogger {
-	lvl := zapcore.Level(-1 * level)
-	if l.l.Core().Enabled(lvl) {
-		return &infoLogger{
-			l:   l.l,
-			lvl: lvl,
-		}
+func (l *zapLogger) V(level int) logr.Logger {
+	return &zapLogger{
+		lvl: l.lvl - zapcore.Level(level),
+		l:   l.l,
 	}
-	return disabledInfoLogger
 }
 
 // WithValues return logr.Logger with some keys And Values
@@ -186,11 +162,8 @@ func NewJSONLogger(l *zap.Logger, w zapcore.WriteSyncer) logr.Logger {
 				return zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), zapcore.AddSync(w), zapcore.DebugLevel)
 			}))
 	return &zapLogger{
-		l: log,
-		infoLogger: infoLogger{
-			l:   log,
-			lvl: zap.DebugLevel,
-		},
+		l:   log,
+		lvl: zap.DebugLevel,
 	}
 }
 

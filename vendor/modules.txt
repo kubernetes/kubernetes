@@ -401,9 +401,9 @@ github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-ini/ini => github.com/go-ini/ini v1.9.0
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 # github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
-# github.com/go-logr/logr v0.1.0 => github.com/go-logr/logr v0.1.0
+# github.com/go-logr/logr v0.2.0 => github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
-# github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
+# github.com/go-logr/logr => github.com/go-logr/logr v0.2.0
 # github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
 ## explicit
 github.com/go-openapi/analysis
@@ -2183,10 +2183,10 @@ k8s.io/gengo/types
 ## explicit
 # k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog/v2 v2.1.0 => k8s.io/klog/v2 v2.1.0
+# k8s.io/klog/v2 v2.2.0 => k8s.io/klog/v2 v2.2.0
 ## explicit
 k8s.io/klog/v2
-# k8s.io/klog/v2 => k8s.io/klog/v2 v2.1.0
+# k8s.io/klog/v2 => k8s.io/klog/v2 v2.2.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator

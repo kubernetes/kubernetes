@@ -16,7 +16,7 @@ require (
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/tools v0.0.0-20200602230032-c00d67ef29d0 // indirect
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
-	k8s.io/klog/v2 v2.1.0
+	k8s.io/klog/v2 v2.2.0
 	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
