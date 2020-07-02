@@ -125,7 +125,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 			// Execute createStaticPodFunction
 			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			err := CreateStaticPodFiles(manifestPath, "", "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
 			if err != nil {
 				t.Errorf("Error executing createStaticPodFunction: %v", err)
 				return
@@ -174,7 +174,7 @@ func TestCreateStaticPodFilesKustomize(t *testing.T) {
 
 	// Execute createStaticPodFunction with kustomizations
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateStaticPodFiles(manifestPath, kustomizePath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
+	err = CreateStaticPodFiles(manifestPath, kustomizePath, "", cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return
@@ -188,6 +188,52 @@ func TestCreateStaticPodFilesKustomize(t *testing.T) {
 
 	if _, ok := pod.ObjectMeta.Annotations["kustomize"]; !ok {
 		t.Error("Kustomize did not apply patches corresponding to the resource")
+	}
+}
+
+func TestCreateStaticPodFilesWithPatches(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+
+	// Creates a Cluster Configuration
+	cfg := &kubeadmapi.ClusterConfiguration{
+		KubernetesVersion: "v1.9.0",
+	}
+
+	patchesPath := filepath.Join(tmpdir, "patch-files")
+	err := os.MkdirAll(patchesPath, 0777)
+	if err != nil {
+		t.Fatalf("Couldn't create %s", patchesPath)
+	}
+
+	patchString := dedent.Dedent(`
+	metadata:
+	  annotations:
+	    patched: "true"
+	`)
+
+	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.KubeAPIServer+".yaml"), []byte(patchString), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile returned unexpected error: %v", err)
+	}
+
+	// Execute createStaticPodFunction with patches
+	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
+	err = CreateStaticPodFiles(manifestPath, "", patchesPath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
+	if err != nil {
+		t.Errorf("Error executing createStaticPodFunction: %v", err)
+		return
+	}
+
+	pod, err := staticpodutil.ReadStaticPodFromDisk(filepath.Join(manifestPath, fmt.Sprintf("%s.yaml", kubeadmconstants.KubeAPIServer)))
+	if err != nil {
+		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
+		return
+	}
+
+	if _, ok := pod.ObjectMeta.Annotations["patched"]; !ok {
+		t.Errorf("Patches were not applied to %s", kubeadmconstants.KubeAPIServer)
 	}
 }
 

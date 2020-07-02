@@ -52,6 +52,7 @@ type applyFlags struct {
 	renewCerts         bool
 	imagePullTimeout   time.Duration
 	kustomizeDir       string
+	patchesDir         string
 }
 
 // sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
@@ -89,6 +90,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	// TODO: The flag was deprecated in 1.19; remove the flag following a GA deprecation policy of 12 months or 2 releases (whichever is longer)
 	cmd.Flags().MarkDeprecated("image-pull-timeout", "This flag is deprecated and will be removed in a future version.")
 	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
+	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
 	return cmd
 }
@@ -215,8 +217,8 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
 	if flags.dryRun {
-		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, flags.patchesDir, internalcfg)
 	}
 
-	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
+	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir, flags.patchesDir)
 }

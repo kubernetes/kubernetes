@@ -99,6 +99,7 @@ type initOptions struct {
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
 	kustomizeDir            string
+	patchesDir              string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -121,6 +122,7 @@ type initData struct {
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
 	kustomizeDir            string
+	patchesDir              string
 }
 
 // NewCmdInit returns "kubeadm init" command.
@@ -277,6 +279,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		"Don't print the key used to encrypt the control-plane certificates.",
 	)
 	options.AddKustomizePodsFlag(flagSet, &initOptions.kustomizeDir)
+	options.AddPatchesFlag(flagSet, &initOptions.patchesDir)
 }
 
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
@@ -413,6 +416,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		uploadCerts:             options.uploadCerts,
 		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
 		kustomizeDir:            options.kustomizeDir,
+		patchesDir:              options.patchesDir,
 	}, nil
 }
 
@@ -548,6 +552,11 @@ func (d *initData) Tokens() []string {
 // KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
 func (d *initData) KustomizeDir() string {
 	return d.kustomizeDir
+}
+
+// PatchesDir returns the folder where patches for components are stored
+func (d *initData) PatchesDir() string {
+	return d.patchesDir
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {

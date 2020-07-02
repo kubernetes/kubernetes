@@ -19,6 +19,7 @@ package staticpod
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"net/url"
@@ -37,6 +38,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
 const (
@@ -175,6 +177,48 @@ func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
 	pod2, ok := obj.(*v1.Pod)
 	if !ok {
 		return pod, errors.Wrap(err, "kustomized manifest is not a valid Pod object")
+	}
+
+	return pod2, nil
+}
+
+// PatchStaticPod applies patches stored in patchesDir to a static Pod.
+func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, error) {
+	// Marshal the Pod manifest into YAML.
+	podYAML, err := kubeadmutil.MarshalToYaml(pod, v1.SchemeGroupVersion)
+	if err != nil {
+		return pod, errors.Wrapf(err, "failed to marshal Pod manifest to YAML")
+	}
+
+	var knownTargets = []string{
+		kubeadmconstants.Etcd,
+		kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.KubeControllerManager,
+		kubeadmconstants.KubeScheduler,
+	}
+
+	patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
+	if err != nil {
+		return pod, err
+	}
+
+	patchTarget := &patches.PatchTarget{
+		Name:                      pod.Name,
+		StrategicMergePatchObject: v1.Pod{},
+		Data:                      podYAML,
+	}
+	if err := patchManager.ApplyPatchesToTarget(patchTarget); err != nil {
+		return pod, err
+	}
+
+	obj, err := kubeadmutil.UnmarshalFromYaml(patchTarget.Data, v1.SchemeGroupVersion)
+	if err != nil {
+		return pod, errors.Wrap(err, "failed to unmarshal patched manifest from YAML")
+	}
+
+	pod2, ok := obj.(*v1.Pod)
+	if !ok {
+		return pod, errors.Wrap(err, "patched manifest is not a valid Pod object")
 	}
 
 	return pod2, nil
