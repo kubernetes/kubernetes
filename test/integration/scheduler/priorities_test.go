@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -40,23 +39,18 @@ func TestNodeAffinity(t *testing.T) {
 	testCtx := initTest(t, "node-affinity")
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
-	nodes, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 5)
+	_, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 4)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
 	// Add a label to one of the nodes.
-	labeledNode := nodes[1]
 	labelKey := "kubernetes.io/node-topologyKey"
 	labelValue := "topologyvalue"
-	labels := map[string]string{
-		labelKey: labelValue,
+	labeledNode, err := createNode(testCtx.ClientSet, st.MakeNode().Name("testnode-4").Label(labelKey, labelValue).Obj())
+	if err != nil {
+		t.Fatalf("Cannot create labeled node: %v", err)
 	}
-	if err = utils.AddLabelsToNode(testCtx.ClientSet, labeledNode.Name, labels); err != nil {
-		t.Fatalf("Cannot add labels to node: %v", err)
-	}
-	if err = waitForNodeLabels(testCtx.ClientSet, labeledNode.Name, labels); err != nil {
-		t.Fatalf("Adding labels to node didn't succeed: %v", err)
-	}
+
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
 	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
@@ -234,23 +228,17 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
 	defer testutils.CleanupTest(t, testCtx)
-	// Add 4 nodes.
-	nodes, err := createNodes(cs, "node", st.MakeNode(), 4)
-	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
-	}
-	for i, node := range nodes {
-		// Apply labels "zone: zone-{0,1}" and "node: <node name>" to each node.
-		labels := map[string]string{
-			"zone": fmt.Sprintf("zone-%d", i/2),
-			"node": node.Name,
+
+	var nodes []*v1.Node
+	for i := 0; i < 4; i++ {
+		// Create nodes with labels "zone: zone-{0,1}" and "node: <node name>" to each node.
+		nodeName := fmt.Sprintf("node-%d", i)
+		zone := fmt.Sprintf("zone-%d", i/2)
+		node, err := createNode(cs, st.MakeNode().Name(nodeName).Label("node", nodeName).Label("zone", zone).Obj())
+		if err != nil {
+			t.Fatalf("Cannot create node: %v", err)
 		}
-		if err = utils.AddLabelsToNode(cs, node.Name, labels); err != nil {
-			t.Fatalf("Cannot add labels to node: %v", err)
-		}
-		if err = waitForNodeLabels(cs, node.Name, labels); err != nil {
-			t.Fatalf("Adding labels to node failed: %v", err)
-		}
+		nodes = append(nodes, node)
 	}
 
 	// Taint the 0th node
@@ -259,10 +247,10 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 		Value:  "v1",
 		Effect: v1.TaintEffectNoSchedule,
 	}
-	if err = testutils.AddTaintToNode(cs, nodes[0].Name, taint); err != nil {
+	if err := testutils.AddTaintToNode(cs, nodes[0].Name, taint); err != nil {
 		t.Fatalf("Adding taint to node failed: %v", err)
 	}
-	if err = testutils.WaitForNodeTaints(cs, nodes[0], []v1.Taint{taint}); err != nil {
+	if err := testutils.WaitForNodeTaints(cs, nodes[0], []v1.Taint{taint}); err != nil {
 		t.Fatalf("Taint not seen on node: %v", err)
 	}
 

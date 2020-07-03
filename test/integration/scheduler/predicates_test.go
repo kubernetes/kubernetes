@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -871,22 +870,14 @@ func TestEvenPodsSpreadPredicate(t *testing.T) {
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
 	defer testutils.CleanupTest(t, testCtx)
-	// Add 4 nodes.
-	nodes, err := createNodes(cs, "node", st.MakeNode(), 4)
-	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
-	}
-	for i, node := range nodes {
-		// Apply labels "zone: zone-{0,1}" and "node: <node name>" to each node.
-		labels := map[string]string{
-			"zone": fmt.Sprintf("zone-%d", i/2),
-			"node": node.Name,
-		}
-		if err = utils.AddLabelsToNode(cs, node.Name, labels); err != nil {
-			t.Fatalf("Cannot add labels to node: %v", err)
-		}
-		if err = waitForNodeLabels(cs, node.Name, labels); err != nil {
-			t.Fatalf("Failed to poll node labels: %v", err)
+
+	for i := 0; i < 4; i++ {
+		// Create nodes with labels "zone: zone-{0,1}" and "node: <node name>" to each node.
+		nodeName := fmt.Sprintf("node-%d", i)
+		zone := fmt.Sprintf("zone-%d", i/2)
+		_, err := createNode(cs, st.MakeNode().Name(nodeName).Label("node", nodeName).Label("zone", zone).Obj())
+		if err != nil {
+			t.Fatalf("Cannot create node: %v", err)
 		}
 	}
 
