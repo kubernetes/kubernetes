@@ -3993,13 +3993,21 @@ type ServiceSpec struct {
 	// +optional
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
 
-	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
-	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
-	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
-	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
-	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
-	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
-	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g.
+	// IPv4 vs. IPv6) when the IPv6DualStack feature gate is enabled. In a dual-stack cluster,
+	// you can specify ipFamily when creating a ClusterIP Service to determine whether the
+	// controller will allocate an IPv4 or IPv6 IP for it, and you can specify ipFamily when
+	// creating a headless Service to determine whether it will have IPv4 or IPv6 Endpoints. In
+	// either case, if you do not specify an ipFamily explicitly, it will default to the
+	// cluster's primary IP family.
+	// This field is part of an alpha feature, and you should not make any assumptions about its
+	// semantics other than those described above. In particular, you should not assume that it
+	// can (or cannot) be changed after creation time; that it can only have the values "IPv4"
+	// and "IPv6"; or that its current value on a given Service correctly reflects the current
+	// state of that Service. (For ClusterIP Services, look at clusterIP to see if the Service
+	// is IPv4 or IPv6. For headless Services, look at the endpoints, which may be dual-stack in
+	// the future. For ExternalName Services, ipFamily has no meaning, but it may be set to an
+	// irrelevant value anyway.)
 	// +optional
 	IPFamily *IPFamily `json:"ipFamily,omitempty" protobuf:"bytes,15,opt,name=ipFamily,Configcasttype=IPFamily"`
 
