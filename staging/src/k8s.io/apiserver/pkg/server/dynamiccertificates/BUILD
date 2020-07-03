@@ -7,6 +7,7 @@ go_library(
         "client_ca.go",
         "configmap_cafile_content.go",
         "dynamic_cafile_content.go",
+        "dynamic_getcert_function.go",
         "dynamic_serving_content.go",
         "dynamic_sni_content.go",
         "named_certificates.go",
@@ -56,6 +57,7 @@ go_test(
     srcs = [
         "cert_key_test.go",
         "client_ca_test.go",
+        "dynamic_getcert_function_test.go",
         "named_certificates_test.go",
         "server_test.go",
         "tlsconfig_test.go",
