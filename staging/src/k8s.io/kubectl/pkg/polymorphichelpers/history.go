@@ -233,9 +233,8 @@ type StatefulSetHistoryViewer struct {
 
 // ViewHistory returns a list of the revision history of a statefulset
 // TODO: this should be a describer
-// TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	_, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
+	sts, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
 	if err != nil {
 		return "", err
 	}
@@ -243,6 +242,23 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 	if len(history) <= 0 {
 		return "No rollout history found.", nil
 	}
+	historyInfo := make(map[int64]*appsv1.ControllerRevision)
+	for _, history := range history {
+		historyInfo[history.Revision] = history
+	}
+	// Print details of a specific revision
+	if revision > 0 {
+		history, ok := historyInfo[revision]
+		if !ok {
+			return "", fmt.Errorf("unable to find the specified revision")
+		}
+		stsOfHistory, err := applyRevision(sts, history)
+		if err != nil {
+			return "", fmt.Errorf("unable to parse history %s", history.Name)
+		}
+		return printTemplate(&stsOfHistory.Spec.Template)
+	}
+
 	revisions := make([]int64, 0, len(history))
 	for _, revision := range history {
 		revisions = append(revisions, revision.Revision)
