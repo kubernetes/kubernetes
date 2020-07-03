@@ -958,7 +958,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			expected: map[string]bool{"node4": true},
 		},
 		{
-			name: "ErrTopologySpreadConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
+			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
@@ -970,6 +970,15 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+				"node3": framework.NewStatus(framework.Unschedulable, ""),
+				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+			},
+			expected: map[string]bool{"node1": true, "node3": true},
+		},
+		{
+			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
+			nodesStatuses: framework.NodeToStatusMap{
+				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, podtopologyspread.ErrReasonNodeLabelNotMatch),
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
