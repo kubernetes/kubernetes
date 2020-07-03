@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -28,6 +29,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -242,6 +244,409 @@ func TestFetchFromClusterWithLocalUpgrades(t *testing.T) {
 						}
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestGetVersionStates(t *testing.T) {
+	tests := []struct {
+		desc        string
+		objects     []runtime.Object
+		substitutes string
+		expected    []outputapi.ComponentConfigVersionState
+	}{
+		{
+			desc: "Normal config",
+			objects: []runtime.Object{
+				kubeproxyConfigMap(`
+					apiVersion: kubeproxy.config.k8s.io/v1alpha1
+					kind: KubeProxyConfiguration
+				`),
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1beta1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: false,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1beta1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: false,
+				},
+			},
+		},
+		{
+			desc: "Normal config ignoring a current substitute",
+			objects: []runtime.Object{
+				kubeproxyConfigMap(`
+					apiVersion: kubeproxy.config.k8s.io/v1alpha1
+					kind: KubeProxyConfiguration
+				`),
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1beta1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			substitutes: dedent.Dedent(`
+				apiVersion: kubeproxy.config.k8s.io/v1alpha1
+				kind: KubeProxyConfiguration
+			`),
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: false,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1beta1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: false,
+				},
+			},
+		},
+		{
+			desc: "Normal config with an old substitute",
+			objects: []runtime.Object{
+				kubeproxyConfigMap(`
+					apiVersion: kubeproxy.config.k8s.io/v1alpha1
+					kind: KubeProxyConfiguration
+				`),
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1beta1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			substitutes: dedent.Dedent(`
+				apiVersion: kubeproxy.config.k8s.io/v1alpha0
+				kind: KubeProxyConfiguration
+			`),
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha0",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: true,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1beta1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: false,
+				},
+			},
+		},
+		{
+			desc: "Old user supplied config",
+			objects: []runtime.Object{
+				kubeproxyConfigMap(`
+					apiVersion: kubeproxy.config.k8s.io/v1alpha0
+					kind: KubeProxyConfiguration
+				`),
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1alpha1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha0",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: true,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: true,
+				},
+			},
+		},
+		{
+			desc: "Old user supplied config with a proper substitute",
+			objects: []runtime.Object{
+				kubeproxyConfigMap(`
+					apiVersion: kubeproxy.config.k8s.io/v1alpha0
+					kind: KubeProxyConfiguration
+				`),
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1alpha1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			substitutes: dedent.Dedent(`
+				apiVersion: kubeproxy.config.k8s.io/v1alpha1
+				kind: KubeProxyConfiguration
+			`),
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: false,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: true,
+				},
+			},
+		},
+		{
+			desc: "Old user supplied config with an old substitute",
+			objects: []runtime.Object{
+				kubeproxyConfigMap(`
+					apiVersion: kubeproxy.config.k8s.io/v1alpha0
+					kind: KubeProxyConfiguration
+				`),
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1alpha1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			substitutes: dedent.Dedent(`
+				apiVersion: kubeproxy.config.k8s.io/v1alpha0
+				kind: KubeProxyConfiguration
+			`),
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha0",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: true,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: true,
+				},
+			},
+		},
+		{
+			desc: "Old kubeadm generated config",
+			objects: []runtime.Object{
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.KubeProxyConfigMap,
+						Namespace: metav1.NamespaceSystem,
+						Annotations: map[string]string{
+							constants.ComponentConfigHashAnnotationKey: "sha256:8d3dfd7abcac205f6744d8e9db44505cce0c15b0a5395501e272fc18bd54c13c",
+						},
+					},
+					Data: map[string]string{
+						constants.KubeProxyConfigMapKey: dedent.Dedent(`
+							apiVersion: kubeproxy.config.k8s.io/v1alpha0
+							kind: KubeProxyConfiguration
+						`),
+					},
+				},
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1beta1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: false,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1beta1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: false,
+				},
+			},
+		},
+		{
+			desc: "Old kubeadm generated config with a proper substitute",
+			objects: []runtime.Object{
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.KubeProxyConfigMap,
+						Namespace: metav1.NamespaceSystem,
+						Annotations: map[string]string{
+							constants.ComponentConfigHashAnnotationKey: "sha256:8d3dfd7abcac205f6744d8e9db44505cce0c15b0a5395501e272fc18bd54c13c",
+						},
+					},
+					Data: map[string]string{
+						constants.KubeProxyConfigMapKey: dedent.Dedent(`
+							apiVersion: kubeproxy.config.k8s.io/v1alpha0
+							kind: KubeProxyConfiguration
+						`),
+					},
+				},
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1beta1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			substitutes: dedent.Dedent(`
+				apiVersion: kubeproxy.config.k8s.io/v1alpha1
+				kind: KubeProxyConfiguration
+			`),
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha1",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: false,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1beta1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: false,
+				},
+			},
+		},
+		{
+			desc: "Old kubeadm generated config with an old substitute",
+			objects: []runtime.Object{
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.KubeProxyConfigMap,
+						Namespace: metav1.NamespaceSystem,
+						Annotations: map[string]string{
+							constants.ComponentConfigHashAnnotationKey: "sha256:8d3dfd7abcac205f6744d8e9db44505cce0c15b0a5395501e272fc18bd54c13c",
+						},
+					},
+					Data: map[string]string{
+						constants.KubeProxyConfigMapKey: dedent.Dedent(`
+							apiVersion: kubeproxy.config.k8s.io/v1alpha0
+							kind: KubeProxyConfiguration
+						`),
+					},
+				},
+				&v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+						Namespace: metav1.NamespaceSystem,
+					},
+					Data: map[string]string{
+						constants.KubeletBaseConfigurationConfigMapKey: dedent.Dedent(`
+							apiVersion: kubelet.config.k8s.io/v1beta1
+							kind: KubeletConfiguration
+						`),
+					},
+				},
+			},
+			substitutes: dedent.Dedent(`
+				apiVersion: kubeproxy.config.k8s.io/v1alpha0
+				kind: KubeProxyConfiguration
+			`),
+			expected: []outputapi.ComponentConfigVersionState{
+				{
+					Group:                 "kubeproxy.config.k8s.io",
+					CurrentVersion:        "v1alpha0",
+					PreferredVersion:      "v1alpha1",
+					ManualUpgradeRequired: true,
+				},
+				{
+					Group:                 "kubelet.config.k8s.io",
+					CurrentVersion:        "v1beta1",
+					PreferredVersion:      "v1beta1",
+					ManualUpgradeRequired: false,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			docmap, err := kubeadmutil.SplitYAMLDocuments([]byte(test.substitutes))
+			if err != nil {
+				t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+			}
+
+			clusterCfg := &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			}
+			client := clientsetfake.NewSimpleClientset(test.objects...)
+			got, err := GetVersionStates(clusterCfg, client, docmap)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Fatalf("unexpected result:\n\texpected: %v\n\tgot: %v", test.expected, got)
 			}
 		})
 	}
