@@ -1269,7 +1269,7 @@ func (kl *Kubelet) initializeModules() error {
 	// If the container logs directory does not exist, create it.
 	if _, err := os.Stat(ContainerLogsDir); err != nil {
 		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
-			klog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
+			return fmt.Errorf("failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
 
