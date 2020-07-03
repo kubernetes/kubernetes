@@ -65,17 +65,17 @@ func TestEventCompatibility(t *testing.T) {
 	oldBroadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	oldRecorder.Eventf(regarding, v1.EventTypeNormal, "started", "note")
 
-	newBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
+	newBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	newRecorder := newBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
 	newBroadcaster.StartRecordingToSink(stopCh)
 	newRecorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
 	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
-		v1beta1Events, err := client.EventsV1beta1().Events("").List(context.TODO(), metav1.ListOptions{})
+		v1Events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		if len(v1beta1Events.Items) != 2 {
+		if len(v1Events.Items) != 2 {
 			return false, nil
 		}
 

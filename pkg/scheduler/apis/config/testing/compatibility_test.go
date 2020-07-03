@@ -1333,7 +1333,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 			}
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
+			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
 
 			sched, err := scheduler.New(
 				client,
@@ -1509,7 +1509,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
+			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
 
 			sched, err := scheduler.New(
 				client,
@@ -1938,7 +1938,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
+			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
 
 			sched, err := scheduler.New(
 				client,

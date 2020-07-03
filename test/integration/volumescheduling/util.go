@@ -105,7 +105,7 @@ func initTestSchedulerWithOptions(
 
 	podInformer := testCtx.informerFactory.Core().V1().Pods()
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: testCtx.clientSet.EventsV1beta1().Events(""),
+		Interface: testCtx.clientSet.EventsV1(),
 	})
 
 	var err error
