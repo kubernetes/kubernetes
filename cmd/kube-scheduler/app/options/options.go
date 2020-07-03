@@ -41,6 +41,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
@@ -61,6 +62,7 @@ type Options struct {
 	Authentication          *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization           *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics                 *metrics.Options
+	Logs                    *logs.Options
 	Deprecated              *DeprecatedOptions
 
 	// ConfigFile is the location of the scheduler server's configuration file.
@@ -106,6 +108,7 @@ func NewOptions() (*Options, error) {
 			HardPodAffinitySymmetricWeight: 1,
 		},
 		Metrics: metrics.NewOptions(),
+		Logs:    logs.NewOptions(),
 	}
 
 	o.Authentication.TolerateInClusterLookupFailure = true
@@ -167,6 +170,7 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	options.BindLeaderElectionFlags(&o.ComponentConfig.LeaderElection, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
 	o.Metrics.AddFlags(nfs.FlagSet("metrics"))
+	o.Logs.AddFlags(nfs.FlagSet("logs"))
 
 	return nfs
 }
@@ -219,6 +223,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
+	o.Logs.Apply()
 	return nil
 }
 
@@ -244,6 +249,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Deprecated.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
+	errs = append(errs, o.Logs.Validate()...)
 
 	return errs
 }
