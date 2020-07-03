@@ -396,9 +396,11 @@ func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, nam
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		old := getPDBStatusOrDie(dc, ns, name)
 		patchBytes, err := f(old)
+		framework.ExpectNoError(err)
 		if updated, err = cs.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(context.TODO(), old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
 			return err
 		}
+		framework.ExpectNoError(err)
 		return nil
 	})
 

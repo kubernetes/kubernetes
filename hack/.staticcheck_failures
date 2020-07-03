@@ -8,7 +8,6 @@ pkg/volume/azure_dd
 pkg/volume/gcepd
 pkg/volume/rbd
 pkg/volume/testing
-test/e2e/apps
 test/e2e/autoscaling
 test/e2e_node
 test/integration/examples
