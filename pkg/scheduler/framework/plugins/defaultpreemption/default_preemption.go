@@ -106,7 +106,7 @@ func preempt(ctx context.Context, fh framework.FrameworkHandle, state *framework
 		return "", err
 	}
 
-	if !podEligibleToPreemptOthers(pod, fh.SnapshotSharedLister().NodeInfos()) {
+	if !podEligibleToPreemptOthers(pod, fh.SnapshotSharedLister().NodeInfos(), m[pod.Status.NominatedNodeName]) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return "", nil
 	}
@@ -189,13 +189,19 @@ func preempt(ctx context.Context, fh framework.FrameworkHandle, state *framework
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
-func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister) bool {
+func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister, nominatedNodeStatus *framework.Status) bool {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
 		return false
 	}
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
+		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
+		// then the pod should be considered for preempting again.
+		if nominatedNodeStatus.Code() == framework.UnschedulableAndUnresolvable {
+			return true
+		}
+
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			podPriority := podutil.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods {
