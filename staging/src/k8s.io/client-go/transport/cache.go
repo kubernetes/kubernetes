@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -128,10 +129,23 @@ func tlsConfigKey(c *Config) (tlsCacheKey, error) {
 	if err := loadTLSFiles(c); err != nil {
 		return tlsCacheKey{}, err
 	}
+
+	// since golang forbids comparing functions we should take the address of the certificate instead
+	// see:
+	//   https://golang.org/ref/spec#Address_operators
+	//   https://golang.org/ref/spec#Comparison_operators
+	var getCert *tls.Certificate
+	if c.TLS.GetCert != nil {
+		var err error
+		if getCert, err = c.TLS.GetCert(); err != nil {
+			return tlsCacheKey{}, err
+		}
+	}
+
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
 		caData:             string(c.TLS.CAData),
-		getCert:            fmt.Sprintf("%p", c.TLS.GetCert),
+		getCert:            fmt.Sprintf("%p", getCert),
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		dial:               fmt.Sprintf("%p", c.Dial),

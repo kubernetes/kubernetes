@@ -284,8 +284,9 @@ func TestProxyHandler(t *testing.T) {
 			}
 
 			certProvider, _ := dynamiccertificates.NewStaticCertKeyContent("test", svcCrt, svcKey)
+			getCertProvider, _ := dynamiccertificates.NewDynamicGetCertFunction(certProvider)
 			if tc.apiService != nil {
-				handler.certKeyContentProvider = certProvider
+				handler.dynamicGetCertProvider = getCertProvider
 			}
 
 			server := httptest.NewServer(contextHandler(handler, tc.user))
@@ -380,7 +381,12 @@ func TestProxyCertReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to load dynamic certificates: %v", err)
 	}
-	handler.certKeyContentProvider = certProvider
+	getCertProvider, err := dynamiccertificates.NewDynamicGetCertFunction(certProvider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certProvider.AddListener(getCertProvider)
+	handler.dynamicGetCertProvider = getCertProvider
 
 	apiService := &apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
@@ -537,10 +543,11 @@ func TestProxyUpgrade(t *testing.T) {
 
 			serverURL, _ := url.Parse(backendServer.URL)
 			certProvider, _ := dynamiccertificates.NewStaticCertKeyContent("test", svcCrt, svcKey)
+			getCertProvider, _ := dynamiccertificates.NewDynamicGetCertFunction(certProvider)
 
 			proxyHandler := &proxyHandler{
 				serviceResolver:        &mockedRouter{destinationHost: serverURL.Host},
-				certKeyContentProvider: certProvider,
+				dynamicGetCertProvider: getCertProvider,
 			}
 			proxyHandler.updateAPIService(tc.APIService)
 			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))

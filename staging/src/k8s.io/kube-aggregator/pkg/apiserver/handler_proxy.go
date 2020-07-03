@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 	"net/url"
 	"strings"
@@ -55,8 +54,8 @@ type proxyHandler struct {
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
-	// certKeyContentProvider provides certificates to confirm the proxy's identity
-	certKeyContentProvider dynamiccertificates.CertKeyContentProvider
+	// dynamicGetCertProvider provides dynamic reloading of client cert used to identify this proxy.
+	dynamicGetCertProvider dynamiccertificates.DynamicGetCertFunctionsProvider
 
 	proxyTransport *http.Transport
 
@@ -246,12 +245,8 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 
 	transportConfig := &transport.Config{
 		TLS: transport.TLSConfig{
-			Insecure: apiService.Spec.InsecureSkipTLSVerify,
-			GetCert: func() (*tls.Certificate, error) {
-				cert, key := r.certKeyContentProvider.CurrentCertKeyContent()
-				crt, err := tls.X509KeyPair(cert, key)
-				return &crt, err
-			},
+			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+			GetCert:    r.dynamicGetCertProvider.GetCert,
 			CAData:     apiService.Spec.CABundle,
 			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
 		},

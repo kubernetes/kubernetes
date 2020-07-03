@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -71,7 +70,7 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	discoveryClient *http.Client
+	transportConfig *transport.Config
 
 	serviceResolver ServiceResolver
 
@@ -91,7 +90,7 @@ func NewAvailableConditionController(
 	serviceInformer v1informers.ServiceInformer,
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
-	certKeyContentProvider dynamiccertificates.CertKeyContentProvider,
+	dynamicGetCertProvider dynamiccertificates.DynamicGetCertFunctionsProvider,
 	egressSelector *egressselector.EgressSelector,
 	proxyTransport *http.Transport,
 	serviceResolver ServiceResolver,
@@ -140,11 +139,7 @@ func NewAvailableConditionController(
 	transportConfig := &transport.Config{
 		TLS: transport.TLSConfig{
 			Insecure: true,
-			GetCert: func() (*tls.Certificate, error) {
-				cert, key := certKeyContentProvider.CurrentCertKeyContent()
-				crt, err := tls.X509KeyPair(cert, key)
-				return &crt, err
-			},
+			GetCert:  dynamicGetCertProvider.GetCert,
 		},
 	}
 
@@ -160,16 +155,7 @@ func NewAvailableConditionController(
 		transportConfig.Dial = proxyTransport.DialContext
 	}
 
-	tr, err := transport.New(transportConfig)
-	if err != nil {
-		return nil, err
-	}
-	c.discoveryClient = &http.Client{
-		Transport: tr,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
-	}
-
+	c.transportConfig = transportConfig
 	c.syncFn = c.sync
 
 	return c, nil
@@ -276,6 +262,15 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
+	tr, err := transport.New(c.transportConfig)
+	if err != nil {
+		return err
+	}
+	discoveryClient := &http.Client{
+		Transport: tr,
+		// the request should happen quickly.
+		Timeout: 5 * time.Second,
+	}
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
 		attempts := 5
 		results := make(chan error, attempts)
@@ -304,7 +299,7 @@ func (c *AvailableConditionController) sync(key string) error {
 
 					// setting the system-masters identity ensures that we will always have access rights
 					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
-					resp, err := c.discoveryClient.Do(newReq)
+					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
 						// we should always been in the 200s or 300s

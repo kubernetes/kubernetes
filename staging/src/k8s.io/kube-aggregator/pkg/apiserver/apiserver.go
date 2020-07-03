@@ -108,9 +108,8 @@ type APIAggregator struct {
 
 	delegateHandler http.Handler
 
-	// certKeyContentProvider is dynamically reloaded client cert used to identify this proxy. Backing APIServices use
-	// this to confirm the proxy's identity
-	certKeyContentProvider dynamiccertificates.CertKeyContentProvider
+	// dynamicGetCertProvider provides dynamic reloading of client cert used to identify this proxy.
+	dynamicGetCertProvider dynamiccertificates.DynamicGetCertFunctionsProvider
 	proxyTransport         *http.Transport
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
@@ -177,6 +176,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	var certKeyContentProvider *dynamiccertificates.DynamicCertKeyPairContent
+	var dynamicGetCertFunctionProvider *dynamiccertificates.DynamicGetCertFunction
 	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {
 		certKeyContentProvider, err = dynamiccertificates.NewDynamicServingContentFromFiles("aggregator-proxy-cert", c.ExtraConfig.ProxyClientCertFile, c.ExtraConfig.ProxyClientKeyFile)
 		if err != nil {
@@ -185,12 +185,17 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		if err := certKeyContentProvider.RunOnce(); err != nil {
 			return nil, err
 		}
+		dynamicGetCertFunctionProvider, err = dynamiccertificates.NewDynamicGetCertFunction(certKeyContentProvider)
+		if err != nil {
+			return nil, err
+		}
+		certKeyContentProvider.AddListener(dynamicGetCertFunctionProvider)
 	}
 
 	s := &APIAggregator{
 		GenericAPIServer:         genericServer,
 		delegateHandler:          delegationTarget.UnprotectedHandler(),
-		certKeyContentProvider:   certKeyContentProvider,
+		dynamicGetCertProvider:   dynamicGetCertFunctionProvider,
 		proxyTransport:           c.ExtraConfig.ProxyTransport,
 		proxyHandlers:            map[string]*proxyHandler{},
 		handledGroups:            sets.String{},
@@ -229,7 +234,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.ApiregistrationV1(),
-		certKeyContentProvider,
+		dynamicGetCertFunctionProvider,
 		c.GenericConfig.EgressSelector,
 		c.ExtraConfig.ProxyTransport,
 		s.serviceResolver,
@@ -325,7 +330,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
 		localDelegate:          s.delegateHandler,
-		certKeyContentProvider: s.certKeyContentProvider,
+		dynamicGetCertProvider: s.dynamicGetCertProvider,
 		serviceResolver:        s.serviceResolver,
 	}
 	proxyHandler.updateAPIService(apiService)

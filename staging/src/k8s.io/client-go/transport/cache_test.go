@@ -30,14 +30,14 @@ import (
 func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that don't affect the tls config don't affect the cache key
 	rand.Seed(time.Now().UTC().UnixNano())
-	getRandBytes := func() []byte {
+	tlsCertificate := &tls.Certificate{OCSPStaple: func() []byte {
 		b := make([]byte, 32)
 		if _, err := rand.Read(b); err != nil {
 			panic(err) // rand should never fail
 		}
 		return b
-	}
-	getCertDynamic := func() (*tls.Certificate, error) { return &tls.Certificate{OCSPStaple: getRandBytes()}, nil }
+	}()}
+	getCertDynamic := func() (*tls.Certificate, error) { return tlsCertificate, nil }
 	getCertIdenticalConfigurations := map[string]*Config{
 		"getCertDynamic1": {
 			TLS: TLSConfig{
@@ -98,8 +98,8 @@ func TestTLSConfigKey(t *testing.T) {
 			}
 			getCertA, _ := valueA.TLS.GetCert()
 			getCertB, _ := valueB.TLS.GetCert()
-			if getCertA == getCertB {
-				t.Errorf("Expected different values returned from GetCert function for %q and %q", nameA, nameB)
+			if getCertA != getCertB {
+				t.Errorf("Expected got get the same certificate returned from GetCert function for %q and %q", nameA, nameB)
 				continue
 			}
 		}
@@ -134,7 +134,12 @@ func TestTLSConfigKey(t *testing.T) {
 
 	// Make sure config fields that affect the tls config affect the cache key
 	dialer := net.Dialer{}
-	getCert := func() (*tls.Certificate, error) { return nil, nil }
+	getCert := func(cert *tls.Certificate) func() (*tls.Certificate, error) {
+		return func() (*tls.Certificate, error) { return cert, nil }
+	}(&tls.Certificate{})
+	getCert2 := func(cert *tls.Certificate) func() (*tls.Certificate, error) {
+		return func() (*tls.Certificate, error) { return cert, nil }
+	}(&tls.Certificate{})
 	uniqueConfigurations := map[string]*Config{
 		"no tls":   {},
 		"dialer":   {Dial: dialer.DialContext},
@@ -196,7 +201,7 @@ func TestTLSConfigKey(t *testing.T) {
 		"getCert2": {
 			TLS: TLSConfig{
 				KeyData: []byte{1},
-				GetCert: func() (*tls.Certificate, error) { return nil, nil },
+				GetCert: getCert2,
 			},
 		},
 		"getCert1, key 2": {

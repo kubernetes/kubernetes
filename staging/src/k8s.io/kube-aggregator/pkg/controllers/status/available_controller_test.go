@@ -122,23 +122,19 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 		apiServiceIndexer.Add(o)
 	}
 
-	tr, _ := transport.New(&transport.Config{
+	trCfg := &transport.Config{
 		TLS: transport.TLSConfig{
 			Insecure:   true,
 			ServerName: "",
-		}})
+		}}
 
 	c := AvailableConditionController{
 		apiServiceClient: fakeClient.ApiregistrationV1(),
 		apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
 		serviceLister:    v1listers.NewServiceLister(serviceIndexer),
 		endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
-		discoveryClient: &http.Client{
-			Transport: tr,
-			// the request should happen quickly.
-			Timeout: 5 * time.Second,
-		},
-		serviceResolver: &fakeServiceResolver{url: testServer.URL},
+		transportConfig:  trCfg,
+		serviceResolver:  &fakeServiceResolver{url: testServer.URL},
 		queue: workqueue.NewNamedRateLimitingQueue(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
@@ -361,11 +357,11 @@ func TestSync(t *testing.T) {
 			}))
 			defer testServer.Close()
 
-			tr, _ := transport.New(&transport.Config{
+			trCfg := &transport.Config{
 				TLS: transport.TLSConfig{
 					Insecure:   true,
 					ServerName: "",
-				}})
+				}}
 
 			c := AvailableConditionController{
 				apiServiceClient: fakeClient.ApiregistrationV1(),
@@ -373,11 +369,7 @@ func TestSync(t *testing.T) {
 				serviceLister:    v1listers.NewServiceLister(serviceIndexer),
 				endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
 				serviceResolver:  &fakeServiceResolver{url: testServer.URL},
-				discoveryClient: &http.Client{
-					Transport: tr,
-					// the request should happen quickly.
-					Timeout: 5 * time.Second,
-				},
+				transportConfig:  trCfg,
 			}
 			c.sync(tc.apiServiceName)
 
