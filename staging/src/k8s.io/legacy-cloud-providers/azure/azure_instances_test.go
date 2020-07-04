@@ -384,7 +384,7 @@ func TestNodeAddresses(t *testing.T) {
 func TestIsCurrentInstance(t *testing.T) {
 	cloud := &Cloud{
 		Config: Config{
-			VMType: vmTypeVMSS,
+			VMType: vmTypeStandard,
 		},
 	}
 	testcases := []struct {
@@ -404,11 +404,6 @@ func TestIsCurrentInstance(t *testing.T) {
 			expected:       false,
 		},
 		{
-			nodeName:       "vmss000001",
-			metadataVMName: "vmss_1",
-			expected:       true,
-		},
-		{
 			nodeName:       "vmss_2",
 			metadataVMName: "vmss000000",
 			expected:       false,
@@ -417,7 +412,6 @@ func TestIsCurrentInstance(t *testing.T) {
 			nodeName:       "vmss123456",
 			metadataVMName: "vmss_$123",
 			expected:       false,
-			expectError:    true,
 		},
 	}
 
