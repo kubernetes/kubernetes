@@ -297,6 +297,7 @@ func (c *Controller) syncHandler(key string) error {
 	// should update the Deployment resource.
 	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
 		klog.V(4).Infof("Foo %s replicas: %d, deployment replicas: %d", name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
+		*foo.Spec.Replicas = *deployment.Spec.Replicas
 		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(context.TODO(), newDeployment(foo), metav1.UpdateOptions{})
 	}
 
