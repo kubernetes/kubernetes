@@ -299,10 +299,34 @@ func (ec2i *FakeEC2Impl) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.Delete
 	panic("Not implemented")
 }
 
-// ModifyInstanceAttribute is not implemented but is required for interface
-// conformance
+// ModifyInstanceAttribute only modifies SourceDestCheck now.
 func (ec2i *FakeEC2Impl) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
-	panic("Not implemented")
+	reqInstanceID := aws.StringValue(request.InstanceId)
+	for _, instance := range ec2i.aws.instances {
+		if aws.StringValue(instance.InstanceId) == reqInstanceID {
+			if request.SourceDestCheck != nil {
+				instance.SourceDestCheck = request.SourceDestCheck.Value
+			}
+			return &ec2.ModifyInstanceAttributeOutput{}, nil
+		}
+	}
+	return nil, fmt.Errorf("instance not found: %s", reqInstanceID)
+}
+
+// ModifyNetworkInterfaceAttribute only modifies SourceDestCheck now.
+func (ec2i *FakeEC2Impl) ModifyNetworkInterfaceAttribute(request *ec2.ModifyNetworkInterfaceAttributeInput) (*ec2.ModifyNetworkInterfaceAttributeOutput, error) {
+	interfaceID := aws.StringValue(request.NetworkInterfaceId)
+	for _, instance := range ec2i.aws.instances {
+		for _, device := range instance.NetworkInterfaces {
+			if aws.StringValue(device.NetworkInterfaceId) == interfaceID {
+				if request.SourceDestCheck != nil {
+					device.SourceDestCheck = request.SourceDestCheck.Value
+				}
+				return &ec2.ModifyNetworkInterfaceAttributeOutput{}, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("interface not found: %s", interfaceID)
 }
 
 // DescribeVpcs returns fake VPC descriptions

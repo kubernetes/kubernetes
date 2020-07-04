@@ -127,16 +127,49 @@ func (c *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpro
 	return routes, nil
 }
 
-// Sets the instance attribute "source-dest-check" to the specified value
-func (c *Cloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCheck bool) error {
-	request := &ec2.ModifyInstanceAttributeInput{}
-	request.InstanceId = aws.String(instanceID)
-	request.SourceDestCheck = &ec2.AttributeBooleanValue{Value: aws.Bool(sourceDestCheck)}
+// Sets the instance's primary network interface attribute "source-dest-check" to the specified value
+func (c *Cloud) configureInstanceSourceDestCheck(instance *ec2.Instance, sourceDestCheck bool) error {
+	instanceID := aws.StringValue(instance.InstanceId)
+	srcDstCheck := &ec2.AttributeBooleanValue{Value: aws.Bool(sourceDestCheck)}
 
-	_, err := c.ec2.ModifyInstanceAttribute(request)
+	devicesCount := len(instance.NetworkInterfaces)
+	if devicesCount == 0 {
+		return fmt.Errorf("no network interface found on instance %s", instanceID)
+	}
+
+	if devicesCount == 1 {
+		_, err := c.ec2.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
+			InstanceId:      instance.InstanceId,
+			SourceDestCheck: srcDstCheck,
+		})
+		if err != nil {
+			return fmt.Errorf("error configuring source-dest-check on instance %s: %q", instanceID, err)
+		}
+		return nil
+	}
+
+	// If there are multiple network interfaces attached to the instance,
+	// the invocation of `ModifyInstanceAttributes()` would fail with the following error:
+	// "InvalidInstanceID: There are multiple interfaces attached to instance 'i-xx'. Please specify an interface ID for the operation instead."
+	// So we need to modify the attribute of primary network interface here.
+	var primaryInterfaceID *string
+	for _, device := range instance.NetworkInterfaces {
+		if aws.Int64Value(device.Attachment.DeviceIndex) == 0 {
+			primaryInterfaceID = device.NetworkInterfaceId
+			break
+		}
+	}
+	if primaryInterfaceID == nil {
+		return fmt.Errorf("no primary network interface found on instance %s", instanceID)
+	}
+	_, err := c.ec2.ModifyNetworkInterfaceAttribute(&ec2.ModifyNetworkInterfaceAttributeInput{
+		NetworkInterfaceId: primaryInterfaceID,
+		SourceDestCheck:    srcDstCheck,
+	})
 	if err != nil {
 		return fmt.Errorf("error configuring source-dest-check on instance %s: %q", instanceID, err)
 	}
+
 	return nil
 }
 
@@ -150,7 +183,7 @@ func (c *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 
 	// In addition to configuring the route itself, we also need to configure the instance to accept that traffic
 	// On AWS, this requires turning source-dest checks off
-	err = c.configureInstanceSourceDestCheck(aws.StringValue(instance.InstanceId), false)
+	err = c.configureInstanceSourceDestCheck(instance, false)
 	if err != nil {
 		return err
 	}

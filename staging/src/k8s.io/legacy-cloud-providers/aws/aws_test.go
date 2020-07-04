@@ -3064,3 +3064,71 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigureSrcDstCheck(t *testing.T) {
+	testCases := []struct {
+		name    string
+		devices []*ec2.InstanceNetworkInterface
+	}{
+		{
+			name: "single interface",
+			devices: []*ec2.InstanceNetworkInterface{
+				{
+					Attachment: &ec2.InstanceNetworkInterfaceAttachment{
+						DeviceIndex: aws.Int64(0),
+					},
+					NetworkInterfaceId: aws.String("eth0"),
+					SourceDestCheck:    aws.Bool(true),
+				},
+			},
+		},
+		{
+			name: "multiple interfaces",
+			devices: []*ec2.InstanceNetworkInterface{
+				{
+					Attachment: &ec2.InstanceNetworkInterfaceAttachment{
+						DeviceIndex: aws.Int64(0),
+					},
+					NetworkInterfaceId: aws.String("eth0"),
+					SourceDestCheck:    aws.Bool(true),
+				},
+				{
+					Attachment: &ec2.InstanceNetworkInterfaceAttachment{
+						DeviceIndex: aws.Int64(1),
+					},
+					NetworkInterfaceId: aws.String("eth1"),
+					SourceDestCheck:    aws.Bool(true),
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			awsServices := newMockedFakeAWSServices(TestClusterID)
+			awsServices.selfInstance.SourceDestCheck = aws.Bool(true)
+			awsServices.selfInstance.NetworkInterfaces = tc.devices
+			c, err := newAWSCloud(CloudConfig{}, awsServices)
+			if err != nil {
+				t.Errorf("Error building aws cloud: %v", err)
+				return
+			}
+
+			err = c.configureInstanceSourceDestCheck(awsServices.selfInstance, false)
+			if err != nil {
+				t.Errorf("configureInstanceSourceDestCheck: %v", err)
+				return
+			}
+
+			if len(tc.devices) == 1 {
+				if aws.BoolValue(awsServices.selfInstance.SourceDestCheck) {
+					t.Errorf("Failed to disable SourceDestCheck")
+				}
+				return
+			}
+
+			if aws.BoolValue(awsServices.selfInstance.NetworkInterfaces[0].SourceDestCheck) {
+				t.Errorf("Failed to disable SourceDestCheck")
+			}
+		})
+	}
+}

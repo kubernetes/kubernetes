@@ -354,6 +354,8 @@ type EC2 interface {
 
 	ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error)
 
+	ModifyNetworkInterfaceAttribute(request *ec2.ModifyNetworkInterfaceAttributeInput) (*ec2.ModifyNetworkInterfaceAttributeOutput, error)
+
 	DescribeVpcs(input *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
 }
 
@@ -1142,6 +1144,10 @@ func (s *awsSdkEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRoute
 
 func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
 	return s.ec2.ModifyInstanceAttribute(request)
+}
+
+func (s *awsSdkEC2) ModifyNetworkInterfaceAttribute(request *ec2.ModifyNetworkInterfaceAttributeInput) (*ec2.ModifyNetworkInterfaceAttributeOutput, error) {
+	return s.ec2.ModifyNetworkInterfaceAttribute(request)
 }
 
 func (s *awsSdkEC2) DescribeVpcs(request *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
