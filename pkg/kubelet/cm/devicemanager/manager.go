@@ -997,8 +997,10 @@ func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, re
 	if err != nil {
 		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %v", err)
 	}
-	// TODO: Add metrics support for init RPC
-	return sets.NewString(resp.ContainerResponses[0].DeviceIDs...), nil
+	if resp != nil && len(resp.ContainerResponses) > 0 {
+		return sets.NewString(resp.ContainerResponses[0].DeviceIDs...), nil
+	}
+	return sets.NewString(), nil
 }
 
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager
