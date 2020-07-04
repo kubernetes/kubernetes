@@ -44,6 +44,12 @@ func IsQuotaHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix) || strings.HasPrefix(string(name), core.ResourceRequestsHugePagesPrefix)
 }
 
+// IsAttachableVolumesResourceName returns true if the resource name has the
+// attachable volumes prefix.
+func IsAttachableVolumesResourceName(name core.ResourceName) bool {
+	return strings.HasPrefix(string(name), core.ResourceAttachableVolumesPrefix)
+}
+
 // HugePageResourceName returns a ResourceName with the canonical hugepage
 // prefix prepended for the specified page size.  The page size is converted
 // to its canonical representation.
@@ -145,7 +151,9 @@ var standardContainerResources = sets.NewString(
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
 func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str) || IsHugePageResourceName(core.ResourceName(str))
+	return standardContainerResources.Has(str) ||
+		IsHugePageResourceName(core.ResourceName(str)) ||
+		IsAttachableVolumesResourceName(core.ResourceName(str))
 }
 
 // IsExtendedResourceName returns true if:
@@ -244,7 +252,9 @@ var standardResources = sets.NewString(
 
 // IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
-	return standardResources.Has(str) || IsQuotaHugePageResourceName(core.ResourceName(str))
+	return standardResources.Has(str) ||
+		IsQuotaHugePageResourceName(core.ResourceName(str)) ||
+		IsAttachableVolumesResourceName(core.ResourceName(str))
 }
 
 var integerResources = sets.NewString(

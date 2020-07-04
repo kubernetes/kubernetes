@@ -5142,6 +5142,10 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
+		if helper.IsAttachableVolumesResourceName(resourceName) {
+			allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("attachable volumes limit is forbidden")))
+		}
+
 		if helper.IsHugePageResourceName(resourceName) {
 			limContainsHugePages = true
 		}

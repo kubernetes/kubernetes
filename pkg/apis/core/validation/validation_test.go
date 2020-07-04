@@ -5796,6 +5796,7 @@ func TestValidateContainers(t *testing.T) {
 				Requests: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+					core.ResourceName("attachable-volumes-aws-ebs"): resource.MustParse("3"),
 				},
 				Limits: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
