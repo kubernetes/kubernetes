@@ -23,8 +23,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pmezard/go-difflib/difflib"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -32,24 +30,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func diff(expected, actual []byte) string {
-	// Write out the diff
-	var diffBytes bytes.Buffer
-	difflib.WriteUnifiedDiff(&diffBytes, difflib.UnifiedDiff{
-		A:        difflib.SplitLines(string(expected)),
-		B:        difflib.SplitLines(string(actual)),
-		FromFile: "expected",
-		ToFile:   "actual",
-		Context:  3,
-	})
-	return diffBytes.String()
-}
-
 func TestLoadInitConfigurationFromFile(t *testing.T) {
 	// Create temp folder for the test case
 	tmpdir, err := ioutil.TempDir("", "")
 	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
+		t.Fatalf("Couldn't create tmpdir: %v", err)
 	}
 	defer os.RemoveAll(tmpdir)
 
@@ -100,7 +85,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 			cfgPath := filepath.Join(tmpdir, rt.name)
 			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
 			if err != nil {
-				t.Errorf("Couldn't create file")
+				t.Errorf("Couldn't create file: %v", err)
 				return
 			}
 
@@ -116,7 +101,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 				}
 
 				if obj == nil {
-					t.Errorf("Unexpected nil return value")
+					t.Error("Unexpected nil return value")
 				}
 			}
 		})
