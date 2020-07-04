@@ -218,6 +218,11 @@ func TestPostFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			p := DefaultPreemption{
+				fh:        f,
+				podLister: informerFactory.Core().V1().Pods().Lister(),
+				pdbLister: getPDBLister(informerFactory),
+			}
 
 			state := framework.NewCycleState()
 			// Ensure <state> is populated.
@@ -225,10 +230,6 @@ func TestPostFilter(t *testing.T) {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
-			p := DefaultPreemption{
-				fh:        f,
-				pdbLister: getPDBLister(informerFactory),
-			}
 			gotResult, gotStatus := p.PostFilter(context.TODO(), state, tt.pod, tt.filteredNodesStatuses)
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("Status does not match: %v, want: %v", gotStatus, tt.wantStatus)
@@ -1307,6 +1308,7 @@ func TestPreempt(t *testing.T) {
 			// Call preempt and check the expected results.
 			pl := DefaultPreemption{
 				fh:        fwk,
+				podLister: informerFactory.Core().V1().Pods().Lister(),
 				pdbLister: getPDBLister(informerFactory),
 			}
 			node, err := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))

@@ -33,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -52,6 +53,7 @@ const (
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
 	fh        framework.FrameworkHandle
+	podLister corelisters.PodLister
 	pdbLister policylisters.PodDisruptionBudgetLister
 }
 
@@ -66,6 +68,7 @@ func (pl *DefaultPreemption) Name() string {
 func New(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 	pl := DefaultPreemption{
 		fh:        fh,
+		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
 		pdbLister: getPDBLister(fh.SharedInformerFactory()),
 	}
 	return &pl, nil
@@ -109,7 +112,7 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj, i.e., factory.go#MakeDefaultErrorFunc().
 	// However, tests may need to manually initialize the shared pod informer.
-	pod, err := pl.fh.SharedInformerFactory().Core().V1().Pods().Lister().Pods(pod.Namespace).Get(pod.Name)
+	pod, err := pl.podLister.Pods(pod.Namespace).Get(pod.Name)
 	if err != nil {
 		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
 		return "", err
