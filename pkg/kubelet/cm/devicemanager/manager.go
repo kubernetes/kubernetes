@@ -709,7 +709,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		if err != nil {
 			return nil, err
 		}
-		if allocateRemainingFrom(preferred.Intersection(aligned.Union(allocated))) {
+		if allocateRemainingFrom(preferred.Intersection(aligned)) {
 			return allocated, nil
 		}
 		// Then fallback to allocate from the aligned set if no preferred list
@@ -734,7 +734,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if err != nil {
 		return nil, err
 	}
-	if allocateRemainingFrom(preferred.Intersection(available.Union(allocated))) {
+	if allocateRemainingFrom(preferred.Intersection(available)) {
 		return allocated, nil
 	}
 
