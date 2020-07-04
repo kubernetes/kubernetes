@@ -76,6 +76,14 @@ func WithNamespace(namespace string) SharedInformerOption {
 	}
 }
 
+// WithCustomInformer sets a custom informer for the given informer type.
+func WithCustomInformer(obj v1.Object, informer cache.SharedIndexInformer) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.informers[reflect.TypeOf(obj)] = informer
+		return factory
+	}
+}
+
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync)
