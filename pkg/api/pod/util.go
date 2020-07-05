@@ -24,6 +24,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // ContainerType signifies container type
@@ -328,6 +329,13 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 	dropPodStatusDisabledFields(podStatus, oldPodStatus)
 }
 
+// AddDisabledFields to the provided set of resetFields
+// This should be called with the resetFields for all resources containing a Pod
+func AddDisabledFields(to *fieldpath.Set) {
+	addDisabledStatusFields(to)
+	addDisabledFields(to)
+}
+
 // dropPodStatusDisabledFields removes disabled fields from the pod status
 func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.PodStatus) {
 	// trim PodIPs down to only one entry (non dual stack).
@@ -336,6 +344,12 @@ func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.Pod
 		if len(podStatus.PodIPs) != 0 {
 			podStatus.PodIPs = podStatus.PodIPs[0:1]
 		}
+	}
+}
+
+func addDisabledStatusFields(to *fieldpath.Set) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		to.Insert(fieldpath.MakePathOrDie("status", "podIPs"))
 	}
 }
 
@@ -437,6 +451,32 @@ func dropDisabledFields(
 		podSpec.SetHostnameAsFQDN = nil
 	}
 
+}
+
+// dropDisabledFields removes disabled fields from the pod metadata and spec.
+func addDisabledFields(to *fieldpath.Set) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+		// TODO: add the actual fieldpath here, this is just a probably wrong dummy based on
+		// podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken
+		to.Insert(fieldpath.MakePathOrDie("spec", "volumes", "projected", "sources", "serviceAccountToken"))
+	}
+	// TODO: add all the fields from podutil.DropDisabledPodFields (a lot)
+
+	// TODO: how to handle cases like this
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) /* && !appArmorInUse(oldPodAnnotations) */ {
+		// for k := range podAnnotations {
+		// 	if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
+		// 		delete(podAnnotations, k)
+		// 	}
+		// }
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+		// if podSpec.SecurityContext != nil {
+		// 	podSpec.SecurityContext.Sysctls = nil
+		// }
+		to.Insert(fieldpath.MakePathOrDie("spec", "securityContext", "sysctls"))
+	}
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related

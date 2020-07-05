@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // podStrategy implements behavior for Pods
@@ -64,6 +66,23 @@ var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// ResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (podStrategy) ResetFields() rest.ResetFields {
+	fields := rest.ResetFields{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+			// TODO: add fields reset by podutil.DropDisabledPodFields
+		),
+	}
+
+	// For more versions, loop here
+	// This should not be done at every call as currently the result can not change at runtime
+	podutil.AddDisabledFields(fields["v1"])
+
+	return fields
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
@@ -163,6 +182,18 @@ type podStatusStrategy struct {
 
 // StatusStrategy wraps and exports the used podStrategy for the storage package.
 var StatusStrategy = podStatusStrategy{Strategy}
+
+// ResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (podStatusStrategy) ResetFields() rest.ResetFields {
+	return rest.ResetFields{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata", "deletionTimestamp"),
+			fieldpath.MakePathOrDie("metadata", "ownerReferences"),
+		),
+	}
+}
 
 func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)

@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -260,6 +261,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	if isNamedCreater {
 		isCreater = true
+	}
+
+	var resetFields rest.ResetFields
+	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		if resetFieldsProvider, isResetFieldsProvider := storage.(rest.ResetFieldsProvider); isResetFieldsProvider {
+			resetFields = resetFieldsProvider.ResetFields()
+			// TODO(kwiesmueller): remove debug logging
+			klog.Infof("---- +ResetFields: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)
+		} else {
+			klog.Infof("---- !ResetFields: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)
+		}
 	}
 
 	var versionedList interface{}
@@ -570,6 +582,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
+			resetFields,
 			isSubresource,
 		)
 		if err != nil {

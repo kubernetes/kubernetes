@@ -178,6 +178,10 @@ type Store struct {
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
 
+	// ResetFieldsStrategy provides the fields reset by the strategy that
+	// should not be modified by the user.
+	ResetFieldsStrategy rest.ResetFieldsProvider
+
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
 	// either pass-through or simply dry-run.
@@ -1395,6 +1399,14 @@ func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, table
 
 func (e *Store) StorageVersion() runtime.GroupVersioner {
 	return e.StorageVersioner
+}
+
+// ResetFields implements rest.ResetFieldsProvider
+func (e *Store) ResetFields() rest.ResetFields {
+	if e.ResetFieldsStrategy == nil {
+		return nil
+	}
+	return e.ResetFieldsStrategy.ResetFields()
 }
 
 // validateIndexers will check the prefix of indexers.

@@ -67,6 +67,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
+		ResetFieldsStrategy: namespace.Strategy,
 		ReturnDeletedObject: true,
 
 		ShouldDeleteDuringUpdate: ShouldDeleteNamespaceDuringUpdate,
@@ -80,9 +81,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 	statusStore := *store
 	statusStore.UpdateStrategy = namespace.StatusStrategy
+	statusStore.ResetFieldsStrategy = namespace.StatusStrategy
 
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
+	finalizeStore.ResetFieldsStrategy = namespace.FinalizeStrategy
 
 	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
 }
@@ -294,6 +297,10 @@ func (r *REST) StorageVersion() runtime.GroupVersioner {
 	return r.store.StorageVersion()
 }
 
+// ResetFields implements rest.ResetFieldsProvider
+func (r *REST) ResetFields() rest.ResetFields {
+	return r.store.ResetFields()
+}
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -310,6 +317,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// ResetFields implements rest.ResetFieldsProvider
+func (r *StatusREST) ResetFields() rest.ResetFields {
+	return r.store.ResetFields()
+}
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -319,4 +330,9 @@ func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.Upd
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// ResetFields implements rest.ResetFieldsProvider
+func (r *FinalizeREST) ResetFields() rest.ResetFields {
+	return r.store.ResetFields()
 }

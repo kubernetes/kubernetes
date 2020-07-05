@@ -25,11 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -45,6 +47,17 @@ var Strategy = namespaceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped is false for namespaces.
 func (namespaceStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// ResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (namespaceStrategy) ResetFields() rest.ResetFields {
+	return rest.ResetFields{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+			fieldpath.MakePathOrDie("spec.finalizers"),
+		),
+	}
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
@@ -111,6 +124,16 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
+// ResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (namespaceStatusStrategy) ResetFields() rest.ResetFields {
+	return rest.ResetFields{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
+
 func (namespaceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
@@ -129,6 +152,17 @@ var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+}
+
+// ResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (namespaceFinalizeStrategy) ResetFields() rest.ResetFields {
+	return rest.ResetFields{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+			fieldpath.MakePathOrDie("spec.finalizers"),
+		),
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

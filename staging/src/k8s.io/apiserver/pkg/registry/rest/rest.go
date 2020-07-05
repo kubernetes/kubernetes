@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 //TODO:
@@ -348,4 +349,13 @@ type StorageVersionProvider interface {
 	// an object will be converted to before persisted in etcd, given a
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
+}
+
+// ResetFields maps versions to the sets of fields that will be reset by the storage strategy.
+type ResetFields map[fieldpath.APIVersion]*fieldpath.Set
+
+// ResetFieldsProvider is an optional interface that a storage object can
+// implement if it wishes to provide the fields reset by its strategies.
+type ResetFieldsProvider interface {
+	ResetFields() ResetFields
 }
