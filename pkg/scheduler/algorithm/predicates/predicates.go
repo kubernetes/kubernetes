@@ -476,7 +476,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo
 	maxAttachLimit := c.maxVolumeFunc(node)
 
 	volumeLimits := nodeInfo.VolumeLimits()
-	if maxAttachLimitFromAllocatable, ok := volumeLimits[c.volumeLimitKey]; ok {
+	if maxAttachLimitFromAllocatable, ok := volumeLimits[c.volumeLimitKey]; ok && getMaxVolLimitFromEnv() < 0 {
 		maxAttachLimit = int(maxAttachLimitFromAllocatable)
 	}
 
