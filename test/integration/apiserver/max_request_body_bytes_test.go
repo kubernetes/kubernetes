@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -41,7 +40,7 @@ func TestMaxResourceSize(t *testing.T) {
 
 	c := clientSet.CoreV1().RESTClient()
 	t.Run("Create should limit the request body size", func(t *testing.T) {
-		err := c.Post().AbsPath(fmt.Sprintf("/api/v1/namespaces/default/pods")).
+		err := c.Post().AbsPath("/api/v1/namespaces/default/pods").
 			Body(hugeData).Do(context.TODO()).Error()
 		if err == nil {
 			t.Fatalf("unexpected no error")
@@ -64,7 +63,7 @@ func TestMaxResourceSize(t *testing.T) {
 	}
 
 	t.Run("Update should limit the request body size", func(t *testing.T) {
-		err = c.Put().AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = c.Put().AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(hugeData).Do(context.TODO()).Error()
 		if err == nil {
 			t.Fatalf("unexpected no error")
@@ -75,7 +74,7 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("Patch should limit the request body size", func(t *testing.T) {
-		err = c.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = c.Patch(types.JSONPatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(hugeData).Do(context.TODO()).Error()
 		if err == nil {
 			t.Fatalf("unexpected no error")
@@ -87,7 +86,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("JSONPatchType should handle a patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`[{"op":"add","path":"/foo","value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}]`)
-		err = rest.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.JSONPatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil && !apierrors.IsBadRequest(err) {
 			t.Errorf("expected success or bad request err, got %v", err)
@@ -95,7 +94,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("JSONPatchType should handle a valid patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`[{"op":"add","path":"/foo","value":0` + strings.Repeat(" ", 3*1024*1024-100) + `}]`)
-		err = rest.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.JSONPatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -103,7 +102,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("MergePatchType should handle a patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
-		err = rest.Patch(types.MergePatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.MergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil && !apierrors.IsBadRequest(err) {
 			t.Errorf("expected success or bad request err, got %v", err)
@@ -111,7 +110,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("MergePatchType should handle a valid patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`{"value":0` + strings.Repeat(" ", 3*1024*1024-100) + `}`)
-		err = rest.Patch(types.MergePatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.MergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -119,7 +118,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("StrategicMergePatchType should handle a patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
-		err = rest.Patch(types.StrategicMergePatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.StrategicMergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil && !apierrors.IsBadRequest(err) {
 			t.Errorf("expected success or bad request err, got %v", err)
@@ -127,7 +126,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("StrategicMergePatchType should handle a valid patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`{"value":0` + strings.Repeat(" ", 3*1024*1024-100) + `}`)
-		err = rest.Patch(types.StrategicMergePatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.StrategicMergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -135,7 +134,7 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("ApplyPatchType should handle a patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
-		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil && !apierrors.IsBadRequest(err) {
 			t.Errorf("expected success or bad request err, got %#v", err)
@@ -143,14 +142,14 @@ func TestMaxResourceSize(t *testing.T) {
 	})
 	t.Run("ApplyPatchType should handle a valid patch just under the max limit", func(t *testing.T) {
 		patchBody := []byte(`{"apiVersion":"v1","kind":"Secret"` + strings.Repeat(" ", 3*1024*1024-100) + `}`)
-		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
 	t.Run("Delete should limit the request body size", func(t *testing.T) {
-		err = c.Delete().AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+		err = c.Delete().AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(hugeData).Do(context.TODO()).Error()
 		if err == nil {
 			t.Fatalf("unexpected no error")
