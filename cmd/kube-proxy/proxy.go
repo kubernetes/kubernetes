@@ -43,6 +43,7 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	// utilflag.InitFlags()
 	logs.InitLogs()
+	_, _ = logs.GlogSetter("7")
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
