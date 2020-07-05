@@ -2454,7 +2454,7 @@ func TestPodResourcesAreReclaimed(t *testing.T) {
 				pod:    &v1.Pod{},
 				status: v1.PodStatus{},
 				runtimeStatus: kubecontainer.PodStatus{
-					ContainerStatuses: []*kubecontainer.ContainerStatus{
+					ContainerStatuses: []*kubecontainer.Status{
 						{},
 					},
 				},
