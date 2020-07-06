@@ -329,10 +329,8 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders) {
-		for _, w := range crdInfo.warnings[requestInfo.APIVersion] {
-			warning.AddWarning(req.Context(), "", w)
-		}
+	for _, w := range crdInfo.warnings[requestInfo.APIVersion] {
+		warning.AddWarning(req.Context(), "", w)
 	}
 
 	verb := strings.ToUpper(requestInfo.Verb)
@@ -883,10 +881,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		statusScopes[v.Name] = &statusScope
 
 		if v.Deprecated {
-			if v.DeprecationWarning != nil {
-				warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
-			} else {
-				warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
+			if utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders) {
+				if v.DeprecationWarning != nil {
+					warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
+				} else {
+					warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
+				}
 			}
 		}
 	}
