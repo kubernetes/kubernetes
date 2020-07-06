@@ -250,6 +250,10 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
+	if o.ServerSideApply && o.DeleteOptions.ForceDeletion {
+		return fmt.Errorf("--force cannot be used with --server-side")
+	}
+
 	if o.DryRunStrategy == cmdutil.DryRunServer && o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--dry-run=server cannot be used with --force")
 	}
