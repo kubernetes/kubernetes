@@ -62,8 +62,6 @@ EOF
 
   ### Without provided --token, the exec credential plugin should be triggered
   # Pre-condition: Client certificate authentication enabled on the API server - already checked by positive test above
-  
-  kube_flags_without_token=('-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify=true')
 
   # Command
   output2=$(kubectl "${kube_flags_without_token[@]:?}" --kubeconfig="${TMPDIR:-/tmp}"/invalid_exec_plugin.yaml get namespace kube-system -o name 2>&1 || true)
