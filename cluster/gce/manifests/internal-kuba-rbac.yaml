@@ -200,6 +200,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: external-metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups:
   - "external.metrics.k8s.io"
