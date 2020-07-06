@@ -50,22 +50,9 @@ def get_all_files(rootdir):
     all_files = []
     for root, dirs, files in os.walk(rootdir):
         # don't visit certain dirs
-        if 'vendor' in dirs:
-            dirs.remove('vendor')
-        if 'staging' in dirs:
-            dirs.remove('staging')
-        if '_output' in dirs:
-            dirs.remove('_output')
-        if '_gopath' in dirs:
-            dirs.remove('_gopath')
-        if 'third_party' in dirs:
-            dirs.remove('third_party')
-        if '.git' in dirs:
-            dirs.remove('.git')
-        if '.make' in dirs:
-            dirs.remove('.make')
-        if 'BUILD' in files:
-           files.remove('BUILD')
+        remove_elem = lambda t, lst: [x for x in lst if not x in t]
+        dirs = remove_elem(['vendor', 'staging', '_output', '_gopath', 'third_party', '.git', '.make'], dirs)
+        files = remove_elem(['BUILD'], files)
 
         for name in files:
             pathname = os.path.join(root, name)
