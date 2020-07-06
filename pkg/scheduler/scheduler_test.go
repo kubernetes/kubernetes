@@ -807,7 +807,12 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		return true, b, nil
 	})
 
-	fwk, _ := st.NewFramework(fns, frameworkruntime.WithClientSet(client), frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()))
+	fwk, _ := st.NewFramework(
+		fns,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+	)
 	prof := &profile.Profile{
 		Framework: fwk,
 		Recorder:  &events.FakeRecorder{},
@@ -824,7 +829,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		scache,
 		internalcache.NewEmptySnapshot(),
 		[]framework.Extender{},
-		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
 
@@ -858,6 +862,7 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolume
 	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
 	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetStore().Add(&testPVC)
 
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1172,7 +1177,6 @@ func TestSchedulerBinding(t *testing.T) {
 				scache,
 				nil,
 				test.extenders,
-				nil,
 				0,
 			)
 			sched := Scheduler{

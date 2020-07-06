@@ -48,7 +48,6 @@ go_test(
         "//pkg/scheduler/framework/plugins/selectorspread:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1/fake:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/profile:go_default_library",

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -422,9 +420,9 @@ func TestGenericScheduler(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC"}}},
+			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault}}},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{
 						{
@@ -474,9 +472,9 @@ func TestGenericScheduler(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", DeletionTimestamp: &metav1.Time{}}}},
+			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{
 						{
@@ -728,10 +726,16 @@ func TestGenericScheduler(t *testing.T) {
 				cache.AddNode(node)
 			}
 
+			cs := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			for i := range test.pvcs {
+				informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetStore().Add(&test.pvcs[i])
+			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
 				test.registerPlugins,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 			)
 			if err != nil {
@@ -741,19 +745,14 @@ func TestGenericScheduler(t *testing.T) {
 				Framework: fwk,
 			}
 
-			var pvcs []v1.PersistentVolumeClaim
-			pvcs = append(pvcs, test.pvcs...)
-			pvcLister := fakeframework.PersistentVolumeClaimLister(pvcs)
-
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
 				[]framework.Extender{},
-				pvcLister,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
-			if !reflect.DeepEqual(err, test.wErr) {
-				t.Errorf("want: %v, got: %v", test.wErr, err)
+			if err != test.wErr && err.Error() != test.wErr.Error() {
+				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
@@ -775,7 +774,7 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 	s := NewGenericScheduler(
 		cache,
 		emptySnapshot,
-		nil, nil,
+		nil,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -1069,7 +1068,6 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				emptySnapshot,
 				[]framework.Extender{},
-				nil,
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 

@@ -119,7 +119,6 @@ type genericScheduler struct {
 	cache                    internalcache.Cache
 	extenders                []framework.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
-	pvcLister                corelisters.PersistentVolumeClaimLister
 	percentageOfNodesToScore int32
 	nextStartNodeIndex       int
 }
@@ -138,7 +137,8 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
-	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
+	pvcLister := prof.SharedInformerFactory().Core().V1().PersistentVolumeClaims().Lister()
+	if err := podPassesBasicChecks(pod, pvcLister); err != nil {
 		return result, err
 	}
 	trace.Step("Basic checks done")
@@ -628,13 +628,11 @@ func NewGenericScheduler(
 	cache internalcache.Cache,
 	nodeInfoSnapshot *internalcache.Snapshot,
 	extenders []framework.Extender,
-	pvcLister corelisters.PersistentVolumeClaimLister,
 	percentageOfNodesToScore int32) ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
 		extenders:                extenders,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
-		pvcLister:                pvcLister,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
 }
