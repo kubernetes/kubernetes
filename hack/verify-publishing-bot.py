@@ -54,7 +54,7 @@ def main():
     rootdir = os.path.abspath(rootdir)
 
     components = []
-    for component in os.listdir(rootdir + '/staging/src/k8s.io/'):
+    for component in os.listdir(os.path.join(rootdir + '/staging/src/k8s.io/')):
         components.append(component)
     components.sort()
 
@@ -64,9 +64,9 @@ def main():
     except ImportError:
         print("Please install missing pyyaml module and re-run %s" % sys.argv[0])
         sys.exit(1)
-    rules_dependencies = get_rules_dependencies(rootdir + rules_file)
+    rules_dependencies = get_rules_dependencies(os.path.join(rootdir + rules_file))
 
-    gomod_dependencies = get_gomod_dependencies(rootdir + '/staging/src/k8s.io/', components)
+    gomod_dependencies = get_gomod_dependencies(os.path.join(rootdir + '/staging/src/k8s.io/'), components)
 
     processed_repos = []
     for rule in rules_dependencies["rules"]:
