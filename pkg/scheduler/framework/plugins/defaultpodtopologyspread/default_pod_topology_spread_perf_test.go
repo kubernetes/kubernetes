@@ -67,7 +67,11 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 				}
 			}
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot), framework.WithInformerFactory(informerFactory))
-			plugin := &DefaultPodTopologySpread{handle: fh}
+			pl, err := New(nil, fh)
+			if err != nil {
+				b.Fatal(err)
+			}
+			plugin := pl.(*DefaultPodTopologySpread)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {

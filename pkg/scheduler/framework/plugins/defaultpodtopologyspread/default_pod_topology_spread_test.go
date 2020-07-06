@@ -382,9 +382,11 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 
 			state := framework.NewCycleState()
 
-			plugin := &DefaultPodTopologySpread{
-				handle: fh,
+			pl, err := New(nil, fh)
+			if err != nil {
+				t.Fatal(err)
 			}
+			plugin := pl.(*DefaultPodTopologySpread)
 
 			status := plugin.PreScore(ctx, state, test.pod, nodes)
 			if !status.IsSuccess() {
@@ -633,9 +635,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
 
-			plugin := &DefaultPodTopologySpread{
-				handle: fh,
+			pl, err := New(nil, fh)
+			if err != nil {
+				t.Fatal(err)
 			}
+			plugin := pl.(*DefaultPodTopologySpread)
 
 			state := framework.NewCycleState()
 			status := plugin.PreScore(ctx, state, test.pod, nodes)
