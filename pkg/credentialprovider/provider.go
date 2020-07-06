@@ -37,6 +37,10 @@ type DockerConfigProvider interface {
 	// implementation depends on information in the image name to return
 	// credentials; implementations are safe to ignore the image.
 	Provide(image string) DockerConfig
+
+	// decide whether to use cache according to image and cache content
+	// returns true(by default) if use cache per image and DockerConfig
+	UseCache(image string, config DockerConfig) bool
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file
@@ -57,10 +61,6 @@ func init() {
 type CachingDockerConfigProvider struct {
 	Provider DockerConfigProvider
 	Lifetime time.Duration
-
-	// ShouldCache is an optional function that returns true if the specific config should be cached.
-	// If nil, all configs are treated as cacheable.
-	ShouldCache func(DockerConfig) bool
 
 	// cache fields
 	cacheDockerConfig DockerConfig
@@ -84,6 +84,11 @@ func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	return DockerConfig{}
 }
 
+// UseCache decide whether to use cache according to image and cache content
+func (d *defaultDockerConfigProvider) UseCache(image string, config DockerConfig) bool {
+	return true
+}
+
 // Enabled implements dockerConfigProvider
 func (d *CachingDockerConfigProvider) Enabled() bool {
 	return d.Provider.Enabled()
@@ -94,16 +99,31 @@ func (d *CachingDockerConfigProvider) Provide(image string) DockerConfig {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	useCache := true
 	// If the cache hasn't expired, return our cache
 	if time.Now().Before(d.expiration) {
-		return d.cacheDockerConfig
+		useCache = d.Provider.UseCache(image, d.cacheDockerConfig)
+		if useCache {
+			return d.cacheDockerConfig
+		}
 	}
 
 	klog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
 	config := d.Provider.Provide(image)
-	if d.ShouldCache == nil || d.ShouldCache(config) {
+	if useCache {
 		d.cacheDockerConfig = config
-		d.expiration = time.Now().Add(d.Lifetime)
+	} else {
+		klog.V(5).Infof("there is cache missing, merge two cache tables for provider: %v", reflect.TypeOf(d.Provider).String())
+		for k, v := range config {
+			d.cacheDockerConfig[k] = v
+		}
 	}
-	return config
+
+	d.expiration = time.Now().Add(d.Lifetime)
+	return d.cacheDockerConfig
+}
+
+// UseCache decide whether to use cache according to image and cache content
+func (d *CachingDockerConfigProvider) UseCache(image string, config DockerConfig) bool {
+	return true
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -197,6 +198,140 @@ func TestParseACRLoginServerFromImage(t *testing.T) {
 	for _, test := range tests {
 		if loginServer := provider.parseACRLoginServerFromImage(test.image); loginServer != test.expected {
 			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
+		}
+	}
+}
+
+func TestUseCache(t *testing.T) {
+	configSP := `
+    {
+        "aadClientId": "foo",
+        "aadClientSecret": "bar"
+	}`
+	configMI := `
+    {
+        "useManagedIdentityExtension": true
+    }`
+	result := []containerregistry.Registry{
+		{
+			Name: to.StringPtr("foo"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.io"),
+			},
+		},
+	}
+	fakeClient := &fakeClient{
+		results: result,
+	}
+
+	providerSP := &acrProvider{
+		registryClient: fakeClient,
+	}
+	providerSP.loadConfig(bytes.NewBufferString(configSP))
+	providerSP.environment = &azure.Environment{
+		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",
+	}
+
+	providerMI := &acrProvider{
+		registryClient: fakeClient,
+	}
+	providerMI.loadConfig(bytes.NewBufferString(configMI))
+	providerMI.environment = &azure.Environment{
+		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",
+	}
+
+	defaultConfigEntry := credentialprovider.DockerConfigEntry{
+		Username: "",
+		Password: "",
+		Email:    dummyRegistryEmail,
+	}
+
+	// create cfg for service principal
+	cfgSP := credentialprovider.DockerConfig{}
+	for _, url := range containerRegistryUrls {
+		cred := &credentialprovider.DockerConfigEntry{
+			Username: "user",
+			Password: "password",
+			Email:    dummyRegistryEmail,
+		}
+		cfgSP[url] = *cred
+	}
+	cfgSP["*.azurecr.*"] = defaultConfigEntry
+
+	// create cfg for managed identity
+	cfgMI := credentialprovider.DockerConfig{}
+	cfgMI["foo.azurecr.io"] = defaultConfigEntry
+	cfgMI["foo.azurecr.my.cloud"] = defaultConfigEntry
+
+	tests := []struct {
+		desc           string
+		provider       credentialprovider.DockerConfigProvider
+		image          string
+		cfg            credentialprovider.DockerConfig
+		expectedResult bool
+	}{
+		{
+			desc:           "use cache for SP when it's an ACR image",
+			provider:       providerSP,
+			image:          "foo.azurecr.io/bar/image:version",
+			cfg:            cfgSP,
+			expectedResult: true,
+		},
+		{
+			desc:           "use cache for SP when it's a docker image",
+			provider:       providerSP,
+			image:          "docker.io/library/busybox:latest",
+			cfg:            cfgSP,
+			expectedResult: true,
+		},
+		{
+			desc:           "use cache for MI when ACR login server is already in the cache",
+			provider:       providerMI,
+			image:          "foo.azurecr.io/bar/image:version",
+			cfg:            cfgMI,
+			expectedResult: true,
+		},
+		{
+			desc:           "use cache for MI when ACR custom login server is already in the cache",
+			provider:       providerMI,
+			image:          "foo.azurecr.my.cloud/bar/image:version",
+			cfg:            cfgMI,
+			expectedResult: true,
+		},
+		{
+			desc:           "use cache for MI when it's a docker image",
+			provider:       providerMI,
+			image:          "docker.io/library/busybox:latest",
+			cfg:            cfgMI,
+			expectedResult: true,
+		},
+		{
+			desc:           "use cache for MI when it's an unknown image",
+			provider:       providerMI,
+			image:          "unknown",
+			cfg:            cfgMI,
+			expectedResult: true,
+		},
+		{
+			desc:           "not use cache for MI when there is a new ACR login server",
+			provider:       providerMI,
+			image:          "foo2.azurecr.io/bar/image:version",
+			cfg:            cfgMI,
+			expectedResult: false,
+		},
+		{
+			desc:           "not use cache for MI when there is a new custom ACR login server",
+			provider:       providerMI,
+			image:          "foo2.azurecr.my.cloud/bar/image:version",
+			cfg:            cfgMI,
+			expectedResult: false,
+		},
+	}
+
+	for _, test := range tests {
+		result := test.provider.UseCache(test.image, test.cfg)
+		if result != test.expectedResult {
+			t.Errorf("test case(%s) UseCache(%s) returned with %v, not equal to %v", test.desc, test.image, result, test.expectedResult)
 		}
 	}
 }

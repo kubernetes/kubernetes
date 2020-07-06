@@ -104,6 +104,11 @@ func (p *ecrProvider) Provide(image string) credentialprovider.DockerConfig {
 	return cfg
 }
 
+// UseCache decide whether to use cache according to image and cache content
+func (p *ecrProvider) UseCache(image string, config credentialprovider.DockerConfig) bool {
+	return true
+}
+
 // getFromCache attempts to get credentials from the cache
 func (p *ecrProvider) getFromCache(parsed *parsedURL) (credentialprovider.DockerConfig, bool) {
 	cfg := credentialprovider.DockerConfig{}

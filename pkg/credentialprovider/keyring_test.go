@@ -469,6 +469,11 @@ func (d *testProvider) Provide(image string) DockerConfig {
 	return DockerConfig{}
 }
 
+// UseCache implements dockerConfigProvider
+func (d *testProvider) UseCache(image string, config DockerConfig) bool {
+	return true
+}
+
 func TestProvidersDockerKeyring(t *testing.T) {
 	provider := &testProvider{
 		Count: 0,

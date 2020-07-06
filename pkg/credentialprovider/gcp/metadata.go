@@ -159,6 +159,11 @@ func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.Docke
 	return credentialprovider.DockerConfig{}
 }
 
+// UseCache decide whether to use cache according to image and cache content
+func (g *dockerConfigKeyProvider) UseCache(image string, config credentialprovider.DockerConfig) bool {
+	return true
+}
+
 // Provide implements DockerConfigProvider
 func (g *dockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg-url key and load a .dockercfg from there
@@ -178,6 +183,11 @@ func (g *dockerConfigURLKeyProvider) Provide(image string) credentialprovider.Do
 	}
 
 	return credentialprovider.DockerConfig{}
+}
+
+// UseCache decide whether to use cache according to image and cache content
+func (g *dockerConfigURLKeyProvider) UseCache(image string, config credentialprovider.DockerConfig) bool {
+	return true
 }
 
 // runWithBackoff runs input function `f` with an exponential backoff.
@@ -297,4 +307,9 @@ func (g *containerRegistryProvider) Provide(image string) credentialprovider.Doc
 		cfg[k] = entry
 	}
 	return cfg
+}
+
+// UseCache decide whether to use cache according to image and cache content
+func (g *containerRegistryProvider) UseCache(image string, config credentialprovider.DockerConfig) bool {
+	return true
 }

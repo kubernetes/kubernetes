@@ -51,6 +51,7 @@ const (
 var (
 	containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
 	acrRE                 = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
+	azureCRName           = ".azurecr."
 )
 
 // init registers the various means by which credentials may
@@ -58,9 +59,8 @@ var (
 func init() {
 	credentialprovider.RegisterCredentialProvider("azure",
 		&credentialprovider.CachingDockerConfigProvider{
-			Provider:    NewACRProvider(flagConfigFile),
-			Lifetime:    1 * time.Minute,
-			ShouldCache: func(d credentialprovider.DockerConfig) bool { return len(d) > 0 },
+			Provider: NewACRProvider(flagConfigFile),
+			Lifetime: 1 * time.Minute,
 		})
 }
 
@@ -195,7 +195,7 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 		Email:    dummyRegistryEmail,
 	}
 
-	if a.config.UseManagedIdentityExtension {
+	if a.config != nil && a.config.UseManagedIdentityExtension {
 		if loginServer := a.parseACRLoginServerFromImage(image); loginServer == "" {
 			klog.V(4).Infof("image(%s) is not from ACR, skip MSI authentication", image)
 		} else {
@@ -218,7 +218,7 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 
 		// Handle the custom cloud case
 		// In clouds where ACR is not yet deployed, the string will be empty
-		if a.environment != nil && strings.Contains(a.environment.ContainerRegistryDNSSuffix, ".azurecr.") {
+		if a.environment != nil && strings.Contains(a.environment.ContainerRegistryDNSSuffix, azureCRName) {
 			customAcrSuffix := "*" + a.environment.ContainerRegistryDNSSuffix
 			hasBeenAdded := false
 			for _, url := range containerRegistryUrls {
@@ -302,4 +302,24 @@ func (a *acrProvider) parseACRLoginServerFromImage(image string) string {
 	}
 
 	return ""
+}
+
+// UseCache decide whether to use cache according to image and cache content
+func (a *acrProvider) UseCache(image string, config credentialprovider.DockerConfig) bool {
+	if a.config != nil && !a.config.UseManagedIdentityExtension {
+		return true
+	}
+
+	loginServer := a.parseACRLoginServerFromImage(image)
+	if loginServer == "" {
+		return true
+	}
+
+	for k := range config {
+		if strings.EqualFold(loginServer, k) {
+			return true
+		}
+	}
+	// ACR loginServer not found, should not use cache
+	return false
 }
