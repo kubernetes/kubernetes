@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/golang/mock/gomock"
 
+	"k8s.io/legacy-cloud-providers/azure/clients/fileclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/fileclient/mockfileclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient/mockstorageaccountclient"
 )
@@ -141,7 +142,7 @@ func TestCreateFileShare(t *testing.T) {
 	for _, test := range tests {
 		mockFileClient := mockfileclient.NewMockInterface(ctrl)
 		cloud.FileClient = mockFileClient
-		mockFileClient.EXPECT().CreateFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(test.err).AnyTimes()
+		mockFileClient.EXPECT().CreateFileShare(gomock.Any(), gomock.Any(), gomock.Any()).Return(test.err).AnyTimes()
 
 		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
 		cloud.StorageAccountClient = mockStorageAccountsClient
@@ -149,7 +150,21 @@ func TestCreateFileShare(t *testing.T) {
 		mockStorageAccountsClient.EXPECT().ListByResourceGroup(gomock.Any(), "rg").Return(test.accounts, nil).AnyTimes()
 		mockStorageAccountsClient.EXPECT().Create(gomock.Any(), "rg", gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-		account, key, err := cloud.CreateFileShare(test.name, test.acct, test.acctType, test.acctKind, test.rg, test.loc, storage.SMB, test.gb)
+		mockAccount := &AccountOptions{
+			Name:          test.acct,
+			Type:          test.acctType,
+			Kind:          test.acctKind,
+			ResourceGroup: test.rg,
+			Location:      test.loc,
+		}
+
+		mockFileShare := &fileclient.ShareOptions{
+			Name:       test.name,
+			Protocol:   storage.SMB,
+			RequestGiB: test.gb,
+		}
+
+		account, key, err := cloud.CreateFileShare(mockAccount, mockFileShare)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
 			continue
