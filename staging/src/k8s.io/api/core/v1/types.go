@@ -3226,7 +3226,44 @@ type PodSecurityContext struct {
 	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy `json:"fsGroupChangePolicy,omitempty" protobuf:"bytes,9,opt,name=fsGroupChangePolicy"`
+	// The seccomp options to use by the containers in this pod.
+	// +optional
+	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,10,opt,name=seccompProfile"`
 }
+
+// SeccompProfile defines a pod/container's seccomp profile settings.
+// Only one profile source may be set.
+// +union
+type SeccompProfile struct {
+	// type indicates which kind of seccomp profile will be applied.
+	// Valid options are:
+	//
+	// Localhost - a profile defined in a file on the node should be used.
+	// RuntimeDefault - the container runtime default profile should be used.
+	// Unconfined - no profile should be applied.
+	// +unionDiscriminator
+	Type SeccompProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SeccompProfileType"`
+	// localhostProfile indicates a profile defined in a file on the node should be used.
+	// The profile must be preconfigured on the node to work.
+	// Must be a descending path, relative to the kubelet's configured seccomp profile location.
+	// Must only be set if type is "Localhost".
+	// +optional
+	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+}
+
+// SeccompProfileType defines the supported seccomp profile types.
+type SeccompProfileType string
+
+const (
+	// SeccompProfileTypeUnconfined indicates no seccomp profile is applied (A.K.A. unconfined).
+	SeccompProfileTypeUnconfined SeccompProfileType = "Unconfined"
+	// SeccompProfileTypeRuntimeDefault represents the default container runtime seccomp profile.
+	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
+	// SeccompProfileTypeLocalhost indicates a profile defined in a file on the node should be used.
+	// The file's location is based off the kubelet's deprecated flag --seccomp-profile-root.
+	// Once the flag support is removed the location will be <kubelet-root-dir>/seccomp.
+	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+)
 
 // PodQOSClass defines the supported qos classes of Pods.
 type PodQOSClass string
@@ -5858,6 +5895,11 @@ type SecurityContext struct {
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
+	// The seccomp options to use by this container. If seccomp options are
+	// provided at both the pod & container level, the container options
+	// override the pod options.
+	// +optional
+	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
 }
 
 type ProcMountType string

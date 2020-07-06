@@ -1583,6 +1583,7 @@ var map_PodSecurityContext = map[string]string{
 	"fsGroup":             "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw ",
 	"sysctls":             "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch.",
 	"fsGroupChangePolicy": "fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod. This field will only apply to volume types which support fsGroup based ownership(and permissions). It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir. Valid values are \"OnRootMismatch\" and \"Always\". If not specified defaults to \"Always\".",
+	"seccompProfile":      "The seccomp options to use by the containers in this pod.",
 }
 
 func (PodSecurityContext) SwaggerDoc() map[string]string {
@@ -2015,6 +2016,16 @@ func (ScopedResourceSelectorRequirement) SwaggerDoc() map[string]string {
 	return map_ScopedResourceSelectorRequirement
 }
 
+var map_SeccompProfile = map[string]string{
+	"":                 "SeccompProfile defines a pod/container's seccomp profile settings. Only one profile source may be set.",
+	"type":             "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.",
+	"localhostProfile": "localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must only be set if type is \"Localhost\".",
+}
+
+func (SeccompProfile) SwaggerDoc() map[string]string {
+	return map_SeccompProfile
+}
+
 var map_Secret = map[string]string{
 	"":           "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
 	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -2101,6 +2112,7 @@ var map_SecurityContext = map[string]string{
 	"readOnlyRootFilesystem":   "Whether this container has a read-only root filesystem. Default is false.",
 	"allowPrivilegeEscalation": "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN",
 	"procMount":                "procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled.",
+	"seccompProfile":           "The seccomp options to use by this container. If seccomp options are provided at both the pod & container level, the container options override the pod options.",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {

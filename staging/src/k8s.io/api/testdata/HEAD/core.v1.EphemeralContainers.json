@@ -282,11 +282,14 @@
         "runAsNonRoot": true,
         "readOnlyRootFilesystem": true,
         "allowPrivilegeEscalation": true,
-        "procMount": "ĭÐl恕ɍȇ廄裭4懙"
+        "procMount": "ĭÐl恕ɍȇ廄裭4懙",
+        "seccompProfile": {
+          "type": "嵒ƫS捕ɷD¡轫n",
+          "localhostProfile": "89"
+        }
       },
       "stdin": true,
-      "tty": true,
-      "targetContainerName": "89"
+      "targetContainerName": "90"
     }
   ]
 }

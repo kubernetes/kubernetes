@@ -3550,15 +3550,40 @@ func validatePodAffinity(podAffinity *core.PodAffinity, fldPath *field.Path) fie
 	return allErrs
 }
 
+func validateSeccompProfileField(sp *core.SeccompProfile, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if sp == nil {
+		return allErrs
+	}
+
+	if err := validateSeccompProfileType(fldPath.Child("type"), sp.Type); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	if sp.Type == core.SeccompProfileTypeLocalhost {
+		if sp.LocalhostProfile == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when seccomp type is Localhost"))
+		} else {
+			allErrs = append(allErrs, validateLocalDescendingPath(*sp.LocalhostProfile, fldPath.Child("localhostProfile"))...)
+		}
+	} else {
+		if sp.LocalhostProfile != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), sp, "can only be set when seccomp type is Localhost"))
+		}
+	}
+
+	return allErrs
+}
+
 func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 	if p == core.SeccompProfileRuntimeDefault || p == core.DeprecatedSeccompProfileDockerDefault {
 		return nil
 	}
-	if p == "unconfined" {
+	if p == v1.SeccompProfileNameUnconfined {
 		return nil
 	}
-	if strings.HasPrefix(p, "localhost/") {
-		return validateLocalDescendingPath(strings.TrimPrefix(p, "localhost/"), fldPath)
+	if strings.HasPrefix(p, v1.SeccompLocalhostProfileNamePrefix) {
+		return validateLocalDescendingPath(strings.TrimPrefix(p, v1.SeccompLocalhostProfileNamePrefix), fldPath)
 	}
 	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
 }
@@ -3575,6 +3600,18 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 	}
 
 	return allErrs
+}
+
+// ValidateSeccompProfileType tests that the argument is a valid SeccompProfileType.
+func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.SeccompProfileType) *field.Error {
+	switch seccompProfileType {
+	case core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined:
+		return nil
+	case "":
+		return field.Required(fldPath, "type is required when seccompProfile is set")
+	default:
+		return field.NotSupported(fldPath, seccompProfileType, []string{string(core.SeccompProfileTypeLocalhost), string(core.SeccompProfileTypeRuntimeDefault), string(core.SeccompProfileTypeUnconfined)})
+	}
 }
 
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
@@ -3598,7 +3635,7 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 
 func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
 	var hasContainer bool
-	podshelper.VisitContainersWithPath(spec, func(c *core.Container, _ *field.Path) bool {
+	podshelper.VisitContainersWithPath(spec, field.NewPath("spec"), func(c *core.Container, _ *field.Path) bool {
 		if c.Name == containerName {
 			hasContainer = true
 			return false
@@ -3684,6 +3721,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			allErrs = append(allErrs, validateFSGroupChangePolicy(securityContext.FSGroupChangePolicy, fldPath.Child("fsGroupChangePolicy"))...)
 		}
 
+		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	}
 
@@ -3720,8 +3758,75 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 	if len(pod.Spec.EphemeralContainers) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeralContainers"), "cannot be set on create"))
 	}
+	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)
 
 	return allErrs
+}
+
+// ValidateSeccompAnnotationsAndFields iterates through all containers and ensure that when both seccompProfile and seccomp annotations exist they match.
+func validateSeccompAnnotationsAndFields(objectMeta metav1.ObjectMeta, podSpec *core.PodSpec, specPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.SeccompProfile != nil {
+		// If both seccomp annotations and fields are specified, the values must match.
+		if annotation, found := objectMeta.Annotations[v1.SeccompPodAnnotationKey]; found {
+			seccompPath := specPath.Child("securityContext").Child("seccompProfile")
+			err := validateSeccompAnnotationsAndFieldsMatch(annotation, podSpec.SecurityContext.SeccompProfile, seccompPath)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+	}
+
+	podshelper.VisitContainersWithPath(podSpec, specPath, func(c *core.Container, cFldPath *field.Path) bool {
+		var field *core.SeccompProfile
+		if c.SecurityContext != nil {
+			field = c.SecurityContext.SeccompProfile
+		}
+
+		if field == nil {
+			return true
+		}
+
+		key := v1.SeccompContainerAnnotationKeyPrefix + c.Name
+		if annotation, found := objectMeta.Annotations[key]; found {
+			seccompPath := cFldPath.Child("securityContext").Child("seccompProfile")
+			err := validateSeccompAnnotationsAndFieldsMatch(annotation, field, seccompPath)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+		return true
+	})
+
+	return allErrs
+}
+
+func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompField *core.SeccompProfile, fldPath *field.Path) *field.Error {
+	if seccompField == nil {
+		return nil
+	}
+
+	switch seccompField.Type {
+	case core.SeccompProfileTypeUnconfined:
+		if annotationValue != v1.SeccompProfileNameUnconfined {
+			return field.Forbidden(fldPath.Child("type"), "seccomp type in annotation and field must match")
+		}
+
+	case core.SeccompProfileTypeRuntimeDefault:
+		if annotationValue != v1.SeccompProfileRuntimeDefault && annotationValue != v1.DeprecatedSeccompProfileDockerDefault {
+			return field.Forbidden(fldPath.Child("type"), "seccomp type in annotation and field must match")
+		}
+
+	case core.SeccompProfileTypeLocalhost:
+		if !strings.HasPrefix(annotationValue, v1.SeccompLocalhostProfileNamePrefix) {
+			return field.Forbidden(fldPath.Child("type"), "seccomp type in annotation and field must match")
+		} else if seccompField.LocalhostProfile == nil || strings.TrimPrefix(annotationValue, v1.SeccompLocalhostProfileNamePrefix) != *seccompField.LocalhostProfile {
+			return field.Forbidden(fldPath.Child("localhostProfile"), "seccomp profile in annotation and field must match")
+		}
+	}
+
+	return nil
 }
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
@@ -4389,6 +4494,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path) fi
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
+	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(spec.ObjectMeta, &spec.Spec, fldPath.Child("spec"))...)
 
 	if len(spec.Spec.EphemeralContainers) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
@@ -5616,8 +5722,9 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 		if err := ValidateProcMountType(fldPath.Child("procMount"), *sc.ProcMount); err != nil {
 			allErrs = append(allErrs, err)
 		}
-	}
 
+	}
+	allErrs = append(allErrs, validateSeccompProfileField(sc.SeccompProfile, fldPath.Child("seccompProfile"))...)
 	if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
 		if sc.Privileged != nil && *sc.Privileged {
 			allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `privileged` to true"))

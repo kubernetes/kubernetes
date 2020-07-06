@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -149,7 +149,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			Privileged:         kubecontainer.HasPrivilegedContainer(pod),
-			SeccompProfilePath: m.getSeccompProfileFromAnnotations(pod.Annotations, ""),
+			SeccompProfilePath: m.getSeccompProfile(pod.Annotations, "", pod.Spec.SecurityContext, nil),
 		},
 	}
 

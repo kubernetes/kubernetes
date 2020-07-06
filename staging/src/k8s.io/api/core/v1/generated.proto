@@ -3293,6 +3293,10 @@ message PodSecurityContext {
   // Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
   // +optional
   optional string fsGroupChangePolicy = 9;
+
+  // The seccomp options to use by the containers in this pod.
+  // +optional
+  optional SeccompProfile seccompProfile = 10;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -4301,6 +4305,27 @@ message ScopedResourceSelectorRequirement {
   repeated string values = 3;
 }
 
+// SeccompProfile defines a pod/container's seccomp profile settings.
+// Only one profile source may be set.
+// +union
+message SeccompProfile {
+  // type indicates which kind of seccomp profile will be applied.
+  // Valid options are:
+  //
+  // Localhost - a profile defined in a file on the node should be used.
+  // RuntimeDefault - the container runtime default profile should be used.
+  // Unconfined - no profile should be applied.
+  // +unionDiscriminator
+  optional string type = 1;
+
+  // localhostProfile indicates a profile defined in a file on the node should be used.
+  // The profile must be preconfigured on the node to work.
+  // Must be a descending path, relative to the kubelet's configured seccomp profile location.
+  // Must only be set if type is "Localhost".
+  // +optional
+  optional string localhostProfile = 2;
+}
+
 // Secret holds secret data of a certain type. The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 message Secret {
@@ -4519,6 +4544,12 @@ message SecurityContext {
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
   optional string procMount = 9;
+
+  // The seccomp options to use by this container. If seccomp options are
+  // provided at both the pod & container level, the container options
+  // override the pod options.
+  // +optional
+  optional SeccompProfile seccompProfile = 11;
 }
 
 // SerializedReference is a reference to serialized object.
