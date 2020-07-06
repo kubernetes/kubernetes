@@ -4,7 +4,6 @@ reviewers:
   - bentheelder
   - cblecker
   - fejta
-  - ixdy
   - juanvallejo
   - hwdef
   - lavalamp
@@ -20,7 +19,6 @@ approvers:
   - deads2k
   - dims # for local-up-cluster related files
   - fejta
-  - ixdy
   - lavalamp
   - liggitt
   - pwittrock
@@ -32,5 +30,6 @@ approvers:
   - mikedanese
 emeritus_approvers:
   - eparis
+  - ixdy
   - jbeda
   - zmerlynn

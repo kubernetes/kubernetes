@@ -21,16 +21,6 @@ filters:
     emeritus_approvers:
       - jbeda
 
-  # Bazel build infrastructure changes often touch files throughout the tree
-  "\\.bzl$":
-    reviewers:
-      - ixdy
-    approvers:
-      - ixdy
-  "BUILD(\\.bazel)?$":
-    approvers:
-      - ixdy
-
   # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
   # dep-approvers
   "go\\.(mod|sum)$":
