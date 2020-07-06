@@ -296,28 +296,28 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		"kind": "Deployment",
 		"metadata": {
 			"name": "deployment",
-						"labels": {"app": "nginx"}
+			"labels": {"app": "nginx"}
 		},
 		"spec": {
-						"replicas": 3,
-						"selector": {
-						        "matchLabels": {
-									     "app": "nginx"
-						        }
-						},
-						"template": {
-						        "metadata": {
-									    "labels": {
-												"app": "nginx"
-									    }
-						        },
-						        "spec": {
-				        "containers": [{
-					        "name":  "nginx",
-					        "image": "nginx:latest"
-				        }]
-						        }
-						}
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
 		}
 	}`)
 
@@ -1870,6 +1870,125 @@ func TestApplyUnsetSharedFields(t *testing.T) {
 	}
 	if deployment.Spec.Template.Spec.Hostname != "test-hostname" {
 		t.Errorf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
+	}
+}
+
+// TestApplyCanTransferFieldOwnershipToController verifies that when an applier creates an
+// object, a controller takes ownership of a field, and the applier
+// then omits the field from its applied configuration, that the field value persists.
+func TestApplyCanTransferFieldOwnershipToController(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Applier creates a deployment with replicas set to 3
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	appliedObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// a controller takes over the replicas field
+	applied, ok := appliedObj.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	replicas := int32(4)
+	applied.Spec.Replicas = &replicas
+	_, err = client.AppsV1().Deployments("default").
+		Update(context.TODO(), applied, metav1.UpdateOptions{FieldManager: "test_updater"})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// applier omits replicas
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// ensure the container is deleted even though a controller updated a field of the container
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 4 {
+		t.Errorf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
 	}
 }
 
