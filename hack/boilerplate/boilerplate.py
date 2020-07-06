@@ -101,10 +101,9 @@ def file_passes(filename, refs, regexs):
     # remove extra content from the top of files
     if extension == "go" or extension == "generatego":
         p = regexs["go_build_constraints"]
-        (data, found) = p.subn("", data, 1)
     elif extension in ["sh", "py"]:
         p = regexs["shebang"]
-        (data, found) = p.subn("", data, 1)
+    (data, found) = p.subn("", data, 1)
 
     data = data.splitlines()
 
