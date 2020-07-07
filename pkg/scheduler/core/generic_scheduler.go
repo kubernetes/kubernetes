@@ -345,6 +345,9 @@ func (g *genericScheduler) findNodesThatPassFilters(
 }
 
 func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes []*v1.Node, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
+	// Extenders are called sequentially.
+	// Nodes in original feasibleNodes can be excluded in one extender, and pass on to the next
+	// extender in a decreasing manner.
 	for _, extender := range g.extenders {
 		if len(feasibleNodes) == 0 {
 			break
@@ -352,7 +355,13 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 		if !extender.IsInterested(pod) {
 			continue
 		}
-		feasibleList, failedMap, err := extender.Filter(pod, feasibleNodes)
+
+		// Status of failed nodes in failedAndUnresolvableMap will be added or overwritten in <statuses>,
+		// so that the scheduler framework can respect the UnschedulableAndUnresolvable status for
+		// particular nodes, and this may eventually improve preemption efficiency.
+		// Note: users are recommended to configure the extenders that may return UnschedulableAndUnresolvable
+		// status ahead of others.
+		feasibleList, failedMap, failedAndUnresolvableMap, err := extender.Filter(pod, feasibleNodes)
 		if err != nil {
 			if extender.IsIgnorable() {
 				klog.InfoS("Skipping extender as it returned error and has ignorable flag set", "extender", extender, "err", err)
@@ -361,13 +370,28 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 			return nil, err
 		}
 
+		for failedNodeName, failedMsg := range failedAndUnresolvableMap {
+			var aggregatedReasons []string
+			if _, found := statuses[failedNodeName]; found {
+				aggregatedReasons = statuses[failedNodeName].Reasons()
+			}
+			aggregatedReasons = append(aggregatedReasons, failedMsg)
+			statuses[failedNodeName] = framework.NewStatus(framework.UnschedulableAndUnresolvable, aggregatedReasons...)
+		}
+
 		for failedNodeName, failedMsg := range failedMap {
+			if _, found := failedAndUnresolvableMap[failedNodeName]; found {
+				// failedAndUnresolvableMap takes precedence over failedMap
+				// note that this only happens if the extender returns the node in both maps
+				continue
+			}
 			if _, found := statuses[failedNodeName]; !found {
 				statuses[failedNodeName] = framework.NewStatus(framework.Unschedulable, failedMsg)
 			} else {
 				statuses[failedNodeName].AppendReason(failedMsg)
 			}
 		}
+
 		feasibleNodes = feasibleList
 	}
 	return feasibleNodes, nil
