@@ -267,7 +267,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 	if r.egressSelector != nil {
 		networkContext := egressselector.Cluster.AsNetworkContext()
 		var egressDialer utilnet.DialFunc
-		egressDialer, err := r.egressSelector.Lookup(networkContext)
+		egressDialer, err := r.egressSelector.Lookup(networkContext, "aggregator")
 		if err != nil {
 			klog.Warning(err.Error())
 		} else {

@@ -126,7 +126,8 @@ func TestEgressSelector(t *testing.T) {
 
 			for _, service := range tc.services {
 				networkContext := NetworkContext{EgressSelectionName: service.egressType}
-				dialer, lookupErr := cs.Lookup(networkContext)
+
+				dialer, lookupErr := cs.Lookup(networkContext, "fake_user_agent")
 				if lookupErr == nil && service.lookupError != nil {
 					t.Errorf("calling Lookup expected error: %s, did not get it", *service.lookupError)
 				}
@@ -187,7 +188,7 @@ type fakeProxier struct {
 	err bool
 }
 
-func (f *fakeProxier) proxy(_ string) (net.Conn, error) {
+func (f *fakeProxier) proxy(_, _ string) (net.Conn, error) {
 	if f.err {
 		return nil, fmt.Errorf("fake error")
 	}
@@ -255,7 +256,7 @@ func TestMetrics(t *testing.T) {
 					protocol:  "fake_protocol",
 				},
 			}
-			dialer := d.createDialer()
+			dialer := d.createDialerGenerator()("fake_user_agent")
 			dialer(context.TODO(), "", "")
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Errorf("Err in comparing metrics %v", err)

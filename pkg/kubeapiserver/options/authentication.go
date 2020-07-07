@@ -457,7 +457,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 	)
 
 	if egressSelector != nil {
-		egressDialer, err := egressSelector.Lookup(egressselector.Master.AsNetworkContext())
+		egressDialer, err := egressSelector.Lookup(egressselector.Master.AsNetworkContext(), "authn-webhook")
 		if err != nil {
 			return err
 		}

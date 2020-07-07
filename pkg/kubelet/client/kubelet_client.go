@@ -106,7 +106,7 @@ func makeTransport(config *KubeletClientConfig, insecureSkipTLSVerify bool) (htt
 		// Assuming EgressSelector if SSHTunnel is not turned on.
 		// We will not get a dialer if egress selector is disabled.
 		networkContext := egressselector.Cluster.AsNetworkContext()
-		dialer, err = config.Lookup(networkContext)
+		dialer, err = config.Lookup(networkContext, "kubelet")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get context dialer for 'cluster': got %v", err)
 		}

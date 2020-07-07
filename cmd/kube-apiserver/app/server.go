@@ -395,7 +395,7 @@ func CreateKubeAPIServerConfig(
 
 		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
 		networkContext := egressselector.Cluster.AsNetworkContext()
-		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
+		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext, "proxy")
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -558,7 +558,7 @@ func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
 
 	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
+		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext(), "authz-webhook")
 		if err != nil {
 			return nil, nil, err
 		}
