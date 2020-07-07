@@ -68,7 +68,6 @@ filegroup(
         "//pkg/registry/core/serviceaccount:all-srcs",
         "//pkg/registry/discovery/endpointslice:all-srcs",
         "//pkg/registry/discovery/rest:all-srcs",
-        "//pkg/registry/events/event:all-srcs",
         "//pkg/registry/events/rest:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
         "//pkg/registry/flowcontrol/flowschema:all-srcs",

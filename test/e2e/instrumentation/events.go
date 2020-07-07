@@ -22,11 +22,12 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
@@ -73,10 +74,12 @@ func eventExistsInList(client typedeventsv1.EventInterface, namespace, name stri
 
 var _ = common.SIGDescribe("Events API", func() {
 	f := framework.NewDefaultFramework("events")
+	var coreClient corev1.EventInterface
 	var client typedeventsv1.EventInterface
 	var clientAllNamespaces typedeventsv1.EventInterface
 
 	ginkgo.BeforeEach(func() {
+		coreClient = f.ClientSet.CoreV1().Events(f.Namespace.Name)
 		client = f.ClientSet.EventsV1().Events(f.Namespace.Name)
 		clientAllNamespaces = f.ClientSet.EventsV1().Events(metav1.NamespaceAll)
 	})
@@ -102,6 +105,20 @@ var _ = common.SIGDescribe("Events API", func() {
 		ginkgo.By("listing events in test namespace")
 		foundCreatedEvent = eventExistsInList(client, f.Namespace.Name, eventName)
 		framework.ExpectEqual(foundCreatedEvent, true, "failed to find test event in list with namespace scope")
+
+		ginkgo.By("listing events with field selection filtering on source")
+		filteredCoreV1List, err := coreClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "source=test-controller"})
+		framework.ExpectNoError(err, "failed to get filtered list")
+		if len(filteredCoreV1List.Items) != 1 || filteredCoreV1List.Items[0].Name != eventName {
+			framework.Failf("expected single event, got %#v", filteredCoreV1List.Items)
+		}
+
+		ginkgo.By("listing events with field selection filtering on reportingController")
+		filteredEventsV1List, err := client.List(context.TODO(), metav1.ListOptions{FieldSelector: "reportingController=test-controller"})
+		framework.ExpectNoError(err, "failed to get filtered list")
+		if len(filteredEventsV1List.Items) != 1 || filteredEventsV1List.Items[0].Name != eventName {
+			framework.Failf("expected single event, got %#v", filteredEventsV1List.Items)
+		}
 
 		ginkgo.By("getting the test event")
 		testEvent, err := client.Get(context.TODO(), eventName, metav1.GetOptions{})
