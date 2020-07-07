@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "common.go",
         "subpath.go",
         "subpath_linux.go",
         "subpath_unsupported.go",
@@ -10,56 +11,44 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/util/subpath",
     visibility = ["//visibility:public"],
-    deps = select({
+    deps = [
+        "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog/v2:go_default_library",
-            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:ios": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog/v2:go_default_library",
-            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
-            "//vendor/k8s.io/klog/v2:go_default_library",
-            "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "//conditions:default": [],

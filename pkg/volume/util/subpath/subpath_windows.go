@@ -30,13 +30,6 @@ import (
 	"k8s.io/utils/nsenter"
 )
 
-type subpath struct{}
-
-// New returns a subpath.Interface for the current system
-func New(mount.Interface) Interface {
-	return &subpath{}
-}
-
 // NewNSEnter is to satisfy the compiler for having NewSubpathNSEnter exist for all
 // OS choices. however, NSEnter is only valid on Linux
 func NewNSEnter(mounter mount.Interface, ne *nsenter.Nsenter, rootDir string) Interface {
@@ -146,29 +139,29 @@ func lockPath(path string) (uintptr, error) {
 
 // Lock all directories in subPath and check they're not symlinks.
 func (sp *subpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	handles, err := lockAndCheckSubPath(subPath.VolumePath, subPath.Path)
+	newHostPath, err = doBindSubPath(sp.mounter, subPath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	handles, err := lockAndCheckSubPath(subPath.VolumePath, newHostPath)
 
 	// Unlock the directories when the container starts
 	cleanupAction = func() {
 		unlockPath(handles)
 	}
-	return subPath.Path, cleanupAction, err
+
+	return newHostPath, cleanupAction, err
 }
 
-// No bind-mounts for subpaths are necessary on Windows
-func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
-	return nil
-}
-
-// SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
-func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
-	realBase, err := filepath.EvalSymlinks(base)
-	if err != nil {
-		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+func bindMount(mounter mount.Interface, subpath Subpath, bindPathTarget string) error {
+	options := []string{"bind"}
+	klog.V(5).Infof("bind mounting %q at %q", subpath.Path, bindPathTarget)
+	if err := mounter.Mount(subpath.Path, bindPathTarget, "" /*fstype*/, options); err != nil {
+		return fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 
-	realFullPath := filepath.Join(realBase, subdir)
-	return doSafeMakeDir(realFullPath, realBase, perm)
+	return nil
 }
 
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {

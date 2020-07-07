@@ -26,14 +26,7 @@ import (
 	"k8s.io/utils/nsenter"
 )
 
-type subpath struct{}
-
 var errUnsupported = errors.New("util/subpath on this platform is not supported")
-
-// New returns a subpath.Interface for the current system.
-func New(mount.Interface) Interface {
-	return &subpath{}
-}
 
 // NewNSEnter is to satisfy the compiler for having NewSubpathNSEnter exist for all
 // OS choices. however, NSEnter is only valid on Linux
@@ -45,10 +38,10 @@ func (sp *subpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, clea
 	return subPath.Path, nil, errUnsupported
 }
 
-func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
-	return errUnsupported
+func bindMount(mounter mount.Interface, subpath Subpath, bindPathTarget string) error {
+	return nil
 }
 
-func (sp *subpath) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return errUnsupported
+func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
 }
