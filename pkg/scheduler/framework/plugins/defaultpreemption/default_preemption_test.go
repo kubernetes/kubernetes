@@ -915,6 +915,20 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected:            false,
 		},
 		{
+			name:                "Pod with priority zero",
+			pod:                 st.MakePod().Name("p_priority_zero").UID("p").Priority(0).Obj(),
+			nodes:               []string{"node1"},
+			nominatedNodeStatus: nil,
+			expected:            false,
+		},
+		{
+			name:                "Pod with no priority",
+			pod:                 st.MakePod().Name("p_no_priority").UID("p").Obj(),
+			nodes:               []string{"node1"},
+			nominatedNodeStatus: nil,
+			expected:            false,
+		},
+		{
 			name:                "Pod without nominated node",
 			pod:                 st.MakePod().Name("p_without_nominated_node").UID("p").Priority(highPriority).Obj(),
 			pods:                []*v1.Pod{},

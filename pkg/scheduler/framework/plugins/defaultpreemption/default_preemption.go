@@ -194,6 +194,13 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
 		return false
 	}
+
+	podPriority := podutil.GetPodPriority(pod)
+	if podPriority == 0 {
+		// Lowest possible priority.
+		return false
+	}
+
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
@@ -203,7 +210,6 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 		}
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
-			podPriority := podutil.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods {
 				if p.Pod.DeletionTimestamp != nil && podutil.GetPodPriority(p.Pod) < podPriority {
 					// There is a terminating pod on the nominated node.
