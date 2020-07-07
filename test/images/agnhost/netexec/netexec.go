@@ -69,7 +69,7 @@ var CmdNetexec = &cobra.Command{
   - "protocol": The protocol which will be used when making the request. Default value: "http".
     Acceptable values: "http", "udp", "sctp".
   - "tries": The number of times the request will be performed. Default value: "1".
-- "/echo": Returns the given "msg" ("/echo?msg=echoed_msg")
+- "/echo": Returns the given "msg" ("/echo?msg=echoed_msg"), with the optional status "code".
 - "/exit": Closes the server with the given code and graceful shutdown. The endpoint's parameters
 	are:
 	- "code": The exit code for the process. Default value: 0. Allows an integer [0-127].
@@ -166,6 +166,7 @@ func addRoutes(exitCh chan shutdownRequest) {
 }
 
 func startServer(server *http.Server, exitCh chan shutdownRequest, fn func() error) {
+	log.Printf("Started HTTP server on port %d", httpPort)
 	go func() {
 		re := <-exitCh
 		ctx, cancelFn := context.WithTimeout(context.Background(), re.timeout)
@@ -190,8 +191,18 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func echoHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GET /echo?msg=%s", r.FormValue("msg"))
-	fmt.Fprintf(w, "%s", r.FormValue("msg"))
+	msg := r.FormValue("msg")
+	codeString := r.FormValue("code")
+	log.Printf("GET /echo?msg=%s&code=%s", msg, codeString)
+	if codeString != "" {
+		code, err := strconv.Atoi(codeString)
+		if err != nil && codeString != "" {
+			fmt.Fprintf(w, "argument 'code' must be an integer or empty, got %q\n", codeString)
+			return
+		}
+		w.WriteHeader(code)
+	}
+	fmt.Fprintf(w, "%s", msg)
 }
 
 func clientIPHandler(w http.ResponseWriter, r *http.Request) {
@@ -497,7 +508,7 @@ func startUDPServer(udpPort int) {
 	defer serverConn.Close()
 	buf := make([]byte, 2048)
 
-	log.Printf("Started UDP server")
+	log.Printf("Started UDP server on port %d", udpPort)
 	// Start responding to readiness probes.
 	serverReady.set(true)
 	defer func() {
