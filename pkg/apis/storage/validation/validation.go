@@ -442,18 +442,14 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 	return allErrs
 }
 
+var supportedVolumeLifecycleModes = sets.NewString(string(storage.VolumeLifecyclePersistent), string(storage.VolumeLifecycleEphemeral))
+
 // validateVolumeLifecycleModes tests if mode has one of the allowed values.
 func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, mode := range modes {
-		switch mode {
-		case storage.VolumeLifecyclePersistent, storage.VolumeLifecycleEphemeral:
-		default:
-			allErrs = append(allErrs, field.NotSupported(fldPath, mode,
-				[]string{
-					string(storage.VolumeLifecyclePersistent),
-					string(storage.VolumeLifecycleEphemeral),
-				}))
+		if !supportedVolumeLifecycleModes.Has(string(mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeLifecycleModes.List()))
 		}
 	}
 
