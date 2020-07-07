@@ -407,6 +407,8 @@ Starts a HTTP(S) server on given port with the following endpoints:
   it exited.
 - `/hostname`: Returns the server's hostname.
 - `/hostName`: Returns the server's hostname.
+- `/redirect`: Returns a redirect response to the given `location`, with the optional status `code`
+  (`/redirect?location=/echo%3Fmsg=foobar&code=307`).
 - `/shell`: Executes the given `shellCommand` or `cmd` (`/shell?cmd=some-command`) and
   returns a JSON containing the fields `output` (command's output) and `error` (command's
   error message). Returns `200 OK` if the command succeeded, `417 Expectation Failed` if not.
