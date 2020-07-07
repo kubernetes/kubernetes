@@ -384,6 +384,7 @@ func createManager(containerName string) (cgroups.Manager, error) {
 					Major:       configs.Wildcard,
 				},
 			},
+			SkipDevices: true,
 		},
 	}
 
