@@ -24,9 +24,9 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("apigroup list", func() {
-	f := framework.NewDefaultFramework("apigroup-list")
-	ginkgo.It("should locate PreferredVersion for each APIGroup", func() {
+var _ = SIGDescribe("apigroup preferred version", func() {
+	f := framework.NewDefaultFramework("apigroup-preferred-version")
+	ginkgo.It("should validate PreferredVersion for each APIGroup", func() {
 
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}
@@ -37,7 +37,7 @@ var _ = SIGDescribe("apigroup list", func() {
 		for _, group := range list.Groups {
 			framework.Logf("Checking APIGroup: %v", group.Name)
 
-			// hit APIGroup endpoint
+			// locate APIGroup endpoint
 			checkGroup := &metav1.APIGroup{}
 			apiPath := "/apis/" + group.Name + "/"
 			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
