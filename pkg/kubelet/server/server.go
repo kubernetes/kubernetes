@@ -143,10 +143,11 @@ func ListenAndServeKubeletServer(
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
-	redirectContainerStreaming bool,
+	redirectContainerStreaming,
+	enableSystemLogHandler bool,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, enableSystemLogHandler, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -168,7 +169,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, nil)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -222,7 +223,8 @@ func NewServer(
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
-	redirectContainerStreaming bool,
+	redirectContainerStreaming,
+	enableSystemLogHandler bool,
 	criHandler http.Handler) Server {
 	server := Server{
 		host:                       host,
@@ -239,6 +241,9 @@ func NewServer(
 	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers(criHandler)
+		// To maintain backward compatibility serve logs only when enableDebuggingHandlers is also enabled
+		// see https://github.com/kubernetes/kubernetes/pull/87273
+		server.InstallSystemLogHandler(enableSystemLogHandler)
 		if enableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
@@ -470,19 +475,6 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getPortForward"))
 	s.restfulCont.Add(ws)
 
-	s.addMetricsBucketMatcher("logs")
-	ws = new(restful.WebService)
-	ws.
-		Path(logsPath)
-	ws.Route(ws.GET("").
-		To(s.getLogs).
-		Operation("getLogs"))
-	ws.Route(ws.GET("/{logpath:*}").
-		To(s.getLogs).
-		Operation("getLogs").
-		Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
-	s.restfulCont.Add(ws)
-
 	s.addMetricsBucketMatcher("containerLogs")
 	ws = new(restful.WebService)
 	ws.
@@ -558,6 +550,28 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 		"/runningpods/", pprofBasePath, logsPath}
 	for _, p := range paths {
 		s.restfulCont.Handle(p, h)
+	}
+}
+
+// InstallSystemLogHandler registers the HTTP request patterns for logs endpoint.
+func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool) {
+	s.addMetricsBucketMatcher("logs")
+	if enableSystemLogHandler {
+		ws := new(restful.WebService)
+		ws.Path(logsPath)
+		ws.Route(ws.GET("").
+			To(s.getLogs).
+			Operation("getLogs"))
+		ws.Route(ws.GET("/{logpath:*}").
+			To(s.getLogs).
+			Operation("getLogs").
+			Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
+		s.restfulCont.Add(ws)
+	} else {
+		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "logs endpoint is disabled.", http.StatusMethodNotAllowed)
+		})
+		s.restfulCont.Handle(logsPath, h)
 	}
 }
 

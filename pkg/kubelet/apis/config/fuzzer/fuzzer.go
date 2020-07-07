@@ -103,6 +103,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.Logging.Format == "" {
 				obj.Logging.Format = "text"
 			}
+			obj.EnableSystemLogHandler = true
 		},
 	}
 }

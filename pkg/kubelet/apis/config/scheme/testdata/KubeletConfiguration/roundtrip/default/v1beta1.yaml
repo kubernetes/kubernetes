@@ -25,6 +25,7 @@ cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
 enableDebuggingHandlers: true
 enableServer: true
+enableSystemLogHandler: true
 enforceNodeAllocatable:
 - pods
 eventBurst: 10

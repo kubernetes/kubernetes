@@ -166,6 +166,7 @@ var (
 		"EnableControllerAttachDetach",
 		"EnableDebuggingHandlers",
 		"EnableServer",
+		"EnableSystemLogHandler",
 		"EnforceNodeAllocatable[*]",
 		"EventBurst",
 		"EventRecordQPS",

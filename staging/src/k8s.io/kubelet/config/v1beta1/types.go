@@ -800,6 +800,10 @@ type KubeletConfiguration struct {
 	//   Format: text
 	// + optional
 	Logging componentbaseconfigv1alpha1.LoggingConfiguration `json:"logging,omitempty"`
+	// enableSystemLogHandler enables system logs via web interface host:port/logs/
+	// Default: true
+	// +optional
+	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
 }
 
 type KubeletAuthorizationMode string

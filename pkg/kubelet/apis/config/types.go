@@ -361,6 +361,8 @@ type KubeletConfiguration struct {
 	// Logging specifies the options of logging.
 	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
 	Logging componentbaseconfig.LoggingConfiguration
+	// EnableSystemLogHandler enables /logs handler.
+	EnableSystemLogHandler bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

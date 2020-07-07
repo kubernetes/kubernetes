@@ -236,4 +236,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	// Use the Default LoggingConfiguration option
 	componentbaseconfigv1alpha1.RecommendedLoggingConfiguration(&obj.Logging)
+	if obj.EnableSystemLogHandler == nil {
+		obj.EnableSystemLogHandler = utilpointer.BoolPtr(true)
+	}
 }
