@@ -601,13 +601,17 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 
 // chainExists is used internally by Monitor; none of the public Interface methods can be
 // used to distinguish "chain exists" from "chain does not exist" with no side effects
+// it does not wait to acquire the iptables lock, avoiding to lock the runner unnecessarely
 func (runner *runner) chainExists(table Table, chain Chain) (bool, error) {
+	iptablesCmd := iptablesCommand(runner.protocol)
 	fullArgs := makeFullArgs(table, chain)
+	fullArgs = append([]string{string(opListChain)}, fullArgs...)
 
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
+	klog.V(5).Infof("running iptables: %s %v", iptablesCmd, fullArgs)
+	_, err := runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 
-	_, err := runner.run(opListChain, fullArgs)
 	return err == nil, err
 }
 
@@ -617,7 +621,7 @@ const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
 	opDeleteChain operation = "-X"
-	opListChain   operation = "-L"
+	opListChain   operation = "-S"
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"

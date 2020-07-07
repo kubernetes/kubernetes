@@ -89,6 +89,8 @@ type monitorFakeCmd struct {
 }
 
 func (mfc *monitorFakeCmd) CombinedOutput() ([]byte, error) {
+	var op operation
+	var chainName, tableName string
 	if mfc.cmd == cmdIPTablesRestore {
 		// Only used for "iptables-restore --version", and the result doesn't matter
 		return []byte{}, nil
@@ -100,12 +102,23 @@ func (mfc *monitorFakeCmd) CombinedOutput() ([]byte, error) {
 		return []byte("iptables v1.6.2"), nil
 	}
 
-	if len(mfc.args) != 8 || mfc.args[0] != WaitString || mfc.args[1] != WaitSecondsValue || mfc.args[2] != WaitIntervalString || mfc.args[3] != WaitIntervalUsecondsValue || mfc.args[6] != "-t" {
-		panic(fmt.Sprintf("bad args %#v", mfc.args))
+	if len(mfc.args) == 8 {
+		if mfc.args[0] != WaitString || mfc.args[1] != WaitSecondsValue || mfc.args[2] != WaitIntervalString || mfc.args[3] != WaitIntervalUsecondsValue || mfc.args[6] != "-t" {
+			panic(fmt.Sprintf("bad args %#v", mfc.args))
+		}
+		op = operation(mfc.args[4])
+		chainName = mfc.args[5]
+		tableName = mfc.args[7]
 	}
-	op := operation(mfc.args[4])
-	chainName := mfc.args[5]
-	tableName := mfc.args[7]
+
+	if len(mfc.args) == 4 {
+		if mfc.args[0] != "-S" || mfc.args[2] != "-t" {
+			panic(fmt.Sprintf("bad args %#v", mfc.args))
+		}
+		op = operation(mfc.args[0])
+		chainName = mfc.args[1]
+		tableName = mfc.args[3]
+	}
 
 	mfc.mfe.Lock()
 	defer mfc.mfe.Unlock()
