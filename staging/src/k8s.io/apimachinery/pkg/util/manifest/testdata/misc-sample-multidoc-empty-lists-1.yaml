@@ -1,0 +1,22 @@
+---
+kind: List
+apiVersion: v1
+---
+kind: List
+apiVersion: v1
+items: []
+---
+kind: List
+apiVersion: v1
+items:
+- kind: List
+  apiVersion: v1
+  items:
+  - kind: List
+    apiVersion: v1
+    items: []
+  - kind: List
+    apiVersion: v1
+- kind: List
+  apiVersion: v1
+  items: []

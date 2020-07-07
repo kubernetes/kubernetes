@@ -1,0 +1,72 @@
+{
+    "kind": "List",
+    "apiVersion": "v1",
+    "items": [
+        {
+            "kind": "List",
+            "apiVersion": "v1",
+            "items": [
+                {
+                    "apiVersion": "v1",
+                    "kind": "Service",
+                    "metadata": {
+                          "name": "test",
+                          "namespace": "test1"
+                    }
+                },
+                {
+                    "apiVersion": "v1",
+                    "kind": "Service",
+                    "metadata": {
+                          "name": "test",
+                          "namespace": "test2"
+                    }
+                }
+            ]
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                  "name": "test",
+                  "namespace": "test3"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                  "name": "test",
+                  "namespace": "test4"
+            }
+        },
+        {
+            "kind": "List",
+            "apiVersion": "v1",
+            "items": [
+                {
+                    "kind": "List",
+                    "apiVersion": "v1",
+                    "items": [
+                        {
+                            "apiVersion": "v1",
+                            "kind": "ServiceAccount",
+                            "metadata": {
+                                  "name": "test",
+                                  "namespace": "test5"
+                            }
+                        },
+                        {
+                            "apiVersion": "v1",
+                            "kind": "ServiceAccount",
+                            "metadata": {
+                                  "name": "test",
+                                  "namespace": "test6"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

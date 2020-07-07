@@ -1,0 +1,44 @@
+---
+kind: List
+apiVersion: v1
+---
+kind: List
+apiVersion: v1
+items: []
+---
+kind: List
+apiVersion: v1
+items:
+- apiVersion: "v1"
+  kind: "Service"
+  metadata:
+    name: "test"
+    namespace: "test1"
+- apiVersion: "v1"
+  kind: "Service"
+  metadata:
+    name: "test"
+    namespace: "test2"
+---
+kind: List
+apiVersion: v1
+items:
+- kind: List
+  apiVersion: v1
+  items:
+  - kind: List
+    apiVersion: v1
+    items: []
+  - kind: List
+    apiVersion: v1
+- kind: List
+  apiVersion: v1
+  items: []
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: "test1"}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: "test2"}
