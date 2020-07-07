@@ -642,7 +642,7 @@ func initializeVolume(cs clientset.Interface, ns string, pvc *v1.PersistentVolum
 		SeLinuxLabel:  e2epv.SELinuxLabel,
 		NodeSelection: node,
 	}
-	pod, err := e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPod(cs, &podConfig, e2epod.PodStartTimeout)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
