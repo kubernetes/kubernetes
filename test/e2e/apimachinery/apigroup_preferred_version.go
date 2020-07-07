@@ -28,9 +28,6 @@ var _ = SIGDescribe("apigroup list", func() {
 	f := framework.NewDefaultFramework("apigroup-list")
 	ginkgo.It("should locate PreferredVersion for each APIGroup", func() {
 
-		// TEST BEGINS HERE
-		ginkgo.By("[status] begin")
-
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}
 		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
@@ -44,11 +41,21 @@ var _ = SIGDescribe("apigroup list", func() {
 			checkGroup := &metav1.APIGroup{}
 			apiPath := "/apis/" + group.Name + "/"
 			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
-
 			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
 
-			// get PreferredVersion for endpoint
-			framework.Logf("PreferredVersion: %v", checkGroup.PreferredVersion)
+			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
+			framework.Logf("Versions found %v", checkGroup.Versions)
+
+			// confirm that the PreferredVersion is a valid version
+			match := false
+			for _, version := range checkGroup.Versions {
+				if version.GroupVersion == checkGroup.PreferredVersion.GroupVersion {
+					framework.Logf("%s matches %s", version.GroupVersion, checkGroup.PreferredVersion.GroupVersion)
+					match = true
+					break
+				}
+			}
+			framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
 		}
 	})
 })
