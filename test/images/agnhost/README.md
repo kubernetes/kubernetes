@@ -393,7 +393,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
   - `protocol`: The protocol which will be used when making the request. Default value: `http`.
     Acceptable values: `http`, `udp`, `sctp`.
   - `tries`: The number of times the request will be performed. Default value: `1`.
-- `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`)
+- `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`), with the optional status `code`.
 - `/exit`: Closes the server with the given code and graceful shutdown. The endpoint's parameters
 	are:
 	- `code`: The exit code for the process. Default value: 0. Allows an integer [0-127].
