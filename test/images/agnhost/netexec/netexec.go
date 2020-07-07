@@ -40,13 +40,14 @@ import (
 )
 
 var (
-	httpPort    = 8080
-	udpPort     = 8081
-	sctpPort    = -1
-	shellPath   = "/bin/sh"
-	serverReady = &atomicBool{0}
-	certFile    = ""
-	privKeyFile = ""
+	httpPort     = 8080
+	udpPort      = 8081
+	sctpPort     = -1
+	shellPath    = "/bin/sh"
+	serverReady  = &atomicBool{0}
+	certFile     = ""
+	privKeyFile  = ""
+	httpOverride = ""
 )
 
 // CmdNetexec is used by agnhost Cobra.
@@ -114,6 +115,7 @@ func init() {
 		"File containing an x509 private key matching --tls-cert-file")
 	CmdNetexec.Flags().IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")
 	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
+	CmdNetexec.Flags().StringVar(&httpOverride, "http-override", "", "Override the HTTP handler to always respond as if it were a GET with this path & params")
 }
 
 // atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
@@ -137,7 +139,21 @@ func (a *atomicBool) get() bool {
 
 func main(cmd *cobra.Command, args []string) {
 	exitCh := make(chan shutdownRequest)
-	addRoutes(exitCh)
+	if httpOverride != "" {
+		mux := http.NewServeMux()
+		addRoutes(mux, exitCh)
+
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			overrideReq, err := http.NewRequestWithContext(r.Context(), "GET", httpOverride, nil)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("override request failed: %v", err), http.StatusInternalServerError)
+				return
+			}
+			mux.ServeHTTP(w, overrideReq)
+		})
+	} else {
+		addRoutes(http.DefaultServeMux, exitCh)
+	}
 
 	go startUDPServer(udpPort)
 	if sctpPort != -1 {
@@ -152,20 +168,20 @@ func main(cmd *cobra.Command, args []string) {
 	}
 }
 
-func addRoutes(exitCh chan shutdownRequest) {
-	http.HandleFunc("/", rootHandler)
-	http.HandleFunc("/clientip", clientIPHandler)
-	http.HandleFunc("/dial", dialHandler)
-	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
-	http.HandleFunc("/healthz", healthzHandler)
-	http.HandleFunc("/hostname", hostnameHandler)
-	http.HandleFunc("/redirect", redirectHandler)
-	http.HandleFunc("/shell", shellHandler)
-	http.HandleFunc("/upload", uploadHandler)
+func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
+	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/clientip", clientIPHandler)
+	mux.HandleFunc("/dial", dialHandler)
+	mux.HandleFunc("/echo", echoHandler)
+	mux.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
+	mux.HandleFunc("/healthz", healthzHandler)
+	mux.HandleFunc("/hostname", hostnameHandler)
+	mux.HandleFunc("/redirect", redirectHandler)
+	mux.HandleFunc("/shell", shellHandler)
+	mux.HandleFunc("/upload", uploadHandler)
 	// older handlers
-	http.HandleFunc("/hostName", hostNameHandler)
-	http.HandleFunc("/shutdown", shutdownHandler)
+	mux.HandleFunc("/hostName", hostNameHandler)
+	mux.HandleFunc("/shutdown", shutdownHandler)
 }
 
 func startServer(server *http.Server, exitCh chan shutdownRequest, fn func() error) {
