@@ -108,7 +108,7 @@ func Test_podSandboxDeleter_deleteSandboxesInPod(t *testing.T) {
 				podStatus: &kubecontainer.PodStatus{
 					ContainerStatuses: []*kubecontainer.Status{
 						{
-							PodSandboxId: "testsandbox1",
+							PodSandboxID: "testsandbox1",
 						},
 					},
 					SandboxStatuses: []*runtimeapi.PodSandboxStatus{

@@ -327,7 +327,7 @@ func TestGetPodStatus(t *testing.T) {
 	assert.Equal(t, pod.Namespace, podStatus.Namespace)
 	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
 	for _, containerStatus := range podStatus.ContainerStatuses {
-		assert.Equal(t, sandbox.Id, containerStatus.PodSandboxId)
+		assert.Equal(t, sandbox.Id, containerStatus.PodSandboxID)
 	}
 }
 
