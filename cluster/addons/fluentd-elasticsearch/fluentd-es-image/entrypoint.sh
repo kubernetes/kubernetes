@@ -27,6 +27,16 @@ else
     export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
 fi
 
+# For disabling elasticsearch ruby client sniffering feature.
+# Because, on k8s, sniffering feature sometimes causes failed to flush buffers error
+# due to between service name and ip address glitch.
+# And this should be needed for downstream helm chart configurations
+# for sniffer_class_name parameter.
+SIMPLE_SNIFFER=$( gem contents fluent-plugin-elasticsearch | grep elasticsearch_simple_sniffer.rb )
+if [ -n "$SIMPLE_SNIFFER" ] && [ -f "$SIMPLE_SNIFFER" ] ; then
+    FLUENTD_ARGS="$FLUENTD_ARGS -r $SIMPLE_SNIFFER"
+fi
+
 # Use exec to get the signal
 # A non-quoted string and add the comment to prevent shellcheck failures on this line.
 # See https://github.com/koalaman/shellcheck/wiki/SC2086
