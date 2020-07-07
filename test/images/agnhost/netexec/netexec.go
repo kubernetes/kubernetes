@@ -83,6 +83,8 @@ var CmdNetexec = &cobra.Command{
   it exited.
 - "/hostname": Returns the server's hostname.
 - "/hostName": Returns the server's hostname.
+- "/redirect": Returns a redirect response to the given "location", with the optional status "code"
+  ("/redirect?location=/echo%3Fmsg=foobar&code=307").
 - "/shell": Executes the given "shellCommand" or "cmd" ("/shell?cmd=some-command") and
   returns a JSON containing the fields "output" (command's output) and "error" (command's
   error message). Returns "200 OK" if the command succeeded, "417 Expectation Failed" if not.
@@ -153,13 +155,14 @@ func main(cmd *cobra.Command, args []string) {
 func addRoutes(exitCh chan shutdownRequest) {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/clientip", clientIPHandler)
+	http.HandleFunc("/dial", dialHandler)
 	http.HandleFunc("/echo", echoHandler)
 	http.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
+	http.HandleFunc("/healthz", healthzHandler)
 	http.HandleFunc("/hostname", hostnameHandler)
+	http.HandleFunc("/redirect", redirectHandler)
 	http.HandleFunc("/shell", shellHandler)
 	http.HandleFunc("/upload", uploadHandler)
-	http.HandleFunc("/dial", dialHandler)
-	http.HandleFunc("/healthz", healthzHandler)
 	// older handlers
 	http.HandleFunc("/hostName", hostNameHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
@@ -497,6 +500,22 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 func hostNameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /hostName")
 	fmt.Fprint(w, getHostName())
+}
+
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	location := r.FormValue("location")
+	codeString := r.FormValue("code")
+	log.Printf("%s /redirect?msg=%s&code=%s", r.Method, location, codeString)
+	code := http.StatusFound
+	if codeString != "" {
+		var err error
+		code, err = strconv.Atoi(codeString)
+		if err != nil && codeString != "" {
+			fmt.Fprintf(w, "argument 'code' must be an integer or empty, got %q\n", codeString)
+			return
+		}
+	}
+	http.Redirect(w, r, location, code)
 }
 
 // udp server supports the hostName, echo and clientIP commands.
