@@ -1616,18 +1616,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		statuses[container.Name] = status
 	}
 
+	// Sort the container statuses since clients of this interface expect the list
+	// of containers in a pod has a deterministic order.
+	if isInitContainer {
+		return kubetypes.SortStatusesOfInitContainers(pod, statuses)
+	}
 	var containerStatuses []v1.ContainerStatus
 	for _, status := range statuses {
 		containerStatuses = append(containerStatuses, *status)
 	}
 
-	// Sort the container statuses since clients of this interface expect the list
-	// of containers in a pod has a deterministic order.
-	if isInitContainer {
-		kubetypes.SortInitContainerStatuses(pod, containerStatuses)
-	} else {
-		sort.Sort(kubetypes.SortedContainerStatuses(containerStatuses))
-	}
+	sort.Sort(kubetypes.SortedContainerStatuses(containerStatuses))
 	return containerStatuses
 }
 
