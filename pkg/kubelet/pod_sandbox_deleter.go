@@ -46,8 +46,7 @@ func (a sandboxStatusByCreatedList) Less(i, j int) bool {
 func newPodSandboxDeleter(runtime kubecontainer.Runtime) *podSandboxDeleter {
 	buffer := make(chan string, sandboxDeletionBufferLimit)
 	go wait.Forever(func() {
-		for {
-			id := <-buffer
+		for id := range buffer {
 			if err := runtime.DeleteSandbox(id); err != nil {
 				klog.Warningf("[pod_sandbox_deleter] DeleteSandbox returned error for (id=%v): %v", id, err)
 			}
@@ -64,7 +63,7 @@ func newPodSandboxDeleter(runtime kubecontainer.Runtime) *podSandboxDeleter {
 func (p *podSandboxDeleter) deleteSandboxesInPod(podStatus *kubecontainer.PodStatus, toKeep int) {
 	sandboxIDs := sets.NewString()
 	for _, containerStatus := range podStatus.ContainerStatuses {
-		sandboxIDs.Insert(containerStatus.PodSandboxId)
+		sandboxIDs.Insert(containerStatus.PodSandboxID)
 	}
 	sandboxStatuses := podStatus.SandboxStatuses
 	if toKeep > 0 {
