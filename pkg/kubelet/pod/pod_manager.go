@@ -77,10 +77,8 @@ type Manager interface {
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
 	DeletePod(pod *v1.Pod)
-	// DeleteOrphanedMirrorPods deletes all mirror pods which do not have
-	// associated static pods. This method sends deletion requests to the API
-	// server, but does NOT modify the internal pod storage in basicManager.
-	DeleteOrphanedMirrorPods()
+	// GetOrphanedMirrorPodNames returns names of orphaned mirror pods
+	GetOrphanedMirrorPodNames() []string
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
 	// original UID.
@@ -323,7 +321,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	return podToMirror, mirrorToPod
 }
 
-func (pm *basicManager) getOrphanedMirrorPodNames() []string {
+func (pm *basicManager) GetOrphanedMirrorPodNames() []string {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	var podFullNames []string
@@ -333,13 +331,6 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 		}
 	}
 	return podFullNames
-}
-
-func (pm *basicManager) DeleteOrphanedMirrorPods() {
-	podFullNames := pm.getOrphanedMirrorPodNames()
-	for _, podFullName := range podFullNames {
-		pm.MirrorClient.DeleteMirrorPod(podFullName, nil)
-	}
 }
 
 func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {

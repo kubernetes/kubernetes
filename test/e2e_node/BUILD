@@ -123,6 +123,7 @@ go_test(
         "hugepages_test.go",
         "image_id_test.go",
         "log_path_test.go",
+        "mirror_pod_grace_period_test.go",
         "mirror_pod_test.go",
         "node_container_manager_test.go",
         "node_perf_test.go",
