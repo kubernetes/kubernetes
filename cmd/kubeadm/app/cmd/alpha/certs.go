@@ -24,6 +24,7 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/duration"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -33,8 +34,10 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -69,6 +72,22 @@ var (
 	You can also use "kubeadm init --upload-certs" without specifying a certificate key and it will
 	generate and print one for you.
 `)
+	generateCSRLongDesc = cmdutil.LongDesc(`
+	Generates keys and certificate signing requests (CSRs) for all the certificates required to run the control plane.
+	This command also generates partial kubeconfig files with private key data in the  "users > user > client-key-data" field,
+	and for each kubeconfig file an accompanying ".csr" file is created.
+
+	This command is designed for use in [Kubeadm External CA Mode](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#external-ca-mode).
+	It generates CSRs which you can then submit to your external certificate authority for signing.
+
+	The PEM encoded signed certificates should then be saved alongside the key files, using ".crt" as the file extension,
+	or in the case of kubeconfig files, the PEM encoded signed certificate should be base64 encoded
+	and added to the kubeconfig file in the "users > user > client-certificate-data" field.
+`)
+	generateCSRExample = cmdutil.Examples(`
+	# The following command will generate keys and CSRs for all control-plane certificates and kubeconfig files:
+	kubeadm alpha certs generate-csr --kubeconfig-dir /tmp/etc-k8s --cert-dir /tmp/etc-k8s/pki
+`)
 )
 
 // newCmdCertsUtility returns main command for certs phase
@@ -82,7 +101,81 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 	cmd.AddCommand(newCmdCertsRenewal(out))
 	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
 	cmd.AddCommand(NewCmdCertificateKey())
+	cmd.AddCommand(newCmdGenCSR())
 	return cmd
+}
+
+// genCSRConfig is the configuration required by the gencsr command
+type genCSRConfig struct {
+	kubeadmConfigPath string
+	certDir           string
+	kubeConfigDir     string
+	kubeadmConfig     *kubeadmapi.InitConfiguration
+}
+
+func newGenCSRConfig() *genCSRConfig {
+	return &genCSRConfig{
+		kubeConfigDir: kubeadmconstants.KubernetesDir,
+	}
+}
+
+func (o *genCSRConfig) addFlagSet(flagSet *pflag.FlagSet) {
+	options.AddConfigFlag(flagSet, &o.kubeadmConfigPath)
+	options.AddCertificateDirFlag(flagSet, &o.certDir)
+	options.AddKubeConfigDirFlag(flagSet, &o.kubeConfigDir)
+}
+
+// load merges command line flag values into kubeadm's config.
+// Reads Kubeadm config from a file (if present)
+// else use dynamically generated default config.
+// This configuration contains the DNS names and IP addresses which
+// are encoded in the control-plane CSRs.
+func (o *genCSRConfig) load() (err error) {
+	o.kubeadmConfig, err = configutil.LoadOrDefaultInitConfiguration(
+		o.kubeadmConfigPath,
+		&kubeadmapiv1beta2.InitConfiguration{},
+		&kubeadmapiv1beta2.ClusterConfiguration{},
+	)
+	if err != nil {
+		return err
+	}
+	// --cert-dir takes priority over kubeadm config if set.
+	if o.certDir != "" {
+		o.kubeadmConfig.CertificatesDir = o.certDir
+	}
+	return nil
+}
+
+// newCmdGenCSR returns cobra.Command for generating keys and CSRs
+func newCmdGenCSR() *cobra.Command {
+	config := newGenCSRConfig()
+
+	cmd := &cobra.Command{
+		Use:     "generate-csr",
+		Short:   "Generate keys and certificate signing requests",
+		Long:    generateCSRLongDesc,
+		Example: generateCSRExample,
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := config.load(); err != nil {
+				return err
+			}
+			return runGenCSR(config)
+		},
+	}
+	config.addFlagSet(cmd.Flags())
+	return cmd
+}
+
+// runGenCSR contains the logic of the generate-csr sub-command.
+func runGenCSR(config *genCSRConfig) error {
+	if err := certsphase.CreateDefaultKeysAndCSRFiles(config.kubeadmConfig); err != nil {
+		return err
+	}
+	if err := kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(config.kubeConfigDir, config.kubeadmConfig); err != nil {
+		return err
+	}
+	return nil
 }
 
 // NewCmdCertificateKey returns cobra.Command for certificate key generate
