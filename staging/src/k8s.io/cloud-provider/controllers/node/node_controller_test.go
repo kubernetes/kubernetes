@@ -217,7 +217,22 @@ func Test_AddCloudNode(t *testing.T) {
 				},
 				Spec: v1.NodeSpec{
 					ProviderID: "fake://12345",
-					Taints:     []v1.Taint{},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
 				},
 			},
 		},
@@ -338,10 +353,23 @@ func Test_AddCloudNode(t *testing.T) {
 							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
 				},
 				Spec: v1.NodeSpec{
 					ProviderID: "aws://12345",
-					Taints:     []v1.Taint{},
 				},
 			},
 		},
@@ -601,7 +629,6 @@ func Test_AddCloudNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					Labels:            map[string]string{},
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -610,6 +637,20 @@ func Test_AddCloudNode(t *testing.T) {
 							Status:             v1.ConditionUnknown,
 							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
 						},
 					},
 				},

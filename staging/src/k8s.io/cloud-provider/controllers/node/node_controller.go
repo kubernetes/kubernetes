@@ -233,15 +233,6 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 		if !ok {
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
-		// Node that isn't present according to the cloud provider shouldn't have its address updated
-		exists, err := ensureNodeExistsByProviderID(ctx, instances, node)
-		if err != nil {
-			// Continue to update node address when not sure the node is not exists
-			klog.Errorf("%v", err)
-		} else if !exists {
-			klog.V(4).Infof("The node %s is no longer present according to the cloud provider, do not process.", node.Name)
-			return nil, fmt.Errorf("node %q not exist", node.Name)
-		}
 
 		nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, node.Spec.ProviderID, node.Name)
 		if err != nil {
