@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -236,7 +237,53 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 				framework.ExpectEqual(volumeSnapshotRef["name"], vs.GetName())
 				framework.ExpectEqual(volumeSnapshotRef["namespace"], vs.GetNamespace())
 			})
+			ginkgo.It("should restore from snapshot with saved data after modifying source data", func() {
+				var restoredPVC *v1.PersistentVolumeClaim
+				var restoredPod *v1.Pod
 
+				ginkgo.By("modifying the data in the source PVC")
+				command := "echo junkdata > /mnt/test/data"
+				RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-data-tester", command, config.ClientNodeSelection)
+
+				ginkgo.By("creating a pvc from the snapshot")
+				restoredPVC = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					ClaimSize:        claimSize,
+					StorageClassName: &(sc.Name),
+				}, config.Framework.Namespace.Name)
+
+				group := "snapshot.storage.k8s.io"
+				dataSourceRef := &v1.TypedLocalObjectReference{
+					APIGroup: &group,
+					Kind:     "VolumeSnapshot",
+					Name:     vs.GetName(),
+				}
+
+				restoredPVC.Spec.DataSource = dataSourceRef
+
+				restoredPVC, err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Create(context.TODO(), restoredPVC, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				cleanupSteps = append(cleanupSteps, func() {
+					framework.Logf("deleting claim %q/%q", restoredPVC.Namespace, restoredPVC.Name)
+					// typically this claim has already been deleted
+					err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Delete(context.TODO(), restoredPVC.Name, metav1.DeleteOptions{})
+					if err != nil && !apierrors.IsNotFound(err) {
+						framework.Failf("Error deleting claim %q. Error: %v", restoredPVC.Name, err)
+					}
+				})
+
+				ginkgo.By("starting a pod to use the claim")
+
+				restoredPod = StartInPodWithVolume(cs, restoredPVC.Namespace, restoredPVC.Name, "restored-pvc-tester", "sleep 300", config.ClientNodeSelection)
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(cs, restoredPod.Name, restoredPod.Namespace))
+				cleanupSteps = append(cleanupSteps, func() {
+					StopPod(cs, restoredPod)
+				})
+
+				command = "cat /mnt/test/data"
+				actualData, err := utils.PodExec(f, restoredPod, command)
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(actualData, "hello world")
+			})
 		})
 	})
 }
