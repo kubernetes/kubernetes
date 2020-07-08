@@ -32,7 +32,7 @@ func TestFailValidateAuthenticationSpec(t *testing.T) {
 		},
 		"invalid webhook ref": {
 			spec: configv1.AuthenticationSpec{
-				WebhookTokenAuthenticators: []configv1.WebhookTokenAuthenticator{
+				WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
 					{KubeConfig: configv1.SecretNameReference{Name: "this+that"}},
 				},
 			},
@@ -41,7 +41,7 @@ func TestFailValidateAuthenticationSpec(t *testing.T) {
 		},
 		"invalid webhook ref - multiple webhooks": {
 			spec: configv1.AuthenticationSpec{
-				WebhookTokenAuthenticators: []configv1.WebhookTokenAuthenticator{
+				WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
 					{KubeConfig: configv1.SecretNameReference{Name: "that.now"}},
 					{KubeConfig: configv1.SecretNameReference{Name: "this+that"}},
 					{KubeConfig: configv1.SecretNameReference{Name: "this.then"}},
@@ -52,7 +52,7 @@ func TestFailValidateAuthenticationSpec(t *testing.T) {
 		},
 		"empty webhook name": {
 			spec: configv1.AuthenticationSpec{
-				WebhookTokenAuthenticators: []configv1.WebhookTokenAuthenticator{
+				WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
 					{KubeConfig: configv1.SecretNameReference{Name: ""}},
 				},
 			},
@@ -96,12 +96,12 @@ func TestSucceedValidateAuthenticationSpec(t *testing.T) {
 			},
 		},
 		"webhook set": {
-			WebhookTokenAuthenticators: []configv1.WebhookTokenAuthenticator{
+			WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
 				{KubeConfig: configv1.SecretNameReference{Name: "wheniwaslittleiwantedtobecomeawebhook"}},
 			},
 		},
 		"some webhooks": {
-			WebhookTokenAuthenticators: []configv1.WebhookTokenAuthenticator{
+			WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
 				{KubeConfig: configv1.SecretNameReference{Name: "whatacoolnameforasecret"}},
 				{KubeConfig: configv1.SecretNameReference{Name: "whatacoolnameforasecret2"}},
 				{KubeConfig: configv1.SecretNameReference{Name: "thisalsoisacoolname"}},
@@ -113,7 +113,7 @@ func TestSucceedValidateAuthenticationSpec(t *testing.T) {
 			OAuthMetadata: configv1.ConfigMapNameReference{
 				Name: "suchname",
 			},
-			WebhookTokenAuthenticators: []configv1.WebhookTokenAuthenticator{
+			WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
 				{KubeConfig: configv1.SecretNameReference{Name: "thisisawebhook"}},
 				{KubeConfig: configv1.SecretNameReference{Name: "thisisawebhook2"}},
 				{KubeConfig: configv1.SecretNameReference{Name: "thisisawebhook33"}},
