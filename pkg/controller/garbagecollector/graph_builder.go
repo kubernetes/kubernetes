@@ -530,6 +530,18 @@ func (gb *GraphBuilder) runProcessGraphChanges() {
 	}
 }
 
+func identityFromEvent(event *event, accessor metav1.Object) objectReference {
+	return objectReference{
+		OwnerReference: metav1.OwnerReference{
+			APIVersion: event.gvk.GroupVersion().String(),
+			Kind:       event.gvk.Kind,
+			UID:        accessor.GetUID(),
+			Name:       accessor.GetName(),
+		},
+		Namespace: accessor.GetNamespace(),
+	}
+}
+
 // Dequeueing an event from graphChanges, updating graph, populating dirty_queue.
 func (gb *GraphBuilder) processGraphChanges() bool {
 	item, quit := gb.graphChanges.Get()
@@ -560,15 +572,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 	switch {
 	case (event.eventType == addEvent || event.eventType == updateEvent) && !found:
 		newNode := &node{
-			identity: objectReference{
-				OwnerReference: metav1.OwnerReference{
-					APIVersion: event.gvk.GroupVersion().String(),
-					Kind:       event.gvk.Kind,
-					UID:        accessor.GetUID(),
-					Name:       accessor.GetName(),
-				},
-				Namespace: accessor.GetNamespace(),
-			},
+			identity:           identityFromEvent(event, accessor),
 			dependents:         make(map[*node]struct{}),
 			owners:             accessor.GetOwnerReferences(),
 			deletingDependents: beingDeleted(accessor) && hasDeleteDependentsFinalizer(accessor),
@@ -608,15 +612,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		existingNode.dependentsLock.RLock()
 		defer existingNode.dependentsLock.RUnlock()
 		if len(existingNode.dependents) > 0 {
-			gb.absentOwnerCache.Add(objectReference{
-				OwnerReference: metav1.OwnerReference{
-					APIVersion: event.gvk.GroupVersion().String(),
-					Kind:       event.gvk.Kind,
-					Name:       accessor.GetName(),
-					UID:        accessor.GetUID(),
-				},
-				Namespace: accessor.GetNamespace(),
-			})
+			gb.absentOwnerCache.Add(identityFromEvent(event, accessor))
 		}
 		for dep := range existingNode.dependents {
 			gb.attemptToDelete.Add(dep)
