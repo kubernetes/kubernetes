@@ -318,7 +318,7 @@ data:
            pods insecure
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
-        }{{ .Federation }}
+        }
         prometheus :9153
         forward . {{ .UpstreamNameserver }}
         cache 30
