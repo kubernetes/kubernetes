@@ -395,9 +395,9 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 			klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; ignoring", id, oldDeltas, obj)
 			return nil
 		}
-		klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; removing from queue", id, oldDeltas, obj)
+		klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; breaking invariant by storing empty Deltas", id, oldDeltas, obj)
 		f.items[id] = newDeltas
-		f.filterQueueLocked()
+		return fmt.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; broke DeltaFIFO invariant by storing empty Deltas", id, oldDeltas, obj)
 	}
 	return nil
 }
@@ -654,35 +654,6 @@ func (f *DeltaFIFO) syncKeyLocked(key string) error {
 		return fmt.Errorf("couldn't queue object: %v", err)
 	}
 	return nil
-}
-
-// A partial repair function.  Removes keys from f.queue that
-// correspond to nothing in f.items.  Removes keys from both when the
-// entry in f.items has zero length.  Ensures each key appears at most
-// once in queue.  Must be called with the lock held.
-func (f *DeltaFIFO) filterQueueLocked() {
-	newQueue := make([]string, 0, len(f.queue))
-	newItems := make(map[string]Deltas, len(f.items))
-	for _, key := range f.queue {
-		if _, exists := newItems[key]; exists {
-			klog.Errorf("Removing duplicate key %q", key)
-			continue
-		}
-		deltas, exists := f.items[key]
-		if !exists {
-			klog.Errorf("Removing key %q because it has no Deltas", key)
-			continue
-		}
-		if len(deltas) == 0 {
-			klog.Errorf("Removing key %q because it has zero-length Deltas", key)
-			continue
-		}
-		newQueue = append(newQueue, key)
-		newItems[key] = deltas
-	}
-	klog.Info("Finished repair of queue")
-	f.queue = newQueue
-	f.items = newItems
 }
 
 // A KeyListerGetter is anything that knows how to list its keys and look up by key.
