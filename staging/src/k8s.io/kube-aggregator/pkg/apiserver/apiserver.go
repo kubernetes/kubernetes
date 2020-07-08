@@ -363,6 +363,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyCurrentCertKeyContent: s.proxyCurrentCertKeyContent,
 		proxyTransport:             s.proxyTransport,
 		serviceResolver:            s.serviceResolver,
+		egressSelector:             s.egressSelector,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {
