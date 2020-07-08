@@ -628,19 +628,14 @@ func (plugin *kubenetNetworkPlugin) getNetworkStatus(id kubecontainer.ContainerI
 	if !ok {
 		return nil
 	}
-	// sort making v4 first
-	// TODO: (khenidak) IPv6 beta stage.
-	// This - forced sort - could be avoided by checking which cidr that an IP belongs
-	// to, then placing the IP according to cidr index. But before doing that. Check how IP is collected
-	// across all of kubelet code (against cni and cri).
-	ips := make([]net.IP, 0)
+
+	if len(iplist) == 0 {
+		return nil
+	}
+
+	ips := make([]net.IP, 0, len(iplist))
 	for _, ip := range iplist {
-		isV6 := netutils.IsIPv6String(ip)
-		if !isV6 {
-			ips = append([]net.IP{net.ParseIP(ip)}, ips...)
-		} else {
-			ips = append(ips, net.ParseIP(ip))
-		}
+		ips = append(ips, net.ParseIP(ip))
 	}
 
 	return &network.PodNetworkStatus{
