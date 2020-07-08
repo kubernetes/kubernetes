@@ -37,6 +37,7 @@ go_test(
     srcs = [
         "cmd_test.go",
         "namer_test.go",
+        "parser_test.go",
     ],
     embed = [":go_default_library"],
 )
