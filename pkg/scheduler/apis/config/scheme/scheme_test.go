@@ -475,7 +475,6 @@ clientConnection:
   contentType: ""
   kubeconfig: ""
   qps: 0
-disablePreemption: false
 enableContentionProfiling: false
 enableProfiling: false
 healthzBindAddress: ""

@@ -321,7 +321,6 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		ctx.Done(),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
-		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
