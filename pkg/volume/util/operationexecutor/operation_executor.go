@@ -195,13 +195,17 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume's file system resize request is finished.
-	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
+	MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) bool
 
 	// GetDeviceMountState returns mount state of the device in global path
 	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
 
 	// GetVolumeMountState returns mount state of the volume for the Pod
 	GetVolumeMountState(volumName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
+
+	// MarkForInUseExpansionError marks the volume to have in-use error during expansion.
+	// volume expansion must not be retried for this volume
+	MarkForInUseExpansionError(volumeName v1.UniqueVolumeName)
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -215,6 +219,9 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
 	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+
+	// MarkAsAttachedWithSize is same as MarkVolumeAsAttached except we also record pvc size in actualStateOfWorld
+	MarkAsAttachedWithSize(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string, claimSize resource.Quantity) error
 
 	// Marks the specified volume as *possibly* attached to the specified node.
 	// If an attach operation fails, the attach/detach controller does not know for certain if the volume is attached or not.

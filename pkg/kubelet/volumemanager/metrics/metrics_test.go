@@ -19,7 +19,8 @@ package metrics
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -73,7 +74,7 @@ func TestMetricCollection(t *testing.T) {
 
 	// Add one volume to ActualStateOfWorld
 	devicePath := "fake/device/path"
-	err = asw.MarkVolumeAsAttached("", volumeSpec, "", devicePath)
+	err = asw.MarkAsAttachedWithSize("", volumeSpec, "", devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}

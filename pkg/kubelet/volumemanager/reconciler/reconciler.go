@@ -34,6 +34,7 @@ import (
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -202,7 +203,7 @@ func (rc *reconciler) unmountVolumes() {
 func (rc *reconciler) mountAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
-		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsVolumeNotAttachedError(err) {
 			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
@@ -632,9 +633,9 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 	rc.updateDevicePath(volumesNeedUpdate)
 
 	for _, volume := range volumesNeedUpdate {
-		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
+		err := rc.actualStateOfWorld.MarkAsAttachedWithSize(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
-			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
+			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath, resource.Quantity{Format: resource.BinarySI})
 		if err != nil {
 			klog.Errorf("Could not add volume information to actual state of world: %v", err)
 			continue

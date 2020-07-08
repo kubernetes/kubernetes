@@ -894,7 +894,7 @@ func volumeCapacity(size int) v1.ResourceList {
 
 func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *testing.T) {
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		err := asw.MarkVolumeAsAttached(volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
+		err := asw.MarkAsAttachedWithSize(volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "", resource.Quantity{Format: resource.BinarySI})
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}
@@ -936,7 +936,7 @@ func reprocess(dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePod
 func getResizeRequiredVolumes(dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld) []v1.UniqueVolumeName {
 	resizeRequiredVolumes := []v1.UniqueVolumeName{}
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		_, _, err := asw.PodExistsInVolume(volumeToMount)
 		if cache.IsFSResizeRequiredError(err) {
 			resizeRequiredVolumes = append(resizeRequiredVolumes, volumeToMount.VolumeName)
 		}

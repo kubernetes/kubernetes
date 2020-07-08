@@ -27,6 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -613,7 +614,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// NodeExpandVolume will resize the file system if user has requested a resize of
 			// underlying persistent volume and is allowed to do so.
-			resizeDone, resizeError = og.nodeExpandVolume(volumeToMount, resizeOptions)
+			resizeDone, resizeError = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 
 			if resizeError != nil {
 				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
@@ -669,7 +670,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		//	- Volume does not support DeviceMounter interface.
 		//	- In case of CSI the volume does not have node stage_unstage capability.
 		if !resizeDone {
-			_, resizeError = og.nodeExpandVolume(volumeToMount, resizeOptions)
+			_, resizeError = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 			if resizeError != nil {
 				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
 				return volumeToMount.GenerateError("MountVolume.Setup failed while expanding volume", resizeError)
@@ -1083,7 +1084,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			DeviceStagePath: stagingPath,
 			CSIVolumePhase:  volume.CSIVolumePublished,
 		}
-		_, resizeError := og.nodeExpandVolume(volumeToMount, resizeOptions)
+		_, resizeError := og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 		if resizeError != nil {
 			klog.Errorf("MapVolume.NodeExpandVolume failed with %v", resizeError)
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed while expanding volume", resizeError)
@@ -1302,13 +1303,25 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 	}
 
 	verifyControllerAttachedVolumeFunc := func() (error, error) {
+		var claimSize resource.Quantity
+		if volumeToMount.VolumeSpec.PersistentVolume != nil {
+			pv := volumeToMount.VolumeSpec.PersistentVolume
+			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return volumeToMount.GenerateError("VerifyControllerAttachedVolume.GetPVC failed", err)
+			}
+			pvcStatusSize := pvc.Status.Capacity.Storage()
+			if pvcStatusSize != nil {
+				claimSize = *pvcStatusSize
+			}
+		}
 		if !volumeToMount.PluginIsAttachable {
 			// If the volume does not implement the attacher interface, it is
 			// assumed to be attached and the actual state of the world is
 			// updated accordingly.
 
-			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
+			addVolumeNodeErr := actualStateOfWorld.MarkAsAttachedWithSize(
+				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */, claimSize)
 			if addVolumeNodeErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
@@ -1343,8 +1356,8 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
-				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+				addVolumeNodeErr := actualStateOfWorld.MarkAsAttachedWithSize(
+					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath, claimSize)
 				klog.Infof(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)))
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.
@@ -1495,7 +1508,6 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 
 	fsResizeFunc := func() (error, error) {
 		var resizeDone bool
-		var simpleErr, detailedErr error
 		resizeOptions := volume.NodeResizeOptions{
 			VolumeSpec: volumeToMount.VolumeSpec,
 			DevicePath: volumeToMount.DevicePath,
@@ -1557,9 +1569,9 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 
 		// if we are doing online expansion then volume is already published
 		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
-		resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
-		if simpleErr != nil || detailedErr != nil {
-			return simpleErr, detailedErr
+		resizeDone, err = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
+		if err != nil {
+			return err, err
 		}
 		if resizeDone {
 			return nil, nil
@@ -1583,29 +1595,9 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	}, nil
 }
 
-func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
+func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	resizeOptions volume.NodeResizeOptions) (bool, error, error) {
-
-	resizeDone, err := og.nodeExpandVolume(volumeToMount, resizeOptions)
-	if err != nil {
-		klog.Errorf("NodeExpandVolume.NodeExpandVolume failed : %v", err)
-		e1, e2 := volumeToMount.GenerateError("NodeExpandVolume.NodeExpandVolume failed", err)
-		return false, e1, e2
-	}
-	if resizeDone {
-		markFSResizedErr := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.PodName, volumeToMount.VolumeName)
-		if markFSResizedErr != nil {
-			// On failure, return error. Caller will log and retry.
-			e1, e2 := volumeToMount.GenerateError("NodeExpandVolume.MarkVolumeAsResized failed", markFSResizedErr)
-			return false, e1, e2
-		}
-		return true, nil, nil
-	}
-	return false, nil, nil
-}
-
-func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOpts volume.NodeResizeOptions) (bool, error) {
+	rsOpts volume.NodeResizeOptions) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		klog.V(4).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
 		return true, nil
@@ -1649,6 +1641,10 @@ func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOp
 			rsOpts.OldSize = pvcStatusCap
 			resizeDone, resizeErr := expandableVolumePlugin.NodeExpand(rsOpts)
 			if resizeErr != nil {
+				// Mark volume for precondition error so as volume expansion can not be retried
+				if volumetypes.IsFailedPreconditionError(resizeErr) {
+					actualStateOfWorld.MarkForInUseExpansionError(volumeToMount.VolumeName)
+				}
 				return false, fmt.Errorf("MountVolume.NodeExpandVolume failed : %v", resizeErr)
 			}
 			// Volume resizing is not done but it did not error out. This could happen if a CSI volume
@@ -1666,6 +1662,11 @@ func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOp
 			if err != nil {
 				// On retry, NodeExpandVolume will be called again but do nothing
 				return false, fmt.Errorf("MountVolume.NodeExpandVolume update PVC status failed : %v", err)
+			}
+			ok := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, pvSpecCap)
+			if !ok {
+				// On failure, return error. Caller will log and retry.
+				return false, fmt.Errorf("NodeExpandVolume.MarkVolumeAsResized failed for volume %q", volumeToMount.VolumeName)
 			}
 			return true, nil
 		}

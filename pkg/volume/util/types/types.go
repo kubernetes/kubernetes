@@ -54,6 +54,30 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	return o.OperationFunc()
 }
 
+// FailedPrecondition error indicates CSI operation returned failed precondition
+// error
+type FailedPrecondition struct {
+	msg string
+}
+
+func (err *FailedPrecondition) Error() string {
+	return err.msg
+}
+
+// NewFailedPreconditionError returns a new FailedPrecondition error instance
+func NewFailedPreconditionError(msg string) *FailedPrecondition {
+	return &FailedPrecondition{msg: msg}
+}
+
+// IsFailedPreconditionError checks if given error is of type that indicates
+// operation failed with precondition
+func IsFailedPreconditionError(err error) bool {
+	if _, ok := err.(*FailedPrecondition); ok {
+		return true
+	}
+	return false
+}
+
 // TransientOperationFailure indicates operation failed with a transient error
 // and may fix itself when retried.
 type TransientOperationFailure struct {

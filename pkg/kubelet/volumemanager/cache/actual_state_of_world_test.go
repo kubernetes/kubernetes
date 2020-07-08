@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -31,10 +32,10 @@ import (
 
 var emptyVolumeName = v1.UniqueVolumeName("")
 
-// Calls MarkVolumeAsAttached() once to add volume
+// Calls MarkAsAttachedWithSize() once to add volume
 // Verifies newly added volume exists in GetUnmountedVolumes()
 // Verifies newly added volume doesn't exist in GetGloballyMountedVolumes()
-func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
+func Test_MarkAsAttachedWithSize_Positive_NewVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -64,11 +65,11 @@ func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
 	}
 
 	// Act
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 
 	// Assert
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
@@ -76,12 +77,12 @@ func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 }
 
-// Calls MarkVolumeAsAttached() once to add volume, specifying a name --
+// Calls MarkAsAttachedWithSize() once to add volume, specifying a name --
 // establishes that the supplied volume name is used to register the volume
 // rather than the generated one.
 // Verifies newly added volume exists in GetUnmountedVolumes()
 // Verifies newly added volume doesn't exist in GetGloballyMountedVolumes()
-func Test_MarkVolumeAsAttached_SuppliedVolumeName_Positive_NewVolume(t *testing.T) {
+func Test_MarkAsAttachedWithSize_SuppliedVolumeName_Positive_NewVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -108,11 +109,11 @@ func Test_MarkVolumeAsAttached_SuppliedVolumeName_Positive_NewVolume(t *testing.
 	volumeName := v1.UniqueVolumeName("this-would-never-be-a-volume-name")
 
 	// Act
-	err := asw.MarkVolumeAsAttached(volumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err := asw.MarkAsAttachedWithSize(volumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 
 	// Assert
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	verifyVolumeExistsAsw(t, volumeName, true /* shouldExist */, asw)
@@ -120,11 +121,11 @@ func Test_MarkVolumeAsAttached_SuppliedVolumeName_Positive_NewVolume(t *testing.
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, volumeName, asw)
 }
 
-// Calls MarkVolumeAsAttached() twice to add the same volume
+// Calls MarkAsAttachedWithSize() twice to add the same volume
 // Verifies second call doesn't fail
 // Verifies newly added volume exists in GetUnmountedVolumes()
 // Verifies newly added volume doesn't exist in GetGloballyMountedVolumes()
-func Test_MarkVolumeAsAttached_Positive_ExistingVolume(t *testing.T) {
+func Test_MarkAsAttachedWithSize_Positive_ExistingVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	devicePath := "fake/device/path"
@@ -153,17 +154,17 @@ func Test_MarkVolumeAsAttached_Positive_ExistingVolume(t *testing.T) {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 
 	// Assert
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
@@ -204,9 +205,9 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 	podName := util.GetUniquePodName(pod)
 
@@ -279,9 +280,9 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 	podName := util.GetUniquePodName(pod)
 
@@ -386,9 +387,9 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 			generatedVolumeName2, volumeSpec1, volumeSpec2)
 	}
 
-	err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 	podName1 := util.GetUniquePodName(pod1)
 
@@ -540,7 +541,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	verifyVolumeDoesntExistWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 }
 
-// Calls MarkVolumeAsAttached() once to add volume
+// Calls MarkAsAttachedWithSize() once to add volume
 // Calls MarkDeviceAsMounted() to mark volume as globally mounted.
 // Verifies newly added volume exists in GetUnmountedVolumes()
 // Verifies newly added volume exists in GetGloballyMountedVolumes()
@@ -574,9 +575,9 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
@@ -621,9 +622,9 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		plugin, volumeSpec1)
 	require.NoError(t, err)
 
-	err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+	err = asw.MarkAsAttachedWithSize(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath, resource.Quantity{Format: resource.BinarySI})
 	if err != nil {
-		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+		t.Fatalf("MarkAsAttachedWithSize failed. Expected: <no error> Actual: <%v>", err)
 	}
 	podName1 := util.GetUniquePodName(pod1)
 
@@ -656,7 +657,13 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("expected volume %s to be not found in asw", volumeSpec1.Name())
 	}
 
-	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1)
+	vmt := VolumeToMount{
+		VolumeToMount: operationexecutor.VolumeToMount{
+			VolumeName: generatedVolumeName1,
+			PodName:    podName1,
+		},
+	}
+	volExists, _, _ := asw.PodExistsInVolume(vmt)
 	if volExists {
 		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
@@ -737,8 +744,13 @@ func verifyPodExistsInVolumeAsw(
 	expectedVolumeName v1.UniqueVolumeName,
 	expectedDevicePath string,
 	asw ActualStateOfWorld) {
-	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName)
+	vmt := VolumeToMount{
+		VolumeToMount: operationexecutor.VolumeToMount{
+			VolumeName: expectedVolumeName,
+			PodName:    expectedPodName,
+		},
+	}
+	podExistsInVolume, devicePath, err := asw.PodExistsInVolume(vmt)
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -764,8 +776,13 @@ func verifyPodDoesntExistInVolumeAsw(
 	volumeToCheck v1.UniqueVolumeName,
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
-	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(podToCheck, volumeToCheck)
+	vmt := VolumeToMount{
+		VolumeToMount: operationexecutor.VolumeToMount{
+			VolumeName: volumeToCheck,
+			PodName:    podToCheck,
+		},
+	}
+	podExistsInVolume, devicePath, err := asw.PodExistsInVolume(vmt)
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume did not return error. Expected: <error indicating volume does not exist> Actual: <%v>", err)

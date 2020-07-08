@@ -114,6 +114,11 @@ type DesiredStateOfWorld interface {
 	// Each error string is stored only once.
 	AddErrorToPod(podName types.UniquePodName, err string)
 
+	// UpdatePersistentVolumeSize updates persistentVolumeSize in desired state of the world
+	// so as it can be compared against actual size and volume expansion performed
+	// if necessary
+	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity)
+
 	// PopPodErrors returns accumulated errors on a given pod and clears
 	// them.
 	PopPodErrors(podName types.UniquePodName) []string
@@ -126,6 +131,7 @@ type DesiredStateOfWorld interface {
 // be mounted to PodName.
 type VolumeToMount struct {
 	operationexecutor.VolumeToMount
+	persistentVolumeSize resource.Quantity
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
@@ -182,6 +188,9 @@ type volumeToMount struct {
 	// desiredSizeLimit indicates the desired upper bound on the size of the volume
 	// (if so implemented)
 	desiredSizeLimit *resource.Quantity
+	// persistentVolumeSize indicates size of persistent volume when persistent volume was
+	// added to desired state of the world.
+	persistentVolumeSize resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -268,7 +277,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				}
 			}
 		}
-		dsw.volumesToMount[volumeName] = volumeToMount{
+		vmt := volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable:      attachable,
@@ -277,6 +286,13 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			reportedInUse:           false,
 			desiredSizeLimit:        sizeLimit,
 		}
+
+		if volumeSpec.PersistentVolume != nil {
+			pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
+			vmt.persistentVolumeSize = *pvCap
+		}
+
+		dsw.volumesToMount[volumeName] = vmt
 	}
 
 	// Create new podToMount object. If it already exists, it is refreshed with
@@ -332,6 +348,19 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	if len(dsw.volumesToMount[volumeName].podsToMount) == 0 {
 		// Delete volume if no child pods left
 		delete(dsw.volumesToMount, volumeName)
+	}
+}
+
+// UpdatePersistentVolumeSize updates last known PV size. This is used for volume expansion and
+// should be only used for persistent volumes.
+func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity) {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	vol, volExists := dsw.volumesToMount[volumeName]
+	if volExists {
+		vol.persistentVolumeSize = size
+		dsw.volumesToMount[volumeName] = vol
 	}
 }
 
@@ -404,7 +433,9 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
 						VolumeGidValue:          volumeObj.volumeGidValue,
 						ReportedInUse:           volumeObj.reportedInUse,
-						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
+						DesiredSizeLimit:        volumeObj.desiredSizeLimit},
+					persistentVolumeSize: volumeObj.persistentVolumeSize,
+				})
 		}
 	}
 	return volumesToMount

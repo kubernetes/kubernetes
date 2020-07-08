@@ -28,7 +28,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -252,6 +253,14 @@ func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error {
+	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, devicePath, true)
+	return err
+}
+
+// MarkAsAttachedWithSize is same as MarkVolumeAsAttached except we also record pvc size in actualStateOfWorld
+// This is not used in A/D controller
+func (asw *actualStateOfWorld) MarkAsAttachedWithSize(
+	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string, claimSize resource.Quantity) error {
 	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, devicePath, true)
 	return err
 }

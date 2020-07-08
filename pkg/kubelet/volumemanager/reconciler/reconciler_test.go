@@ -1001,16 +1001,34 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 	fsMode := v1.PersistentVolumeFilesystem
 
 	var tests = []struct {
-		name       string
-		volumeMode *v1.PersistentVolumeMode
+		name          string
+		volumeMode    *v1.PersistentVolumeMode
+		pvcSize       resource.Quantity
+		pvcStatusSize resource.Quantity
+		pvSize        resource.Quantity
+		readOnly      bool
 	}{
 		{
-			name:       "expand-fs-volume",
-			volumeMode: &fsMode,
+			name:          "expand-fs-volume",
+			volumeMode:    &fsMode,
+			pvcSize:       resource.MustParse("10G"),
+			pvcStatusSize: resource.MustParse("10G"),
+			pvSize:        resource.MustParse("15G"),
 		},
 		{
-			name:       "expand-raw-block",
-			volumeMode: &blockMode,
+			name:          "expand-fs-volume-readonly",
+			volumeMode:    &fsMode,
+			pvcSize:       resource.MustParse("10G"),
+			pvcStatusSize: resource.MustParse("10G"),
+			pvSize:        resource.MustParse("15G"),
+			readOnly:      true,
+		},
+		{
+			name:          "expand-raw-block",
+			volumeMode:    &blockMode,
+			pvcSize:       resource.MustParse("10G"),
+			pvcStatusSize: resource.MustParse("10G"),
+			pvSize:        resource.MustParse("15G"),
 		},
 	}
 
@@ -1024,6 +1042,11 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				Spec: v1.PersistentVolumeSpec{
 					ClaimRef:   &v1.ObjectReference{Name: "pvc"},
 					VolumeMode: tc.volumeMode,
+					// initially PV size is same as PVC status size
+					// so as expansion can be triggered later
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: tc.pvcStatusSize,
+					},
 				},
 			}
 			pvc := &v1.PersistentVolumeClaim{
@@ -1032,8 +1055,18 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 					UID:  "pvcuid",
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: tc.pvcSize,
+						},
+					},
 					VolumeName: "pv",
 					VolumeMode: tc.volumeMode,
+				},
+				Status: v1.PersistentVolumeClaimStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: tc.pvcStatusSize,
+					},
 				},
 			}
 			pod := &v1.Pod{
@@ -1048,6 +1081,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 							VolumeSource: v1.VolumeSource{
 								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 									ClaimName: pvc.Name,
+									ReadOnly:  tc.readOnly,
 								},
 							},
 						},
@@ -1104,23 +1138,37 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			close(stopChan)
 			<-stoppedChan
 
-			// Mark volume as fsResizeRequired.
-			asw.MarkFSResizeRequired(volumeName, podName)
-			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName)
-			if !cache.IsFSResizeRequiredError(podExistErr) {
-				t.Fatalf("Volume should be marked as fsResizeRequired, but receive unexpected error: %v", podExistErr)
+			// simulate what desired_state_of_populator does
+			pv.Spec.Capacity[v1.ResourceStorage] = tc.pvSize
+			volumeSpec = &volume.Spec{PersistentVolume: pv}
+			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+			if !tc.readOnly {
+				dsw.UpdatePersistentVolumeSize(volumeName, tc.pvSize)
 			}
 
-			// Start the reconciler again, we hope reconciler will perform the
-			// resize operation and clear the fsResizeRequired flag for volume.
-			go reconciler.Run(wait.NeverStop)
+			volumeToMount := dsw.GetVolumesToMount()[0]
 
-			waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
-				mounted, _, err := asw.PodExistsInVolume(podName, volumeName)
-				return mounted && err == nil, nil
-			})
-			if waitErr != nil {
-				t.Fatal("Volume resize should succeeded")
+			mounted, _, podExistErr := asw.PodExistsInVolume(volumeToMount)
+			if tc.readOnly {
+				if podExistErr != nil || !mounted {
+					t.Errorf("for readonly volumes expected mounted to be true and no error, mounted is: %v error: %v", mounted, podExistErr)
+				}
+			} else {
+				if !cache.IsFSResizeRequiredError(podExistErr) {
+					t.Errorf("Volume should be marked as fsResizeRequired, but receive unexpected error: %v", podExistErr)
+				}
+
+				// Start the reconciler again, we hope reconciler will perform the
+				// resize operation and clear the fsResizeRequired flag for volume.
+				go reconciler.Run(wait.NeverStop)
+
+				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
+					mounted, _, err := asw.PodExistsInVolume(volumeToMount)
+					return mounted && err == nil, nil
+				})
+				if waitErr != nil {
+					t.Errorf("Volume resize should succeeded")
+				}
 			}
 		})
 	}
@@ -1653,6 +1701,13 @@ func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolume
 	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
 		return true, pv, nil
 	})
+	fakeClient.AddReactor("patch", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() == "status" {
+			return true, pvc, nil
+		}
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
+
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
