@@ -682,6 +682,60 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 
 		removeExistingNode := true
 
+		if event.virtual {
+			// this is a virtual delete event, not one observed from an informer
+			deletedIdentity := identityFromEvent(event, accessor)
+			if existingNode.virtual {
+
+				// our existing node is also virtual, we're not sure of its coordinates.
+				// see if any dependents reference this owner with coordinates other than the one we got a virtual delete event for.
+				if matchingDependents, nonmatchingDependents := partitionDependents(existingNode.getDependents(), deletedIdentity); len(nonmatchingDependents) > 0 {
+
+					// some of our dependents disagree on our coordinates, so do not remove the existing virtual node from the graph
+					removeExistingNode = false
+
+					if len(matchingDependents) > 0 {
+						// mark the observed deleted identity as absent
+						gb.absentOwnerCache.Add(deletedIdentity)
+						// attempt to delete dependents that do match the verified deleted identity
+						for _, dep := range matchingDependents {
+							gb.attemptToDelete.Add(dep)
+						}
+					}
+
+					// if the delete event verified existingNode.identity doesn't exist...
+					if existingNode.identity == deletedIdentity {
+						// find an alternative identity our nonmatching dependents refer to us by
+						replacementIdentity := getAlternateOwnerIdentity(nonmatchingDependents, deletedIdentity)
+						if replacementIdentity != nil {
+							// replace the existing virtual node with a new one with one of our other potential identities
+							replacementNode := existingNode.clone()
+							replacementNode.identity = *replacementIdentity
+							gb.uidToNode.Write(replacementNode)
+							// and add the new virtual node back to the attemptToDelete queue
+							gb.attemptToDelete.AddRateLimited(replacementNode)
+						}
+					}
+				}
+
+			} else if existingNode.identity != deletedIdentity {
+				// do not remove the existing real node from the graph based on a virtual delete event
+				removeExistingNode = false
+
+				// our existing node which was observed via informer disagrees with the virtual delete event's coordinates
+				matchingDependents, _ := partitionDependents(existingNode.getDependents(), deletedIdentity)
+
+				if len(matchingDependents) > 0 {
+					// mark the observed deleted identity as absent
+					gb.absentOwnerCache.Add(deletedIdentity)
+					// attempt to delete dependents that do match the verified deleted identity
+					for _, dep := range matchingDependents {
+						gb.attemptToDelete.Add(dep)
+					}
+				}
+			}
+		}
+
 		if removeExistingNode {
 			// removeNode updates the graph
 			gb.removeNode(existingNode)
@@ -705,4 +759,128 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		}
 	}
 	return true
+}
+
+// partitionDependents divides the provided dependents into a list which have an ownerReference matching the provided identity,
+// and ones which have an ownerReference for the given uid that do not match the provided identity.
+// Note that a dependent with multiple ownerReferences for the target uid can end up in both lists.
+func partitionDependents(dependents []*node, matchOwnerIdentity objectReference) (matching, nonmatching []*node) {
+	ownerIsNamespaced := len(matchOwnerIdentity.Namespace) > 0
+	for i := range dependents {
+		dep := dependents[i]
+		foundMatch := false
+		foundMismatch := false
+		// if the dep namespace matches or the owner is cluster scoped ...
+		if ownerIsNamespaced && matchOwnerIdentity.Namespace != dep.identity.Namespace {
+			// all references to the parent do not match, since the dependent namespace does not match the owner
+			foundMismatch = true
+		} else {
+			for _, ownerRef := range dep.owners {
+				// ... find the ownerRef with a matching uid ...
+				if ownerRef.UID == matchOwnerIdentity.UID {
+					// ... and check if it matches all coordinates
+					if ownerReferenceMatchesCoordinates(ownerRef, matchOwnerIdentity.OwnerReference) {
+						foundMatch = true
+					} else {
+						foundMismatch = true
+					}
+				}
+			}
+		}
+
+		if foundMatch {
+			matching = append(matching, dep)
+		}
+		if foundMismatch {
+			nonmatching = append(nonmatching, dep)
+		}
+	}
+	return matching, nonmatching
+}
+
+func referenceLessThan(a, b objectReference) bool {
+	// kind/apiVersion are more significant than namespace,
+	// so that we get coherent ordering between kinds
+	// regardless of whether they are cluster-scoped or namespaced
+	if a.Kind != b.Kind {
+		return a.Kind < b.Kind
+	}
+	if a.APIVersion != b.APIVersion {
+		return a.APIVersion < b.APIVersion
+	}
+	// namespace is more significant than name
+	if a.Namespace != b.Namespace {
+		return a.Namespace < b.Namespace
+	}
+	// name is more significant than uid
+	if a.Name != b.Name {
+		return a.Name < b.Name
+	}
+	// uid is included for completeness, but is expected to be identical
+	// when getting alternate identities for an owner since they are keyed by uid
+	if a.UID != b.UID {
+		return a.UID < b.UID
+	}
+	return false
+}
+
+// getAlternateOwnerIdentity searches deps for owner references which match
+// verifiedAbsentIdentity.UID but differ in apiVersion/kind/name or namespace.
+// The first that follows verifiedAbsentIdentity (according to referenceLessThan) is returned.
+// If none follow verifiedAbsentIdentity, the first (according to referenceLessThan) is returned.
+// If no alternate identities are found, nil is returned.
+func getAlternateOwnerIdentity(deps []*node, verifiedAbsentIdentity objectReference) *objectReference {
+	absentIdentityIsClusterScoped := len(verifiedAbsentIdentity.Namespace) == 0
+
+	seenAlternates := map[objectReference]bool{verifiedAbsentIdentity: true}
+
+	// keep track of the first alternate reference (according to referenceLessThan)
+	var first *objectReference
+	// keep track of the first reference following verifiedAbsentIdentity (according to referenceLessThan)
+	var firstFollowing *objectReference
+
+	for _, dep := range deps {
+		for _, ownerRef := range dep.owners {
+			if ownerRef.UID != verifiedAbsentIdentity.UID {
+				// skip references that aren't the uid we care about
+				continue
+			}
+
+			if ownerReferenceMatchesCoordinates(ownerRef, verifiedAbsentIdentity.OwnerReference) {
+				if absentIdentityIsClusterScoped || verifiedAbsentIdentity.Namespace == dep.identity.Namespace {
+					// skip references that exactly match verifiedAbsentIdentity
+					continue
+				}
+			}
+
+			ref := objectReference{OwnerReference: ownerReferenceCoordinates(ownerRef), Namespace: dep.identity.Namespace}
+			if absentIdentityIsClusterScoped && ref.APIVersion == verifiedAbsentIdentity.APIVersion && ref.Kind == verifiedAbsentIdentity.Kind {
+				// we know this apiVersion/kind is cluster-scoped because of verifiedAbsentIdentity,
+				// so clear the namespace from the alternate identity
+				ref.Namespace = ""
+			}
+
+			if seenAlternates[ref] {
+				// skip references we've already seen
+				continue
+			}
+			seenAlternates[ref] = true
+
+			if first == nil || referenceLessThan(ref, *first) {
+				// this alternate comes first lexically
+				first = &ref
+			}
+			if referenceLessThan(verifiedAbsentIdentity, ref) && (firstFollowing == nil || referenceLessThan(ref, *firstFollowing)) {
+				// this alternate is the first following verifiedAbsentIdentity lexically
+				firstFollowing = &ref
+			}
+		}
+	}
+
+	// return the first alternate identity following the verified absent identity, if there is one
+	if firstFollowing != nil {
+		return firstFollowing
+	}
+	// otherwise return the first alternate identity
+	return first
 }
