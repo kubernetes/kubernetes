@@ -158,6 +158,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/metrics",
 		"/readyz",
 		"/readyz/delegate-health",
+		"/readyz/informer-sync",
 		"/readyz/log",
 		"/readyz/ping",
 		"/readyz/poststarthook/delegate-post-start-hook",
@@ -233,10 +234,10 @@ func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) 
 			pathset.Insert(p.(string))
 		}
 		expectedset := sets.NewString(expectedPaths...)
-		for _, p := range pathset.Difference(expectedset) {
+		for p := range pathset.Difference(expectedset) {
 			t.Errorf("Got %v path, which we did not expect", p)
 		}
-		for _, p := range expectedset.Difference(pathset) {
+		for p := range expectedset.Difference(pathset) {
 			t.Errorf(" Expected %v path which we did not get", p)
 		}
 	})

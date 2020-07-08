@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/client-go/informers"
 	"k8s.io/klog"
 )
 
@@ -78,6 +79,39 @@ func (l *log) Check(_ *http.Request) error {
 		return nil
 	}
 	return fmt.Errorf("logging blocked")
+}
+
+type informerSync struct {
+	sharedInformerFactory informers.SharedInformerFactory
+}
+
+var _ HealthChecker = &informerSync{}
+
+// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given sharedInformerFactory sync.
+func NewInformerSyncHealthz(sharedInformerFactory informers.SharedInformerFactory) HealthChecker {
+	return &informerSync{
+		sharedInformerFactory: sharedInformerFactory,
+	}
+}
+
+func (i *informerSync) Name() string {
+	return "informer-sync"
+}
+
+func (i *informerSync) Check(_ *http.Request) error {
+	stopCh := make(chan struct{})
+	// Close stopCh to force checking if informers are synced now.
+	close(stopCh)
+
+	var informersByStarted map[bool][]string
+	for informerType, started := range i.sharedInformerFactory.WaitForCacheSync(stopCh) {
+		informersByStarted[started] = append(informersByStarted[started], informerType.String())
+	}
+
+	if notStarted := informersByStarted[false]; len(notStarted) > 0 {
+		return fmt.Errorf("%d informers not started yet: %v", len(notStarted), notStarted)
+	}
+	return nil
 }
 
 // NamedCheck returns a healthz checker for the given name and function.
