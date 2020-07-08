@@ -19,6 +19,7 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,10 +29,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
-        "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	bm "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
-
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	topologyv1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	topoclientset "k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	topoinformerexternal "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions"
@@ -79,20 +79,25 @@ func (tm *NodeResourceTopologyMatch) Name() string {
 }
 
 func filter(containers []v1.Container, nodes NUMANodeList) *framework.Status {
-	for _, container := range(containers) {
+	for _, container := range containers  {
 		bitmask := bm.NewEmptyBitMask()
 		bitmask.Fill()
 		for resource, quantity := range container.Resources.Requests {
 			resourceBitmask := bm.NewEmptyBitMask()
 			for _, numaNode := range nodes {
 				numaQuantity, ok := numaNode.Resources[resource]
-				if !ok || numaQuantity.Cmp(quantity) < 0 {
+				if !ok {
 					continue
 				}
-				resourceBitmask.Add(numaNode.NUMAID)
-			}
-			if resourceBitmask.IsEmpty() {
-				continue
+				// Check for the following:
+				// 1. set numa node as possible node if resource is memory or Hugepages (until memory manager will not be merged and
+				// memory will not be provided in CRD
+				// 2. otherwise check amount of resources
+				if resource == v1.ResourceMemory ||
+					strings.HasPrefix(string(resource), string(v1.ResourceHugePagesPrefix)) ||
+					numaQuantity.Cmp(quantity) >= 0 {
+					resourceBitmask.Add(numaNode.NUMAID)
+				}
 			}
 			bitmask.And(resourceBitmask)
 		}
