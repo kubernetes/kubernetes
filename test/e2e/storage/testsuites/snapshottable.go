@@ -120,11 +120,12 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			driverCleanup func()
 			cleanupSteps  []func()
 
-			cs        clientset.Interface
-			dc        dynamic.Interface
-			pvc       *v1.PersistentVolumeClaim
-			sc        *storagev1.StorageClass
-			claimSize string
+			cs                  clientset.Interface
+			dc                  dynamic.Interface
+			pvc                 *v1.PersistentVolumeClaim
+			sc                  *storagev1.StorageClass
+			claimSize           string
+			originalMntTestData string
 		)
 		init := func() {
 			cleanupSteps = make([]func(), 0)
@@ -146,7 +147,8 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			})
 
 			ginkgo.By("starting a pod to use the claim")
-			command := "echo 'hello world' > /mnt/test/data"
+			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
+			command := fmt.Sprintf("echo '%s' > /mnt/test/data", originalMntTestData)
 
 			RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
 
@@ -204,7 +206,9 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			})
 
 			ginkgo.It("should delete the VolumeSnapshotContent according to its deletion policy", func() {
-				DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
+				err = DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
+				framework.ExpectNoError(err)
+
 				switch pattern.SnapshotDeletionPolicy {
 				case testpatterns.DeleteSnapshot:
 					ginkgo.By("checking the SnapshotContent has been deleted")
@@ -240,9 +244,11 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			ginkgo.It("should restore from snapshot with saved data after modifying source data", func() {
 				var restoredPVC *v1.PersistentVolumeClaim
 				var restoredPod *v1.Pod
+				modifiedMntTestData := fmt.Sprintf("modified data from %s namespace", pvc.GetNamespace())
 
 				ginkgo.By("modifying the data in the source PVC")
-				command := "echo junkdata > /mnt/test/data"
+
+				command := fmt.Sprintf("echo '%s' > /mnt/test/data", modifiedMntTestData)
 				RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-data-tester", command, config.ClientNodeSelection)
 
 				ginkgo.By("creating a pvc from the snapshot")
@@ -282,7 +288,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 				command = "cat /mnt/test/data"
 				actualData, err := utils.PodExec(f, restoredPod, command)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(actualData, "hello world")
+				framework.ExpectEqual(actualData, originalMntTestData)
 			})
 		})
 	})
@@ -324,8 +330,8 @@ func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string,
 	var err error
 	ginkgo.By("deleting the snapshot")
 	err = dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		framework.Failf("Error deleting snapshot %s in namespace %s. Error: %v", snapshotName, ns, err)
+	if err != nil {
+		return err
 	}
 
 	ginkgo.By("checking the Snapshot has been deleted")
