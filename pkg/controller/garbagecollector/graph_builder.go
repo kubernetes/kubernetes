@@ -679,24 +679,29 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 			klog.V(5).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return true
 		}
-		// removeNode updates the graph
-		gb.removeNode(existingNode)
-		existingNode.dependentsLock.RLock()
-		defer existingNode.dependentsLock.RUnlock()
-		if len(existingNode.dependents) > 0 {
-			gb.absentOwnerCache.Add(identityFromEvent(event, accessor))
-		}
-		for dep := range existingNode.dependents {
-			gb.attemptToDelete.Add(dep)
-		}
-		for _, owner := range existingNode.owners {
-			ownerNode, found := gb.uidToNode.Read(owner.UID)
-			if !found || !ownerNode.isDeletingDependents() {
-				continue
+
+		removeExistingNode := true
+
+		if removeExistingNode {
+			// removeNode updates the graph
+			gb.removeNode(existingNode)
+			existingNode.dependentsLock.RLock()
+			defer existingNode.dependentsLock.RUnlock()
+			if len(existingNode.dependents) > 0 {
+				gb.absentOwnerCache.Add(identityFromEvent(event, accessor))
 			}
-			// this is to let attempToDeleteItem check if all the owner's
-			// dependents are deleted, if so, the owner will be deleted.
-			gb.attemptToDelete.Add(ownerNode)
+			for dep := range existingNode.dependents {
+				gb.attemptToDelete.Add(dep)
+			}
+			for _, owner := range existingNode.owners {
+				ownerNode, found := gb.uidToNode.Read(owner.UID)
+				if !found || !ownerNode.isDeletingDependents() {
+					continue
+				}
+				// this is to let attempToDeleteItem check if all the owner's
+				// dependents are deleted, if so, the owner will be deleted.
+				gb.attemptToDelete.Add(ownerNode)
+			}
 		}
 	}
 	return true
