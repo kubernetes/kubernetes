@@ -22,7 +22,7 @@ limitations under the License.
 // A client only acts on timestamps captured locally to infer the state of the
 // leader election. The client does not consider timestamps in the leader
 // election record to be accurate because these timestamps may not have been
-// produced by a local clock. The implemention does not depend on their
+// produced by a local clock. The implementation does not depend on their
 // accuracy and only uses their change to indicate that another client has
 // renewed the leader lease. Thus the implementation is tolerant to arbitrary
 // clock skew, but is not tolerant to arbitrary clock skew rate.
