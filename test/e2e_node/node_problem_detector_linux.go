@@ -419,7 +419,7 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 		count += int(event.Count)
 	}
 	if count != num {
-		return fmt.Errorf("Expected %d events with reason set to %s and message set to %s\nbut %d actual events occured. Events : %v", num, reason, message, count, events.Items)
+		return fmt.Errorf("expected %d events with reason set to %s and message set to %s\nbut %d actual events occurred. Events : %v", num, reason, message, count, events.Items)
 	}
 	return nil
 }
