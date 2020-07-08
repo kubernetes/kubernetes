@@ -279,7 +279,7 @@ func newTestKubeletWithImageList(
 	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
-	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
+	kubelet.podKiller = NewPodKiller(kubelet)
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
