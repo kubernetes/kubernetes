@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// Attention: blob disk feature is deprecated
 const (
 	vhdContainerName         = "vhds"
 	useHTTPSForBlobBasedDisk = true
