@@ -177,7 +177,7 @@ type fakeProxyServerConnector struct {
 	proxierErr   bool
 }
 
-func (f *fakeProxyServerConnector) connect() (proxier, error) {
+func (f *fakeProxyServerConnector) connect(_ string) (proxier, error) {
 	if f.connectorErr {
 		return nil, fmt.Errorf("fake error")
 	}

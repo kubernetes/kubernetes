@@ -157,7 +157,7 @@ func (g *grpcProxier) proxy(addr, caller string) (net.Conn, error) {
 type proxyServerConnector interface {
 	// connect establishes connection to the proxy server, and returns a
 	// proxier based on the connection.
-	connect() (proxier, error)
+	connect(caller string) (proxier, error)
 }
 
 type tcpHTTPConnectConnector struct {
@@ -165,7 +165,7 @@ type tcpHTTPConnectConnector struct {
 	tlsConfig    *tls.Config
 }
 
-func (t *tcpHTTPConnectConnector) connect() (proxier, error) {
+func (t *tcpHTTPConnectConnector) connect(caller string) (proxier, error) {
 	conn, err := tls.Dial("tcp", t.proxyAddress, t.tlsConfig)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ type udsHTTPConnectConnector struct {
 	udsName string
 }
 
-func (u *udsHTTPConnectConnector) connect() (proxier, error) {
+func (u *udsHTTPConnectConnector) connect(caller string) (proxier, error) {
 	conn, err := net.Dial("unix", u.udsName)
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ type udsGRPCConnector struct {
 	udsName string
 }
 
-func (u *udsGRPCConnector) connect() (proxier, error) {
+func (u *udsGRPCConnector) connect(caller string) (proxier, error) {
 	udsName := u.udsName
 	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 		c, err := net.Dial("unix", udsName)
@@ -199,7 +199,7 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		return c, err
 	})
 
-	tunnel, err := client.CreateSingleUseGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(udsName, dialOption, grpc.WithInsecure(), grpc.WithUserAgent(caller))
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (d *dialerCreator) createDialerGenerator() func(string) utilnet.DialFunc {
 			trace := utiltrace.New(fmt.Sprintf("Proxy via HTTP Connect over %s", d.options.transport), utiltrace.Field{Key: "address", Value: addr})
 			defer trace.LogIfLong(500 * time.Millisecond)
 			start := egressmetrics.Metrics.Clock().Now()
-			proxier, err := d.connector.connect()
+			proxier, err := d.connector.connect(caller)
 			if err != nil {
 				egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
 				return nil, err
