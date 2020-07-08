@@ -179,7 +179,7 @@ func TestAddFlags(t *testing.T) {
 		}).WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),
-			BindPort:    8080,
+			BindPort:    0,
 		}).WithLoopback(),
 		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{

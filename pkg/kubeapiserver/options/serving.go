@@ -41,11 +41,10 @@ func NewSecureServingOptions() *genericoptions.SecureServingOptionsWithLoopback 
 }
 
 // NewInsecureServingOptions gives default values for the kube-apiserver.
-// TODO: switch insecure serving off by default
 func NewInsecureServingOptions() *genericoptions.DeprecatedInsecureServingOptionsWithLoopback {
 	o := genericoptions.DeprecatedInsecureServingOptions{
 		BindAddress: net.ParseIP("127.0.0.1"),
-		BindPort:    8080,
+		BindPort:    0, // Disabled.
 	}
 	return o.WithLoopback()
 }
