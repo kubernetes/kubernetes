@@ -100,11 +100,6 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		**out = **in
 	}
 	in.DebuggingConfiguration.DeepCopyInto(&out.DebuggingConfiguration)
-	if in.DisablePreemption != nil {
-		in, out := &in.DisablePreemption, &out.DisablePreemption
-		*out = new(bool)
-		**out = **in
-	}
 	if in.PercentageOfNodesToScore != nil {
 		in, out := &in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore
 		*out = new(int32)

@@ -103,11 +103,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		}
 	}
 
-	if obj.DisablePreemption == nil {
-		disablePreemption := false
-		obj.DisablePreemption = &disablePreemption
-	}
-
 	if obj.PercentageOfNodesToScore == nil {
 		percentageOfNodesToScore := int32(config.DefaultPercentageOfNodesToScore)
 		obj.PercentageOfNodesToScore = &percentageOfNodesToScore

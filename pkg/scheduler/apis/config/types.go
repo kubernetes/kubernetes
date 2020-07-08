@@ -77,9 +77,6 @@ type KubeSchedulerConfiguration struct {
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfig.DebuggingConfiguration
 	componentbaseconfig.DebuggingConfiguration
 
-	// DisablePreemption disables the pod preemption feature.
-	DisablePreemption bool
-
 	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
 	// for running a pod, the scheduler stops its search for more feasible nodes in
 	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find

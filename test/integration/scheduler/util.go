@@ -39,6 +39,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -88,9 +90,19 @@ func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutil
 // initTestDisablePreemption initializes a test environment and creates master and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			PostFilter: &schedulerconfig.PluginSet{
+				Disabled: []schedulerconfig.Plugin{
+					{Name: defaultpreemption.Name},
+				},
+			},
+		},
+	}
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil,
-		time.Second, scheduler.WithPreemptionDisabled(true))
+		time.Second, scheduler.WithProfiles(prof))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx

@@ -76,9 +76,6 @@ type Scheduler struct {
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
 
-	// Disable pod preemption or not.
-	DisablePreemption bool
-
 	// SchedulingQueue holds pods to be scheduled
 	SchedulingQueue internalqueue.SchedulingQueue
 
@@ -97,7 +94,6 @@ func (sched *Scheduler) Cache() internalcache.Cache {
 
 type schedulerOptions struct {
 	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
-	disablePreemption        bool
 	percentageOfNodesToScore int32
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
@@ -123,13 +119,6 @@ func WithProfiles(p ...schedulerapi.KubeSchedulerProfile) Option {
 func WithAlgorithmSource(source schedulerapi.SchedulerAlgorithmSource) Option {
 	return func(o *schedulerOptions) {
 		o.schedulerAlgorithmSource = source
-	}
-}
-
-// WithPreemptionDisabled sets disablePreemption for Scheduler, the default value is false
-func WithPreemptionDisabled(disablePreemption bool) Option {
-	return func(o *schedulerOptions) {
-		o.disablePreemption = disablePreemption
 	}
 }
 
@@ -187,7 +176,6 @@ var defaultSchedulerOptions = schedulerOptions{
 	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
 		Provider: defaultAlgorithmSourceProviderName(),
 	},
-	disablePreemption:        false,
 	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
@@ -227,7 +215,6 @@ func New(client clientset.Interface,
 		podInformer:              podInformer,
 		schedulerCache:           schedulerCache,
 		StopEverything:           stopEverything,
-		disablePreemption:        options.disablePreemption,
 		percentageOfNodesToScore: options.percentageOfNodesToScore,
 		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
 		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
@@ -276,7 +263,6 @@ func New(client clientset.Interface,
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
 	// Additional tweaks to the config produced by the configurator.
-	sched.DisablePreemption = options.disablePreemption
 	sched.StopEverything = stopEverything
 	sched.client = client
 	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -481,9 +467,8 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// into the resources that were preempted, but this is harmless.
 		nominatedNode := ""
 		if fitError, ok := err.(*core.FitError); ok {
-			if sched.DisablePreemption || !prof.HasPostFilterPlugins() {
-				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
-					" No preemption is performed.")
+			if !prof.HasPostFilterPlugins() {
+				klog.V(3).Infof("No PostFilter plugins are registered, so no preemption will be performed.")
 			} else {
 				// Run PostFilter plugins to try to make the pod schedulable in a future scheduling cycle.
 				result, status := prof.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
