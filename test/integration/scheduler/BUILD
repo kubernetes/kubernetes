@@ -85,6 +85,8 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/disruption:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
