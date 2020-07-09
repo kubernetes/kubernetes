@@ -77,7 +77,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) RequiresRemount() bool {
+func (plugin *gitRepoPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

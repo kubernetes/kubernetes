@@ -520,6 +520,12 @@ func AddHandlers(h printers.PrintHandler) {
 			Name: "StorageCapacity", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["storageCapacity"],
 		})
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		csiDriverColumnDefinitions = append(csiDriverColumnDefinitions, []metav1.TableColumnDefinition{
+			{Name: "TokenRequests", Type: "string", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["tokenRequests"]},
+			{Name: "RequiresRepublish", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["requiresRepublish"]},
+		}...)
+	}
 	csiDriverColumnDefinitions = append(csiDriverColumnDefinitions, []metav1.TableColumnDefinition{
 		{Name: "Modes", Type: "string", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["volumeLifecycleModes"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -1394,6 +1400,21 @@ func printCSIDriver(obj *storage.CSIDriver, options printers.GenerateOptions) ([
 			storageCapacity = *obj.Spec.StorageCapacity
 		}
 		row.Cells = append(row.Cells, storageCapacity)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		tokenRequests := "<unset>"
+		if obj.Spec.TokenRequests != nil {
+			audiences := []string{}
+			for _, t := range obj.Spec.TokenRequests {
+				audiences = append(audiences, t.Audience)
+			}
+			tokenRequests = strings.Join(audiences, ",")
+		}
+		requiresRepublish := false
+		if obj.Spec.RequiresRepublish != nil {
+			requiresRepublish = *obj.Spec.RequiresRepublish
+		}
+		row.Cells = append(row.Cells, tokenRequests, requiresRepublish)
 	}
 	row.Cells = append(row.Cells, modes, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil

@@ -36,9 +36,10 @@ func getValidCSIDriver(name string) *storage.CSIDriver {
 			Name: name,
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &enabled,
-			PodInfoOnMount:  &enabled,
-			StorageCapacity: &enabled,
+			AttachRequired:    &enabled,
+			PodInfoOnMount:    &enabled,
+			StorageCapacity:   &enabled,
+			RequiresRepublish: &enabled,
 		},
 	}
 }
@@ -88,11 +89,13 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 	attachRequired := true
 	podInfoOnMount := true
 	storageCapacity := true
+	requiresRepublish := true
 
 	tests := []struct {
-		name         string
-		withCapacity bool
-		withInline   bool
+		name                    string
+		withCapacity            bool
+		withInline              bool
+		withServiceAccountToken bool
 	}{
 		{
 			name:       "inline enabled",
@@ -110,12 +113,21 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			name:         "capacity disabled",
 			withCapacity: false,
 		},
+		{
+			name:                    "serviceAccountToken enabled",
+			withServiceAccountToken: true,
+		},
+		{
+			name:                    "serviceAccountToken disabled",
+			withServiceAccountToken: false,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.withCapacity)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.withInline)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountToken, test.withServiceAccountToken)()
 
 			csiDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -128,6 +140,8 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecyclePersistent,
 					},
+					TokenRequests:     []storage.TokenRequest{},
+					RequiresRepublish: &requiresRepublish,
 				},
 			}
 			Strategy.PrepareForCreate(ctx, csiDriver)
@@ -153,6 +167,21 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 					t.Errorf("VolumeLifecycleModes not stripped: %v", csiDriver.Spec)
 				}
 			}
+			if test.withServiceAccountToken {
+				if csiDriver.Spec.TokenRequests == nil {
+					t.Errorf("TokenRequests modified: %v", csiDriver.Spec)
+				}
+				if csiDriver.Spec.RequiresRepublish == nil {
+					t.Errorf("RequiresRepublish modified: %v", csiDriver.Spec)
+				}
+			} else {
+				if csiDriver.Spec.TokenRequests != nil {
+					t.Errorf("TokenRequests stripped: %v", csiDriver.Spec)
+				}
+				if csiDriver.Spec.RequiresRepublish != nil {
+					t.Errorf("RequiresRepublish stripped: %v", csiDriver.Spec)
+				}
+			}
 		})
 	}
 }
@@ -166,13 +195,9 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 
 	attachRequired := true
 	podInfoOnMount := true
-	driverWithoutModes := &storage.CSIDriver{
+	driverWithNothing := &storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
-		},
-		Spec: storage.CSIDriverSpec{
-			AttachRequired: &attachRequired,
-			PodInfoOnMount: &podInfoOnMount,
 		},
 	}
 	driverWithPersistent := &storage.CSIDriver{
@@ -201,11 +226,8 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	}
 	enabled := true
 	disabled := false
-	driverWithoutCapacity := &storage.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-	}
+	gcp := "gcp"
+	vault := "vault"
 	driverWithCapacityEnabled := &storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -222,116 +244,121 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			StorageCapacity: &disabled,
 		},
 	}
+	driverWithServiceAccountTokenGCP := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			TokenRequests:     []storage.TokenRequest{{Audience: gcp}},
+			RequiresRepublish: &enabled,
+		},
+	}
+	driverWithServiceAccountTokenVault := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			TokenRequests:     []storage.TokenRequest{{Audience: vault}},
+			RequiresRepublish: &enabled,
+		},
+	}
 
-	var resultEmpty []storage.VolumeLifecycleMode
 	resultPersistent := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
-	resultEphemeral := []storage.VolumeLifecycleMode{storage.VolumeLifecycleEphemeral}
 
 	tests := []struct {
 		name                          string
 		old, update                   *storage.CSIDriver
-		withCapacity, withoutCapacity *bool
-		withInline, withoutInline     []storage.VolumeLifecycleMode
+		csiStorageCapacityEnabled     bool
+		csiInlineVolumeEnabled        bool
+		csiServiceAccountTokenEnabled bool
+		wantCapacity                  *bool
+		wantModes                     []storage.VolumeLifecycleMode
+		wantTokenRequests             []storage.TokenRequest
+		wantRequiresRepublish         *bool
 	}{
 		{
-			name:            "before: no capacity, update: no capacity",
-			old:             driverWithoutCapacity,
-			update:          driverWithoutCapacity,
-			withCapacity:    nil,
-			withoutCapacity: nil,
+			name:                      "capacity feature enabled, before: none, update: enabled",
+			csiStorageCapacityEnabled: true,
+			old:                       driverWithNothing,
+			update:                    driverWithCapacityEnabled,
+			wantCapacity:              &enabled,
 		},
 		{
-			name:            "before: no capacity, update: enabled",
-			old:             driverWithoutCapacity,
-			update:          driverWithCapacityEnabled,
-			withCapacity:    &enabled,
-			withoutCapacity: nil,
+			name:         "capacity feature disabled, before: none, update: disabled",
+			old:          driverWithNothing,
+			update:       driverWithCapacityDisabled,
+			wantCapacity: nil,
 		},
 		{
-			name:            "before: capacity enabled, update: disabled",
-			old:             driverWithCapacityEnabled,
-			update:          driverWithCapacityDisabled,
-			withCapacity:    &disabled,
-			withoutCapacity: &disabled,
+			name:         "capacity feature disabled, before: enabled, update: disabled",
+			old:          driverWithCapacityEnabled,
+			update:       driverWithCapacityDisabled,
+			wantCapacity: &disabled,
 		},
 		{
-			name:            "before: capacity enabled, update: no capacity",
-			old:             driverWithCapacityEnabled,
-			update:          driverWithoutCapacity,
-			withCapacity:    nil,
-			withoutCapacity: nil,
-		},
-
-		{
-			name:          "before: no mode, update: no mode",
-			old:           driverWithoutModes,
-			update:        driverWithoutModes,
-			withInline:    resultEmpty,
-			withoutInline: resultEmpty,
+			name:                   "inline feature enabled, before: none, update: persitent",
+			csiInlineVolumeEnabled: true,
+			old:                    driverWithNothing,
+			update:                 driverWithPersistent,
+			wantModes:              resultPersistent,
 		},
 		{
-			name:          "before: no mode, update: persistent",
-			old:           driverWithoutModes,
-			update:        driverWithPersistent,
-			withInline:    resultPersistent,
-			withoutInline: resultEmpty,
+			name:      "inline feature disabled, before: none, update: persitent",
+			old:       driverWithNothing,
+			update:    driverWithPersistent,
+			wantModes: nil,
 		},
 		{
-			name:          "before: persistent, update: ephemeral",
-			old:           driverWithPersistent,
-			update:        driverWithEphemeral,
-			withInline:    resultEphemeral,
-			withoutInline: resultEphemeral,
+			name:      "inline feature disabled, before: ephemeral, update: persitent",
+			old:       driverWithEphemeral,
+			update:    driverWithPersistent,
+			wantModes: resultPersistent,
 		},
 		{
-			name:          "before: persistent, update: no mode",
-			old:           driverWithPersistent,
-			update:        driverWithoutModes,
-			withInline:    resultEmpty,
-			withoutInline: resultEmpty,
+			name:                          "service account token feature enabled, before: none, update: audience=gcp",
+			csiServiceAccountTokenEnabled: true,
+			old:                           driverWithNothing,
+			update:                        driverWithServiceAccountTokenGCP,
+			wantTokenRequests:             []storage.TokenRequest{{Audience: gcp}},
+			wantRequiresRepublish:         &enabled,
+		},
+		{
+			name:                  "service account token feature disabled, before: none, update: audience=gcp",
+			old:                   driverWithNothing,
+			update:                driverWithServiceAccountTokenGCP,
+			wantTokenRequests:     nil,
+			wantRequiresRepublish: nil,
+		},
+		{
+			name:                  "service account token feature disabled, before: audience=vault, update: audience=gcp",
+			old:                   driverWithServiceAccountTokenVault,
+			update:                driverWithServiceAccountTokenGCP,
+			wantTokenRequests:     []storage.TokenRequest{{Audience: gcp}},
+			wantRequiresRepublish: &enabled,
 		},
 	}
 
-	runAll := func(t *testing.T, withCapacity, withInline bool) {
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, withCapacity)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, withInline)()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.csiStorageCapacityEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolumeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountToken, test.csiServiceAccountTokenEnabled)()
 
-				csiDriver := test.update.DeepCopy()
-				Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
-				if withCapacity {
-					require.Equal(t, test.withCapacity, csiDriver.Spec.StorageCapacity)
-				} else {
-					require.Equal(t, test.withoutCapacity, csiDriver.Spec.StorageCapacity)
-				}
-				if withInline {
-					require.Equal(t, test.withInline, csiDriver.Spec.VolumeLifecycleModes)
-				} else {
-					require.Equal(t, test.withoutInline, csiDriver.Spec.VolumeLifecycleModes)
-				}
-			})
-		}
+			csiDriver := test.update.DeepCopy()
+			Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
+			require.Equal(t, test.wantCapacity, csiDriver.Spec.StorageCapacity)
+			require.Equal(t, test.wantModes, csiDriver.Spec.VolumeLifecycleModes)
+			require.Equal(t, test.wantTokenRequests, csiDriver.Spec.TokenRequests)
+			require.Equal(t, test.wantRequiresRepublish, csiDriver.Spec.RequiresRepublish)
+		})
 	}
 
-	t.Run("with capacity", func(t *testing.T) {
-		runAll(t, true, false)
-	})
-	t.Run("without capacity", func(t *testing.T) {
-		runAll(t, false, false)
-	})
-
-	t.Run("with inline volumes", func(t *testing.T) {
-		runAll(t, false, true)
-	})
-	t.Run("without inline volumes", func(t *testing.T) {
-		runAll(t, false, false)
-	})
 }
 
 func TestCSIDriverValidation(t *testing.T) {
 	enabled := true
 	disabled := true
+	gcp := "gcp"
 
 	tests := []struct {
 		name        string
@@ -350,9 +377,10 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:  &enabled,
-					PodInfoOnMount:  &enabled,
-					StorageCapacity: &enabled,
+					AttachRequired:    &enabled,
+					PodInfoOnMount:    &enabled,
+					StorageCapacity:   &enabled,
+					RequiresRepublish: &enabled,
 				},
 			},
 			false,
@@ -364,9 +392,10 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:  &disabled,
-					PodInfoOnMount:  &disabled,
-					StorageCapacity: &disabled,
+					AttachRequired:    &disabled,
+					PodInfoOnMount:    &disabled,
+					StorageCapacity:   &disabled,
+					RequiresRepublish: &disabled,
 				},
 			},
 			false,
@@ -378,9 +407,10 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "*foo#",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:  &enabled,
-					PodInfoOnMount:  &enabled,
-					StorageCapacity: &enabled,
+					AttachRequired:    &enabled,
+					PodInfoOnMount:    &enabled,
+					StorageCapacity:   &enabled,
+					RequiresRepublish: &enabled,
 				},
 			},
 			true,
@@ -398,6 +428,7 @@ func TestCSIDriverValidation(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecycleMode("no-such-mode"),
 					},
+					RequiresRepublish: &enabled,
 				},
 			},
 			true,
@@ -415,6 +446,7 @@ func TestCSIDriverValidation(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecyclePersistent,
 					},
+					RequiresRepublish: &enabled,
 				},
 			},
 			false,
@@ -432,6 +464,7 @@ func TestCSIDriverValidation(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecycleEphemeral,
 					},
+					RequiresRepublish: &enabled,
 				},
 			},
 			false,
@@ -450,6 +483,23 @@ func TestCSIDriverValidation(t *testing.T) {
 						storage.VolumeLifecyclePersistent,
 						storage.VolumeLifecycleEphemeral,
 					},
+					RequiresRepublish: &enabled,
+				},
+			},
+			false,
+		},
+		{
+			"service account token with gcp as audience",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:    &enabled,
+					PodInfoOnMount:    &enabled,
+					StorageCapacity:   &enabled,
+					TokenRequests:     []storage.TokenRequest{{Audience: gcp}},
+					RequiresRepublish: &enabled,
 				},
 			},
 			false,

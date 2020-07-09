@@ -47,6 +47,13 @@
       "r鯹)晿\u003co,c鮽ort昍řČ扷5ƗǸ"
     ],
     "storageCapacity": true,
-    "fsGroupPolicy": "/ʕVŚ(ĿȊ甞谐颋ǅSǡ"
+    "fsGroupPolicy": "/ʕVŚ(ĿȊ甞谐颋ǅSǡ",
+    "tokenRequests": [
+      {
+        "audience": "19",
+        "expirationSeconds": -8506428344202195448
+      }
+    ],
+    "requiresRepublish": false
   }
 }

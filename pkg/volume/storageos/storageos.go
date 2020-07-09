@@ -92,7 +92,7 @@ func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
 }
 
-func (plugin *storageosPlugin) RequiresRemount() bool {
+func (plugin *storageosPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

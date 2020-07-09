@@ -96,7 +96,7 @@ func (plugin *portworxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PortworxVolume != nil)
 }
 
-func (plugin *portworxVolumePlugin) RequiresRemount() bool {
+func (plugin *portworxVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

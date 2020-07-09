@@ -163,7 +163,7 @@ type VolumePlugin interface {
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
 	// this to update the contents of the volume.
-	RequiresRemount() bool
+	RequiresRemount(spec *Spec) bool
 
 	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
@@ -1027,6 +1027,7 @@ func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
 		// start informer for CSIDriver
 		informerFactory := kletHost.GetInformerFactory()
 		informerFactory.Start(stopCh)
+		informerFactory.WaitForCacheSync(stopCh)
 	}
 }
 

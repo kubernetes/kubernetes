@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -59,10 +60,11 @@ const (
 )
 
 type csiPlugin struct {
-	host                   volume.VolumeHost
-	blockEnabled           bool
-	csiDriverLister        storagelisters.CSIDriverLister
-	volumeAttachmentLister storagelisters.VolumeAttachmentLister
+	host                      volume.VolumeHost
+	blockEnabled              bool
+	csiDriverLister           storagelisters.CSIDriverLister
+	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	volumeAttachmentLister    storagelisters.VolumeAttachmentLister
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -205,6 +207,10 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			if p.csiDriverLister == nil {
 				klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
 			}
+			p.serviceAccountTokenGetter = host.GetServiceAccountTokenFunc()
+			if p.serviceAccountTokenGetter == nil {
+				klog.Error(log("ServiceAccountTokenGetter not found on KubeletVolumeHost"))
+			}
 			// We don't run the volumeAttachmentLister in the kubelet context
 			p.volumeAttachmentLister = nil
 		}
@@ -334,8 +340,24 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
 }
 
-func (p *csiPlugin) RequiresRemount() bool {
-	return false
+func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		return false
+	}
+	if p.csiDriverLister == nil {
+		return false
+	}
+	driverName, err := GetCSIDriverName(spec)
+	if err != nil {
+		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
+		return false
+	}
+	csiDriver, err := p.csiDriverLister.Get(driverName)
+	if err != nil {
+		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
+		return false
+	}
+	return *csiDriver.Spec.RequiresRepublish
 }
 
 func (p *csiPlugin) NewMounter(
