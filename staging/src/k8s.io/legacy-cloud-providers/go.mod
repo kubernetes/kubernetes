@@ -2,7 +2,7 @@
 
 module k8s.io/legacy-cloud-providers
 
-go 1.14
+go 1.13
 
 require (
 	cloud.google.com/go v0.51.0

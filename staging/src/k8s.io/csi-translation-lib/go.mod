@@ -2,7 +2,7 @@
 
 module k8s.io/csi-translation-lib
 
-go 1.14
+go 1.13
 
 require (
 	github.com/stretchr/testify v1.4.0

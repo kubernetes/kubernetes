@@ -2,7 +2,7 @@
 
 module k8s.io/apiextensions-apiserver
 
-go 1.14
+go 1.13
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible

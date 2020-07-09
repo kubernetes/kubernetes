@@ -2,7 +2,7 @@
 
 module k8s.io/component-base
 
-go 1.14
+go 1.13
 
 require (
 	github.com/blang/semver v3.5.0+incompatible
