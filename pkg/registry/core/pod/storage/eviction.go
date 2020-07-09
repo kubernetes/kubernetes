@@ -247,7 +247,8 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 // canIgnorePDB returns true for pod conditions that allow the pod to be deleted
 // without checking PDBs.
 func canIgnorePDB(pod *api.Pod) bool {
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodPending {
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed ||
+		pod.Status.Phase == api.PodPending || !pod.ObjectMeta.DeletionTimestamp.IsZero() {
 		return true
 	}
 	return false
@@ -255,7 +256,7 @@ func canIgnorePDB(pod *api.Pod) bool {
 
 func shouldEnforceResourceVersion(pod *api.Pod) bool {
 	// We don't need to enforce ResourceVersion for terminal pods
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed || !pod.ObjectMeta.DeletionTimestamp.IsZero() {
 		return false
 	}
 	// Return true for all other pods to ensure we don't race against a pod becoming
