@@ -19,10 +19,13 @@ package debug
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/utils/pointer"
 )
 
 func TestGenerateDebugContainer(t *testing.T) {
@@ -159,6 +162,484 @@ func TestGenerateDebugContainer(t *testing.T) {
 				tc.pod = &corev1.Pod{}
 			}
 			if diff := cmp.Diff(tc.expected, tc.opts.generateDebugContainer(tc.pod)); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
+
+func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
+	defer func(old func(int) string) { nameSuffixFunc = old }(nameSuffixFunc)
+	var suffixCounter int
+	nameSuffixFunc = func(int) string {
+		suffixCounter++
+		return fmt.Sprint(suffixCounter)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		opts     *DebugOptions
+		pod      *corev1.Pod
+		expected *corev1.Pod
+	}{
+		{
+			name: "basic",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "same node",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				SameNode:   true,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+		},
+		{
+			name: "metadata stripping",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+					Labels: map[string]string{
+						"app": "business",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+					ResourceVersion:   "1",
+					CreationTimestamp: metav1.Time{time.Now()},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "add a debug container",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "customize envs",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{{
+					Name:  "TEST",
+					Value: "test",
+				}},
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							Env: []corev1.EnvVar{{
+								Name:  "TEST",
+								Value: "test",
+							}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug args as container command",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Args:       []string{"/bin/echo", "one", "two", "three"},
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							Command:                  []string{"/bin/echo", "one", "two", "three"},
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug args as container command",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Args:       []string{"one", "two", "three"},
+				ArgsOnly:   true,
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							Args:                     []string{"one", "two", "three"},
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "modify existing command to debug args",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Args:       []string{"sleep", "1d"},
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "debugger",
+							Command: []string{"echo"},
+							Args:    []string{"one", "two", "three"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							Command:                  []string{"sleep", "1d"},
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "random name",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "business",
+						},
+						{
+							Name:                     "debugger-1",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "random name collision",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger-1",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger-1",
+						},
+						{
+							Name:                     "debugger-2",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "shared process namespace",
+			opts: &DebugOptions{
+				CopyTo:                "debugger",
+				Container:             "debugger",
+				Image:                 "busybox",
+				PullPolicy:            corev1.PullIfNotPresent,
+				ShareProcesses:        true,
+				shareProcessedChanged: true,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+					ShareProcessNamespace: pointer.BoolPtr(true),
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+			suffixCounter = 0
+
+			if tc.pod == nil {
+				tc.pod = &corev1.Pod{}
+			}
+			pod, _ := tc.opts.generatePodCopyWithDebugContainer(tc.pod)
+			if diff := cmp.Diff(tc.expected, pod); diff != "" {
 				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
