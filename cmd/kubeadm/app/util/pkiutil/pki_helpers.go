@@ -36,6 +36,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
@@ -566,6 +567,8 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		return nil, errors.New("must specify at least one ExtKeyUsage")
 	}
 
+	RemoveDuplicateAltNames(&cfg.AltNames)
+
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -584,4 +587,25 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		return nil, err
 	}
 	return x509.ParseCertificate(certDERBytes)
+}
+
+// RemoveDuplicateAltNames removes duplicate items in altNames.
+func RemoveDuplicateAltNames(altNames *certutil.AltNames) {
+	if altNames == nil {
+		return
+	}
+
+	if altNames.DNSNames != nil {
+		altNames.DNSNames = sets.NewString(altNames.DNSNames...).List()
+	}
+
+	ipsKeys := make(map[string]struct{})
+	var ips []net.IP
+	for _, one := range altNames.IPs {
+		if _, ok := ipsKeys[one.String()]; !ok {
+			ipsKeys[one.String()] = struct{}{}
+			ips = append(ips, one)
+		}
+	}
+	altNames.IPs = ips
 }

@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"reflect"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -754,4 +755,52 @@ func TestAppendSANsToAltNames(t *testing.T) {
 		}
 	}
 
+}
+
+func TestRemoveDuplicateAltNames(t *testing.T) {
+	tests := []struct {
+		args *certutil.AltNames
+		want *certutil.AltNames
+	}{
+		{
+			&certutil.AltNames{},
+			&certutil.AltNames{},
+		},
+		{
+			&certutil.AltNames{
+				DNSNames: []string{"a", "a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+		},
+		{
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}, {127, 0, 0, 1}},
+			},
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+		},
+		{
+			&certutil.AltNames{
+				DNSNames: []string{"a", "a"},
+				IPs:      []net.IP{{127, 0, 0, 1}, {127, 0, 0, 1}},
+			},
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		RemoveDuplicateAltNames(tt.args)
+		if !reflect.DeepEqual(tt.args, tt.want) {
+			t.Errorf("Wanted %v, got %v", tt.want, tt.args)
+		}
+	}
 }
