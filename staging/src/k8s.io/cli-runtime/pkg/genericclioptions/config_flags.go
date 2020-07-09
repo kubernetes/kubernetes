@@ -55,7 +55,10 @@ const (
 	flagHTTPCacheDir     = "cache-dir"
 )
 
-var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+var (
+	defaultCacheDir                = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+	defaultDiscoveryCacheParentDir = filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery")
+)
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -224,14 +227,20 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = 100
 
+	httpCacheDir, discoveryCacheParentDir := defaultCacheDir, defaultDiscoveryCacheParentDir
+
 	// retrieve a user-provided value for the "cache-dir"
-	// defaulting to ~/.kube/http-cache if no user-value is given.
-	httpCacheDir := defaultCacheDir
+	// override httpCacheDir and discoveryCacheDir if user-value is given.
 	if f.CacheDir != nil {
 		httpCacheDir = *f.CacheDir
+		if len(httpCacheDir) > 0 {
+			// override discoveryCacheDir default value so that server resources and http-cache data are stored in the same location
+			discoveryCacheParentDir = filepath.Join(filepath.Dir(httpCacheDir), "cache", "discovery")
+		}
 	}
 
-	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
+	discoveryCacheDir := computeDiscoverCacheDir(discoveryCacheParentDir, config.Host)
+
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
