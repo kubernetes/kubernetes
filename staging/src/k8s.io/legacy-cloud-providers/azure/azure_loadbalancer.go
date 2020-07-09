@@ -102,6 +102,8 @@ const (
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
 	clusterNameKey = "kubernetes-cluster-name"
+
+	defaultLoadBalancerSourceRanges = "0.0.0.0/0"
 )
 
 // GetLoadBalancer returns whether the specified load balancer and its components exist, and
@@ -1132,6 +1134,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if lbIP != nil {
 		destinationIPAddress = *lbIP
 	}
+
 	if destinationIPAddress == "" {
 		destinationIPAddress = "*"
 	}
@@ -1141,6 +1144,12 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	serviceTags := getServiceTags(service)
+	if len(serviceTags) != 0 {
+		if _, ok := sourceRanges[defaultLoadBalancerSourceRanges]; ok {
+			delete(sourceRanges, defaultLoadBalancerSourceRanges)
+		}
+	}
+
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
