@@ -1725,9 +1725,23 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1.Tabl
 	if obj.FirstTimestamp.IsZero() {
 		firstTimestamp = translateMicroTimestampSince(obj.EventTime)
 	}
+
 	lastTimestamp := translateTimestampSince(obj.LastTimestamp)
 	if obj.LastTimestamp.IsZero() {
 		lastTimestamp = firstTimestamp
+	}
+
+	count := obj.Count
+	if obj.Series != nil {
+		lastTimestamp = translateMicroTimestampSince(obj.Series.LastObservedTime)
+		// When a series is created for the first time, its count is set to 1.
+		// However, for a series to be created, there needs to be an isomorphic
+		// singleton event created beforehand. This singleton event is not
+		// counted in the series count which is why one is added here.
+		count = obj.Series.Count + 1
+	} else if count == 0 {
+		// Singleton events don't have a count set in the new API.
+		count = 1
 	}
 
 	var target string
@@ -1746,7 +1760,7 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1.Tabl
 			formatEventSource(obj.Source),
 			strings.TrimSpace(obj.Message),
 			firstTimestamp,
-			int64(obj.Count),
+			int64(count),
 			obj.Name,
 		)
 	} else {
