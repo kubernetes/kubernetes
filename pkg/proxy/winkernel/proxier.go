@@ -604,8 +604,12 @@ func NewProxier(
 		isIPv6Mode:          isIPv6,
 	}
 
-	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, &isIPv6, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, &isIPv6, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
+	ipFamily := v1.IPv4Protocol
+	if isIPv6 {
+		ipFamily = v1.IPv6Protocol
+	}
+	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
+	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
@@ -644,7 +648,14 @@ func NewDualStackProxier(
 
 	// Return a meta-proxier that dispatch calls between the two
 	// single-stack proxier instances
-	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
+	return metaproxier.NewMetaProxier(
+		ipv4Proxier,
+		ipv6Proxier,
+		hostname,
+		[]string{"0.0.0.0", "::"}, /* dual stack proxy will work on 0.0.0.0 and ::0 */
+		syncPeriod,
+		minSyncPeriod,
+		recorder), nil
 }
 
 // CleanupLeftovers removes all hns rules created by the Proxier
