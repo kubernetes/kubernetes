@@ -335,6 +335,27 @@ type CSIDriverSpec struct {
 	// more modes may be added in the future.
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
+
+	// If set to true, storageCapacity indicates that the CSI
+	// volume driver wants pod scheduling to consider the storage
+	// capacity that the driver deployment will report by creating
+	// CSIStorageCapacity objects with capacity information.
+	//
+	//
+	// The check can be enabled immediately when deploying a driver.
+	// In that case, provisioning new volumes with late binding
+	// will pause until the driver deployment has published
+	// some suitable CSIStorageCapacity object.
+	//
+	// Alternatively, the driver can be deployed with the field
+	// unset or false and it can be flipped later when storage
+	// capacity information has been published.
+	//
+	// This is an alpha field and only available when the CSIStorageCapacity
+	// feature is enabled. The default is false.
+	//
+	// +optional
+	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 }
 
 // VolumeLifecycleMode is an enumeration of possible usage modes for a volume

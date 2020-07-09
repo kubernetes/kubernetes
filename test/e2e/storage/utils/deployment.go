@@ -124,6 +124,9 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		if o.PodInfo != nil {
 			object.Spec.PodInfoOnMount = o.PodInfo
 		}
+		if o.StorageCapacity != nil {
+			object.Spec.StorageCapacity = o.StorageCapacity
+		}
 		if o.CanAttach != nil {
 			object.Spec.AttachRequired = o.CanAttach
 		}
@@ -169,6 +172,10 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	CanAttach *bool
+	// If not nil, the value to use for the CSIDriver.Spec.StorageCapacity
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	StorageCapacity *bool
 	// If not nil, the value to use for the CSIDriver.Spec.VolumeLifecycleModes
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.

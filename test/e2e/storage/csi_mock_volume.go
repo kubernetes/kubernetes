@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,14 +29,17 @@ import (
 	"google.golang.org/grpc/codes"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -89,9 +93,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		lateBinding         bool
 		enableTopology      bool
 		podInfo             *bool
-		scName              string
-		enableResizing      bool // enable resizing for both CSI mock driver and storageClass.
-		enableNodeExpansion bool // enable node expansion for CSI mock driver
+		storageCapacity     *bool
+		scName              string // pre-selected storage class name; must be unique in the cluster
+		enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
+		enableNodeExpansion bool   // enable node expansion for CSI mock driver
 		// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
 		disableResizingOnDriver bool
 		javascriptHooks         map[string]string
@@ -124,6 +129,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		driverOpts := drivers.CSIMockDriverOpts{
 			RegisterDriver:      tp.registerDriver,
 			PodInfo:             tp.podInfo,
+			StorageCapacity:     tp.storageCapacity,
 			EnableTopology:      tp.enableTopology,
 			AttachLimit:         tp.attachLimit,
 			DisableAttach:       tp.disableAttach,
@@ -159,19 +165,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
 		scTest := testsuites.StorageClassTest{
-			Name:         m.driver.GetDriverInfo().Name,
-			Provisioner:  sc.Provisioner,
-			Parameters:   sc.Parameters,
-			ClaimSize:    "1Gi",
-			ExpectedSize: "1Gi",
-			DelayBinding: m.tp.lateBinding,
-		}
-		if m.tp.scName != "" {
-			scTest.StorageClassName = m.tp.scName
-		}
-
-		if m.tp.enableResizing {
-			scTest.AllowVolumeExpansion = true
+			Name:                 m.driver.GetDriverInfo().Name,
+			Provisioner:          sc.Provisioner,
+			Parameters:           sc.Parameters,
+			ClaimSize:            "1Gi",
+			ExpectedSize:         "1Gi",
+			DelayBinding:         m.tp.lateBinding,
+			AllowVolumeExpansion: m.tp.enableResizing,
 		}
 
 		// The mock driver only works when everything runs on a single node.
@@ -182,7 +182,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				m.pods = append(m.pods, pod)
 			}
 		} else {
-			class, claim, pod = startPausePod(f.ClientSet, scTest, nodeSelection, f.Namespace.Name)
+			class, claim, pod = startPausePod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name)
 			if class != nil {
 				m.sc[class.Name] = class
 			}
@@ -218,10 +218,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.By(fmt.Sprintf("Deleting claim %s", claim.Name))
 			claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 			if err == nil {
-				cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
-				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				if err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{}); err != nil {
+					errs = append(errs, err)
+				}
+				if claim.Spec.VolumeName != "" {
+					errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				}
 			}
-
 		}
 
 		for _, sc := range m.sc {
@@ -348,7 +351,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.It(t.name, func() {
 				init(testParameters{
 					registerDriver: test.deployClusterRegistrar,
-					scName:         "csi-mock-sc-" + f.UniqueName,
 					podInfo:        test.podInfoOnMount})
 
 				defer cleanup()
@@ -676,7 +678,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{
 					disableAttach:   true,
 					registerDriver:  true,
-					scName:          "csi-mock-sc-" + f.UniqueName,
 					javascriptHooks: scripts,
 				})
 				defer cleanup()
@@ -944,7 +945,193 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+
+	// These tests *only* work on a cluster which has the CSIStorageCapacity feature enabled.
+	ginkgo.Context("CSIStorageCapacity [Feature:CSIStorageCapacity]", func() {
+		var (
+			err error
+			yes = true
+			no  = false
+		)
+		// Tests that expect a failure are slow because we have to wait for a while
+		// to be sure that the volume isn't getting created.
+		tests := []struct {
+			name            string
+			storageCapacity *bool
+			capacities      []string
+			expectFailure   bool
+		}{
+			{
+				name: "CSIStorageCapacity unused",
+			},
+			{
+				name:            "CSIStorageCapacity disabled",
+				storageCapacity: &no,
+			},
+			{
+				name:            "CSIStorageCapacity used, no capacity",
+				storageCapacity: &yes,
+				expectFailure:   true,
+			},
+			{
+				name:            "CSIStorageCapacity used, insufficient capacity",
+				storageCapacity: &yes,
+				expectFailure:   true,
+				capacities:      []string{"1Mi"},
+			},
+			{
+				name:            "CSIStorageCapacity used, have capacity",
+				storageCapacity: &yes,
+				capacities:      []string{"100Gi"},
+			},
+			// We could add more test cases here for
+			// various situations, but covering those via
+			// the scheduler binder unit tests is faster.
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(t.name, func() {
+				scName := "mock-csi-storage-capacity-" + f.UniqueName
+				init(testParameters{
+					registerDriver:  true,
+					scName:          scName,
+					storageCapacity: test.storageCapacity,
+					lateBinding:     true,
+				})
+				defer cleanup()
+
+				// The storage class uses a random name, therefore we have to create it first
+				// before adding CSIStorageCapacity objects for it.
+				for _, capacityStr := range test.capacities {
+					capacityQuantity := resource.MustParse(capacityStr)
+					capacity := &storagev1alpha1.CSIStorageCapacity{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: "fake-capacity-",
+						},
+						// Empty topology, usable by any node.
+						StorageClassName: scName,
+						NodeTopology:     &metav1.LabelSelector{},
+						Capacity:         &capacityQuantity,
+					}
+					createdCapacity, err := f.ClientSet.StorageV1alpha1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
+					m.testCleanups = append(m.testCleanups, func() {
+						f.ClientSet.StorageV1alpha1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
+					})
+				}
+
+				// kube-scheduler may need some time before it gets the CSIDriver and CSIStorageCapacity objects.
+				// Without them, scheduling doesn't run as expected by the test.
+				syncDelay := 5 * time.Second
+				time.Sleep(syncDelay)
+
+				sc, _, pod := createPod(false /* persistent volume, late binding as specified above */)
+				framework.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
+
+				waitCtx, cancel := context.WithTimeout(context.Background(), podStartTimeout)
+				defer cancel()
+				condition := anyOf(
+					podRunning(waitCtx, f.ClientSet, pod.Name, pod.Namespace),
+					// We only just created the CSIStorageCapacity objects, therefore
+					// we have to ignore all older events, plus the syncDelay as our
+					// safety margin.
+					podHasStorage(waitCtx, f.ClientSet, pod.Name, pod.Namespace, time.Now().Add(syncDelay)),
+				)
+				err = wait.PollImmediateUntil(poll, condition, waitCtx.Done())
+				if test.expectFailure {
+					switch {
+					case errors.Is(err, context.DeadlineExceeded),
+						errors.Is(err, wait.ErrWaitTimeout),
+						errors.Is(err, errNotEnoughSpace):
+						// Okay, we expected that.
+					case err == nil:
+						framework.Fail("pod unexpectedly started to run")
+					default:
+						framework.Failf("unexpected error while waiting for pod: %v", err)
+					}
+				} else {
+					framework.ExpectNoError(err, "failed to start pod")
+				}
+
+				ginkgo.By("Deleting the previously created pod")
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting")
+			})
+		}
+	})
 })
+
+// A lot of this code was copied from e2e/framework. It would be nicer
+// if it could be reused - see https://github.com/kubernetes/kubernetes/issues/92754
+func podRunning(ctx context.Context, c clientset.Interface, podName, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch pod.Status.Phase {
+		case v1.PodRunning:
+			return true, nil
+		case v1.PodFailed, v1.PodSucceeded:
+			return false, errPodCompleted
+		}
+		return false, nil
+	}
+}
+
+const (
+	podStartTimeout = 5 * time.Minute
+	poll            = 2 * time.Second
+)
+
+var (
+	errPodCompleted   = fmt.Errorf("pod ran to completion")
+	errNotEnoughSpace = errors.New(scheduling.ErrReasonNotEnoughSpace)
+)
+
+func podHasStorage(ctx context.Context, c clientset.Interface, podName, namespace string, when time.Time) wait.ConditionFunc {
+	// Check for events of this pod. Copied from test/e2e/common/container_probe.go.
+	expectedEvent := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.name":      podName,
+		"involvedObject.namespace": namespace,
+		"reason":                   "FailedScheduling",
+	}.AsSelector().String()
+	options := metav1.ListOptions{
+		FieldSelector: expectedEvent,
+	}
+	// copied from test/e2e/framework/events/events.go
+	return func() (bool, error) {
+		// We cannot be sure here whether it has enough storage, only when
+		// it hasn't. In that case we abort waiting with a special error.
+		events, err := c.CoreV1().Events(namespace).List(ctx, options)
+		if err != nil {
+			return false, fmt.Errorf("got error while getting events: %w", err)
+		}
+		for _, event := range events.Items {
+			if /* event.CreationTimestamp.After(when) &&
+			 */strings.Contains(event.Message, scheduling.ErrReasonNotEnoughSpace) {
+				return false, errNotEnoughSpace
+			}
+		}
+		return false, nil
+	}
+}
+
+func anyOf(conditions ...wait.ConditionFunc) wait.ConditionFunc {
+	return func() (bool, error) {
+		for _, condition := range conditions {
+			done, err := condition()
+			if err != nil {
+				return false, err
+			}
+			if done {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+}
 
 func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	waitErr := wait.PollImmediate(10*time.Second, csiPodUnschedulableTimeout, func() (bool, error) {
@@ -987,8 +1174,11 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 	return attachLimit, nil
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
+	if scName != "" {
+		class.Name = scName
+	}
 	var err error
 	_, err = cs.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 	if err != nil {

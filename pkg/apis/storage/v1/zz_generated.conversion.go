@@ -254,6 +254,7 @@ func autoConvert_v1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1.CSIDriverSpec,
 	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
 	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
 	out.VolumeLifecycleModes = *(*[]storage.VolumeLifecycleMode)(unsafe.Pointer(&in.VolumeLifecycleModes))
+	out.StorageCapacity = (*bool)(unsafe.Pointer(in.StorageCapacity))
 	return nil
 }
 
@@ -266,6 +267,7 @@ func autoConvert_storage_CSIDriverSpec_To_v1_CSIDriverSpec(in *storage.CSIDriver
 	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
 	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
 	out.VolumeLifecycleModes = *(*[]v1.VolumeLifecycleMode)(unsafe.Pointer(&in.VolumeLifecycleModes))
+	out.StorageCapacity = (*bool)(unsafe.Pointer(in.StorageCapacity))
 	return nil
 }
 

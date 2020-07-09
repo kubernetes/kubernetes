@@ -78,6 +78,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Spec.PodInfoOnMount = new(bool)
 				*(obj.Spec.PodInfoOnMount) = false
 			}
+			if obj.Spec.StorageCapacity == nil {
+				obj.Spec.StorageCapacity = new(bool)
+				*(obj.Spec.StorageCapacity) = false
+			}
 			if len(obj.Spec.VolumeLifecycleModes) == 0 {
 				obj.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
