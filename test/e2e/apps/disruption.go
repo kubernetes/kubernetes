@@ -461,8 +461,8 @@ func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
-						Name:  "busybox",
-						Image: imageutils.GetE2EImage(imageutils.EchoServer),
+						Name:  "donothing",
+						Image: imageutils.GetPauseImageName(),
 					},
 				},
 				RestartPolicy: v1.RestartPolicyAlways,
@@ -506,8 +506,8 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 
 func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclusive bool) {
 	container := v1.Container{
-		Name:  "busybox",
-		Image: imageutils.GetE2EImage(imageutils.EchoServer),
+		Name:  "donothing",
+		Image: imageutils.GetPauseImageName(),
 	}
 	if exclusive {
 		container.Ports = []v1.ContainerPort{
