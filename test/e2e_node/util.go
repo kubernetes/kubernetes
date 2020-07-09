@@ -58,9 +58,6 @@ import (
 	"github.com/onsi/gomega"
 )
 
-// TODO(random-liu): Get this automatically from kubelet flag.
-var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
-
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
@@ -75,7 +72,11 @@ const (
 )
 
 func getNodeSummary() (*kubeletstatsv1alpha1.Summary, error) {
-	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
+	kubeletConfig, err := getCurrentKubeletConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current kubelet config")
+	}
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/stats/summary", kubeletConfig.Address, kubeletConfig.ReadOnlyPort), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build http request: %v", err)
 	}
