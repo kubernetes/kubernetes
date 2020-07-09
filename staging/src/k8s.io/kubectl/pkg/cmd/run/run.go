@@ -306,6 +306,10 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return err
 	}
 
+	if len(o.Generator) > 0 && o.Generator != generateversioned.RunPodV1GeneratorName {
+		return cmdutil.UsageErrorf(cmd, "generator %q is not supported by run", o.Generator)
+	}
+
 	generators := generateversioned.GeneratorFn("run")
 	generator, found := generators[generateversioned.RunPodV1GeneratorName]
 	if !found {
