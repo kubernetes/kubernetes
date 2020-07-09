@@ -1,12 +1,13 @@
 package ebpf
 
 import (
+	"errors"
+	"fmt"
 	"math"
 
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/internal"
 	"github.com/cilium/ebpf/internal/btf"
-	"golang.org/x/xerrors"
 )
 
 // CollectionOptions control loading a collection into the kernel.
@@ -64,12 +65,12 @@ func (cs *CollectionSpec) RewriteMaps(maps map[string]*Map) error {
 				// Not all programs need to use the map
 
 			default:
-				return xerrors.Errorf("program %s: %w", progName, err)
+				return fmt.Errorf("program %s: %w", progName, err)
 			}
 		}
 
 		if !seen {
-			return xerrors.Errorf("map %s not referenced by any programs", symbol)
+			return fmt.Errorf("map %s not referenced by any programs", symbol)
 		}
 
 		// Prevent NewCollection from creating rewritten maps
@@ -96,21 +97,21 @@ func (cs *CollectionSpec) RewriteMaps(maps map[string]*Map) error {
 func (cs *CollectionSpec) RewriteConstants(consts map[string]interface{}) error {
 	rodata := cs.Maps[".rodata"]
 	if rodata == nil {
-		return xerrors.New("missing .rodata section")
+		return errors.New("missing .rodata section")
 	}
 
 	if rodata.BTF == nil {
-		return xerrors.New(".rodata section has no BTF")
+		return errors.New(".rodata section has no BTF")
 	}
 
 	if n := len(rodata.Contents); n != 1 {
-		return xerrors.Errorf("expected one key in .rodata, found %d", n)
+		return fmt.Errorf("expected one key in .rodata, found %d", n)
 	}
 
 	kv := rodata.Contents[0]
 	value, ok := kv.Value.([]byte)
 	if !ok {
-		return xerrors.Errorf("first value in .rodata is %T not []byte", kv.Value)
+		return fmt.Errorf("first value in .rodata is %T not []byte", kv.Value)
 	}
 
 	buf := make([]byte, len(value))
@@ -185,14 +186,14 @@ func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (col
 		var handle *btf.Handle
 		if mapSpec.BTF != nil {
 			handle, err = loadBTF(btf.MapSpec(mapSpec.BTF))
-			if err != nil && !xerrors.Is(err, btf.ErrNotSupported) {
+			if err != nil && !errors.Is(err, btf.ErrNotSupported) {
 				return nil, err
 			}
 		}
 
 		m, err := newMapWithBTF(mapSpec, handle)
 		if err != nil {
-			return nil, xerrors.Errorf("map %s: %w", mapName, err)
+			return nil, fmt.Errorf("map %s: %w", mapName, err)
 		}
 		maps[mapName] = m
 	}
@@ -216,29 +217,29 @@ func NewCollectionWithOptions(spec *CollectionSpec, opts CollectionOptions) (col
 
 			m := maps[ins.Reference]
 			if m == nil {
-				return nil, xerrors.Errorf("program %s: missing map %s", progName, ins.Reference)
+				return nil, fmt.Errorf("program %s: missing map %s", progName, ins.Reference)
 			}
 
 			fd := m.FD()
 			if fd < 0 {
-				return nil, xerrors.Errorf("map %s: %w", ins.Reference, internal.ErrClosedFd)
+				return nil, fmt.Errorf("map %s: %w", ins.Reference, internal.ErrClosedFd)
 			}
 			if err := ins.RewriteMapPtr(m.FD()); err != nil {
-				return nil, xerrors.Errorf("progam %s: map %s: %w", progName, ins.Reference, err)
+				return nil, fmt.Errorf("progam %s: map %s: %w", progName, ins.Reference, err)
 			}
 		}
 
 		var handle *btf.Handle
 		if progSpec.BTF != nil {
 			handle, err = loadBTF(btf.ProgramSpec(progSpec.BTF))
-			if err != nil && !xerrors.Is(err, btf.ErrNotSupported) {
+			if err != nil && !errors.Is(err, btf.ErrNotSupported) {
 				return nil, err
 			}
 		}
 
 		prog, err := newProgramWithBTF(progSpec, handle, opts.Programs)
 		if err != nil {
-			return nil, xerrors.Errorf("program %s: %w", progName, err)
+			return nil, fmt.Errorf("program %s: %w", progName, err)
 		}
 		progs[progName] = prog
 	}

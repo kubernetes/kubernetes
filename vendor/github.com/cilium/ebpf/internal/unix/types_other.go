@@ -17,6 +17,7 @@ const (
 	ENOSPC                   = syscall.ENOSPC
 	EINVAL                   = syscall.EINVAL
 	EINTR                    = syscall.EINTR
+	EPERM                    = syscall.EPERM
 	ESRCH                    = syscall.ESRCH
 	ENODEV                   = syscall.ENODEV
 	BPF_F_RDONLY_PROG        = 0

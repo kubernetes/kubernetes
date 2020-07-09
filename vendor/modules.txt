@@ -135,7 +135,7 @@ github.com/chai2010/gettext-go/gettext/po
 # github.com/checkpoint-restore/go-criu/v4 v4.0.2 => github.com/checkpoint-restore/go-criu/v4 v4.0.2
 github.com/checkpoint-restore/go-criu/v4
 github.com/checkpoint-restore/go-criu/v4/rpc
-# github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574 => github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574
+# github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775 => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
@@ -575,7 +575,7 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1 => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc90.0.20200624011356-1b94395c0657 => github.com/opencontainers/runc v1.0.0-rc90.0.20200624011356-1b94395c0657
+# github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
 github.com/opencontainers/runc/libcontainer/cgroups
