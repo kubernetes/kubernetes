@@ -922,7 +922,7 @@ contexts:
   name: webhook
 EOF
   fi
-  if [[ "${EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${SETUP_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
       cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
@@ -3028,7 +3028,7 @@ function main() {
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
-  if [[ "${EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${SETUP_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     KONNECTIVITY_SERVER_TOKEN="$(secure_random 32)"
   fi
   if [[ "${ENABLE_MONITORING_TOKEN:-false}" == "true" ]]; then
