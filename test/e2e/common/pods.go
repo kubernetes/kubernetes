@@ -54,6 +54,8 @@ const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
+	podRetryPeriod       = 1 * time.Second
+	podRetryTimeout      = 1 * time.Minute
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -829,4 +831,62 @@ var _ = framework.KubeDescribe("Pods", func() {
 		validatePodReadiness(false)
 
 	})
+
+	ginkgo.It("should delete a collection of pods", func() {
+		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
+
+		ginkgo.By("Create set of pods")
+		// create a set of pods in test namespace
+		for _, podTestName := range podTestNames {
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podTestName,
+					Labels: map[string]string{
+						"type": "Testing"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:  "token-test",
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				}}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create pod")
+			framework.Logf("created %v", podTestName)
+		}
+
+		// wait as required for all 3 pods to be found
+		ginkgo.By("waiting for all 3 pods to be located")
+		err := wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 3))
+		framework.ExpectNoError(err, "3 pods not found")
+
+		// delete Collection of pods with a label in the current namespace
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "type=Testing"})
+		framework.ExpectNoError(err, "failed to delete collection of pods")
+
+		// wait for all pods to be deleted
+		ginkgo.By("waiting for all pods to be deleted")
+		err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 0))
+		framework.ExpectNoError(err, "found a pod(s)")
+	})
 })
+
+func checkPodListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != quantity {
+			framework.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
+			return false, err
+		}
+		return true, nil
+	}
+}
