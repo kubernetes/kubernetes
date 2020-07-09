@@ -313,9 +313,10 @@ var (
 		// Base units.
 		"amperes": "amperes",
 		"bytes":   "bytes",
-		"celsius": "celsius", // Celsius is more common in practice than Kelvin.
+		"celsius": "celsius", // Also allow Celsius because it is common in typical Prometheus use cases.
 		"grams":   "grams",
 		"joules":  "joules",
+		"kelvin":  "kelvin", // SI base unit, used in special cases (e.g. color temperature, scientific measurements).
 		"meters":  "meters", // Both American and international spelling permitted.
 		"metres":  "metres",
 		"seconds": "seconds",
@@ -328,8 +329,7 @@ var (
 		"days":    "seconds",
 		"weeks":   "seconds",
 		// Temperature.
-		"kelvin":     "celsius",
-		"kelvins":    "celsius",
+		"kelvins":    "kelvin",
 		"fahrenheit": "celsius",
 		"rankine":    "celsius",
 		// Length.

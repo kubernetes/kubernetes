@@ -41,7 +41,7 @@ type ProcFDInfo struct {
 	Flags string
 	// Mount point ID
 	MntID string
-	// List of inotify lines (structed) in the fdinfo file (kernel 3.8+ only)
+	// List of inotify lines (structured) in the fdinfo file (kernel 3.8+ only)
 	InotifyInfos []InotifyInfo
 }
 
