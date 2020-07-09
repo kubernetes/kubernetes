@@ -341,16 +341,18 @@ function start-kube-apiserver {
   local csc_config_volume=""
   local default_konnectivity_socket_vol=""
   local default_konnectivity_socket_mnt=""
-  if [[ "${EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${SETUP_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     # Create the EgressSelectorConfiguration yaml file to control the Egress Selector.
     csc_config_mount="{\"name\": \"cscconfigmount\",\"mountPath\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"readOnly\": false},"
     csc_config_volume="{\"name\": \"cscconfigmount\",\"hostPath\": {\"path\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"type\": \"FileOrCreate\"}},"
-    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
 
     # UDS socket for communication between apiserver and konnectivity-server
     local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity-server"
     default_konnectivity_socket_vol="{ \"name\": \"konnectivity-socket\", \"hostPath\": {\"path\": \"${default_konnectivity_socket_path}\", \"type\": \"DirectoryOrCreate\"}},"
     default_konnectivity_socket_mnt="{ \"name\": \"konnectivity-socket\", \"mountPath\": \"${default_konnectivity_socket_path}\", \"readOnly\": false},"
+  fi
+  if [[ "${EGRESS_VIA_KONNECTIVITY:-false}" == "true" ]]; then
+    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
   fi
 
   local container_env=""
