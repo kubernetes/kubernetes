@@ -91,6 +91,10 @@ func TestStandardDetachDisk(t *testing.T) {
 
 		_, err := vmSet.DetachDisk(test.diskName, "", test.nodeName)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
+		if !test.expectedError && test.diskName != "" {
+			dataDisks, err := vmSet.GetDataDisks(test.nodeName, cacheReadTypeDefault)
+			assert.Equal(t, true, len(dataDisks) == 1, "TestCase[%d]: %s, err: %v", i, test.desc, err)
+		}
 	}
 }
 
