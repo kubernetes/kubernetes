@@ -651,6 +651,27 @@ func TestRoundTripper(t *testing.T) {
 	get(t, http.StatusOK)
 }
 
+func TestTokenPresentCancelsExecAction(t *testing.T) {
+	a, err := newAuthenticator(newCache(), &api.ExecConfig{
+		Command:    "./testdata/test-plugin.sh",
+		APIVersion: "client.authentication.k8s.io/v1alpha1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
+	// transport config, in which case it takes precedence
+	cert := func() (*tls.Certificate, error) {
+		return nil, nil
+	}
+	tc := &transport.Config{BearerToken: "token1", TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
+
+	if err := a.UpdateTransportConfig(tc); err != nil {
+		t.Error("Expected presence of bearer token in config to cancel exec action")
+	}
+}
+
 func TestTLSCredentials(t *testing.T) {
 	now := time.Now()
 

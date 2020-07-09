@@ -69,6 +69,7 @@ function run_kube_apiserver() {
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
+    --client-ca-file=hack/testdata/ca.crt \
     --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
   export APISERVER_PID=$!
 

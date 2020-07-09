@@ -237,6 +237,15 @@ type credentials struct {
 // UpdateTransportConfig updates the transport.Config to use credentials
 // returned by the plugin.
 func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
+	// If a bearer token is present in the request - avoid the GetCert callback when
+	// setting up the transport, as that triggers the exec action if the server is
+	// also configured to allow client certificates for authentication. For requests
+	// like "kubectl get --token (token) pods" we should assume the intention is to
+	// use the provided token for authentication.
+	if c.HasTokenAuth() {
+		return nil
+	}
+
 	c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return &roundTripper{a, rt}
 	})

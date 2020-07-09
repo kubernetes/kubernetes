@@ -452,6 +452,22 @@ function kube::util::test_openssl_installed {
     OPENSSL_BIN=$(command -v openssl)
 }
 
+# Query the API server for client certificate authentication capabilities
+function kube::util::test_client_certificate_authentication_enabled {
+  local output
+  kube::util::test_openssl_installed
+
+  output=$(echo \
+    | "${OPENSSL_BIN}" s_client -connect "127.0.0.1:${SECURE_API_PORT}" 2> /dev/null \
+    | grep -A3 'Acceptable client certificate CA names')
+
+  if [[ "${output}" != *"/CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
+    echo "API server not configured for client certificate authentication"
+    echo "Output of from acceptable client certificate check: ${output}"
+    exit 1
+  fi
+}
+
 # creates a client CA, args are sudo, dest-dir, ca-id, purpose
 # purpose is dropped in after "key encipherment", you usually want
 # '"client auth"'
