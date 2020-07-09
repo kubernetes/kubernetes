@@ -92,7 +92,7 @@ dependencies:
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-hyperkube-base: dependents"
-    version: 1.1.0
+    version: 1.1.1
     refPaths:
     - path: build/workspace.bzl
       match: tag =
