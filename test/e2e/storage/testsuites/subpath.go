@@ -28,6 +28,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -798,25 +799,41 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 	return nil
 }
 
-// Tests that the existing subpath mount is detected when a container restarts
-func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
+type podContainerRestartHooks struct {
+	AddLivenessProbeFunc  func(pod *v1.Pod, probeFilePath string)
+	FailLivenessProbeFunc func(pod *v1.Pod, probeFilePath string)
+	FixLivenessProbeFunc  func(pod *v1.Pod, probeFilePath string)
+}
+
+func (h *podContainerRestartHooks) AddLivenessProbe(pod *v1.Pod, probeFilePath string) {
+	if h.AddLivenessProbeFunc != nil {
+		h.AddLivenessProbeFunc(pod, probeFilePath)
+	}
+}
+
+func (h *podContainerRestartHooks) FailLivenessProbe(pod *v1.Pod, probeFilePath string) {
+	if h.FailLivenessProbeFunc != nil {
+		h.FailLivenessProbeFunc(pod, probeFilePath)
+	}
+}
+
+func (h *podContainerRestartHooks) FixLivenessProbe(pod *v1.Pod, probeFilePath string) {
+	if h.FixLivenessProbeFunc != nil {
+		h.FixLivenessProbeFunc(pod, probeFilePath)
+	}
+}
+
+// testPodContainerRestartWithHooks tests that container restarts to stabilize.
+// hooks wrap functions between container restarts.
+func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks *podContainerRestartHooks) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
 	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
-	// Add liveness probe to subpath container
-	pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
-		Handler: v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"cat", probeFilePath},
-			},
-		},
-		InitialDelaySeconds: 1,
-		FailureThreshold:    1,
-		PeriodSeconds:       2,
-	}
+
+	hooks.AddLivenessProbe(pod, probeFilePath)
 
 	// Start pod
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
@@ -830,9 +847,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
-	out, err := podContainerExec(pod, 1, fmt.Sprintf("rm %v", probeFilePath))
-	framework.Logf("Pod exec output: %v", out)
-	framework.ExpectNoError(err, "while failing liveness probe")
+	hooks.FailLivenessProbe(pod, probeFilePath)
 
 	// Check that container has restarted
 	ginkgo.By("Waiting for container to restart")
@@ -857,16 +872,8 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(err, "while waiting for container to restart")
 
 	// Fix liveness probe
-	ginkgo.By("Rewriting the file")
-	var writeCmd string
-	if framework.NodeOSDistroIs("windows") {
-		writeCmd = fmt.Sprintf("echo test-after | Out-File -FilePath %v", probeFilePath)
-	} else {
-		writeCmd = fmt.Sprintf("echo test-after > %v", probeFilePath)
-	}
-	out, err = podContainerExec(pod, 1, writeCmd)
-	framework.Logf("Pod exec output: %v", out)
-	framework.ExpectNoError(err, "while rewriting the probe file")
+	ginkgo.By("Fix liveness probe")
+	hooks.FixLivenessProbe(pod, probeFilePath)
 
 	// Wait for container restarts to stabilize
 	ginkgo.By("Waiting for container to stop restarting")
@@ -896,6 +903,89 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 		return false, nil
 	})
 	framework.ExpectNoError(err, "while waiting for container to stabilize")
+}
+
+// testPodContainerRestart tests that the existing subpath mount is detected when a container restarts
+func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
+	testPodContainerRestartWithHooks(f, pod, &podContainerRestartHooks{
+		AddLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
+			p.Spec.Containers[0].LivenessProbe = &v1.Probe{
+				Handler: v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"cat", probeFilePath},
+					},
+				},
+				InitialDelaySeconds: 1,
+				FailureThreshold:    1,
+				PeriodSeconds:       2,
+			}
+		},
+		FailLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
+			out, err := podContainerExec(p, 1, fmt.Sprintf("rm %v", probeFilePath))
+			framework.Logf("Pod exec output: %v", out)
+			framework.ExpectNoError(err, "while failing liveness probe")
+		},
+		FixLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
+			ginkgo.By("Rewriting the file")
+			var writeCmd string
+			if framework.NodeOSDistroIs("windows") {
+				writeCmd = fmt.Sprintf("echo test-after | Out-File -FilePath %v", probeFilePath)
+			} else {
+				writeCmd = fmt.Sprintf("echo test-after > %v", probeFilePath)
+			}
+			out, err := podContainerExec(pod, 1, writeCmd)
+			framework.Logf("Pod exec output: %v", out)
+			framework.ExpectNoError(err, "while rewriting the probe file")
+		},
+	})
+}
+
+// TestPodContainerRestartWithConfigmapModified tests that container can restart to stabilize when configmap has been modified.
+// 1. valid container running
+// 2. update configmap
+// 3. container restarts
+// 4. container becomes stable after configmap mounted file has been modified
+func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, original, modified *v1.ConfigMap) {
+	ginkgo.By("Create configmap")
+	_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), original, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err, "while creating configmap to modify")
+	}
+
+	var subpath string
+	for k := range original.Data {
+		subpath = k
+		break
+	}
+	pod := SubpathTestPod(f, subpath, "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: original.Name}}}, false)
+	pod.Spec.InitContainers[0].Command = e2evolume.GenerateScriptCmd(fmt.Sprintf("touch %v", probeFilePath))
+
+	modifiedValue := modified.Data[subpath]
+	testPodContainerRestartWithHooks(f, pod, &podContainerRestartHooks{
+		AddLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
+			p.Spec.Containers[0].LivenessProbe = &v1.Probe{
+				Handler: v1.Handler{
+					Exec: &v1.ExecAction{
+						// Expect probe file exist or configmap mounted file has been modified.
+						Command: []string{"sh", "-c", fmt.Sprintf("cat %s || test `cat %s` = '%s'", probeFilePath, volumePath, modifiedValue)},
+					},
+				},
+				InitialDelaySeconds: 1,
+				FailureThreshold:    1,
+				PeriodSeconds:       2,
+			}
+		},
+		FailLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
+			out, err := podContainerExec(p, 1, fmt.Sprintf("rm %v", probeFilePath))
+			framework.Logf("Pod exec output: %v", out)
+			framework.ExpectNoError(err, "while failing liveness probe")
+		},
+		FixLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
+			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), modified, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "while fixing liveness probe")
+		},
+	})
+
 }
 
 func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, pod *v1.Pod, forceDelete bool) {
