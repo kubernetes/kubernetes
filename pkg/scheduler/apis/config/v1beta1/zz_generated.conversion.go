@@ -462,6 +462,7 @@ func Convert_config_NodeLabelArgs_To_v1beta1_NodeLabelArgs(in *config.NodeLabelA
 
 func autoConvert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1beta1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
+	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	return nil
 }
 
@@ -472,6 +473,7 @@ func Convert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1b
 
 func autoConvert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta1.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
+	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	return nil
 }
 

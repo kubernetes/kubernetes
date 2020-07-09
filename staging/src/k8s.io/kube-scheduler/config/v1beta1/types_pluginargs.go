@@ -62,6 +62,12 @@ type NodeResourcesFitArgs struct {
 	// should ignore.
 	// +listType=atomic
 	IgnoredResources []string `json:"ignoredResources,omitempty"`
+	// IgnoredResourceGroups defines the list of resource groups that NodeResources fit filter should ignore.
+	// e.g. if group is ["example.com"], it will ignore all resource names that begin
+	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
+	// A resource group name can't contain '/'.
+	// +listType=atomic
+	IgnoredResourceGroups []string `json:"ignoredResourceGroups,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
