@@ -142,8 +142,25 @@ aliases:
     - justaugustus
     - listx
 
+  sig-storage-approvers:
+    - saad-ali
+    - thockin
+    - jsafrane
+    - gnufied
+    - msau42
+  # emeritus:
+  # - rootfs
   sig-storage-reviewers:
     - saad-ali
+    - jsafrane
+    - rootfs
+    - jingxu97
+    - msau42
+    - gnufied
+    - verult
+    - humblec
+  # emeritus:
+  # - davidz627
 
   sig-scheduling-maintainers:
     - alculquicondor
@@ -452,6 +469,7 @@ aliases:
   #   -
 
   sig-storage-api-reviewers:
+    - deads2k
     - saad-ali
     - msau42
     - jsafrane
