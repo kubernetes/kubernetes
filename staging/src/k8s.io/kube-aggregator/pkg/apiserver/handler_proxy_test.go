@@ -18,12 +18,16 @@ package apiserver
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -88,6 +92,10 @@ type mockedRouter struct {
 
 func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
+}
+
+func emptyCert() []byte {
+	return []byte{}
 }
 
 func TestProxyHandler(t *testing.T) {
@@ -274,9 +282,10 @@ func TestProxyHandler(t *testing.T) {
 				serviceResolver = &mockedRouter{destinationHost: targetServer.Listener.Addr().String()}
 			}
 			handler := &proxyHandler{
-				localDelegate:   http.NewServeMux(),
-				serviceResolver: serviceResolver,
-				proxyTransport:  &http.Transport{},
+				localDelegate:              http.NewServeMux(),
+				serviceResolver:            serviceResolver,
+				proxyTransport:             &http.Transport{},
+				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
 			server := httptest.NewServer(contextHandler(handler, tc.user))
 			defer server.Close()
@@ -418,8 +427,9 @@ func TestProxyUpgrade(t *testing.T) {
 
 			serverURL, _ := url.Parse(backendServer.URL)
 			proxyHandler := &proxyHandler{
-				serviceResolver: &mockedRouter{destinationHost: serverURL.Host},
-				proxyTransport:  &http.Transport{},
+				serviceResolver:            &mockedRouter{destinationHost: serverURL.Host},
+				proxyTransport:             &http.Transport{},
+				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
 			proxyHandler.updateAPIService(tc.APIService)
 			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
@@ -566,3 +576,294 @@ func TestGetContextForNewRequest(t *testing.T) {
 	}
 
 }
+
+// TestProxyCertReload verifies that the proxy reloading of certificates work
+// to be able to test the reloading it starts a server with client auth enabled
+// it first uses certs that does not match the client CA so the verification fails - expecting HTTP 503
+// then we write correct client certs to the disk, expecting the proxy to reload the cert and use it for the next request
+//
+// Note: this test doesn't use apiserviceRegistrationController nor it doesn't start DynamicServingContentFromFiles controller
+// instead it manually calls to updateAPIService and RunOnce to reload the certificate
+func TestProxyCertReload(t *testing.T) {
+	// STEP 1: set up a backend server that will require the client certificate
+	//         this server uses clientCaCrt to validate the client certificate
+	backendHandler := &targetHTTPHandler{}
+	backendServer := httptest.NewUnstartedServer(backendHandler)
+	if cert, err := tls.X509KeyPair(backendCertificate, backendKey); err != nil {
+		t.Fatal(err)
+	} else {
+		caCertPool := x509.NewCertPool()
+		// we're testing this while enabling MTLS
+		caCertPool.AppendCertsFromPEM(clientCaCrt)
+		backendServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: caCertPool}
+	}
+	backendServer.StartTLS()
+	defer backendServer.Close()
+
+	// STEP 2: set up the aggregator that will use an invalid certificate (it won't be validated by the clientCA) to auth against the backend server
+	aggregatorHandler := &proxyHandler{
+		localDelegate:   http.NewServeMux(),
+		serviceResolver: &mockedRouter{destinationHost: backendServer.Listener.Addr().String()},
+	}
+	certFile, keyFile, dir := getCertAndKeyPaths(t)
+	writeCerts(certFile, keyFile, backendCertificate, backendKey, t)
+
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
+		}
+	}()
+
+	certProvider, err := dynamiccertificates.NewDynamicServingContentFromFiles("test", certFile, keyFile)
+	if err != nil {
+		t.Fatalf("Unable to create dynamic certificates: %v", err)
+	}
+	err = certProvider.RunOnce()
+	if err != nil {
+		t.Fatalf("Unable to load dynamic certificates: %v", err)
+	}
+	aggregatorHandler.proxyCurrentCertKeyContent = certProvider.CurrentCertKeyContent
+
+	apiService := &apiregistration.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+		Spec: apiregistration.APIServiceSpec{
+			Service:  &apiregistration.ServiceReference{Name: "test-service2", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+			Group:    "foo",
+			Version:  "v1",
+			CABundle: backendCaCertificate, // used to validate backendCertificate
+		},
+		Status: apiregistration.APIServiceStatus{
+			Conditions: []apiregistration.APIServiceCondition{
+				{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+			},
+		},
+	}
+	aggregatorHandler.updateAPIService(apiService)
+
+	server := httptest.NewServer(contextHandler(aggregatorHandler, &user.DefaultInfo{
+		Name:   "username",
+		Groups: []string{"one", "two"},
+	}))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/request/path")
+	if err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("Expected status code 503 but got %d", resp.StatusCode)
+	}
+
+	// STEP 3: swap the certificate used by the aggregator to auth against the backend server and verify the request passes
+	//         note that this step uses the certificate that can be validated by the backend server with clientCaCrt
+	writeCerts(certFile, keyFile, clientCert, clientKey, t)
+	err = certProvider.RunOnce()
+	if err != nil {
+		t.Fatalf("Expected no error when refreshing dynamic certs, got %v", err)
+	}
+	aggregatorHandler.updateAPIService(apiService)
+
+	resp, err = http.Get(server.URL + "/request/path")
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status code 200 but got %d", resp.StatusCode)
+	}
+}
+
+func getCertAndKeyPaths(t *testing.T) (string, string, string) {
+	dir, err := ioutil.TempDir(os.TempDir(), "k8s-test-handler-proxy-cert")
+	if err != nil {
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
+	}
+	certFile := filepath.Join(dir, "certfile.pem")
+	keyFile := filepath.Join(dir, "keytfile.pem")
+	return certFile, keyFile, dir
+}
+
+func writeCerts(certFile, keyFile string, certContent, keyContent []byte, t *testing.T) {
+	if err := ioutil.WriteFile(certFile, certContent, 0600); err != nil {
+		t.Fatalf("Unable to create the file %q: %v", certFile, err)
+	}
+	if err := ioutil.WriteFile(keyFile, keyContent, 0600); err != nil {
+		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
+	}
+}
+
+// cert and ca for client auth
+var clientCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIFaDCCA1ACAWUwDQYJKoZIhvcNAQEFBQAwejELMAkGA1UEBhMCVVMxEzARBgNV
+BAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZpZXcxGDAWBgNVBAoM
+D015IG9yZ2FuaXphdGlvbjEQMA4GA1UECwwHTXkgdW5pdDESMBAGA1UEAwwJbG9j
+YWxob3N0MB4XDTIwMDUyMjA4MTA1MVoXDTIxMDUyMjA4MTA1MVowejELMAkGA1UE
+BhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDU1vdW50YWluIFZp
+ZXcxGDAWBgNVBAoMD015IG9yZ2FuaXphdGlvbjEQMA4GA1UECwwHTXkgdW5pdDES
+MBAGA1UEAwwJbG9jYWxob3N0MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKC
+AgEAwdDdguS2eVb950cmuyK/fTEBy+I1OFwPSg6S2zF5v/98Sva87Y/qFBrv1EzY
+usU+OWuH0nnyk14bOGl+imbvk+tdiXr4i8tIY8QnBrUbyNvPwemcRejQQb1P5YX0
+An3BS8vckt1e1zahhyb+Uch/ApLFzv3nOEGg7OTA5vfyNs/OUcaz7XuKrFQipxLA
+wEpPbukI8ThH2uLwiRxWUrLGmOeWocM4JFCk6LaQLWkTzl9WgKTYwzrI24LaUgb6
+0urlUi0bmE8AJRZBdmVCiEapxiHDre8c3CaLh8aF1LQ95ZraF8NZAvMxJvSK0R7I
+05V+eZH+xdBH2n5naLjVuvm96VPbDGlcWRwi+ZKZXAvi6YMNJ5g564u2Nl+eACtd
+9Kg6C9AIU8vSX9WrX4UcwaohQVjxUmHNL6YqHXhltyPdN3coFxDSPyp46x8Y2BIW
+s1x1qnlor5xOOQhYPoIQzMgrgJw6wRLWdIkyP/NOazSwet2i4cpeLD3wgXpuylQp
+Of06WChGN7NRx9JQSA7y6JKJq38jyB4+iNpU7NfkCQQndwvowPUBOSXNAUOgv2Qt
+QEiODhNPsHhSHM6L4xSpwFzh7dDywpPCeb6Fzyp/EslaLiFoEQr2Wc0xM/Xssqa6
+yBjSpATBqP1exQVr7LQn50lf9penN4FOQRZ9k/49DLX1RFUCAwEAATANBgkqhkiG
+9w0BAQUFAAOCAgEAVyFuPhtyDMi8FxD00fqnAxwnr7IyNBwYuQivu7gXKwQ2U9v1
+LSqDxvUft6sDWNUl/2f+Lga3CaVJ7FJL/rOwU5APkD4lcc43UcUv8pN2QAVFUs2h
+8MPEZnM2oHEA3M77Yr1RZUHE24pHsv3Bi0u7w8kPhFb7ebAbfXAHIWkekPejroso
+fOC2W8PXGqCJcpuIrAzIRvu/Ia0Cu4bmSZp4pK4lilgmUCr5LTc3YeNuAvbqco8f
+mhXJ+qR4PYWkldgOdhz7eajKF0JP6R8pQacCTZ5OM1y9tg3yN6BEKus3EojpDtqs
+5cTegj914lnNXI/bod6kqnuMT1sfnt2y8AmUcgD+NMhw6dG6zJI1Jf+01G2q3HCn
+wtB0jPntk1hRepVkLfSvxoMofkjESHSVstYiGRQWQziFq98ei59uW1ZNpP/yVJGb
+I7eM/b3vnFUBX2eypfVyY7+vBCxvgRjmpKnOuhCgm2bla1Ho7XUz1OvGkYfnHM3u
+lUiTnAdNXQEf1Y2OjWeHeQeoeJ7gJiwJhMH8yZIierLHDP7FbBSLZ+VZW4Wfe6vT
+WJ4no8kkD5ROWBNf0c0dt2uip6dZ5L2zMrqeUrhpy59ZhoZoMP5cmY/sfTzpRzNO
+KitvR2SwVL12T6pAkwq3ItdiGZ16x5XrYv22H0jP8R6MCd59Sfnz9wWdY1Q=
+-----END CERTIFICATE-----`)
+var clientKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
+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
+-----END RSA PRIVATE KEY-----`)
+var backendCertificate = []byte(`-----BEGIN CERTIFICATE-----
+MIICszCCAZsCCQDDGNgLmIQtOTANBgkqhkiG9w0BAQsFADATMREwDwYDVQQDDAh0
+ZXN0LWNhMjAeFw0yMDA1MzExMDAwMTRaFw0yMjA5MDMxMDAwMTRaMCQxIjAgBgNV
+BAMMGXRlc3Qtc2VydmljZTIudGVzdC1ucy5zdmMwggEiMA0GCSqGSIb3DQEBAQUA
+A4IBDwAwggEKAoIBAQDFhy+tjaC7UcaHD0qqF8HOT22EUtUwaA0LQYHQtrbJVQb8
+pGcqm2IdGr1MelSkXO39quhfVDrlXQQV4SVIUmBHMIDmcc9rYoQKutqR7ukaYlSd
+VqkQSTYRm10XeOp9qNmdXe/bq/DhP8Pc1JuISjBghmOEQGzI9SUw6aRfgXdixTOS
+sL5gpVn6rnNJNGnN9RQPwAIzpp4xbe4UFOoEisHa5G5ohMIbA4bu8+CHLJzBHOww
+llw7iRUZvn+i1gHtlGVgWz/U01iL+g0vvoPNi8HpDO5OYlTO1jdRonr/LxS5sgIw
+wWTpMqItALzLPHZebTH1Y21+njPBE+MjYJZr9rnnAgMBAAEwDQYJKoZIhvcNAQEL
+BQADggEBAJWqT0XnBVGUjUUYRJUzyLfHe9L7KJ2gHgI8S+AyscQUi2meOwl3tqlZ
+Z1bQNFKGQ17n0uKCfr5vknHNAH+Rme7wcQaOHozrRsfx5ktziIRjOSc2tE9cssXz
+8rTu4RbfxgRgkHxvW4XNn6liB4BarzfANtg6OjftB2RSCZ5de+e9Q/zOgZD8KAjR
+GD9mE7P/UnZFobNUehaAY3FHPiP+r2txpBPqqxLcsb/qv9rFQsz7OO++n5AN8fb+
+wT/wiq1NdOVhyhncPnzdwJZxvOM3MtuXzN6UbqZ1ur/DxWYrhaiSWmWxCXWoQfde
+Ijs5dRes3aVe33pMaDGTJ6QCEze2QxE=
+-----END CERTIFICATE-----`)
+var backendKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAxYcvrY2gu1HGhw9KqhfBzk9thFLVMGgNC0GB0La2yVUG/KRn
+KptiHRq9THpUpFzt/aroX1Q65V0EFeElSFJgRzCA5nHPa2KECrrake7pGmJUnVap
+EEk2EZtdF3jqfajZnV3v26vw4T/D3NSbiEowYIZjhEBsyPUlMOmkX4F3YsUzkrC+
+YKVZ+q5zSTRpzfUUD8ACM6aeMW3uFBTqBIrB2uRuaITCGwOG7vPghyycwRzsMJZc
+O4kVGb5/otYB7ZRlYFs/1NNYi/oNL76DzYvB6QzuTmJUztY3UaJ6/y8UubICMMFk
+6TKiLQC8yzx2Xm0x9WNtfp4zwRPjI2CWa/a55wIDAQABAoIBAQCAqU2k/ltzqBBo
+aM15fX//ojzztACpRx0397NW/6yP95JVfcC1QADodEJZTlVTujRKxsgVUAgM3kmK
+9twR/5Y2yKEteXRhvgnD83HrHHM5fFMhKRF2SjmtvkUkxN34e8NDfax+qcB898vc
+S6ADZk+cj+zCeDRjsUpIUed/ThU1f5ftBUKnexVSWQpWzy1ceAFKmD3Qe+Up22AT
+SCWXxv8pYoghs2iyAYb7eQFD/+BBVeJykXWvdDfi0TzqNhGC28PZBuE9sMq/+Yhu
+uGd4BRlKaE6B+vqxsY5Ub3m/4kvSGo2HCL6GBiD1zwuTkyrcA/9y2bne/MWfFdj9
+2BBHKOYBAoGBAPPwkBVUbjWZ+rtcObxx32zUui+4wiN4srZgyQowwWH5eHfVr6T1
+DYN/fktTs8vtAqv5tgaDEo58V1SyOINCvp2b4PsnAASs3MbJCLiGzxroyKzhgeBe
+gX+AY2ijwC/XGSZj94dK4dXBesza7CcWqJlP13Yp9DXnGPWFq/IOxulLAoGBAM9L
+NkBiM7T+K0tnpRAe1cM7oyIRYgv1XqkHG/DoPq6npgFLeI3Dc/HMV0gS12YfY1f1
+s5JbVIPKQPr9viTmDcau64aqpZqVZcOqQV38AskRJQSHr7ss5i5gzcNkefROmdIA
+2lYLrEt8H3PC1wkk8biOwEeXHnMhNCnBfUn7W0xVAoGACn4nhHNcRjv4WATQivWO
++bxwwcq9tw7jCQtCuoh8WP2FHAp6AqtzyFs8kHrqOfRY8BLOrJsIuk5I52C/I45E
+ar0gwUzdKFZTLM3K7T0HPY4Ty7PrhT4rbdOU8xRQGP60mz0jkZM8AZjP8m3cSJYl
+7GpNx0xor8TgAveb/M576d8CgYAwQ6fHB9ZYLtGvxdsFzNgik9EgzoFQnXnDyzbz
+OW/WxIv/Qy43e6mUQ+qSimiCi45a3YdI7WDZKo9EoS3Tc4kDmJiYC0Vxn5VJIGwF
+0PZpEEfZLSp6XzLc24ctFkja3C4uWip73E3qaWT9VAEzTNnHCd21DXd2gOWfT0C3
+qAGS3QKBgQCTXOZFOyBYuHTuW6WivhE37BYjSTQv8ig45xMdmM8/tFKtum9oUWpk
+rxkwaxSqpHF5WjsepakAWRrARpsxNa9m1A7u8s5Ui6GremS5d/IMi6W0rrarK4xn
+ktdTr3ZZVCFnQbkH5dIFGbn7gBCFntHSooPET+nqDBIZVkSBljY17w==
+-----END RSA PRIVATE KEY-----`)
+var backendCaCertificate = []byte(`-----BEGIN CERTIFICATE-----
+MIICojCCAYoCCQD19rP3+torQjANBgkqhkiG9w0BAQsFADATMREwDwYDVQQDDAh0
+ZXN0LWNhMjAeFw0yMDA1MzEwOTU5NDFaFw0yNTA1MzAwOTU5NDFaMBMxETAPBgNV
+BAMMCHRlc3QtY2EyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzTvF
+4u3OfiXSkJXQ899xqTSV43/U3YUZ+xg2wj8Mg1gOQ3TNW/LWNxErz9bvqZX0EPjx
+j7ilqmneDKSsNTqQ/4sYxo0h/ZA7AEux3+A2fk+P6KzOb++AiYctJxZuYI3OrB/4
+seU9KO4nNYSVku6uH1nYCjzDTFWQDJuS/SLbPMc7jggywuhp65tlPR/nuL9G2V8t
+5nXV08B4wQ7IdhmequIUPpMtajgobtrDhxpLR3V36t1f57BHU0N/IWWF+kIZFf5F
+7xwsgFBtyXYmjYlmfEwCRQvHNVdUfpp2wI040s7fZs3A64mKA+Xe61J/fJCKzAuC
+mhATlL+SJ7xNVTsqeQIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCd+Esl57Zy36cO
+gHNEvoo2TOtRf8qhuJChxEabIYg2RkRID8s+SYQPlSZ0iWKOsYbT2qmOBubGwVJH
+r0DKGqYNRMEAMQYOwnvDJ4S+Bexj1zhBwS/PhdRL0gz7tAkzJOTyybFBHgOu+Xg5
+bqeOuCUY8piUl/UiuULcrF6+BttQZwBWixfHMMuQzTAsnHTqMGOSqnhTdbnELUcr
+lOz+cVhXs4AWVCDOMXUKKNy1fQglqt/cMangLhrYj+//CKzimsgYHDHfaO2Uo7W+
+peBdV/d+f9YupxJoa83EilhIJtbj17csFxUloTRG2y9Xmf+jFdbz8H0+n0Pq7n38
+EyMJKLfk
+-----END CERTIFICATE-----`)
+var clientCaCrt = []byte(`-----BEGIN CERTIFICATE-----
+MIIFcDCCA1gCCQDgTBDe5gjLSDANBgkqhkiG9w0BAQsFADB6MQswCQYDVQQGEwJV
+UzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNTW91bnRhaW4gVmlldzEY
+MBYGA1UECgwPTXkgb3JnYW5pemF0aW9uMRAwDgYDVQQLDAdNeSB1bml0MRIwEAYD
+VQQDDAlsb2NhbGhvc3QwHhcNMjAwNTIyMDczNTQxWhcNMzAwNTIwMDczNTQxWjB6
+MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNTW91
+bnRhaW4gVmlldzEYMBYGA1UECgwPTXkgb3JnYW5pemF0aW9uMRAwDgYDVQQLDAdN
+eSB1bml0MRIwEAYDVQQDDAlsb2NhbGhvc3QwggIiMA0GCSqGSIb3DQEBAQUAA4IC
+DwAwggIKAoICAQCj89Np0QeBHn6pyDUrzd45Ow9oHTBgvrDAmhND0i+WkcoDAOrX
+V4W6aNLibM/5stR7PRwl93cwkLawE84YHevH7/69EeTjYqIUUTF/Otxh+qTZMDUu
+Z3hcW7Pu/JnfHbmliR+ci4kr7KkVAYHJtT9DcyWAs5KUudPGKpQprVKtnJ04J/hV
+gDrZbBVKU/N7Ik0ta0MWy97LegbRaGrcY/h7ICoaeMDL0UGU8b61tUCVObmhAnM6
+jK6xk/PtMk2d4we3yIWhowrGbp8vxN25WtFXIvJfyrrLFvpsl1f/dLwOzxU8RIt0
+soXkF5ig6BkjzXtG+WM8ZHBGgL1salP6B0IhLjIjsyZVNORyRJEn0SxDnVKtYLuO
+tjcDZb1Ij/KzWdyXCMD8uJECO9z1Zt2kCfsZDjCal+nyas9Otn3djERaGaaQZd1q
+oL/ioQSTgRhHO3Jx721YaetfM5Bf4h/xGIZlR0wsUPM86rN3s5LcN01C8MLMt3op
+l5ECQE4zlCq2j7EZwlTcq7B5onwUDqQYImD/AHIaOMAeAxHCfeGAl9t+84pnd9iU
+BG3XnaSdrhJJApK7Pa7peu7FDaeAkl71VQW0URHjCedCHNdqk1pbsCJMKfpMuRWp
+LldTG83/bCyuNsku8rkKmkY25MSt80EpyYxg0ZfP2GqSX9+wbH67EJlEfQIDAQAB
+MA0GCSqGSIb3DQEBCwUAA4ICAQAqaCc/LkDdJq/QS27qhCKEI885ZYOHuk8N64G6
+7Mfk6YhkSf5/Ln4qwP0f4HJCgupRMRLFs96qIh2HeEvytQk/xd8j111BHBUmjx3E
+tS271x6PTkwkHa5j7kxE85b/wnUjVZ58NKccstp/Ub/ajssPdS7Ohzm0DGTjktja
+Bavju5Q3fyBl4OmICOVDqIVBqNUfszesBtW9QcSgW7VcL2X+5/H/tu2YYnJG8IXp
+v4uJRZ2rimhQZFFvcihCMN6wR7M5hqDPyffloHy+tFYFNd+Wc+RHU/DU2i83ySa/
+BwRD5J8iTHplDFosCo1u6EoALWQx/WM/l4E9P895LFFoF/8tvHUeLAQXjUbqEPUq
+sbHlhZK18vxYUu/n+OtRdHDimjjoEWZHgoUNnNardukcLdGvk2dbmWltd8NA+kjh
+e88NQn5x5mKUfENtK/GYKN4duguR6mOKlKBuobLcjeplnrHcRoWsvYOPJr0L9Ki3
+F1XEUPu0NgZyx5kTX3znm+7UV/W1rZeRppHSeqVfwHE+N2FEds65rMF1sEvw3fZv
+mwAA1eyVJXIGum9MHf9XAgjjyubtwzPdCE6NQ9nYBuXr6sAqZx6irTHrtHl7zmbJ
+St3GLAs3qHVMa6Va1imhvInbV6m9CauCbt4vAs6xVtR/jIaq1NKHP63f+bHp8hhK
+4ulSKQ==
+-----END CERTIFICATE-----`)
