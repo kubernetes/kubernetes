@@ -677,6 +677,43 @@ func TestGenericScheduler(t *testing.T) {
 			expectedHosts: nil,
 			wErr:          nil,
 		},
+		{
+			name: "test prefilter plugin returning Unschedulable status",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter",
+					st.NewFakePreFilterPlugin(framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status")),
+				),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:         []string{"1", "2"},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			expectedHosts: nil,
+			wErr: &FitError{
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+				NumAllNodes: 2,
+				FilteredNodesStatuses: framework.NodeToStatusMap{
+					"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status"),
+					"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status"),
+				},
+			},
+		},
+		{
+			name: "test prefilter plugin returning error status",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter",
+					st.NewFakePreFilterPlugin(framework.NewStatus(framework.Error, "injected error status")),
+				),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:         []string{"1", "2"},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			expectedHosts: nil,
+			wErr:          fmt.Errorf(`prefilter plugin "FakePreFilter" failed for pod "test-prefilter": injected error status`),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -717,7 +754,7 @@ func TestGenericScheduler(t *testing.T) {
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
 			if !reflect.DeepEqual(err, test.wErr) {
-				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
+				t.Errorf("want: %v, got: %v", test.wErr, err)
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
