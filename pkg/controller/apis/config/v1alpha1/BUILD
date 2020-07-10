@@ -20,6 +20,7 @@ go_library(
         "//pkg/controller/deployment/config/v1alpha1:go_default_library",
         "//pkg/controller/endpoint/config/v1alpha1:go_default_library",
         "//pkg/controller/endpointslice/config/v1alpha1:go_default_library",
+        "//pkg/controller/endpointslicemirroring/config/v1alpha1:go_default_library",
         "//pkg/controller/garbagecollector/config/v1alpha1:go_default_library",
         "//pkg/controller/job/config/v1alpha1:go_default_library",
         "//pkg/controller/namespace/config/v1alpha1:go_default_library",

@@ -39,6 +39,8 @@ rules:
       - k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/endpointslice/config
       - k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1
+      - k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config
+      - k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/garbagecollector/config
       - k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1
       - k8s.io/kubernetes/pkg/controller/job/config

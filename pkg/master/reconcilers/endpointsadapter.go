@@ -193,3 +193,17 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 
 	return true
 }
+
+// setSkipMirrorTrue sets endpointslice.kubernetes.io/skip-mirror to true. It
+// returns true if this has resulted in a change to the Endpoints resource.
+func setSkipMirrorTrue(e *corev1.Endpoints) bool {
+	skipMirrorVal, ok := e.Labels[discovery.LabelSkipMirror]
+	if !ok || skipMirrorVal != "true" {
+		if e.Labels == nil {
+			e.Labels = map[string]string{}
+		}
+		e.Labels[discovery.LabelSkipMirror] = "true"
+		return true
+	}
+	return false
+}
