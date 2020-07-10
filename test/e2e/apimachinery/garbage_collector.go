@@ -576,16 +576,32 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
+		var replicaset appsv1.ReplicaSet
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
-			return len(rsList.Items) > 0, nil
+			if len(rsList.Items) > 0 {
+				replicaset = rsList.Items[0]
+				return true, nil
+			}
+			return false, nil
 
 		})
 		if err != nil {
 			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		}
+
+		desiredGeneration := replicaset.Generation
+		if err := wait.PollImmediate(100*time.Millisecond, 60*time.Second, func() (bool, error) {
+			newRS, err := clientSet.AppsV1().ReplicaSets(replicaset.Namespace).Get(context.TODO(), replicaset.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return newRS.Status.ObservedGeneration >= desiredGeneration && newRS.Status.Replicas == *replicaset.Spec.Replicas, nil
+		}); err != nil {
+			framework.Failf("failed to verify .Status.Replicas is equal to .Spec.Replicas for replicaset %q: %v", replicaset.Name, err)
 		}
 
 		ginkgo.By("delete the deployment")
