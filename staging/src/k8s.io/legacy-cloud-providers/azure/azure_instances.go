@@ -21,7 +21,7 @@ package azure
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"os"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +35,10 @@ const (
 	vmPowerStatePrefix      = "PowerState/"
 	vmPowerStateStopped     = "stopped"
 	vmPowerStateDeallocated = "deallocated"
+
+	// nodeNameEnvironmentName is the environment variable name for getting node name.
+	// It is only used for out-of-tree cloud provider.
+	nodeNameEnvironmentName = "NODE_NAME"
 )
 
 var (
@@ -231,17 +235,20 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 }
 
 func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (bool, error) {
+	var err error
 	nodeName := mapNodeNameToVMName(name)
 
+	// VMSS vmName is not same with hostname, use hostname instead.
 	if az.VMType == vmTypeVMSS {
-		// VMSS vmName is not same with hostname, construct the node name "{computer-name-prefix}{base-36-instance-id}".
-		// Refer https://docs.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-instance-ids#scale-set-vm-computer-name.
-		if ssName, instanceID, err := extractVmssVMName(metadataVMName); err == nil {
-			instance, err := strconv.ParseInt(instanceID, 10, 64)
-			if err != nil {
-				return false, fmt.Errorf("failed to parse VMSS instanceID %q: %v", instanceID, err)
-			}
-			metadataVMName = fmt.Sprintf("%s%06s", ssName, strconv.FormatInt(instance, 36))
+		metadataVMName, err = os.Hostname()
+		if err != nil {
+			return false, err
+		}
+
+		// Use name from env variable "NODE_NAME" if it is set.
+		nodeNameEnv := os.Getenv(nodeNameEnvironmentName)
+		if nodeNameEnv != "" {
+			metadataVMName = nodeNameEnv
 		}
 	}
 
