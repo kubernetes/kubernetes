@@ -49,8 +49,8 @@ function os::util::ensure::built_binary_exists() {
 				target="cmd/${binary}"
 			elif [[ -d "${OS_ROOT}/tools/${binary}" ]]; then
 				target="tools/${binary}"
-			elif [[ -d "${OS_ROOT}/tools/rebasehelpers/${binary}" ]]; then
-				target="tools/rebasehelpers/${binary}"
+			elif [[ -d "${OS_ROOT}/openshift-hack/${binary}" ]]; then
+				target="openshift-hack/${binary}"
 			fi
 		fi
 

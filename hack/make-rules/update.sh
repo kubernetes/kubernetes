@@ -43,6 +43,7 @@ if ! ${ALL} ; then
 	echo "Running in short-circuit mode; run with FORCE_ALL=true to force all scripts to run."
 fi
 
+# Skip bazel since it's not used downstream
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
@@ -52,7 +53,6 @@ BASH_TARGETS="
 	update-generated-docs
 	update-generated-swagger-docs
 	update-openapi-spec
-	update-bazel
 	update-gofmt"
 
 for t in ${BASH_TARGETS}; do

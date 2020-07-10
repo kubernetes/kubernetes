@@ -4,16 +4,16 @@
 %global __os_install_post %{_rpmconfigdir}/brp-compress
 
 %global gopath      %{_datadir}/gocode
-%global import_path github.com/openshift/origin
+%global import_path k8s.io/kubernetes
 
-%global golang_version 1.12
-# commit and os_git_vars are intended to be set by the build system.
-# NOTE: The values in this spec file will not be kept up to date.
+%global golang_version 1.13
+
 %{!?commit:
+# DO NOT MODIFY: the value on the line below is sed-like replaced by openshift/doozer
 %global commit 86b5e46426ba828f49195af21c56f7c6674b48f7
 }
 %global shortcommit %(c=%{commit}; echo ${c:0:7})
-# os_git_vars needed to run hack scripts during rpm builds
+# DO NOT MODIFY: the value on the line below is sed-like replaced by openshift/doozer
 %{!?os_git_vars:
 %global os_git_vars OS_GIT_VERSION='' OS_GIT_COMMIT='' OS_GIT_MAJOR='' OS_GIT_MINOR='' OS_GIT_TREE_STATE=''
 }
@@ -34,18 +34,6 @@
 %global package_dist %{dist}
 %endif
 
-%if 0%{?fedora} || 0%{?epel}
-%global need_redistributable_set 0
-%else
-# Due to library availability, redistributable builds only work on x86_64
-%ifarch x86_64
-%global need_redistributable_set 1
-%else
-%global need_redistributable_set 0
-%endif
-%endif
-%{!?make_redistributable: %global make_redistributable %{need_redistributable_set}}
-
 %{!?version: %global version 4.0.0}
 %{!?release: %global release 1}
 
@@ -63,22 +51,13 @@ ExclusiveArch:  %{go_arches}
 ExclusiveArch:  x86_64 aarch64 ppc64le s390x
 %endif
 
+# TODO(marun) tar archives are no longer published for 4.x. Should this value be removed?
 Source0:        https://%{import_path}/archive/%{commit}/%{name}-%{version}.tar.gz
 BuildRequires:  systemd
 BuildRequires:  bsdtar
 BuildRequires:  golang >= %{golang_version}
 BuildRequires:  krb5-devel
 BuildRequires:  rsync
-
-# TODO: Add alternative to tito here to gather and inject Bundled Provides into specfile.
-# The following Bundled Provides entries are populated automatically by the
-# OpenShift tito custom builder found here:
-#   https://github.com/openshift/origin/blob/master/.tito/lib/origin/builder/
-#
-# These are defined as per:
-# https://fedoraproject.org/wiki/Packaging:Guidelines#Bundling_and_Duplication_of_system_libraries
-#
-### AUTO-BUNDLED-GEN-ENTRY-POINT
 
 %description
 OpenShift is a distribution of Kubernetes optimized for enterprise application
@@ -108,16 +87,9 @@ Obsoletes:      atomic-openshift-node <= %{version}
 
 %build
 %if 0%{do_build}
-%if 0%{make_redistributable}
-# Create Binaries for all supported arches
-%{os_git_vars} OS_BUILD_RELEASE_ARCHIVES=n make build-cross
-%else
 # Create Binaries only for building arch
 %ifarch x86_64
   BUILD_PLATFORM="linux/amd64"
-%endif
-%ifarch %{ix86}
-  BUILD_PLATFORM="linux/386"
 %endif
 %ifarch ppc64le
   BUILD_PLATFORM="linux/ppc64le"
@@ -128,9 +100,7 @@ Obsoletes:      atomic-openshift-node <= %{version}
 %ifarch s390x
   BUILD_PLATFORM="linux/s390x"
 %endif
-OS_ONLY_BUILD_PLATFORMS="${BUILD_PLATFORM}" %{os_git_vars} OS_BUILD_RELEASE_ARCHIVES=n make build-cross
-%endif
-
+KUBE_BUILD_PLATFORMS="${BUILD_PLATFORM}" %{os_git_vars} make all WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler cmd/kubelet'
 %endif
 
 %install
@@ -145,7 +115,7 @@ do
   install -p -m 755 _output/local/bin/${PLATFORM}/${bin} %{buildroot}%{_bindir}/${bin}
 done
 
-install -p -m 755 images/hyperkube/hyperkube %{buildroot}%{_bindir}/hyperkube
+install -p -m 755 openshift-hack/images/hyperkube/hyperkube %{buildroot}%{_bindir}/hyperkube
 
 %files hyperkube
 %license LICENSE
