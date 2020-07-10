@@ -17,11 +17,12 @@ limitations under the License.
 package filters
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"sync/atomic"
+	"time"
 
+	"golang.org/x/sync/singleflight"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -40,7 +41,7 @@ func WithLimitUntilHealthy(handler http.Handler, checks []healthz.HealthChecker)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isSelfRequest := false
 
-		urlPaths := strings.Split(r.URL.Path, "/")
+		pathParts := strings.Split(r.URL.Path, "/")
 
 		// This checks if the request is a self request.
 		if userInfo, ok := genericapirequest.UserFrom(r.Context()); ok {
@@ -49,28 +50,48 @@ func WithLimitUntilHealthy(handler http.Handler, checks []healthz.HealthChecker)
 			}
 		}
 
-		// Runs the health checks to ensure that the apiserver is healthy
-		storedHasBeenHealthyBefore := atomic.LoadInt32(&hasBeenHealthyBefore)
-		if storedHasBeenHealthyBefore == 0 {
-			failed := false
-
-			for _, check := range checks {
-				if err := check.Check(r); err != nil {
-					failed = true
-					break
-				}
-			}
-
-			if !failed {
-				atomic.StoreInt32(&hasBeenHealthyBefore, 1)
-			}
-		}
-
-		if _, ok := allowedURLs[urlPaths[1]]; storedHasBeenHealthyBefore == 1 || isSelfRequest || ok {
+		if _, ok := allowedURLs[pathParts[1]]; ok || isSelfRequest {
 			handler.ServeHTTP(w, r)
 			return
 		}
 
-		responsewriters.InternalError(w, r, fmt.Errorf("API not healthy yet"))
+		var requestGroup singleflight.Group
+
+		healthy, err, _ := requestGroup.Do("health check", func() (interface{}, error) {
+			// Runs the health checks to ensure that the apiserver is healthy
+			storedHasBeenHealthyBefore := atomic.LoadInt32(&hasBeenHealthyBefore)
+			if storedHasBeenHealthyBefore == 0 {
+				healthy := true
+
+				for _, check := range checks {
+					if err := check.Check(r); err != nil {
+						healthy = false
+						break
+					}
+				}
+
+				if healthy {
+					atomic.StoreInt32(&hasBeenHealthyBefore, 1)
+				}
+			}
+
+			return storedHasBeenHealthyBefore, nil
+		})
+
+		if err != nil {
+			responsewriters.InternalError(w, r, err)
+			return
+		}
+
+		storedHasBeenHealthyBefore := healthy.(int32)
+
+		if storedHasBeenHealthyBefore == 1 {
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		// Adds a delay so the client doesn't retry immediately
+		time.Sleep(5 * time.Second)
+		http.Error(w, err.Error(), http.StatusTooManyRequests)
 	})
 }
