@@ -19,7 +19,7 @@ require (
 	github.com/google/go-cmp v0.4.0
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/mitchellh/mapstructure v1.1.2
-	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
+	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/vmware/govmomi v0.20.3

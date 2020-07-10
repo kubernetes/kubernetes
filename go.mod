@@ -379,7 +379,7 @@ replace (
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	github.com/rogpeppe/fastuuid => github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	github.com/rogpeppe/go-internal => github.com/rogpeppe/go-internal v1.3.0
-	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
+	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
 	github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
