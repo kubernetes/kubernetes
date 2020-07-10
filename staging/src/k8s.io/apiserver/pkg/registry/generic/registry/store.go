@@ -1027,41 +1027,27 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 		workersNumber = 1
 	}
 	wg := sync.WaitGroup{}
-	toProcess := make(chan int, 2*workersNumber)
 	errs := make(chan error, workersNumber+1)
-
-	go func() {
-		defer utilruntime.HandleCrash(func(panicReason interface{}) {
-			errs <- fmt.Errorf("DeleteCollection distributor panicked: %v", panicReason)
-		})
-		for i := 0; i < len(items); i++ {
-			toProcess <- i
-		}
-		close(toProcess)
-	}()
-
 	wg.Add(workersNumber)
 	for i := 0; i < workersNumber; i++ {
-		go func() {
+		go func(i int) {
 			// panics don't cross goroutine boundaries
 			defer utilruntime.HandleCrash(func(panicReason interface{}) {
 				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
 			})
 			defer wg.Done()
 
-			for index := range toProcess {
-				accessor, err := meta.Accessor(items[index])
-				if err != nil {
-					errs <- err
-					return
-				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
-					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
-					errs <- err
-					return
-				}
+			accessor, err := meta.Accessor(items[i])
+			if err != nil {
+				errs <- err
+				return
 			}
-		}()
+			if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
+				klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+				errs <- err
+				return
+			}
+		}(i)
 	}
 	wg.Wait()
 	select {
