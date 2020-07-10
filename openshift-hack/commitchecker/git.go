@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	MergeSummaryPattern    = regexp.MustCompile(`^Merge commit .*`)
 	UpstreamSummaryPattern = regexp.MustCompile(`^UPSTREAM: (revert: )?(([\w\.-]+\/[\w-\.-]+)?: )?(\d+:|<carry>:|<drop>:)`)
 	BumpSummaryPattern     = regexp.MustCompile(`^bump[\(\w].*`)
 
@@ -98,6 +99,10 @@ type Commit struct {
 	Description []string
 	Files       []File
 	Email       string
+}
+
+func (c Commit) MatchesMergeSummaryPattern() bool {
+	return MergeSummaryPattern.MatchString(c.Summary)
 }
 
 func (c Commit) MatchesUpstreamSummaryPattern() bool {
