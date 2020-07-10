@@ -523,6 +523,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.Cloud == nil {
 		if !cloudprovider.IsExternal(s.CloudProvider) {
+			cloudprovider.DeprecationWarningForProvider(s.CloudProvider)
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
