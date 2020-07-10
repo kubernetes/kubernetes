@@ -1649,6 +1649,39 @@ func (proxier *Proxier) writeIptablesRules() {
 		)
 	}
 
+	// Install the kubernetes-specific postrouting rules. We use a whole chain for
+	// this so that it is easier to flush and change, for example if the mark
+	// value should ever change.
+	// NB: THIS MUST MATCH the corresponding code in the kubelet
+	writeLine(proxier.natRules, []string{
+		"-A", string(kubePostroutingChain),
+		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
+		"-j", "RETURN",
+	}...)
+	// Clear the mark to avoid re-masquerading if the packet re-traverses the network stack.
+	writeLine(proxier.natRules, []string{
+		"-A", string(kubePostroutingChain),
+		// XOR proxier.masqueradeMark to unset it
+		"-j", "MARK", "--xor-mark", proxier.masqueradeMark,
+	}...)
+	masqRule := []string{
+		"-A", string(kubePostroutingChain),
+		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
+		"-j", "MASQUERADE",
+	}
+	if proxier.iptables.HasRandomFully() {
+		masqRule = append(masqRule, "--random-fully")
+	}
+	writeLine(proxier.natRules, masqRule...)
+
+	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
+	// this so that it is easier to flush and change, for example if the mark
+	// value should ever change.
+	writeLine(proxier.natRules, []string{
+		"-A", string(KubeMarkMasqChain),
+		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
+	}...)
+
 	// Write the end-of-table markers.
 	writeLine(proxier.filterRules, "COMMIT")
 	writeLine(proxier.natRules, "COMMIT")
@@ -1707,41 +1740,6 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 		}
 	}
 
-	// Install the kubernetes-specific postrouting rules. We use a whole chain for
-	// this so that it is easier to flush and change, for example if the mark
-	// value should ever change.
-	// NB: THIS MUST MATCH the corresponding code in the kubelet
-	writeLine(proxier.natRules, []string{
-		"-A", string(kubePostroutingChain),
-		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
-		"-j", "RETURN",
-	}...)
-	// Clear the mark to avoid re-masquerading if the packet re-traverses the network stack.
-	writeLine(proxier.natRules, []string{
-		"-A", string(kubePostroutingChain),
-		// XOR proxier.masqueradeMark to unset it
-		"-j", "MARK", "--xor-mark", proxier.masqueradeMark,
-	}...)
-	masqRule := []string{
-		"-A", string(kubePostroutingChain),
-		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-j", "MASQUERADE",
-	}
-	if proxier.iptables.HasRandomFully() {
-		masqRule = append(masqRule, "--random-fully")
-		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
-	} else {
-		klog.V(2).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
-	}
-	writeLine(proxier.natRules, masqRule...)
-
-	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
-	// this so that it is easier to flush and change, for example if the mark
-	// value should ever change.
-	writeLine(proxier.natRules, []string{
-		"-A", string(KubeMarkMasqChain),
-		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
-	}...)
 }
 
 // getExistingChains get iptables-save output so we can check for existing chains and rules.
