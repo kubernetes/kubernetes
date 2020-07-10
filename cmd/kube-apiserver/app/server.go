@@ -242,6 +242,8 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSHKey tunneler.InstallSSHKey
+
+		cloudprovider.DeprecationWarningForProvider(s.CloudProvider.CloudProvider)
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			return nil, nil, fmt.Errorf("cloud provider could not be initialized: %v", err)

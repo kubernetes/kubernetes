@@ -24,6 +24,7 @@ import (
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
+	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -78,6 +79,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointSliceControllerConfiguration holds configuration for
 	// EndpointSliceController related features.
 	EndpointSliceController endpointsliceconfig.EndpointSliceControllerConfiguration
+	// EndpointSliceMirroringControllerConfiguration holds configuration for
+	// EndpointSliceMirroringController related features.
+	EndpointSliceMirroringController endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration

@@ -196,9 +196,13 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
 	}
 
+	// Don't use the EndpointSliceMirroring controller to mirror this to
+	// EndpointSlices. This may change in the future.
+	skipMirrorChanged := setSkipMirrorTrue(e)
+
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
-	if formatCorrect && ipCorrect && portsCorrect {
+	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
 		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
 

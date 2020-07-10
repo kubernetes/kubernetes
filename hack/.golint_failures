@@ -60,6 +60,7 @@ pkg/controller/disruption
 pkg/controller/endpoint
 pkg/controller/endpoint/config/v1alpha1
 pkg/controller/endpointslice/config/v1alpha1
+pkg/controller/endpointslicemirroring/config/v1alpha1
 pkg/controller/garbagecollector
 pkg/controller/garbagecollector/config/v1alpha1
 pkg/controller/job/config/v1alpha1

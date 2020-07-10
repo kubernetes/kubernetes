@@ -56,6 +56,7 @@ go_library(
         "//pkg/controller/disruption:go_default_library",
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/controller/endpointslice:go_default_library",
+        "//pkg/controller/endpointslicemirroring:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/namespace:go_default_library",
