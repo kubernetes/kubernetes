@@ -19,12 +19,14 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
 	"sync"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -71,7 +73,8 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	proxyTransport             *http.Transport
+	// dialContext specifies the dial function for creating unencrypted TCP connections.
+	dialContext                func(ctx context.Context, network, address string) (net.Conn, error)
 	proxyCurrentCertKeyContent certKeyFunc
 	serviceResolver            ServiceResolver
 
@@ -111,8 +114,19 @@ func NewAvailableConditionController(
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
-		proxyTransport:             proxyTransport,
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
+	}
+
+	if egressSelector != nil {
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		var egressDialer utilnet.DialFunc
+		egressDialer, err := egressSelector.Lookup(networkContext)
+		if err != nil {
+			return nil, err
+		}
+		c.dialContext = egressDialer
+	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
+		c.dialContext = proxyTransport.DialContext
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -168,12 +182,12 @@ func (c *AvailableConditionController) sync(key string) error {
 		restConfig.TLSClientConfig.CertData = proxyClientCert
 		restConfig.TLSClientConfig.KeyData = proxyClientKey
 	}
-	if c.proxyTransport != nil && c.proxyTransport.DialContext != nil {
-		restConfig.Dial = c.proxyTransport.DialContext
+	if c.dialContext != nil {
+		restConfig.Dial = c.dialContext
 	}
 	restTransport, err := rest.TransportFor(restConfig)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	discoveryClient := &http.Client{
 		Transport: restTransport,
