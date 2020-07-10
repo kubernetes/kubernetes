@@ -661,13 +661,28 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	return true, nil
 }
 
-func (b *volumeBinder) isVolumeBound(namespace string, vol *v1.Volume) (bool, *v1.PersistentVolumeClaim, error) {
-	if vol.PersistentVolumeClaim == nil {
+func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, pvc *v1.PersistentVolumeClaim, err error) {
+	pvcName := ""
+	ephemeral := false
+	switch {
+	case vol.PersistentVolumeClaim != nil:
+		pvcName = vol.PersistentVolumeClaim.ClaimName
+	case vol.Ephemeral != nil &&
+		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
+		// Generic ephemeral inline volumes also use a PVC,
+		// just with a computed name, and...
+		pvcName = pod.Name + "-" + vol.Name
+		ephemeral = true
+	default:
 		return true, nil, nil
 	}
 
-	pvcName := vol.PersistentVolumeClaim.ClaimName
-	return b.isPVCBound(namespace, pvcName)
+	bound, pvc, err = b.isPVCBound(pod.Namespace, pvcName)
+	// ... the PVC must be owned by the pod.
+	if ephemeral && err == nil && pvc != nil && !metav1.IsControlledBy(pvc, pod) {
+		return false, nil, fmt.Errorf("PVC %s/%s is not owned by pod", pod.Namespace, pvcName)
+	}
+	return
 }
 
 func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.PersistentVolumeClaim, error) {
@@ -703,7 +718,7 @@ func (b *volumeBinder) isPVCFullyBound(pvc *v1.PersistentVolumeClaim) bool {
 // arePodVolumesBound returns true if all volumes are fully bound
 func (b *volumeBinder) arePodVolumesBound(pod *v1.Pod) bool {
 	for _, vol := range pod.Spec.Volumes {
-		if isBound, _, _ := b.isVolumeBound(pod.Namespace, &vol); !isBound {
+		if isBound, _, _ := b.isVolumeBound(pod, &vol); !isBound {
 			// Pod has at least one PVC that needs binding
 			return false
 		}
@@ -719,7 +734,7 @@ func (b *volumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 	unboundClaimsDelayBinding = []*v1.PersistentVolumeClaim{}
 
 	for _, vol := range pod.Spec.Volumes {
-		volumeBound, pvc, err := b.isVolumeBound(pod.Namespace, &vol)
+		volumeBound, pvc, err := b.isVolumeBound(pod, &vol)
 		if err != nil {
 			return nil, nil, nil, err
 		}

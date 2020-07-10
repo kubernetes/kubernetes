@@ -156,6 +156,28 @@ func (pw *prefixWriter) Flush() {
 	}
 }
 
+// nestedPrefixWriter implements PrefixWriter by increasing the level
+// before passing text on to some other writer.
+type nestedPrefixWriter struct {
+	PrefixWriter
+	indent int
+}
+
+var _ PrefixWriter = &prefixWriter{}
+
+// NewPrefixWriter creates a new PrefixWriter.
+func NewNestedPrefixWriter(out PrefixWriter, indent int) PrefixWriter {
+	return &nestedPrefixWriter{PrefixWriter: out, indent: indent}
+}
+
+func (npw *nestedPrefixWriter) Write(level int, format string, a ...interface{}) {
+	npw.PrefixWriter.Write(level+npw.indent, format, a...)
+}
+
+func (npw *nestedPrefixWriter) WriteLine(a ...interface{}) {
+	npw.PrefixWriter.Write(npw.indent, "%s", fmt.Sprintln(a...))
+}
+
 func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescriber, error) {
 	c, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
@@ -822,6 +844,8 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, w)
 		case volume.VolumeSource.PersistentVolumeClaim != nil:
 			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, w)
+		case volume.VolumeSource.Ephemeral != nil:
+			printEphemeralVolumeSource(volume.VolumeSource.Ephemeral, w)
 		case volume.VolumeSource.RBD != nil:
 			printRBDVolumeSource(volume.VolumeSource.RBD, w)
 		case volume.VolumeSource.Quobyte != nil:
@@ -1035,6 +1059,18 @@ func printPersistentVolumeClaimVolumeSource(claim *corev1.PersistentVolumeClaimV
 		"    ClaimName:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		claim.ClaimName, claim.ReadOnly)
+}
+
+func printEphemeralVolumeSource(ephemeral *corev1.EphemeralVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tEphemeralVolume (an inline specification for a volume that gets created and deleted with the pod)\n")
+	if ephemeral.VolumeClaimTemplate != nil {
+		printPersistentVolumeClaim(NewNestedPrefixWriter(w, LEVEL_2),
+			&corev1.PersistentVolumeClaim{
+				ObjectMeta: ephemeral.VolumeClaimTemplate.ObjectMeta,
+				Spec:       ephemeral.VolumeClaimTemplate.Spec,
+			}, false /* not a full PVC */)
+	}
+	w.Write(LEVEL_2, "ReadOnly:\t%v\n", ephemeral.ReadOnly)
 }
 
 func printRBDVolumeSource(rbd *corev1.RBDVolumeSource, w PrefixWriter) {
@@ -1535,39 +1571,7 @@ func getPvcs(volumes []corev1.Volume) []corev1.Volume {
 func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, mountPods []corev1.Pod) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetPersistentVolumeClaimClass(pvc))
-		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestampSince(*pvc.ObjectMeta.DeletionTimestamp))
-		} else {
-			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
-		}
-		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
-		printLabelsMultiline(w, "Labels", pvc.Labels)
-		printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
-		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
-		storage := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
-		capacity := ""
-		accessModes := ""
-		if pvc.Spec.VolumeName != "" {
-			accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
-			storage = pvc.Status.Capacity[corev1.ResourceStorage]
-			capacity = storage.String()
-		}
-		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
-		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
-		if pvc.Spec.VolumeMode != nil {
-			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
-		}
-		if pvc.Spec.DataSource != nil {
-			w.Write(LEVEL_0, "DataSource:\n")
-			if pvc.Spec.DataSource.APIGroup != nil {
-				w.Write(LEVEL_1, "APIGroup:\t%v\n", *pvc.Spec.DataSource.APIGroup)
-			}
-			w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
-			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
-		}
+		printPersistentVolumeClaim(w, pvc, true)
 		printPodsMultiline(w, "Mounted By", mountPods)
 
 		if len(pvc.Status.Conditions) > 0 {
@@ -1590,6 +1594,50 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 
 		return nil
 	})
+}
+
+// printPersistentVolumeClaim is used for both PVCs and PersistentVolumeClaimTemplate. For the latter,
+// we need to skip some fields which have no meaning.
+func printPersistentVolumeClaim(w PrefixWriter, pvc *corev1.PersistentVolumeClaim, isFullPVC bool) {
+	if isFullPVC {
+		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
+	}
+	w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetPersistentVolumeClaimClass(pvc))
+	if isFullPVC {
+		if pvc.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestampSince(*pvc.ObjectMeta.DeletionTimestamp))
+		} else {
+			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
+		}
+	}
+	w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
+	printLabelsMultiline(w, "Labels", pvc.Labels)
+	printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
+	if isFullPVC {
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
+	}
+	storage := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	capacity := ""
+	accessModes := ""
+	if pvc.Spec.VolumeName != "" {
+		accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
+		storage = pvc.Status.Capacity[corev1.ResourceStorage]
+		capacity = storage.String()
+	}
+	w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
+	w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
+	if pvc.Spec.VolumeMode != nil {
+		w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
+	}
+	if pvc.Spec.DataSource != nil {
+		w.Write(LEVEL_0, "DataSource:\n")
+		if pvc.Spec.DataSource.APIGroup != nil {
+			w.Write(LEVEL_1, "APIGroup:\t%v\n", *pvc.Spec.DataSource.APIGroup)
+		}
+		w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
+		w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
+	}
 }
 
 func describeContainers(label string, containers []corev1.Container, containerStatuses []corev1.ContainerStatus,
