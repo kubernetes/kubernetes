@@ -17,12 +17,21 @@ limitations under the License.
 package create
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -37,15 +46,42 @@ var (
 )
 
 // RoleBindingOpts holds the options for 'create rolebinding' sub command
-type RoleBindingOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+type RoleBindingOptions struct {
+	PrintFlags *genericclioptions.PrintFlags
+	PrintObj   func(obj runtime.Object) error
+
+	Name             string
+	Namespace        string
+	EnforceNamespace bool
+	ClusterRole      string
+	Role             string
+	Users            []string
+	Groups           []string
+	ServiceAccounts  []string
+	FieldManager     string
+	CreateAnnotation bool
+
+	Client         rbacclientv1.RbacV1Interface
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
+
+	genericclioptions.IOStreams
+}
+
+// NewRoleBindingOptions creates a new *RoleBindingOptions with sane defaults
+func NewRoleBindingOptions(ioStreams genericclioptions.IOStreams) *RoleBindingOptions {
+	return &RoleBindingOptions{
+		Users:           []string{},
+		Groups:          []string{},
+		ServiceAccounts: []string{},
+		PrintFlags:      genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:       ioStreams,
+	}
 }
 
 // NewCmdCreateRoleBinding returns an initialized Command instance for 'create rolebinding' sub command
 func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := &RoleBindingOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+	o := NewRoleBindingOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
@@ -55,50 +91,167 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 		Example:               roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	o.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.RoleBindingV1GeneratorName)
-	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
-	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
-	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
-	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the role")
-	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the role, in the format <namespace>:<name>")
-	cmdutil.AddFieldManagerFlagVar(cmd, &o.CreateSubcommandOptions.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().StringVar(&o.ClusterRole, "clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
+	cmd.Flags().StringVar(&o.Role, "role", "", i18n.T("Role this RoleBinding should reference"))
+	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role")
+	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the role")
+	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the role, in the format <namespace>:<name>")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
 // Complete completes all the required options
-func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+func (o *RoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+	o.Name, err = NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.Client, err = rbacclientv1.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
 
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.RoleBindingV1GeneratorName:
-		generator = &generateversioned.RoleBindingGeneratorV1{
-			Name:            name,
-			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
-			Role:            cmdutil.GetFlagString(cmd, "role"),
-			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
-			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
-			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
-		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
 	}
 
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicCient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicCient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
+	return nil
 }
 
-// Run calls the CreateSubcommandOptions.Run in RoleBindingOpts instance
-func (o *RoleBindingOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
+// Validate validates required fields are set
+func (o *RoleBindingOptions) Validate() error {
+	if len(o.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+	if (len(o.ClusterRole) == 0) == (len(o.Role) == 0) {
+		return fmt.Errorf("exactly one of clusterrole or role must be specified")
+	}
+	return nil
+}
+
+// Run performs the execution of 'create rolebinding' sub command
+func (o *RoleBindingOptions) Run() error {
+	roleBinding, err := o.createRoleBinding()
+	if err != nil {
+		return err
+	}
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, roleBinding, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(roleBinding.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		roleBinding, err = o.Client.RoleBindings(o.Namespace).Create(context.TODO(), roleBinding, createOptions)
+		if err != nil {
+			return fmt.Errorf("failed to create rolebinding: %v", err)
+		}
+	}
+	return o.PrintObj(roleBinding)
+}
+
+func (o *RoleBindingOptions) createRoleBinding() (*rbacv1.RoleBinding, error) {
+	namespace := ""
+	if o.EnforceNamespace {
+		namespace = o.Namespace
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "RoleBinding"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      o.Name,
+			Namespace: namespace,
+		},
+	}
+
+	switch {
+	case len(o.Role) > 0:
+		roleBinding.RoleRef = rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     o.Role,
+		}
+	case len(o.ClusterRole) > 0:
+		roleBinding.RoleRef = rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     o.ClusterRole,
+		}
+	}
+
+	for _, user := range o.Users {
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:     rbacv1.UserKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     user,
+		})
+	}
+
+	for _, group := range o.Groups {
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:     rbacv1.GroupKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     group,
+		})
+	}
+
+	for _, sa := range o.ServiceAccounts {
+		tokens := strings.Split(sa, ":")
+		if len(tokens) != 2 || tokens[0] == "" || tokens[1] == "" {
+			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
+		}
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
+			APIGroup:  "",
+			Namespace: tokens[0],
+			Name:      tokens[1],
+		})
+	}
+	return roleBinding, nil
 }
