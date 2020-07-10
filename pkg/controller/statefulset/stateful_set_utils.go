@@ -88,6 +88,10 @@ func getPodName(set *apps.StatefulSet, ordinal int) string {
 	return fmt.Sprintf("%s-%d", set.Name, ordinal)
 }
 
+func failedPodsBackOffKey(pod *v1.Pod) string {
+	return fmt.Sprintf("%s/%s/%s", pod.UID, pod.Name, pod.Status.NominatedNodeName)
+}
+
 // getPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a Pod with an ordinal index of ordinal. claim
 // must be a PersistentVolumeClaim from set's VolumeClaims template.
 func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {

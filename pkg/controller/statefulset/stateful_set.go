@@ -38,11 +38,17 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 
 	"k8s.io/klog/v2"
+)
+
+const (
+	// backOffGCInterval is the time that has to pass before next iteration of backoff GC is run
+	backOffGCInterval = 1 * time.Minute
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -86,6 +92,7 @@ func NewStatefulSetController(
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 
+	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset")
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
 		control: NewDefaultStatefulSetControl(
@@ -96,11 +103,13 @@ func NewStatefulSetController(
 				pvcInformer.Lister(),
 				recorder),
 			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
+			queue,
 			history.NewHistory(kubeClient, revInformer.Lister()),
+			flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
 			recorder,
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+		queue:           queue,
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
 		revListerSynced: revInformer.Informer().HasSynced,
@@ -153,6 +162,8 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(ssc.worker, time.Second, stopCh)
 	}
+
+	go wait.Until(ssc.control.podBackOffGC, backOffGCInterval, stopCh)
 
 	<-stopCh
 }

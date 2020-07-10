@@ -21,17 +21,20 @@ import (
 	"encoding/json"
 	"sort"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
@@ -666,7 +669,8 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
 	recorder := record.NewFakeRecorder(10)
-	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh, recorder)
+	fakeBackOff := flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock.NewFakeClock(time.Now()))
+	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssc.queue, ssh, fakeBackOff, recorder)
 
 	return ssc, fpc, ssh
 }

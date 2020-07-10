@@ -33,6 +33,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -43,6 +44,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -51,11 +54,18 @@ import (
 type invariantFunc func(set *apps.StatefulSet, spc *fakeStatefulPodControl) error
 
 func setupController(client clientset.Interface) (*fakeStatefulPodControl, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface, chan struct{}) {
+	return setupControllerWithClock(client, clock.NewFakeClock(time.Now()))
+}
+
+func setupControllerWithClock(client clientset.Interface, clock *clock.FakeClock) (*fakeStatefulPodControl, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface, chan struct{}) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets(), informerFactory.Apps().V1().ControllerRevisions())
 	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 	recorder := record.NewFakeRecorder(10)
-	ssc := NewDefaultStatefulSetControl(spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
+	fakeHistory := history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions())
+	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset")
+	fakeBackOff := flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock)
+	ssc := NewDefaultStatefulSetControl(spc, ssu, queue, fakeHistory, fakeBackOff, recorder)
 
 	stop := make(chan struct{})
 	informerFactory.Start(stop)
@@ -398,7 +408,8 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 
 func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client)
+	fakeClock := clock.NewFakeClock(time.Now())
+	spc, _, ssc, stop := setupControllerWithClock(client, fakeClock)
 	defer close(stop)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -421,6 +432,7 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	}
 	pods[0].Status.Phase = v1.PodFailed
 	spc.podsIndexer.Update(pods[0])
+	failedPodName := pods[0].Name
 	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSet failed to %s", err)
@@ -428,6 +440,8 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	if err := invariants(set, spc); err != nil {
 		t.Error(err)
 	}
+
+	// Failed pod in backoff duration.
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
@@ -438,9 +452,35 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	if err != nil {
 		t.Error(err)
 	}
-	if isCreated(pods[0]) {
+	pod := findPodByName(pods, failedPodName)
+	if !isFailed(pod) {
 		t.Error("StatefulSet did not recreate failed Pod")
 	}
+
+	// backoff period passed.
+	fakeClock.Sleep(time.Second)
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := invariants(set, spc); err != nil {
+		t.Error(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if isCreated(findPodByName(pods, failedPodName)) {
+		t.Error("StatefulSet did not recreate failed Pod")
+	}
+}
+
+func findPodByName(pods []*v1.Pod, podName string) *v1.Pod {
+	for i := range pods {
+		if pods[i].Name == podName {
+			return pods[i]
+		}
+	}
+	return nil
 }
 
 func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
@@ -497,8 +537,10 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets(), informerFactory.Apps().V1().ControllerRevisions())
 		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
+		queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset")
+		fakeBackOff := flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock.NewFakeClock(time.Now()))
 		recorder := record.NewFakeRecorder(10)
-		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
+		ssc := defaultStatefulSetControl{spc, ssu, queue, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder, fakeBackOff}
 
 		stop := make(chan struct{})
 		defer close(stop)

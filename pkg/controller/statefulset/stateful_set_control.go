@@ -17,15 +17,21 @@ limitations under the License.
 package statefulset
 
 import (
+	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -44,6 +50,8 @@ type StatefulSetControlInterface interface {
 	// AdoptOrphanRevisions adopts any orphaned ControllerRevisions that match set's Selector. If all adoptions are
 	// successful the returned error is nil.
 	AdoptOrphanRevisions(set *apps.StatefulSet, revisions []*apps.ControllerRevision) error
+	// failedPodsBackoff begin GC.
+	podBackOffGC()
 }
 
 // NewDefaultStatefulSetControl returns a new instance of the default implementation StatefulSetControlInterface that
@@ -54,16 +62,34 @@ type StatefulSetControlInterface interface {
 func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
 	statusUpdater StatefulSetStatusUpdaterInterface,
+	queue workqueue.RateLimitingInterface,
 	controllerHistory history.Interface,
+	failedPodsBackoff *flowcontrol.Backoff,
 	recorder record.EventRecorder) StatefulSetControlInterface {
-	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder}
+	return &defaultStatefulSetControl{podControl, statusUpdater, queue, controllerHistory, recorder, failedPodsBackoff}
 }
 
 type defaultStatefulSetControl struct {
 	podControl        StatefulPodControlInterface
 	statusUpdater     StatefulSetStatusUpdaterInterface
+	queue             workqueue.RateLimitingInterface
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
+	failedPodsBackoff *flowcontrol.Backoff
+}
+
+// enqueueStatefulSetAfter enqueues the given statefulset in the work queue, after a duration.
+func (ssc *defaultStatefulSetControl) enqueueStatefulSetAfter(obj interface{}, after time.Duration) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	ssc.queue.AddAfter(key, after)
+}
+
+func (ssc *defaultStatefulSetControl) podBackOffGC() {
+	ssc.failedPodsBackoff.GC()
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -388,6 +414,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range replicas {
 		// delete and recreate failed pods
 		if isFailed(replicas[i]) {
+			// This is a critical place where StatefulSet is often fighting with kubelet that rejects pods.
+			// We need to avoid hot looping and backoff.
+			backOffKey := failedPodsBackOffKey(replicas[i])
+
+			now := ssc.failedPodsBackoff.Clock.Now()
+			inBackoff := ssc.failedPodsBackoff.IsInBackOffSinceUpdate(backOffKey, now)
+			if inBackoff {
+				delay := ssc.failedPodsBackoff.Get(backOffKey)
+				klog.V(4).Infof("Deleting failed pod %s/%s has been limited by backoff - %v remaining",
+					replicas[i].Namespace, replicas[i].Name, delay)
+				ssc.enqueueStatefulSetAfter(replicas[i], delay)
+				continue
+			}
+			ssc.failedPodsBackoff.Next(backOffKey, now)
+
 			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
 				"StatefulSet %s/%s is recreating failed Pod %s",
 				set.Namespace,
