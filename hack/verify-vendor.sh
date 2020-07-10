@@ -86,8 +86,12 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     ret=1
   fi
 
+  # Given that we don't intend to publish staging repos from our fork,
+  # it does not seem necessary to ensure that dependencies will match
+  # across staging repos when published.
+  #
   # Verify we are pinned to matching levels
-  hack/lint-dependencies.sh >&2
+  #hack/lint-dependencies.sh >&2
 popd > /dev/null 2>&1
 
 if [[ ${ret} -gt 0 ]]; then
