@@ -709,7 +709,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		if err != nil {
 			return nil, err
 		}
-		if allocateRemainingFrom(preferred.Intersection(aligned.Union(allocated))) {
+		if allocateRemainingFrom(preferred.Intersection(aligned)) {
 			return allocated, nil
 		}
 		// Then fallback to allocate from the aligned set if no preferred list
@@ -730,11 +730,11 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 
 	// Then give the plugin the chance to influence the decision on any
 	// remaining devices to allocate.
-	preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, available.Union(devices), devices, required)
+	preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, available.Union(allocated), allocated, required)
 	if err != nil {
 		return nil, err
 	}
-	if allocateRemainingFrom(preferred.Intersection(available.Union(allocated))) {
+	if allocateRemainingFrom(preferred.Intersection(available)) {
 		return allocated, nil
 	}
 
@@ -997,8 +997,10 @@ func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, re
 	if err != nil {
 		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %v", err)
 	}
-	// TODO: Add metrics support for init RPC
-	return sets.NewString(resp.ContainerResponses[0].DeviceIDs...), nil
+	if resp != nil && len(resp.ContainerResponses) > 0 {
+		return sets.NewString(resp.ContainerResponses[0].DeviceIDs...), nil
+	}
+	return sets.NewString(), nil
 }
 
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager

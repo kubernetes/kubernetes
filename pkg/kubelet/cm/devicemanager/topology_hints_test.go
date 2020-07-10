@@ -791,3 +791,192 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPreferredAllocationParameters(t *testing.T) {
+	tcases := []struct {
+		description         string
+		resource            string
+		request             int
+		allDevices          []pluginapi.Device
+		allocatedDevices    []string
+		reusableDevices     []string
+		hint                topologymanager.TopologyHint
+		expectedAvailable   []string
+		expectedMustInclude []string
+		expectedSize        int
+	}{
+		{
+			description: "Request for 1, socket 0, 0 already allocated, 0 reusable",
+			resource:    "resource",
+			request:     1,
+			allDevices: []pluginapi.Device{
+				makeNUMADevice("Dev0", 0),
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 0),
+				makeNUMADevice("Dev3", 0),
+			},
+			allocatedDevices: []string{},
+			reusableDevices:  []string{},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAvailable:   []string{"Dev0", "Dev1", "Dev2", "Dev3"},
+			expectedMustInclude: []string{},
+			expectedSize:        1,
+		},
+		{
+			description: "Request for 4, socket 0, 2 already allocated, 2 reusable",
+			resource:    "resource",
+			request:     4,
+			allDevices: []pluginapi.Device{
+				makeNUMADevice("Dev0", 0),
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 0),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 0),
+				makeNUMADevice("Dev5", 0),
+				makeNUMADevice("Dev6", 0),
+				makeNUMADevice("Dev7", 0),
+			},
+			allocatedDevices: []string{"Dev0", "Dev5"},
+			reusableDevices:  []string{"Dev0", "Dev5"},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAvailable:   []string{"Dev0", "Dev1", "Dev2", "Dev3", "Dev4", "Dev5", "Dev6", "Dev7"},
+			expectedMustInclude: []string{"Dev0", "Dev5"},
+			expectedSize:        4,
+		},
+		{
+			description: "Request for 4, socket 0, 4 already allocated, 2 reusable",
+			resource:    "resource",
+			request:     4,
+			allDevices: []pluginapi.Device{
+				makeNUMADevice("Dev0", 0),
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 0),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 0),
+				makeNUMADevice("Dev5", 0),
+				makeNUMADevice("Dev6", 0),
+				makeNUMADevice("Dev7", 0),
+			},
+			allocatedDevices: []string{"Dev0", "Dev5", "Dev4", "Dev1"},
+			reusableDevices:  []string{"Dev0", "Dev5"},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAvailable:   []string{"Dev0", "Dev2", "Dev3", "Dev5", "Dev6", "Dev7"},
+			expectedMustInclude: []string{"Dev0", "Dev5"},
+			expectedSize:        4,
+		},
+		{
+			description: "Request for 6, multisocket, 2 already allocated, 2 reusable",
+			resource:    "resource",
+			request:     6,
+			allDevices: []pluginapi.Device{
+				makeNUMADevice("Dev0", 0),
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 0),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 1),
+				makeNUMADevice("Dev5", 1),
+				makeNUMADevice("Dev6", 1),
+				makeNUMADevice("Dev7", 1),
+			},
+			allocatedDevices: []string{"Dev1", "Dev6"},
+			reusableDevices:  []string{"Dev1", "Dev6"},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAvailable:   []string{"Dev0", "Dev1", "Dev2", "Dev3", "Dev4", "Dev5", "Dev6", "Dev7"},
+			expectedMustInclude: []string{"Dev0", "Dev1", "Dev2", "Dev3", "Dev6"},
+			expectedSize:        6,
+		},
+		{
+			description: "Request for 6, multisocket, 4 already allocated, 2 reusable",
+			resource:    "resource",
+			request:     6,
+			allDevices: []pluginapi.Device{
+				makeNUMADevice("Dev0", 0),
+				makeNUMADevice("Dev1", 0),
+				makeNUMADevice("Dev2", 0),
+				makeNUMADevice("Dev3", 0),
+				makeNUMADevice("Dev4", 1),
+				makeNUMADevice("Dev5", 1),
+				makeNUMADevice("Dev6", 1),
+				makeNUMADevice("Dev7", 1),
+			},
+			allocatedDevices: []string{"Dev0", "Dev1", "Dev6", "Dev7"},
+			reusableDevices:  []string{"Dev1", "Dev6"},
+			hint: topologymanager.TopologyHint{
+				NUMANodeAffinity: makeSocketMask(0),
+				Preferred:        true,
+			},
+			expectedAvailable:   []string{"Dev1", "Dev2", "Dev3", "Dev4", "Dev5", "Dev6"},
+			expectedMustInclude: []string{"Dev1", "Dev2", "Dev3", "Dev6"},
+			expectedSize:        6,
+		},
+	}
+	for _, tc := range tcases {
+		m := ManagerImpl{
+			allDevices:            make(map[string]map[string]pluginapi.Device),
+			healthyDevices:        make(map[string]sets.String),
+			allocatedDevices:      make(map[string]sets.String),
+			endpoints:             make(map[string]endpointInfo),
+			podDevices:            make(podDevices),
+			sourcesReady:          &sourcesReadyStub{},
+			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+			topologyAffinityStore: &mockAffinityStore{tc.hint},
+		}
+
+		m.allDevices[tc.resource] = make(map[string]pluginapi.Device)
+		m.healthyDevices[tc.resource] = sets.NewString()
+		for _, d := range tc.allDevices {
+			m.allDevices[tc.resource][d.ID] = d
+			m.healthyDevices[tc.resource].Insert(d.ID)
+		}
+
+		m.allocatedDevices[tc.resource] = sets.NewString()
+		for _, d := range tc.allocatedDevices {
+			m.allocatedDevices[tc.resource].Insert(d)
+		}
+
+		actualAvailable := []string{}
+		actualMustInclude := []string{}
+		actualSize := 0
+		m.endpoints[tc.resource] = endpointInfo{
+			e: &MockEndpoint{
+				getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+					actualAvailable = append(actualAvailable, available...)
+					actualMustInclude = append(actualMustInclude, mustInclude...)
+					actualSize = size
+					return nil, nil
+				},
+			},
+			opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
+		}
+
+		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.NewString(tc.reusableDevices...))
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+
+		if !sets.NewString(actualAvailable...).Equal(sets.NewString(tc.expectedAvailable...)) {
+			t.Errorf("%v. expected available: %v but got: %v", tc.description, tc.expectedAvailable, actualAvailable)
+		}
+
+		if !sets.NewString(actualAvailable...).Equal(sets.NewString(tc.expectedAvailable...)) {
+			t.Errorf("%v. expected mustInclude: %v but got: %v", tc.description, tc.expectedMustInclude, actualMustInclude)
+		}
+
+		if actualSize != tc.expectedSize {
+			t.Errorf("%v. expected size: %v but got: %v", tc.description, tc.expectedSize, actualSize)
+		}
+	}
+}
