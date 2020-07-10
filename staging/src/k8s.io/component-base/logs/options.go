@@ -34,8 +34,8 @@ const (
 
 // List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
 var supportedLogsFlags = map[string]struct{}{
-	"v":       {},
-	"vmodule": {},
+	"v": {},
+	// TODO: support vmodule after 1.19 Alpha
 }
 
 // Options has klog format parameters
