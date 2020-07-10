@@ -585,7 +585,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
         ttl 30
     }
     prometheus :9153
-    forward . /etc/resolv.conf
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
     cache 30
     loop
     reload
@@ -623,7 +625,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
         fallthrough in-addr.arpa ip6.arpa
     }
     prometheus :9153
-    forward . /etc/resolv.conf
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
     k8s_external example.com
     cache 30
     loop
