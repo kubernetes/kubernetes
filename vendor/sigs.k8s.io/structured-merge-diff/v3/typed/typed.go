@@ -61,6 +61,11 @@ type TypedValue struct {
 	schema  *schema.Schema
 }
 
+// TypeRef is the type of the value.
+func (tv TypedValue) TypeRef() schema.TypeRef {
+	return tv.typeRef
+}
+
 // AsValue removes the type from the TypedValue and only keeps the value.
 func (tv TypedValue) AsValue() value.Value {
 	return tv.value
@@ -290,4 +295,16 @@ func (c *Comparison) String() string {
 		bld.WriteString(fmt.Sprintf("- Removed Fields:\n%v\n", c.Removed))
 	}
 	return bld.String()
+}
+
+// ExcludeFields fields from the compare recursively removes the fields
+// from the entire comparison
+func (c *Comparison) ExcludeFields(fields *fieldpath.Set) *Comparison {
+	if fields == nil || fields.Empty() {
+		return c
+	}
+	c.Removed = c.Removed.RecursiveDifference(fields)
+	c.Modified = c.Modified.RecursiveDifference(fields)
+	c.Added = c.Added.RecursiveDifference(fields)
+	return c
 }

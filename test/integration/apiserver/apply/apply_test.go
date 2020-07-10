@@ -30,6 +30,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -295,28 +296,28 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		"kind": "Deployment",
 		"metadata": {
 			"name": "deployment",
-                        "labels": {"app": "nginx"}
+			"labels": {"app": "nginx"}
 		},
 		"spec": {
-                        "replicas": 3,
-                        "selector": {
-                                "matchLabels": {
-                                         "app": "nginx"
-                                }
-                        },
-                        "template": {
-                                "metadata": {
-                                        "labels": {
-                                                "app": "nginx"
-                                        }
-                                },
-                                "spec": {
-				        "containers": [{
-					        "name":  "nginx",
-					        "image": "nginx:latest"
-				        }]
-                                }
-                        }
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
 		}
 	}`)
 
@@ -1649,6 +1650,467 @@ func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 
 	if labels := accessor.GetLabels(); len(labels) < 1 {
 		t.Fatalf("Expected other fields to stay untouched, got: %v", object)
+	}
+}
+
+// TestApplyUnsetExclusivelyOwnedFields verifies that when owned fields are omitted from an applied
+// configuration, and no other managers own the field, it is removed.
+func TestApplyUnsetExclusivelyOwnedFields(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// spec.replicas is a optional, defaulted field
+	// spec.template.spec.hostname is an optional, non-defaulted field
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-exclusive-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"hostname": "test-hostname",
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-exclusive-unset").
+		Param("fieldManager", "apply_test").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// unset spec.replicas and spec.template.spec.hostname
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-exclusive-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-exclusive-unset").
+		Param("fieldManager", "apply_test").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 1 {
+		t.Errorf("Expected deployment.spec.replicas to be 1 (default value), but got %d", deployment.Spec.Replicas)
+	}
+	if len(deployment.Spec.Template.Spec.Hostname) != 0 {
+		t.Errorf("Expected deployment.spec.template.spec.hostname to be unset, but got %s", deployment.Spec.Template.Spec.Hostname)
+	}
+}
+
+// TestApplyUnsetSharedFields verifies that when owned fields are omitted from an applied
+// configuration, but other managers also own the field, is it not removed.
+func TestApplyUnsetSharedFields(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// spec.replicas is a optional, defaulted field
+	// spec.template.spec.hostname is an optional, non-defaulted field
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"hostname": "test-hostname",
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	for _, fieldManager := range []string{"shared_owner_1", "shared_owner_2"} {
+		_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+			AbsPath("/apis/apps/v1").
+			Namespace("default").
+			Resource("deployments").
+			Name("deployment-shared-unset").
+			Param("fieldManager", fieldManager).
+			Body(apply).
+			Do(context.TODO()).
+			Get()
+		if err != nil {
+			t.Fatalf("Failed to create object using Apply patch: %v", err)
+		}
+	}
+
+	// unset spec.replicas and spec.template.spec.hostname
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-unset").
+		Param("fieldManager", "shared_owner_1").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 3 {
+		t.Errorf("Expected deployment.spec.replicas to be 3, but got %d", deployment.Spec.Replicas)
+	}
+	if deployment.Spec.Template.Spec.Hostname != "test-hostname" {
+		t.Errorf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
+	}
+}
+
+// TestApplyCanTransferFieldOwnershipToController verifies that when an applier creates an
+// object, a controller takes ownership of a field, and the applier
+// then omits the field from its applied configuration, that the field value persists.
+func TestApplyCanTransferFieldOwnershipToController(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Applier creates a deployment with replicas set to 3
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	appliedObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// a controller takes over the replicas field
+	applied, ok := appliedObj.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	replicas := int32(4)
+	applied.Spec.Replicas = &replicas
+	_, err = client.AppsV1().Deployments("default").
+		Update(context.TODO(), applied, metav1.UpdateOptions{FieldManager: "test_updater"})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// applier omits replicas
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// ensure the container is deleted even though a controller updated a field of the container
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 4 {
+		t.Errorf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
+	}
+}
+
+// TestApplyCanRemoveMapItemsContributedToByControllers verifies that when an applier creates an
+// object, a controller modifies the contents of the map item via update, and the applier
+// then omits the item from its applied configuration, that the item is removed.
+func TestApplyCanRemoveMapItemsContributedToByControllers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Applier creates a deployment with a name=nginx container
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	appliedObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// a controller sets container.workingDir of the name=nginx container via an update
+	applied, ok := appliedObj.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	applied.Spec.Template.Spec.Containers[0].WorkingDir = "/home/replacement"
+	_, err = client.AppsV1().Deployments("default").
+		Update(context.TODO(), applied, metav1.UpdateOptions{FieldManager: "test_updater"})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// applier removes name=nginx the container
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"hostname": "test-hostname",
+					"containers": [{
+						"name":  "other-container",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// ensure the container is deleted even though a controller updated a field of the container
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Fatalf("Expected 1 container after apply, got %d", len(deployment.Spec.Template.Spec.Containers))
+	}
+	if deployment.Spec.Template.Spec.Containers[0].Name != "other-container" {
+		t.Fatalf("Expected container to be named \"other-container\" but got %s", deployment.Spec.Template.Spec.Containers[0].Name)
 	}
 }
 
