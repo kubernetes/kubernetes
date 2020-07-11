@@ -16,6 +16,15 @@ spec:
         role: primary
         tier: backend
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: agnhost
+                role: replica
+                tier: backend
+            topologyKey: kubernetes.io/hostname
       containers:
       - name: primary
         image: {{.AgnhostImage}}
