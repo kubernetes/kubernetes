@@ -10,11 +10,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/metrics/collectors",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/stats/v1alpha1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
@@ -28,10 +28,10 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/server/stats/testing:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/stats/v1alpha1:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
     ],
 )

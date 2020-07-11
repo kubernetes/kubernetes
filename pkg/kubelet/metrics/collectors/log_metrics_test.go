@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/component-base/metrics/testutil"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 func TestNoMetricsCollected(t *testing.T) {
