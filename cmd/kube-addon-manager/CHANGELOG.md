@@ -1,3 +1,6 @@
+## Version 10.0.0 (Fri July 17 2020 Jake Sanders <jsand@google.com>)
+ - Re-implement addon-manager.sh in Go, add unit tests.
+
 ## Version 9.1.1 (Wed May 19 2020 Antoni Zawodny <zawodny@google.com>)
  - Fix kube-addons.sh and kubectl permissions
 

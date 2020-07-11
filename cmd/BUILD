@@ -22,6 +22,7 @@ filegroup(
         "//cmd/genutils:all-srcs",
         "//cmd/genyaml:all-srcs",
         "//cmd/importverifier:all-srcs",
+        "//cmd/kube-addon-manager:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",
         "//cmd/kube-proxy:all-srcs",
