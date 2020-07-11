@@ -362,8 +362,7 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
-	podInformer coreinformers.PodInformer,
-) {
+	podInformer coreinformers.PodInformer) {
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
