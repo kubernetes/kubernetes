@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 

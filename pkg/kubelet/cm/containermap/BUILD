@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["container_map.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cm/containermap",
     visibility = ["//visibility:public"],
 )
 

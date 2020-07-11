@@ -15,7 +15,7 @@ go_library(
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
         "//pkg/kubelet/checkpointmanager/errors:go_default_library",
-        "//pkg/kubelet/cm/cpumanager/containermap:go_default_library",
+        "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
@@ -32,7 +32,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/checkpointmanager:go_default_library",
-        "//pkg/kubelet/cm/cpumanager/containermap:go_default_library",
+        "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state/testing:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
