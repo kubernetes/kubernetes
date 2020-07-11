@@ -2176,7 +2176,7 @@ func TestPreempt(t *testing.T) {
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				true)
 			state := framework.NewCycleState()
-			scheduler.(*genericScheduler).snapshot()
+			scheduler.Snapshot()
 			// Call Preempt and check the expected results.
 			failedPredMap := defaultFailedPredMap
 			if test.failedPredMap != nil {
