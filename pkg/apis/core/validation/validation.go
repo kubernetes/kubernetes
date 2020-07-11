@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/miekg/dns"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -2930,6 +2931,17 @@ func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *fie
 	return allErrs
 }
 
+// Validate domain name, note this is a looser check than ValidateDNS1123Subdomain
+// which does ensure valid DNS names but is more restrictive than DNS.
+func validateDomainName(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	_, d := dns.IsDomainName(value)
+	if !d {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, fmt.Sprintf("not a valid domain name: %s", value)))
+	}
+	return allErrs
+}
+
 func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -2966,7 +2978,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			if strings.HasSuffix(search, ".") {
 				search = search[0 : len(search)-1]
 			}
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+			allErrs = append(allErrs, validateDomainName(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {

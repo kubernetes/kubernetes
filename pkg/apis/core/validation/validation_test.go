@@ -6535,9 +6535,12 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			desc: "invalid search path",
+			desc: "invalid search path: more than 63 characters in DNS label",
 			dnsConfig: &core.PodDNSConfig{
-				Searches: []string{"custom?"},
+				Searches: []string{
+					generateTestSearchPathFunc(2),
+					generateTestSearchPathFunc(64),
+				},
 			},
 			expectedError: true,
 		},
