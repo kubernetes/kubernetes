@@ -745,3 +745,58 @@ func setHostnameAsFQDNInUse(podSpec *api.PodSpec) bool {
 	}
 	return *podSpec.SetHostnameAsFQDN
 }
+
+// SeccompAnnotationForField takes a pod seccomp profile field and returns the
+// converted annotation value
+func SeccompAnnotationForField(field *api.SeccompProfile) string {
+	// If only seccomp fields are specified, add the corresponding annotations.
+	// This ensures that the fields are enforced even if the node version
+	// trails the API version
+	switch field.Type {
+	case api.SeccompProfileTypeUnconfined:
+		return v1.SeccompProfileNameUnconfined
+
+	case api.SeccompProfileTypeRuntimeDefault:
+		return v1.SeccompProfileRuntimeDefault
+
+	case api.SeccompProfileTypeLocalhost:
+		if field.LocalhostProfile != nil {
+			return v1.SeccompLocalhostProfileNamePrefix + *field.LocalhostProfile
+		}
+	}
+
+	// we can only reach this code path if the LocalhostProfile is nil but the
+	// provided field type is SeccompProfileTypeLocalhost or if an unrecognized
+	// type is specified
+	return ""
+}
+
+// SeccompFieldForAnnotation takes a pod annotation and returns the converted
+// seccomp profile field.
+func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
+	// If only seccomp annotations are specified, copy the values into the
+	// corresponding fields. This ensures that existing applications continue
+	// to enforce seccomp, and prevents the kubelet from needing to resolve
+	// annotations & fields.
+	if annotation == v1.SeccompProfileNameUnconfined {
+		return &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
+	}
+
+	if annotation == api.SeccompProfileRuntimeDefault || annotation == api.DeprecatedSeccompProfileDockerDefault {
+		return &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix)
+		if localhostProfile != "" {
+			return &api.SeccompProfile{
+				Type:             api.SeccompProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
+}
