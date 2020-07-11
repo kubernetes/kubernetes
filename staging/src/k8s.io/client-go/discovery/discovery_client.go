@@ -349,7 +349,6 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 	failedGroups := make(map[schema.GroupVersion]error)
 
 	wg := &sync.WaitGroup{}
-	resultLock := &sync.Mutex{}
 	for _, apiGroup := range apiGroups.Groups {
 		for _, version := range apiGroup.Versions {
 			groupVersion := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
@@ -359,10 +358,6 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 				defer utilruntime.HandleCrash()
 
 				apiResourceList, err := d.ServerResourcesForGroupVersion(groupVersion.String())
-
-				// lock to record results
-				resultLock.Lock()
-				defer resultLock.Unlock()
 
 				if err != nil {
 					// TODO: maybe restrict this to NotFound errors
