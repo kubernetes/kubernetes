@@ -167,10 +167,6 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	cc.queue.Add(key)
 }
 
-// maybeSignCertificate will inspect the certificate request and, if it has
-// been approved and meets policy expectations, generate an X509 cert using the
-// cluster CA assets. If successful it will update the CSR approve subresource
-// with the signed certificate.
 func (cc *CertificateController) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
