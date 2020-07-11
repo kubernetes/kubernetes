@@ -123,6 +123,14 @@ var (
 		},
 		[]string{"requestKind"},
 	)
+	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
+	TLSHandshakeErrors = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_tls_handshake_errors_total",
+			Help:           "Number of requests dropped with 'TLS handshake error from' error",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
 	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
 	RegisteredWatchers = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -177,6 +185,7 @@ var (
 		requestLatencies,
 		responseSizes,
 		DroppedRequests,
+		TLSHandshakeErrors,
 		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
