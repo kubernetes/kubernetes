@@ -272,7 +272,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 						// create the pod, capture the change events, then delete the pod
 						start := time.Now()
 						created := podClient.Create(pod)
-						ch := make(chan []watch.Event, 1)
+						ch := make(chan []watch.Event)
+						numEvents := 0
 						go func() {
 							defer close(ch)
 							w, err := podClient.Watch(context.TODO(), metav1.ListOptions{
@@ -298,6 +299,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 								}
 							}
 							ch <- events
+							numEvents = len(events)
 						}()
 
 						t := time.Duration(rand.Intn(delay)) * time.Millisecond
@@ -319,6 +321,11 @@ var _ = SIGDescribe("Pods Extended", func() {
 							}
 						case <-time.After(5 * time.Minute):
 							framework.Failf("timed out waiting for watch events for %s", pod.Name)
+							// Iterate over the events and stop them to avoid leak
+							for i := 0; i < numEvents; i++ {
+								w := <-ch
+								w.Stop()
+							}
 						}
 
 						end := time.Now()
