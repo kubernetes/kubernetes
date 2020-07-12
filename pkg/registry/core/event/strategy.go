@@ -104,6 +104,10 @@ func Matcher(label labels.Selector, field fields.Selector) storage.SelectionPred
 // ToSelectableFields returns a field set that represents the object.
 func ToSelectableFields(event *api.Event) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&event.ObjectMeta, true)
+	source := event.Source.Component
+	if source == "" {
+		source = event.ReportingController
+	}
 	specificFieldsSet := fields.Set{
 		"involvedObject.kind":            event.InvolvedObject.Kind,
 		"involvedObject.namespace":       event.InvolvedObject.Namespace,
@@ -113,7 +117,8 @@ func ToSelectableFields(event *api.Event) fields.Set {
 		"involvedObject.resourceVersion": event.InvolvedObject.ResourceVersion,
 		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
 		"reason":                         event.Reason,
-		"source":                         event.Source.Component,
+		"reportingComponent":             event.ReportingController, // use the core/v1 field name
+		"source":                         source,
 		"type":                           event.Type,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
