@@ -213,6 +213,13 @@ func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	}
 }
 
+// SkipUnlessNodeOSArchIs skips if the node OS distro is not included in the supportedNodeOsArchs.
+func SkipUnlessNodeOSArchIs(supportedNodeOsArchs ...string) {
+	if !framework.NodeOSArchIs(supportedNodeOsArchs...) {
+		skipInternalf(1, "Only supported for node OS arch %v (not %s)", supportedNodeOsArchs, framework.TestContext.NodeOSArch)
+	}
+}
+
 // SkipIfNodeOSDistroIs skips if the node OS distro is included in the unsupportedNodeOsDistros.
 func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
 	if framework.NodeOSDistroIs(unsupportedNodeOsDistros...) {
