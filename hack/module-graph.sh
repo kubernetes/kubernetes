@@ -54,6 +54,7 @@ kubernetes_dependencies()
 	go mod graph | grep -E "^.*k8s.io.*k8s.io.*$" | sed -E 's|@\S+ | |g' | sed -E 's|@\S+$||g' | sed -E 's/[\.\/\-]/_/g' | sort | uniq | sed -E 's| | -> |g' | sed -E 's|^|    |g' >> _output/module-dependencies.dot || error_exit "Failed to generate kubernetes dependencies in DOT file"
 }
 
+mkdir -p _output
 echo "digraph module_dependencies {" > _output/module-dependencies.dot || error_exit "Failed to open DOT file"
 if [[ -n "$1" && $1 == "staging" ]]; then
 	echo "Generating just staging modules"
