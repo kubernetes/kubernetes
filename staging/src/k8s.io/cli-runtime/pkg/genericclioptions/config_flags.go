@@ -52,12 +52,11 @@ const (
 	flagUsername         = "username"
 	flagPassword         = "password"
 	flagTimeout          = "request-timeout"
-	flagHTTPCacheDir     = "cache-dir"
+	flagCacheDir         = "cache-dir"
 )
 
 var (
-	defaultCacheDir                = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
-	defaultDiscoveryCacheParentDir = filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery")
+	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "cache")
 )
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
@@ -227,19 +226,15 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = 100
 
-	httpCacheDir, discoveryCacheParentDir := defaultCacheDir, defaultDiscoveryCacheParentDir
+	cacheDir := defaultCacheDir
 
 	// retrieve a user-provided value for the "cache-dir"
 	// override httpCacheDir and discoveryCacheDir if user-value is given.
 	if f.CacheDir != nil {
-		httpCacheDir = *f.CacheDir
-		if len(httpCacheDir) > 0 {
-			// override discoveryCacheDir default value so that server resources and http-cache data are stored in the same location
-			discoveryCacheParentDir = filepath.Join(filepath.Dir(httpCacheDir), "cache", "discovery")
-		}
+		cacheDir = *f.CacheDir
 	}
-
-	discoveryCacheDir := computeDiscoverCacheDir(discoveryCacheParentDir, config.Host)
+	httpCacheDir := filepath.Join(cacheDir, "http")
+	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
@@ -262,7 +257,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVar(f.KubeConfig, "kubeconfig", *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
 	}
 	if f.CacheDir != nil {
-		flags.StringVar(f.CacheDir, flagHTTPCacheDir, *f.CacheDir, "Default HTTP cache directory")
+		flags.StringVar(f.CacheDir, flagCacheDir, *f.CacheDir, "Default cache directory")
 	}
 
 	// add config options
