@@ -99,7 +99,9 @@ func TestVMSSVMCache(t *testing.T) {
 	assert.NoError(t, err)
 
 	// the VM should be removed from cache after deleteCacheForNode().
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, cacheReadTypeDefault)
+	cacheKey, cache, err := ss.getVMSSVMCache("rg", vmssName)
+	assert.NoError(t, err)
+	cached, err := cache.Get(cacheKey, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	cachedVirtualMachines := cached.(*sync.Map)
 	_, ok := cachedVirtualMachines.Load(vmName)
