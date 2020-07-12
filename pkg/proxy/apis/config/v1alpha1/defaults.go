@@ -61,6 +61,9 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.IPTables.SyncPeriod.Duration == 0 {
 		obj.IPTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
+	if obj.IPTables.MinSyncPeriod.Duration == 0 {
+		obj.IPTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
+	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
