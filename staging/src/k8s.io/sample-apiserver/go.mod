@@ -12,9 +12,8 @@ require (
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/cobra v0.0.5
-	go.uber.org/atomic v1.3.3-0.20181018215023-8dc6146f7569 // indirect
 	go.uber.org/multierr v1.1.1-0.20180122172545-ddea229ff1df // indirect
-	k8s.io/apimachinery v0.18.3
+	k8s.io/apimachinery v0.18.4
 	k8s.io/apiserver v0.18.3
 	k8s.io/client-go v0.18.3
 	k8s.io/code-generator v0.18.3
@@ -33,7 +32,9 @@ replace (
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/text => golang.org/x/text v0.3.2
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

@@ -23,7 +23,9 @@ replace (
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.8
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/text => golang.org/x/text v0.3.2
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

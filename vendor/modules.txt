@@ -351,7 +351,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
-# github.com/google/cadvisor v0.35.0 => github.com/google/cadvisor v0.35.0
+# github.com/google/cadvisor v0.35.0 => github.com/openshift/cadvisor v0.33.2-0.20200609152315-52275b81dc5b
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -484,7 +484,7 @@ github.com/inconshreveable/mousetrap
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0 => github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
-# github.com/json-iterator/go v1.1.9 => github.com/json-iterator/go v1.1.8
+# github.com/json-iterator/go v1.1.10 => github.com/json-iterator/go v1.1.8
 github.com/json-iterator/go
 # github.com/karrick/godirwalk v1.7.5 => github.com/karrick/godirwalk v1.7.5
 github.com/karrick/godirwalk
@@ -615,7 +615,7 @@ github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v1.3.1-0.20190929122143-5215b1806f52 => github.com/opencontainers/selinux v1.3.1-0.20190929122143-5215b1806f52
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
-# github.com/openshift/api v0.0.0-20200521162313-4090b8d67ad8 => github.com/openshift/api v0.0.0-20200521162313-4090b8d67ad8
+# github.com/openshift/api v0.0.0-20200710154525-af4dd20aed23 => github.com/openshift/api v0.0.0-20200710154525-af4dd20aed23
 github.com/openshift/api/apps/v1
 github.com/openshift/api/authorization/v1
 github.com/openshift/api/build/v1
@@ -653,7 +653,7 @@ github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/selinux
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort
-# github.com/openshift/client-go v0.0.0-20200521150516-05eb9880269c => github.com/openshift/client-go v0.0.0-20200521150516-05eb9880269c
+# github.com/openshift/client-go v0.0.0-20200623090625-83993cebb5ae => github.com/openshift/client-go v0.0.0-20200623090625-83993cebb5ae
 github.com/openshift/client-go/apps/clientset/versioned
 github.com/openshift/client-go/apps/clientset/versioned/scheme
 github.com/openshift/client-go/apps/clientset/versioned/typed/apps/v1
@@ -753,7 +753,7 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20200521170207-eeebfaa62843 => github.com/openshift/library-go v0.0.0-20200521170207-eeebfaa62843
+# github.com/openshift/library-go v0.0.0-20200709151624-cc498c355c99 => github.com/openshift/library-go v0.0.0-20200709151624-cc498c355c99
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
 github.com/openshift/library-go/pkg/apiserver/admission/admissiontimeout
@@ -1032,7 +1032,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20190409202823-959b441ac422 => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20200421231249-e086a090c8fd => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+# golang.org/x/net v0.0.0-20200602114024-627f9648deb9 => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -1068,7 +1068,7 @@ golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/text v0.3.2 => golang.org/x/text v0.3.2
+# golang.org/x/text v0.3.3 => golang.org/x/text v0.3.2
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -1241,7 +1241,7 @@ gopkg.in/square/go-jose.v2/jwt
 gopkg.in/tomb.v1
 # gopkg.in/warnings.v0 v0.1.1 => gopkg.in/warnings.v0 v0.1.1
 gopkg.in/warnings.v0
-# gopkg.in/yaml.v2 v2.2.8 => gopkg.in/yaml.v2 v2.2.8
+# gopkg.in/yaml.v2 v2.3.0 => gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
 # gotest.tools v2.2.0+incompatible => gotest.tools v2.2.0+incompatible
 gotest.tools
@@ -1275,7 +1275,7 @@ honnef.co/go/tools/staticcheck/vrp
 honnef.co/go/tools/stylecheck
 honnef.co/go/tools/unused
 honnef.co/go/tools/version
-# k8s.io/api v0.18.3 => k8s.io/api v0.18.3
+# k8s.io/api v0.18.4 => k8s.io/api v0.18.4
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1
@@ -1362,7 +1362,7 @@ k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor
 k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
 k8s.io/apiextensions-apiserver/test/integration
 k8s.io/apiextensions-apiserver/test/integration/fixtures
-# k8s.io/apimachinery v0.18.3 => k8s.io/apimachinery v0.18.3
+# k8s.io/apimachinery v0.18.4 => k8s.io/apimachinery v0.18.4
 k8s.io/apimachinery/pkg/api/apitesting
 k8s.io/apimachinery/pkg/api/apitesting/fuzzer
 k8s.io/apimachinery/pkg/api/apitesting/naming
@@ -1940,7 +1940,7 @@ k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
 k8s.io/kube-scheduler/config/v1
 k8s.io/kube-scheduler/config/v1alpha1
-k8s.io/kube-scheduler/config/v1alpha2
+k8s.io/kube-scheduler/config/v1beta1
 k8s.io/kube-scheduler/extender/v1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 k8s.io/kubectl/pkg/apps

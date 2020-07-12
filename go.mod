@@ -62,7 +62,7 @@ require (
 	github.com/googleapis/gnostic v0.2.0
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
-	github.com/json-iterator/go v1.1.9
+	github.com/json-iterator/go v1.1.10
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/miekg/dns v1.1.4
@@ -73,10 +73,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/runc v1.0.0-rc10
 	github.com/opencontainers/selinux v1.3.1-0.20190929122143-5215b1806f52
-	github.com/openshift/api v0.0.0-20200521162313-4090b8d67ad8
+	github.com/openshift/api v0.0.0-20200710154525-af4dd20aed23
 	github.com/openshift/apiserver-library-go v0.0.0-20200521171520-a7bc13e3e650
-	github.com/openshift/client-go v0.0.0-20200521150516-05eb9880269c
-	github.com/openshift/library-go v0.0.0-20200521170207-eeebfaa62843
+	github.com/openshift/client-go v0.0.0-20200623090625-83993cebb5ae
+	github.com/openshift/library-go v0.0.0-20200709151624-cc498c355c99
 	github.com/pkg/errors v0.8.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.1.0
@@ -98,7 +98,7 @@ require (
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/net v0.0.0-20200421231249-e086a090c8fd
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20191022100944-742c48ecaeb7
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
@@ -107,14 +107,15 @@ require (
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.26.0
 	gopkg.in/gcfg.v1 v1.2.0
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v2 v2.3.0
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
 	honnef.co/go/tools v0.0.1-2019.2.2
-	k8s.io/api v0.18.3
+	k8s.io/api v0.18.4
 	k8s.io/apiextensions-apiserver v0.18.3
-	k8s.io/apimachinery v0.18.3
+	k8s.io/apimachinery v0.18.4
 	k8s.io/apiserver v0.18.3
 	k8s.io/cli-runtime v0.0.0
 	k8s.io/client-go v0.18.3
@@ -211,7 +212,7 @@ replace (
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.6
 	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.1-coreos.6
-	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
+	github.com/coreos/etcd => github.com/coreos/etcd v3.3.17+incompatible // Pinned for openshift
 	github.com/coreos/go-etcd => github.com/coreos/go-etcd v2.0.0+incompatible
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
@@ -313,7 +314,7 @@ replace (
 	github.com/gonum/lapack => github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9
 	github.com/gonum/matrix => github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9
 	github.com/google/btree => github.com/google/btree v1.0.0
-	github.com/google/cadvisor => github.com/google/cadvisor v0.35.0
+	github.com/google/cadvisor => github.com/openshift/cadvisor v0.33.2-0.20200609152315-52275b81dc5b // Fix incorrect diskstats on mapper devices
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	github.com/google/go-github => github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring => github.com/google/go-querystring v1.0.0
@@ -411,11 +412,11 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.0
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.3.1-0.20190929122143-5215b1806f52
-	github.com/openshift/api => github.com/openshift/api v0.0.0-20200521162313-4090b8d67ad8
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20200710154525-af4dd20aed23
 	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20200521171520-a7bc13e3e650
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
-	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20200521150516-05eb9880269c
-	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200521170207-eeebfaa62843
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20200623090625-83993cebb5ae
+	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200709151624-cc498c355c99
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors => github.com/pkg/errors v0.8.1
@@ -531,9 +532,9 @@ replace (
 	gotest.tools/gotestsum => gotest.tools/gotestsum v0.3.5
 	grpc.go4.org => grpc.go4.org v0.0.0-20170609214715-11d0a25b4919
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2019.2.2
-	k8s.io/api => k8s.io/api v0.18.3
+	k8s.io/api => k8s.io/api v0.18.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.18.3
+	k8s.io/apimachinery => k8s.io/apimachinery v0.18.4
 	k8s.io/apiserver => k8s.io/apiserver v0.18.3
 	k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
 	k8s.io/client-go => k8s.io/client-go v0.18.3

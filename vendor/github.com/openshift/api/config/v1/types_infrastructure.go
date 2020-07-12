@@ -277,7 +277,31 @@ type AzurePlatformStatus struct {
 	// If empty, the value is same as ResourceGroupName.
 	// +optional
 	NetworkResourceGroupName string `json:"networkResourceGroupName,omitempty"`
+
+	// cloudName is the name of the Azure cloud environment which can be used to configure the Azure SDK
+	// with the appropriate Azure API endpoints.
+	// If empty, the value is equal to `AzurePublicCloud`.
+	// +optional
+	CloudName AzureCloudEnvironment `json:"cloudName,omitempty"`
 }
+
+// AzureCloudEnvironment is the name of the Azure cloud environment
+// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud
+type AzureCloudEnvironment string
+
+const (
+	// AzurePublicCloud is the general-purpose, public Azure cloud environment.
+	AzurePublicCloud AzureCloudEnvironment = "AzurePublicCloud"
+
+	// AzureUSGovernmentCloud is the Azure cloud environment for the US government.
+	AzureUSGovernmentCloud AzureCloudEnvironment = "AzureUSGovernmentCloud"
+
+	// AzureChinaCloud is the Azure cloud environment used in China.
+	AzureChinaCloud AzureCloudEnvironment = "AzureChinaCloud"
+
+	// AzureGermanCloud is the Azure cloud environment used in Germany.
+	AzureGermanCloud AzureCloudEnvironment = "AzureGermanCloud"
+)
 
 // GCPPlatformSpec holds the desired state of the Google Cloud Platform infrastructure provider.
 // This only includes fields that can be modified in the cluster.

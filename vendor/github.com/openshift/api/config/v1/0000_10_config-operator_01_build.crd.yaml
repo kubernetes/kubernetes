@@ -305,6 +305,12 @@ spec:
               description: BuildOverrides controls override settings for builds
               type: object
               properties:
+                forcePull:
+                  description: ForcePull overrides, if set, the equivalent value in
+                    the builds, i.e. false disables force pull for all builds, true
+                    enables force pull for all builds, independently of what each
+                    build specifies itself
+                  type: boolean
                 imageLabels:
                   description: ImageLabels is a list of docker labels that are applied
                     to the resulting image. If user provided a label in their Build/BuildConfig
