@@ -12,7 +12,7 @@ dependencies:
       match: cniVersion[\t\n\f\r ]*=
 
   - name: "coredns-kube-up"
-    version: 1.6.7
+    version: 1.7.0
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
