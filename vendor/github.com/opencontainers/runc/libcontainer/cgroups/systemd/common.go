@@ -27,6 +27,9 @@ var (
 	versionOnce sync.Once
 	version     int
 	versionErr  error
+
+	isRunningSystemdOnce sync.Once
+	isRunningSystemd     bool
 )
 
 // NOTE: This function comes from package github.com/coreos/go-systemd/util
@@ -37,11 +40,11 @@ var (
 // checks whether /run/systemd/system/ exists and is a directory.
 // http://www.freedesktop.org/software/systemd/man/sd_booted.html
 func IsRunningSystemd() bool {
-	fi, err := os.Lstat("/run/systemd/system")
-	if err != nil {
-		return false
-	}
-	return fi.IsDir()
+	isRunningSystemdOnce.Do(func() {
+		fi, err := os.Lstat("/run/systemd/system")
+		isRunningSystemd = err == nil && fi.IsDir()
+	})
+	return isRunningSystemd
 }
 
 // systemd represents slice hierarchy using `-`, so we need to follow suit when

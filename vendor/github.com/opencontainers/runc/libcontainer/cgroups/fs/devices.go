@@ -23,6 +23,9 @@ func (s *DevicesGroup) Name() string {
 }
 
 func (s *DevicesGroup) Apply(d *cgroupData) error {
+	if d.config.SkipDevices {
+		return nil
+	}
 	_, err := d.join("devices")
 	if err != nil {
 		// We will return error even it's `not found` error, devices
@@ -52,7 +55,7 @@ func buildEmulator(rules []*configs.DeviceRule) (*devices.Emulator, error) {
 }
 
 func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if system.RunningInUserNS() {
+	if system.RunningInUserNS() || cgroup.SkipDevices {
 		return nil
 	}
 

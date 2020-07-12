@@ -77,7 +77,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest v1.0.0-rc1
-	github.com/opencontainers/runc v1.0.0-rc90.0.20200624011356-1b94395c0657
+	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 	github.com/opencontainers/selinux v1.5.2
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
@@ -195,7 +195,7 @@ replace (
 	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 	github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
-	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20200601085316-9f1617e5c574
+	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
 	github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
@@ -362,7 +362,7 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc90.0.20200624011356-1b94395c0657
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.5.2
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0

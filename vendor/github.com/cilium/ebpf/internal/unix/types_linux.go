@@ -16,6 +16,7 @@ const (
 	EINVAL                   = linux.EINVAL
 	EPOLLIN                  = linux.EPOLLIN
 	EINTR                    = linux.EINTR
+	EPERM                    = linux.EPERM
 	ESRCH                    = linux.ESRCH
 	ENODEV                   = linux.ENODEV
 	BPF_F_RDONLY_PROG        = linux.BPF_F_RDONLY_PROG

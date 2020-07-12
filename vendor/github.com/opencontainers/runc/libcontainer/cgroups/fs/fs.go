@@ -204,7 +204,7 @@ func (m *manager) Apply(pid int) (err error) {
 		if err != nil {
 			// The non-presence of the devices subsystem is
 			// considered fatal for security reasons.
-			if cgroups.IsNotFound(err) && sys.Name() != "devices" {
+			if cgroups.IsNotFound(err) && (c.SkipDevices || sys.Name() != "devices") {
 				continue
 			}
 			return err
@@ -298,7 +298,7 @@ func (m *manager) Set(container *configs.Config) error {
 
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
-func (m *manager) Freeze(state configs.FreezerState) (Err error) {
+func (m *manager) Freeze(state configs.FreezerState) error {
 	path := m.Path("freezer")
 	if m.cgroups == nil || path == "" {
 		return errors.New("cannot toggle freezer: cgroups not configured for container")
@@ -306,17 +306,9 @@ func (m *manager) Freeze(state configs.FreezerState) (Err error) {
 
 	prevState := m.cgroups.Resources.Freezer
 	m.cgroups.Resources.Freezer = state
-	defer func() {
-		if Err != nil {
-			m.cgroups.Resources.Freezer = prevState
-		}
-	}()
-
-	freezer, err := m.getSubsystems().Get("freezer")
-	if err != nil {
-		return err
-	}
+	freezer := &FreezerGroup{}
 	if err := freezer.Set(path, m.cgroups); err != nil {
+		m.cgroups.Resources.Freezer = prevState
 		return err
 	}
 	return nil
@@ -359,14 +351,14 @@ func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
 }
 
 func (raw *cgroupData) path(subsystem string) (string, error) {
-	mnt, err := cgroups.FindCgroupMountpoint(raw.root, subsystem)
-	// If we didn't mount the subsystem, there is no point we make the path.
-	if err != nil {
-		return "", err
-	}
-
 	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
 	if filepath.IsAbs(raw.innerPath) {
+		mnt, err := cgroups.FindCgroupMountpoint(raw.root, subsystem)
+		// If we didn't mount the subsystem, there is no point we make the path.
+		if err != nil {
+			return "", err
+		}
+
 		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
 		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
 	}
@@ -418,13 +410,12 @@ func (m *manager) GetCgroups() (*configs.Cgroup, error) {
 
 func (m *manager) GetFreezerState() (configs.FreezerState, error) {
 	dir := m.Path("freezer")
-	freezer, err := m.getSubsystems().Get("freezer")
-
 	// If the container doesn't have the freezer cgroup, say it's undefined.
-	if err != nil || dir == "" {
+	if dir == "" {
 		return configs.Undefined, nil
 	}
-	return freezer.(*FreezerGroup).GetState(dir)
+	freezer := &FreezerGroup{}
+	return freezer.GetState(dir)
 }
 
 func (m *manager) Exists() bool {

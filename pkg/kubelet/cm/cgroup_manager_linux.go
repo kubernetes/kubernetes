@@ -495,6 +495,7 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 			Major:       libcontainerconfigs.Wildcard,
 		},
 	}
+	cgroupConfig.Resources.SkipDevices = true
 
 	manager, err := cgroupfs2.NewManager(cgroupConfig, cgroupConfig.Path, false)
 	if err != nil {
@@ -517,6 +518,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 				Major:       libcontainerconfigs.Wildcard,
 			},
 		},
+		SkipDevices: true,
 	}
 	if resourceConfig == nil {
 		return resources
