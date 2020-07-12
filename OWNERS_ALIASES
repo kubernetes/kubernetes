@@ -113,15 +113,16 @@ aliases:
 
   # SIG Release
   sig-release-approvers:
-    - calebamiles # SIG Chair
+    - alejandrox1 # SIG Technical Lead
     - justaugustus # SIG Chair
+    - saschagrunert # SIG Technical Lead
     - tpepper # SIG Chair
   release-engineering-approvers:
-    - calebamiles # SIG Chair
+    - alejandrox1 # SIG Technical Lead
     - justaugustus # SIG Chair
-    - tpepper # SIG Chair / Patch Release Team
+    - saschagrunert # SIG Technical Lead
+    - tpepper # SIG Chair
   release-engineering-reviewers:
-    - calebamiles # SIG Chair
     - cpanato # Branch Manager
     - feiskyer # Patch Release Team
     - hasheddan # Branch Manager
