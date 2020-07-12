@@ -291,10 +291,15 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 	}
 }
 
+// getEtcHostsPath returns the full host-side path to a pod's generated /etc/hosts file
+func getEtcHostsPath(podDir string) string {
+	return path.Join(podDir, "etc-hosts")
+}
+
 // makeHostsMount makes the mountpoint for the hosts file that the containers
 // in a pod are injected with.
 func makeHostsMount(podDir, podIP, hostName, hostDomainName string, hostAliases []v1.HostAlias, useHostNetwork bool) (*kubecontainer.Mount, error) {
-	hostsFilePath := path.Join(podDir, "etc-hosts")
+	hostsFilePath := getEtcHostsPath(podDir)
 	if err := ensureHostsFile(hostsFilePath, podIP, hostName, hostDomainName, hostAliases, useHostNetwork); err != nil {
 		return nil, err
 	}
