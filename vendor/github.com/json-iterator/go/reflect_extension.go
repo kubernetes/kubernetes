@@ -475,7 +475,7 @@ func calcFieldNames(originalFieldName string, tagProvidedFieldName string, whole
 		fieldNames = []string{tagProvidedFieldName}
 	}
 	// private?
-	isNotExported := unicode.IsLower(rune(originalFieldName[0]))
+	isNotExported := unicode.IsLower(rune(originalFieldName[0])) || originalFieldName[0] == '_'
 	if isNotExported {
 		fieldNames = []string{}
 	}

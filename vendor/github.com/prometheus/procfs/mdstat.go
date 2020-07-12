@@ -52,7 +52,7 @@ type MDStat struct {
 func (fs FS) MDStat() ([]MDStat, error) {
 	data, err := ioutil.ReadFile(fs.proc.Path("mdstat"))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing mdstat %s: %s", fs.proc.Path("mdstat"), err)
+		return nil, err
 	}
 	mdstat, err := parseMDStat(data)
 	if err != nil {

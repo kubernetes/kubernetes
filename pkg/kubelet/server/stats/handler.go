@@ -26,6 +26,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 
@@ -76,6 +77,9 @@ type Provider interface {
 	// containerName. If subcontainers is true, this function will return the
 	// information of all the sub-containers as well.
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
+	// GetRequestedContainersInfo returns the information of the container with
+	// the containerName, and with the specified cAdvisor options.
+	GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
 
 	// The following information is provided by Kubelet.
 	//
