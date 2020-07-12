@@ -23,6 +23,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	appslisters "k8s.io/client-go/listers/apps/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -30,7 +32,11 @@ import (
 
 // SelectorSpread is a plugin that calculates selector spread priority.
 type SelectorSpread struct {
-	handle framework.FrameworkHandle
+	sharedLister           framework.SharedLister
+	services               corelisters.ServiceLister
+	replicationControllers corelisters.ReplicationControllerLister
+	replicaSets            appslisters.ReplicaSetLister
+	statefulSets           appslisters.StatefulSetLister
 }
 
 var _ framework.PreScorePlugin = &SelectorSpread{}
@@ -88,7 +94,7 @@ func (pl *SelectorSpread) Score(ctx context.Context, state *framework.CycleState
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("%+v convert to tainttoleration.preScoreState error", c))
 	}
 
-	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
@@ -115,7 +121,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 		if scores[i].Score > maxCountByNodeName {
 			maxCountByNodeName = scores[i].Score
 		}
-		nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(scores[i].Name)
+		nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
 		if err != nil {
 			return framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", scores[i].Name, err))
 		}
@@ -146,7 +152,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
-			nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(scores[i].Name)
+			nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
 			if err != nil {
 				return framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", scores[i].Name, err))
 			}
@@ -176,13 +182,12 @@ func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.Cy
 		return nil
 	}
 	var selector labels.Selector
-	informerFactory := pl.handle.SharedInformerFactory()
 	selector = helper.DefaultSelector(
 		pod,
-		informerFactory.Core().V1().Services().Lister(),
-		informerFactory.Core().V1().ReplicationControllers().Lister(),
-		informerFactory.Apps().V1().ReplicaSets().Lister(),
-		informerFactory.Apps().V1().StatefulSets().Lister(),
+		pl.services,
+		pl.replicationControllers,
+		pl.replicaSets,
+		pl.statefulSets,
 	)
 	state := &preScoreState{
 		selector: selector,
@@ -193,8 +198,20 @@ func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.Cy
 
 // New initializes a new plugin and returns it.
 func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+	sharedLister := handle.SnapshotSharedLister()
+	if sharedLister == nil {
+		return nil, fmt.Errorf("SnapshotSharedLister is nil")
+	}
+	sharedInformerFactory := handle.SharedInformerFactory()
+	if sharedInformerFactory == nil {
+		return nil, fmt.Errorf("SharedInformerFactory is nil")
+	}
 	return &SelectorSpread{
-		handle: handle,
+		sharedLister:           sharedLister,
+		services:               sharedInformerFactory.Core().V1().Services().Lister(),
+		replicationControllers: sharedInformerFactory.Core().V1().ReplicationControllers().Lister(),
+		replicaSets:            sharedInformerFactory.Apps().V1().ReplicaSets().Lister(),
+		statefulSets:           sharedInformerFactory.Apps().V1().StatefulSets().Lister(),
 	}, nil
 }
 
