@@ -37,12 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -539,7 +539,7 @@ func NewProxier(
 
 	klog.V(1).Infof("Hns Network loaded with info = %v", hnsNetworkInfo)
 	isDSR := config.EnableDSR
-	if isDSR && !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.WinDSR) {
+	if isDSR && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinDSR) {
 		return nil, fmt.Errorf("WinDSR feature gate not enabled")
 	}
 	err = hcn.DSRSupported()
@@ -550,7 +550,7 @@ func NewProxier(
 	var sourceVip string
 	var hostMac string
 	if hnsNetworkInfo.networkType == "Overlay" {
-		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.WinOverlay) {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
 		err = hcn.RemoteSubnetSupported()

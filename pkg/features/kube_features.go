@@ -621,6 +621,18 @@ const (
 	// Allow setting the Fully Qualified Domain Name (FQDN) in the hostname of a Pod. If a Pod does not
 	// have FQDN, this feature has no effect.
 	SetHostnameAsFQDN featuregate.Feature = "SetHostnameAsFQDN"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to run in Overlay mode for Windows
+	WinOverlay featuregate.Feature = "WinOverlay"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to create DSR loadbalancers for Windows
+	WinDSR featuregate.Feature = "WinDSR"
 )
 
 func init() {
@@ -716,6 +728,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: false, PreRelease: featuregate.Alpha},
 	SetHostnameAsFQDN:                              {Default: false, PreRelease: featuregate.Alpha},
+	WinOverlay:                                     {Default: false, PreRelease: featuregate.Alpha},
+	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
