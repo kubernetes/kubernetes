@@ -64,6 +64,7 @@ go_test(
         "least_allocated_test.go",
         "most_allocated_test.go",
         "requested_to_capacity_ratio_test.go",
+        "topology_match_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
