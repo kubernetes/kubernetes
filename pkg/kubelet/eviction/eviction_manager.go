@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -98,6 +99,8 @@ type managerImpl struct {
 	thresholdNotifiers []ThresholdNotifier
 	// thresholdsLastUpdated is the last time the thresholdNotifiers were updated.
 	thresholdsLastUpdated time.Time
+	// etcHostsPath is a function that will get the etc-hosts file's path for a pod given its UID
+	etcHostsPath func(podUID types.UID) string
 }
 
 // ensure it implements the required interface
@@ -114,6 +117,7 @@ func NewManager(
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
 	clock clock.Clock,
+	etcHostsPath func(types.UID) string,
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                        clock,
@@ -129,6 +133,7 @@ func NewManager(
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		dedicatedImageFs:             nil,
 		thresholdNotifiers:           []ThresholdNotifier{},
+		etcHostsPath:                 etcHostsPath,
 	}
 	return manager, manager
 }
@@ -514,7 +519,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	} else {
 		fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
 	}
-	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet)
+	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet, m.etcHostsPath(pod.UID))
 	if err != nil {
 		klog.Errorf("eviction manager: error getting pod disk usage %v", err)
 		return false
