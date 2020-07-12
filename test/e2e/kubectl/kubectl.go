@@ -69,6 +69,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -646,6 +647,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should handle in-cluster config", func() {
+			// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
+			// for now this only works on amd64
+			e2eskipper.SkipUnlessNodeOSArchIs("amd64")
+
 			ginkgo.By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
 			err := e2eauth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
