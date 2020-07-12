@@ -123,8 +123,9 @@ func createCgroupManager(name string) (cgroups.Manager, error) {
 		Parent: "/",
 		Name:   name,
 		Resources: &configs.Resources{
-			Memory:     int64(memoryLimit),
-			MemorySwap: -1,
+			Memory:      int64(memoryLimit),
+			MemorySwap:  -1,
+			SkipDevices: true,
 			Devices: []*configs.DeviceRule{
 				{
 					Minor:       configs.Wildcard,

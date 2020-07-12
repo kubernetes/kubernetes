@@ -85,6 +85,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("JSONPatchType should handle a patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`[{"op":"add","path":"/foo","value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}]`)
 		err = rest.Patch(types.JSONPatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -93,6 +96,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("JSONPatchType should handle a valid patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`[{"op":"add","path":"/foo","value":0` + strings.Repeat(" ", 3*1024*1024-100) + `}]`)
 		err = rest.Patch(types.JSONPatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -101,6 +107,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("MergePatchType should handle a patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
 		err = rest.Patch(types.MergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -109,6 +118,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("MergePatchType should handle a valid patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":0` + strings.Repeat(" ", 3*1024*1024-100) + `}`)
 		err = rest.Patch(types.MergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -117,6 +129,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("StrategicMergePatchType should handle a patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
 		err = rest.Patch(types.StrategicMergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -125,6 +140,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("StrategicMergePatchType should handle a valid patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":0` + strings.Repeat(" ", 3*1024*1024-100) + `}`)
 		err = rest.Patch(types.StrategicMergePatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -133,6 +151,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("ApplyPatchType should handle a patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
 		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -141,6 +162,9 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 	})
 	t.Run("ApplyPatchType should handle a valid patch just under the max limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"apiVersion":"v1","kind":"Secret"` + strings.Repeat(" ", 3*1024*1024-100) + `}`)
 		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/api/v1/namespaces/default/secrets/test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -182,6 +206,9 @@ values: ` + strings.Repeat("[", 3*1024*1024))
 
 	// Create YAML just under 3MB limit, nested
 	t.Run("create should handle a yaml document just under the maximum size with correct nesting", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		yamlBody := []byte(`
 apiVersion: v1
 kind: ConfigMap
@@ -202,6 +229,9 @@ values: ` + strings.Repeat("[", 3*1024*1024/2-500) + strings.Repeat("]", 3*1024*
 
 	// Create YAML just under 3MB limit, not nested
 	t.Run("create should handle a yaml document just under the maximum size with unbalanced nesting", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		yamlBody := []byte(`
 apiVersion: v1
 kind: ConfigMap
@@ -243,6 +273,9 @@ values: ` + strings.Repeat("[", 3*1024*1024-1000))
 
 	// Create JSON just under 3MB limit, nested
 	t.Run("create should handle a json document just under the maximum size with correct nesting", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		jsonBody := []byte(`{
 	"apiVersion": "v1",
 	"kind": "ConfigMap",
@@ -265,6 +298,9 @@ values: ` + strings.Repeat("[", 3*1024*1024-1000))
 
 	// Create JSON just under 3MB limit, not nested
 	t.Run("create should handle a json document just under the maximum size with unbalanced nesting", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		jsonBody := []byte(`{
 	"apiVersion": "v1",
 	"kind": "ConfigMap",

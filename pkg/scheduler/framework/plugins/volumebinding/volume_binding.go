@@ -61,7 +61,8 @@ func (d *stateData) Clone() framework.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
-	Binder scheduling.SchedulerVolumeBinder
+	Binder                               scheduling.SchedulerVolumeBinder
+	GenericEphemeralVolumeFeatureEnabled bool
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
@@ -77,9 +78,10 @@ func (pl *VolumeBinding) Name() string {
 	return Name
 }
 
-func podHasPVCs(pod *v1.Pod) bool {
+func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) bool {
 	for _, vol := range pod.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil {
+		if vol.PersistentVolumeClaim != nil ||
+			pl.GenericEphemeralVolumeFeatureEnabled && vol.Ephemeral != nil {
 			return true
 		}
 	}
@@ -91,7 +93,7 @@ func podHasPVCs(pod *v1.Pod) bool {
 // UnschedulableAndUnresolvable is returned.
 func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	// If pod does not reference any PVC, we don't need to do anything.
-	if !podHasPVCs(pod) {
+	if !pl.podHasPVCs(pod) {
 		state.Write(stateKey, &stateData{skip: true})
 		return nil
 	}
@@ -268,7 +270,8 @@ func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin,
 	}
 	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	return &VolumeBinding{
-		Binder: binder,
+		Binder:                               binder,
+		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	}, nil
 }
 

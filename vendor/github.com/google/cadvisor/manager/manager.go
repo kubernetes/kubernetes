@@ -18,7 +18,6 @@ package manager
 import (
 	"flag"
 	"fmt"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"net/http"
 	"os"
 	"path"
@@ -48,6 +47,7 @@ import (
 	"github.com/google/cadvisor/watcher"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 
 	"k8s.io/klog/v2"
@@ -932,7 +932,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		perfCgroupPath := path.Join(fs2.UnifiedMountpoint, containerName)
 		cont.perfCollector, err = m.perfManager.GetCollector(perfCgroupPath)
 		if err != nil {
-			klog.Infof("perf_event metrics will not be available for container %s: %s", containerName, err)
+			klog.V(4).Infof("perf_event metrics will not be available for container %s: %s", containerName, err)
 		}
 	} else {
 		devicesCgroupPath, err := handler.GetCgroupPath("devices")
@@ -950,18 +950,20 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		} else {
 			cont.perfCollector, err = m.perfManager.GetCollector(perfCgroupPath)
 			if err != nil {
-				klog.Infof("perf_event metrics will not be available for container %s: %s", containerName, err)
+				klog.V(4).Infof("perf_event metrics will not be available for container %s: %s", containerName, err)
 			}
 		}
 	}
 
-	resctrlPath, err := intelrdt.GetIntelRdtPath(containerName)
-	if err != nil {
-		klog.Warningf("Error getting resctrl path: %q", err)
-	} else {
-		cont.resctrlCollector, err = m.resctrlManager.GetCollector(resctrlPath)
+	if m.includedMetrics.Has(container.ResctrlMetrics) {
+		resctrlPath, err := intelrdt.GetIntelRdtPath(containerName)
 		if err != nil {
-			klog.Infof("resctrl metrics will not be available for container %s: %s", cont.info.Name, err)
+			klog.V(4).Infof("Error getting resctrl path: %q", err)
+		} else {
+			cont.resctrlCollector, err = m.resctrlManager.GetCollector(resctrlPath)
+			if err != nil {
+				klog.V(4).Infof("resctrl metrics will not be available for container %s: %s", cont.info.Name, err)
+			}
 		}
 	}
 

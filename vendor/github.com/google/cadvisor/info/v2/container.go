@@ -19,7 +19,7 @@ import (
 
 	// TODO(rjnagal): Remove dependency after moving all stats structs from v1.
 	// using v1 now for easy conversion.
-	"github.com/google/cadvisor/info/v1"
+	v1 "github.com/google/cadvisor/info/v1"
 )
 
 const (

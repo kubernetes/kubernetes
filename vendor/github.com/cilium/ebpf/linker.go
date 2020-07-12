@@ -1,10 +1,10 @@
 package ebpf
 
 import (
+	"fmt"
+
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/internal/btf"
-
-	"golang.org/x/xerrors"
 )
 
 // link resolves bpf-to-bpf calls.
@@ -28,7 +28,7 @@ func link(prog *ProgramSpec, libs []*ProgramSpec) error {
 
 			needed, err := needSection(insns, lib.Instructions)
 			if err != nil {
-				return xerrors.Errorf("linking %s: %w", lib.Name, err)
+				return fmt.Errorf("linking %s: %w", lib.Name, err)
 			}
 
 			if !needed {
@@ -41,7 +41,7 @@ func link(prog *ProgramSpec, libs []*ProgramSpec) error {
 
 			if prog.BTF != nil && lib.BTF != nil {
 				if err := btf.ProgramAppend(prog.BTF, lib.BTF); err != nil {
-					return xerrors.Errorf("linking BTF of %s: %w", lib.Name, err)
+					return fmt.Errorf("linking BTF of %s: %w", lib.Name, err)
 				}
 			}
 		}

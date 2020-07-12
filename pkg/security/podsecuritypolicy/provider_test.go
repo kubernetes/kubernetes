@@ -346,6 +346,18 @@ func TestValidatePodFailures(t *testing.T) {
 		},
 	}
 
+	failGenericEphemeralPod := defaultPod()
+	failGenericEphemeralPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "generic ephemeral volume",
+			VolumeSource: api.VolumeSource{
+				Ephemeral: &api.EphemeralVolumeSource{
+					VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{},
+				},
+			},
+		},
+	}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *policy.PodSecurityPolicy
@@ -484,6 +496,11 @@ func TestValidatePodFailures(t *testing.T) {
 			pod:           failCSIDriverPod,
 			psp:           defaultPSP(),
 			expectedError: "csi volumes are not allowed to be used",
+		},
+		"generic ephemeral volumes without proper policy set": {
+			pod:           failGenericEphemeralPod,
+			psp:           defaultPSP(),
+			expectedError: "ephemeral volumes are not allowed to be used",
 		},
 	}
 	for name, test := range errorCases {
@@ -888,6 +905,18 @@ func TestValidatePodSuccess(t *testing.T) {
 		},
 	}
 
+	genericEphemeralPod := defaultPod()
+	genericEphemeralPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "generic ephemeral volume",
+			VolumeSource: api.VolumeSource{
+				Ephemeral: &api.EphemeralVolumeSource{
+					VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{},
+				},
+			},
+		},
+	}
+
 	successCases := map[string]struct {
 		pod *api.Pod
 		psp *policy.PodSecurityPolicy
@@ -992,6 +1021,22 @@ func TestValidatePodSuccess(t *testing.T) {
 				psp := defaultPSP()
 				psp.Spec.Volumes = []policy.FSType{policy.All}
 				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
+		"generic ephemeral volume policy with generic ephemeral volume used": {
+			pod: genericEphemeralPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.Ephemeral}
+				return psp
+			}(),
+		},
+		"policy.All with generic ephemeral volume used": {
+			pod: genericEphemeralPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.All}
 				return psp
 			}(),
 		},
@@ -1328,6 +1373,7 @@ func defaultV1Pod() *v1.Pod {
 // the FSTypeAll wildcard.
 func TestValidateAllowedVolumes(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
 
 	val := reflect.ValueOf(api.VolumeSource{})
 

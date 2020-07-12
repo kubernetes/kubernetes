@@ -435,6 +435,7 @@ func AddFieldLabelConversionsForEvent(scheme *runtime.Scheme) error {
 				"involvedObject.resourceVersion",
 				"involvedObject.fieldPath",
 				"reason",
+				"reportingComponent",
 				"source",
 				"type",
 				"metadata.namespace",

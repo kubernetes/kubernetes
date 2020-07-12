@@ -127,10 +127,13 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *ServiceAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+	if len(pl.args.AffinityLabels) == 0 {
+		return nil
+	}
+
 	s, err := pl.createPreFilterState(pod)
 	if err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("could not create preFilterState: %v", err))
-
 	}
 	cycleState.Write(preFilterStateKey, s)
 	return nil
@@ -138,6 +141,9 @@ func (pl *ServiceAffinity) PreFilter(ctx context.Context, cycleState *framework.
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
 func (pl *ServiceAffinity) PreFilterExtensions() framework.PreFilterExtensions {
+	if len(pl.args.AffinityLabels) == 0 {
+		return nil
+	}
 	return pl
 }
 

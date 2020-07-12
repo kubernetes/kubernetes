@@ -221,7 +221,6 @@ func TestPostFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			p := DefaultPreemption{fh: f}
 
 			state := framework.NewCycleState()
 			// Ensure <state> is populated.
@@ -229,6 +228,10 @@ func TestPostFilter(t *testing.T) {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
+			p := DefaultPreemption{
+				fh:        f,
+				pdbLister: getPDBLister(informerFactory),
+			}
 			gotResult, gotStatus := p.PostFilter(context.TODO(), state, tt.pod, tt.filteredNodesStatuses)
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("Status does not match: %v, want: %v", gotStatus, tt.wantStatus)
@@ -1236,6 +1239,7 @@ func TestPreempt(t *testing.T) {
 				extenders = append(extenders, extender)
 			}
 
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
@@ -1247,7 +1251,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
-				frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(client, 0)),
+				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1260,7 +1264,11 @@ func TestPreempt(t *testing.T) {
 				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
 			}
 			// Call preempt and check the expected results.
-			node, err := preempt(context.Background(), fwk, state, test.pod, make(framework.NodeToStatusMap))
+			pl := DefaultPreemption{
+				fh:        fwk,
+				pdbLister: getPDBLister(informerFactory),
+			}
+			node, err := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
@@ -1298,7 +1306,7 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, err = preempt(context.Background(), fwk, state, test.pod, make(framework.NodeToStatusMap))
+			node, err = pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}

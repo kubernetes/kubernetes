@@ -1757,7 +1757,7 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1.Tabl
 			obj.Reason,
 			target,
 			obj.InvolvedObject.FieldPath,
-			formatEventSource(obj.Source),
+			formatEventSource(obj.Source, obj.ReportingController, obj.ReportingInstance),
 			strings.TrimSpace(obj.Message),
 			firstTimestamp,
 			int64(count),
@@ -2247,13 +2247,29 @@ func layoutContainerCells(containers []api.Container) (names string, images stri
 	return namesBuffer.String(), imagesBuffer.String()
 }
 
-// formatEventSource formats EventSource as a comma separated string excluding Host when empty
-func formatEventSource(es api.EventSource) string {
-	EventSourceString := []string{es.Component}
-	if len(es.Host) > 0 {
-		EventSourceString = append(EventSourceString, es.Host)
+// formatEventSource formats EventSource as a comma separated string excluding Host when empty.
+// It uses reportingController when Source.Component is empty and reportingInstance when Source.Host is empty
+func formatEventSource(es api.EventSource, reportingController, reportingInstance string) string {
+	return formatEventSourceComponentInstance(
+		firstNonEmpty(es.Component, reportingController),
+		firstNonEmpty(es.Host, reportingInstance),
+	)
+}
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if len(s) > 0 {
+			return s
+		}
 	}
-	return strings.Join(EventSourceString, ", ")
+	return ""
+}
+
+func formatEventSourceComponentInstance(component, instance string) string {
+	if len(instance) == 0 {
+		return component
+	}
+	return component + ", " + instance
 }
 
 func printControllerRevision(obj *apps.ControllerRevision, options printers.GenerateOptions) ([]metav1.TableRow, error) {

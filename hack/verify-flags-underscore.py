@@ -35,7 +35,7 @@ def is_binary(pathname):
     try:
         with open(pathname, 'r') as f:
             CHUNKSIZE = 1024
-            while 1:
+            while True:
                 chunk = f.read(CHUNKSIZE)
                 if '\0' in chunk: # found null byte
                     return True

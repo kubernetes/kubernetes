@@ -21,7 +21,7 @@ hostnameOverride: ""
 iptables:
   masqueradeAll: false
   masqueradeBit: 14
-  minSyncPeriod: 0s
+  minSyncPeriod: 1s
   syncPeriod: 30s
 ipvs:
   excludeCIDRs: null

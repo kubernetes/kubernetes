@@ -108,7 +108,13 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 		framework.ExpectEqual(len(podTemplateList.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
 	})
 
-	ginkgo.It("should delete a collection of pod templates", func() {
+	/*
+		Release : v1.19
+		Testname: PodTemplate, delete a collection
+		Description: A set of Pod Templates is created with a label selector which MUST be found when listed.
+		The set of Pod Templates is deleted and MUST NOT show up when listed by its label selector.
+	*/
+	framework.ConformanceIt("should delete a collection of pod templates", func() {
 		podTemplateNames := []string{"test-podtemplate-1", "test-podtemplate-2", "test-podtemplate-3"}
 
 		ginkgo.By("Create set of pod templates")

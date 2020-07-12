@@ -184,6 +184,9 @@ func setupConsole(socket *os.File, config *initConfig, mount bool) error {
 		return err
 	}
 
+	// After we return from here, we don't need the console anymore.
+	defer pty.Close()
+
 	if config.ConsoleHeight != 0 && config.ConsoleWidth != 0 {
 		err = pty.Resize(console.WinSize{
 			Height: config.ConsoleHeight,
@@ -194,9 +197,6 @@ func setupConsole(socket *os.File, config *initConfig, mount bool) error {
 			return err
 		}
 	}
-
-	// After we return from here, we don't need the console anymore.
-	defer pty.Close()
 
 	// Mount the console inside our rootfs.
 	if mount {

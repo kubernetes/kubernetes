@@ -69,7 +69,11 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 				}
 			}
 			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
-			plugin := &SelectorSpread{handle: fh}
+			pl, err := New(nil, fh)
+			if err != nil {
+				b.Fatal(err)
+			}
+			plugin := pl.(*SelectorSpread)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {

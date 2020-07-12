@@ -383,9 +383,11 @@ func TestSelectorSpreadScore(t *testing.T) {
 
 			state := framework.NewCycleState()
 
-			plugin := &SelectorSpread{
-				handle: fh,
+			pl, err := New(nil, fh)
+			if err != nil {
+				t.Fatal(err)
 			}
+			plugin := pl.(*SelectorSpread)
 
 			status := plugin.PreScore(ctx, state, test.pod, nodes)
 			if !status.IsSuccess() {
@@ -635,9 +637,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
 
-			plugin := &SelectorSpread{
-				handle: fh,
+			pl, err := New(nil, fh)
+			if err != nil {
+				t.Fatal(err)
 			}
+			plugin := pl.(*SelectorSpread)
 
 			state := framework.NewCycleState()
 			status := plugin.PreScore(ctx, state, test.pod, nodes)

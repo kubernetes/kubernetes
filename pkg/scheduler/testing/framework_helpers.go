@@ -42,6 +42,11 @@ func RegisterQueueSortPlugin(pluginName string, pluginNewFunc runtime.PluginFact
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "QueueSort")
 }
 
+// RegisterPreFilterPlugin returns a function to register a PreFilter Plugin to a given registry.
+func RegisterPreFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreFilter")
+}
+
 // RegisterFilterPlugin returns a function to register a Filter Plugin to a given registry.
 func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")

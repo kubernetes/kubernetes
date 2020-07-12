@@ -168,7 +168,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 			_, isSupported = driver.(InlineVolumeTestDriver)
 		case testpatterns.PreprovisionedPV:
 			_, isSupported = driver.(PreprovisionedPVTestDriver)
-		case testpatterns.DynamicPV:
+		case testpatterns.DynamicPV, testpatterns.GenericEphemeralVolume:
 			_, isSupported = driver.(DynamicPVTestDriver)
 		case testpatterns.CSIInlineVolume:
 			_, isSupported = driver.(EphemeralTestDriver)
@@ -240,7 +240,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 				r.VolSource = createVolumeSource(r.Pvc.Name, false /* readOnly */)
 			}
 		}
-	case testpatterns.DynamicPV:
+	case testpatterns.DynamicPV, testpatterns.GenericEphemeralVolume:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			var err error
@@ -262,10 +262,16 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			if r.Sc != nil {
+			switch pattern.VolType {
+			case testpatterns.DynamicPV:
 				r.Pv, r.Pvc = createPVCPVFromDynamicProvisionSC(
 					f, dInfo.Name, claimSize, r.Sc, pattern.VolMode, dInfo.RequiredAccessModes)
 				r.VolSource = createVolumeSource(r.Pvc.Name, false /* readOnly */)
+			case testpatterns.GenericEphemeralVolume:
+				driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+				claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, dInfo.RequiredAccessModes, claimSize, false /* readOnly */)
 			}
 		}
 	case testpatterns.CSIInlineVolume:
@@ -297,7 +303,28 @@ func createVolumeSource(pvcName string, readOnly bool) *v1.VolumeSource {
 			ReadOnly:  readOnly,
 		},
 	}
+}
 
+func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolumeAccessMode, claimSize string, readOnly bool) *v1.VolumeSource {
+	if len(accessModes) == 0 {
+		accessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+	return &v1.VolumeSource{
+		Ephemeral: &v1.EphemeralVolumeSource{
+			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: &scName,
+					AccessModes:      accessModes,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse(claimSize),
+						},
+					},
+				},
+			},
+			ReadOnly: readOnly,
+		},
+	}
 }
 
 // CleanupResource cleans up VolumeResource

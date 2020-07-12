@@ -14,14 +14,12 @@ go_library(
         "ptr_32_le.go",
         "ptr_64.go",
         "syscall.go",
+        "syscall_string.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/cilium/ebpf/internal",
     importpath = "github.com/cilium/ebpf/internal",
     visibility = ["//vendor/github.com/cilium/ebpf:__subpackages__"],
-    deps = [
-        "//vendor/github.com/cilium/ebpf/internal/unix:go_default_library",
-        "//vendor/golang.org/x/xerrors:go_default_library",
-    ],
+    deps = ["//vendor/github.com/cilium/ebpf/internal/unix:go_default_library"],
 )
 
 filegroup(

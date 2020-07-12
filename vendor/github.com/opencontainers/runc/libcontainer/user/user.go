@@ -60,7 +60,7 @@ type Group struct {
 
 // groupFromOS converts an os/user.(*Group) to local Group
 //
-// (This does not include Pass, Shell or Gecos)
+// (This does not include Pass or List)
 func groupFromOS(g *user.Group) (Group, error) {
 	newGroup := Group{
 		Name: g.Name,

@@ -23,7 +23,6 @@ go_library(
         "//vendor/github.com/cilium/ebpf/internal:go_default_library",
         "//vendor/github.com/cilium/ebpf/internal/btf:go_default_library",
         "//vendor/github.com/cilium/ebpf/internal/unix:go_default_library",
-        "//vendor/golang.org/x/xerrors:go_default_library",
     ],
 )
 

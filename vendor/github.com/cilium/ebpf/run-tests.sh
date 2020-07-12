@@ -15,8 +15,13 @@ if [[ "${1:-}" = "--in-vm" ]]; then
   export GOPROXY=file:///run/go-root/pkg/mod/cache/download
   export GOCACHE=/run/go-cache
 
+  elfs=""
+  if [[ -d "/run/input/bpf" ]]; then
+    elfs="/run/input/bpf"
+  fi
+
   echo Running tests...
-  /usr/local/bin/go test -coverprofile="$1/coverage.txt" -covermode=atomic -v ./...
+  /usr/local/bin/go test -coverprofile="$1/coverage.txt" -covermode=atomic -v -elfs "$elfs" ./...
   touch "$1/success"
   exit 0
 fi
@@ -39,20 +44,34 @@ if [[ -z "${kernel_version}" ]]; then
 fi
 
 readonly kernel="linux-${kernel_version}.bz"
+readonly selftests="linux-${kernel_version}-selftests-bpf.bz"
+readonly input="$(mktemp -d)"
 readonly output="$(mktemp -d)"
-readonly tmp_dir="${TMPDIR:-$(mktemp -d)}"
+readonly tmp_dir="${TMPDIR:-/tmp}"
+readonly branch="${BRANCH:-master}"
 
-test -e "${tmp_dir}/${kernel}" || {
-  echo Fetching "${kernel}"
-  curl --fail -L "https://github.com/cilium/ci-kernels/blob/master/${kernel}?raw=true" -o "${tmp_dir}/${kernel}"
+fetch() {
+    echo Fetching "${1}"
+    wget -nv -N -P "${tmp_dir}" "https://github.com/cilium/ci-kernels/raw/${branch}/${1}"
 }
+
+fetch "${kernel}"
+
+if fetch "${selftests}"; then
+  mkdir "${input}/bpf"
+  tar --strip-components=4 -xjf "${tmp_dir}/${selftests}" -C "${input}/bpf"
+else
+  echo "No selftests found, disabling"
+fi
 
 echo Testing on "${kernel_version}"
 $sudo virtme-run --kimg "${tmp_dir}/${kernel}" --memory 512M --pwd \
+  --rwdir=/run/input="${input}" \
   --rwdir=/run/output="${output}" \
   --rodir=/run/go-path="$(go env GOPATH)" \
   --rwdir=/run/go-cache="$(go env GOCACHE)" \
-  --script-sh "$(realpath "$0") --in-vm /run/output"
+  --script-sh "$(realpath "$0") --in-vm /run/output" \
+  --qemu-opts -smp 2 # need at least two CPUs for some tests
 
 if [[ ! -e "${output}/success" ]]; then
   echo "Test failed on ${kernel_version}"
@@ -66,4 +85,5 @@ else
   fi
 fi
 
+$sudo rm -r "${input}"
 $sudo rm -r "${output}"

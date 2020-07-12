@@ -320,7 +320,9 @@ data:
            ttl 30
         }
         prometheus :9153
-        forward . {{ .UpstreamNameserver }}
+        forward . {{ .UpstreamNameserver }} {
+           max_concurrent 1000
+        }
         cache 30
         loop
         reload

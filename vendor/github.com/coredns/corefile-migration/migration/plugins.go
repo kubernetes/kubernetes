@@ -146,8 +146,8 @@ var plugins = map[string]map[string]plugin{
 		},
 		"v6": plugin{
 			namedOptions: map[string]option{
-				"resyncperiod": { // new removal
-					status: removed,
+				"resyncperiod": { // now ignored
+					status: ignored,
 					action: removeOption,
 				},
 				"endpoint": {
@@ -173,7 +173,10 @@ var plugins = map[string]map[string]plugin{
 		},
 		"v7": plugin{
 			namedOptions: map[string]option{
-				// resyncperiod removed
+				"resyncperiod": { // new removal
+					status: removed,
+					action: removeOption,
+				},
 				"endpoint": {
 					status: ignored,
 					action: useFirstArgumentOnly,
@@ -184,8 +187,8 @@ var plugins = map[string]map[string]plugin{
 				"labels":             {},
 				"pods":               {},
 				"endpoint_pod_names": {},
-				"upstream": {
-					status: ignored,
+				"upstream": { // new removal
+					status: removed,
 					action: removeOption,
 				},
 				"ttl":         {},
@@ -312,6 +315,26 @@ var plugins = map[string]map[string]plugin{
 				"tls_servername": {},
 				"policy":         {},
 				"health_check":   {},
+			},
+		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"except":         {},
+				"force_tcp":      {},
+				"prefer_udp":     {},
+				"expire":         {},
+				"max_fails":      {},
+				"tls":            {},
+				"tls_servername": {},
+				"policy":         {},
+				"health_check":   {},
+				"max_concurrent": { // new option
+					status: newdefault,
+					add: func(c *corefile.Plugin) (*corefile.Plugin, error) {
+						return addOptionToPlugin(c, &corefile.Option{Name: "max_concurrent 1000"})
+					},
+					downAction: removeOption,
+				},
 			},
 		},
 	},
