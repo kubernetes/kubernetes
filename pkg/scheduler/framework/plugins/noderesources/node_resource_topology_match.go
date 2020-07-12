@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	bm "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -78,7 +79,12 @@ func (tm *NodeResourceTopologyMatch) Name() string {
 	return NodeResourceTopologyMatchName
 }
 
-func filter(containers []v1.Container, nodes NUMANodeList) *framework.Status {
+func filter(containers []v1.Container, nodes NUMANodeList, qos v1.PodQOSClass) *framework.Status {
+	if qos == v1.PodQOSBestEffort {
+		return nil
+	}
+
+	zeroQuantity := resource.MustParse("0")
 	for _, container := range containers  {
 		bitmask := bm.NewEmptyBitMask()
 		bitmask.Fill()
@@ -86,15 +92,21 @@ func filter(containers []v1.Container, nodes NUMANodeList) *framework.Status {
 			resourceBitmask := bm.NewEmptyBitMask()
 			for _, numaNode := range nodes {
 				numaQuantity, ok := numaNode.Resources[resource]
-				if !ok {
+				// if can't find requested resource on the node - skip (don't set it as available NUMA node)
+				// if unfound resource has 0 quantity probably this numa node can be considered
+				if !ok && quantity.Cmp(zeroQuantity) != 0{
 					continue
 				}
 				// Check for the following:
 				// 1. set numa node as possible node if resource is memory or Hugepages (until memory manager will not be merged and
 				// memory will not be provided in CRD
-				// 2. otherwise check amount of resources
+				// 2. set numa node as possible node if resource is cpu and it's not guaranteed QoS, since cpu will flow
+				// 3. set numa node as possible node if zero quantity for non existing resource was requested (TODO check topology manaager behaviour)
+				// 4. otherwise check amount of resources
 				if resource == v1.ResourceMemory ||
 					strings.HasPrefix(string(resource), string(v1.ResourceHugePagesPrefix)) ||
+					resource == v1.ResourceCPU && qos != v1.PodQOSGuaranteed ||
+					quantity.Cmp(zeroQuantity) == 0 ||
 					numaQuantity.Cmp(quantity) >= 0 {
 					resourceBitmask.Add(numaNode.NUMAID)
 				}
@@ -150,7 +162,7 @@ func (tm NodeResourceTopologyMatch) PolicyFilter(pod *v1.Pod, zoneMap topologyv1
 			nodes = append(nodes, NUMANode{NUMAID: numaID, Resources: resources})
 		}
 	}
-	return filter(containers, nodes)
+	return filter(containers, nodes, v1qos.GetPodQOS(pod))
 }
 
 // Filter Now only single-numa-node supported
