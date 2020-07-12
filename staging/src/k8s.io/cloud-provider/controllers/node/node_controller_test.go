@@ -171,6 +171,7 @@ func Test_AddCloudNode(t *testing.T) {
 		{
 			name: "node initialized with provider ID",
 			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
 				InstanceTypes: map[types.NodeName]string{
 					types.NodeName("node0"): "t1.micro",
 				},
@@ -216,13 +217,29 @@ func Test_AddCloudNode(t *testing.T) {
 				},
 				Spec: v1.NodeSpec{
 					ProviderID: "fake://12345",
-					Taints:     []v1.Taint{},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
 				},
 			},
 		},
 		{
 			name: "node ignored",
 			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
 				InstanceTypes: map[types.NodeName]string{
 					types.NodeName("node0"):        "t1.micro",
 					types.NodeName("fake://12345"): "t1.micro",
@@ -262,6 +279,7 @@ func Test_AddCloudNode(t *testing.T) {
 		{
 			name: "zone/region topology labels added",
 			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
 				InstanceTypes: map[types.NodeName]string{
 					types.NodeName("node0"): "t1.micro",
 				},
@@ -335,17 +353,31 @@ func Test_AddCloudNode(t *testing.T) {
 							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
 				},
 				Spec: v1.NodeSpec{
 					ProviderID: "aws://12345",
-					Taints:     []v1.Taint{},
 				},
 			},
 		},
 		{
 			name: "node addresses",
 			fakeCloud: &fakecloud.Cloud{
-				InstanceTypes: map[types.NodeName]string{},
+				EnableInstancesV2: false,
+				InstanceTypes:     map[types.NodeName]string{},
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
 				},
@@ -441,6 +473,7 @@ func Test_AddCloudNode(t *testing.T) {
 		{
 			name: "provided node IP address",
 			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
@@ -541,7 +574,8 @@ func Test_AddCloudNode(t *testing.T) {
 		{
 			name: "provider ID already set",
 			fakeCloud: &fakecloud.Cloud{
-				InstanceTypes: map[types.NodeName]string{},
+				EnableInstancesV2: false,
+				InstanceTypes:     map[types.NodeName]string{},
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeHostName,
@@ -595,6 +629,529 @@ func Test_AddCloudNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "test-provider-id",
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "provider ID not implemented",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes:     map[types.NodeName]string{},
+				Provider:          "test",
+				ExtID:             map[types.NodeName]string{},
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.NotImplemented,
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] node initialized with provider ID",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ErrByProviderID: nil,
+				Err:             nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] node ignored",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"):        "t1.micro",
+					types.NodeName("fake://12345"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+		{
+			name: "[instanceV2] zone/region topology labels added",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Provider: "aws",
+				Zone: cloudprovider.Zone{
+					FailureDomain: "us-west-1a",
+					Region:        "us-west",
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels:            map[string]string{},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						"failure-domain.beta.kubernetes.io/region": "us-west",
+						"failure-domain.beta.kubernetes.io/zone":   "us-west-1a",
+						"topology.kubernetes.io/region":            "us-west",
+						"topology.kubernetes.io/zone":              "us-west-1a",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "aws://12345",
+				},
+			},
+		},
+		{
+			name: "[instanceV2] node addresses",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes:     map[types.NodeName]string{},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ExistsByProviderID: true,
+				Err:                nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels:            map[string]string{},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] provided node IP address",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ExistsByProviderID: true,
+				Err:                nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Annotations: map[string]string{
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "node0.aws.12345",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Annotations: map[string]string{
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "node0.aws.12345",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] provider ID already set",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes:     map[types.NodeName]string{},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ExistsByProviderID: false,
+				Err:                nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{},
 				},
 				Status: v1.NodeStatus{
@@ -615,16 +1172,62 @@ func Test_AddCloudNode(t *testing.T) {
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeHostName,
+							Address: "node0.cloud.internal",
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.0.1",
+						},
+						{
+							Type:    v1.NodeExternalIP,
+							Address: "132.143.154.163",
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "test-provider-id",
+					Taints: []v1.Taint{
+						{
+							Key:    "ImproveCoverageTaint",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
 					},
 				},
 			},
 		},
 		{
-			name: "provider ID not implemented",
+			name: "[instanceV2] provider ID not implemented",
 			fakeCloud: &fakecloud.Cloud{
-				InstanceTypes: map[types.NodeName]string{},
-				Provider:      "test",
-				ExtID:         map[types.NodeName]string{},
+				EnableInstancesV2: true,
+				InstanceTypes:     map[types.NodeName]string{},
+				Provider:          "test",
+				ExtID:             map[types.NodeName]string{},
 				ExtIDErr: map[types.NodeName]error{
 					types.NodeName("node0"): cloudprovider.NotImplemented,
 				},
@@ -706,6 +1309,87 @@ func Test_AddCloudNode(t *testing.T) {
 	}
 }
 
+// test AddCloudNode with instanceV2, same test case with TestGCECondition.
+func TestGCEConditionV2(t *testing.T) {
+	existingNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "node0",
+			CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionUnknown,
+					LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{
+				{
+					Key:    cloudproviderapi.TaintExternalCloudProvider,
+					Value:  "true",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+
+	fakeCloud := &fakecloud.Cloud{
+		EnableInstancesV2: true,
+		InstanceTypes: map[types.NodeName]string{
+			types.NodeName("node0"): "t1.micro",
+		},
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: "node0.cloud.internal",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "10.0.0.1",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+		},
+		Provider: "gce",
+		Err:      nil,
+	}
+
+	clientset := fake.NewSimpleClientset(existingNode)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+
+	eventBroadcaster := record.NewBroadcaster()
+	cloudNodeController := &CloudNodeController{
+		kubeClient:                clientset,
+		nodeInformer:              factory.Core().V1().Nodes(),
+		cloud:                     fakeCloud,
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		nodeStatusUpdateFrequency: 1 * time.Second,
+	}
+	eventBroadcaster.StartLogging(t.Logf)
+
+	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
+
+	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting updated nodes: %v", err)
+	}
+
+	conditionAdded := false
+	for _, cond := range updatedNode.Status.Conditions {
+		if cond.Status == "True" && cond.Type == "NetworkUnavailable" && cond.Reason == "NoRouteCreated" {
+			conditionAdded = true
+		}
+	}
+
+	assert.True(t, conditionAdded, "Network Route Condition for GCE not added by external cloud initializer")
+}
+
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // the GCE route condition is added if cloudprovider is GCE
 func TestGCECondition(t *testing.T) {
@@ -736,6 +1420,7 @@ func TestGCECondition(t *testing.T) {
 	}
 
 	fakeCloud := &fakecloud.Cloud{
+		EnableInstancesV2: false,
 		InstanceTypes: map[types.NodeName]string{
 			types.NodeName("node0"): "t1.micro",
 		},
@@ -1028,6 +1713,77 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 		"Node address changes are not detected correctly")
 }
 
+// Test updateNodeAddress with instanceV2, same test case with TestNodeAddressesNotUpdate.
+func TestNodeAddressesNotUpdateV2(t *testing.T) {
+	existingNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "node0",
+			CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+			Labels:            map[string]string{},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionUnknown,
+					LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{
+				{
+					Key:    cloudproviderapi.TaintExternalCloudProvider,
+					Value:  "true",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(existingNode)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+
+	fakeCloud := &fakecloud.Cloud{
+		EnableInstancesV2: true,
+		InstanceTypes:     map[types.NodeName]string{},
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: "node0.cloud.internal",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "10.0.0.1",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+		},
+		ExistsByProviderID: false,
+		Err:                nil,
+	}
+
+	cloudNodeController := &CloudNodeController{
+		kubeClient:   clientset,
+		nodeInformer: factory.Core().V1().Nodes(),
+		cloud:        fakeCloud,
+	}
+
+	cloudNodeController.updateNodeAddress(context.TODO(), existingNode)
+
+	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting updated nodes: %v", err)
+	}
+
+	if len(updatedNode.Status.Addresses) > 0 {
+		t.Errorf("Node addresses should not be updated")
+	}
+}
+
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
 // and node addresses will not be updated when node isn't present according to the cloudprovider
 func TestNodeAddressesNotUpdate(t *testing.T) {
@@ -1062,7 +1818,8 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 
 	fakeCloud := &fakecloud.Cloud{
-		InstanceTypes: map[types.NodeName]string{},
+		EnableInstancesV2: false,
+		InstanceTypes:     map[types.NodeName]string{},
 		Addresses: []v1.NodeAddress{
 			{
 				Type:    v1.NodeHostName,
@@ -1087,7 +1844,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, fakeCloud)
+	cloudNodeController.updateNodeAddress(context.TODO(), existingNode)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
