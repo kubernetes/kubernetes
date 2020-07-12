@@ -298,7 +298,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else { // Attention: blob disk feature is deprecated
 		if kind == v1.AzureDedicatedBlobDisk {
 			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGiB)
 			if err != nil {
