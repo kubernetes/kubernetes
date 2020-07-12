@@ -151,6 +151,7 @@ go_test(
         "//staging/src/k8s.io/legacy-cloud-providers/azure/cache:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient/mockfileclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient/mockloadbalancerclient:go_default_library",
