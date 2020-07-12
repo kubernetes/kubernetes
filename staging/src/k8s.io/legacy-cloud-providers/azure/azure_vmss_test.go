@@ -56,6 +56,13 @@ func setTestVirtualMachineCloud(ss *Cloud, scaleSetName, zone string, faultDomai
 	scaleSets["rg"] = map[string]compute.VirtualMachineScaleSet{
 		scaleSetName: {
 			Name: &scaleSetName,
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
+					OsProfile: &compute.VirtualMachineScaleSetOSProfile{
+						ComputerNamePrefix: to.StringPtr("vmssee6c2"),
+					},
+				},
+			},
 		},
 	}
 	virtualMachineScaleSetsClient.setFakeStore(scaleSets)
