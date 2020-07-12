@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -200,6 +199,9 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		if !dInfo.Capabilities[CapSnapshotDataSource] {
 			e2eskipper.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
 		}
+		if !dInfo.SupportedFsType.Has(pattern.FsType) {
+			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
+		}
 
 		sDriver, ok := driver.(SnapshottableTestDriver)
 		if !ok {
@@ -210,10 +212,9 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		dc := l.config.Framework.DynamicClient
-		vsc := sDriver.GetSnapshotClass(l.config)
 		testConfig := convertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.cs, dc, l.pvc, l.sc, vsc, pattern.VolMode, expectedContent)
+		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 		defer cleanupFunc()
 
 		l.pvc.Spec.DataSource = dataSource
@@ -723,11 +724,13 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 func prepareSnapshotDataSourceForProvisioning(
 	f *framework.Framework,
 	config e2evolume.TestConfig,
+	perTestConfig *PerTestConfig,
+	pattern testpatterns.TestPattern,
 	client clientset.Interface,
 	dynamicClient dynamic.Interface,
 	initClaim *v1.PersistentVolumeClaim,
 	class *storagev1.StorageClass,
-	snapshotClass *unstructured.Unstructured,
+	sDriver SnapshottableTestDriver,
 	mode v1.PersistentVolumeMode,
 	injectContent string,
 ) (*v1.TypedLocalObjectReference, func()) {
@@ -753,44 +756,30 @@ func prepareSnapshotDataSourceForProvisioning(
 	}
 	e2evolume.InjectContent(f, config, nil, "", tests)
 
-	ginkgo.By("[Initialize dataSource]creating a SnapshotClass")
-	snapshotClass, err = dynamicClient.Resource(SnapshotClassGVR).Create(context.TODO(), snapshotClass, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	snapshotResource := CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace())
 
-	ginkgo.By("[Initialize dataSource]creating a snapshot")
-	snapshot := getSnapshot(updatedClaim.Name, updatedClaim.Namespace, snapshotClass.GetName())
-	snapshot, err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Create(context.TODO(), snapshot, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-
-	WaitForSnapshotReady(dynamicClient, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-	framework.ExpectNoError(err)
-
-	ginkgo.By("[Initialize dataSource]checking the snapshot")
-	// Get new copy of the snapshot
-	snapshot, err = dynamicClient.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
-	framework.ExpectNoError(err)
 	group := "snapshot.storage.k8s.io"
 	dataSourceRef := &v1.TypedLocalObjectReference{
 		APIGroup: &group,
 		Kind:     "VolumeSnapshot",
-		Name:     snapshot.GetName(),
+		Name:     snapshotResource.Vs.GetName(),
 	}
 
 	cleanupFunc := func() {
-		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
-		err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
-		}
-
 		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(context.TODO(), updatedClaim.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
-		framework.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
-		framework.ExpectNoError(dynamicClient.Resource(SnapshotClassGVR).Delete(context.TODO(), snapshotClass.GetName(), metav1.DeleteOptions{}))
+		err = snapshotResource.CleanupResource()
+		framework.ExpectNoError(err)
+
+		ginkgo.By("deleting StorageClass " + class.Name)
+		err = client.StorageV1().StorageClasses().Delete(context.TODO(), class.GetName(), metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Failf("Error deleting storage class %q. Error: %v", class.GetName(), err)
+		}
 	}
 
 	return dataSourceRef, cleanupFunc

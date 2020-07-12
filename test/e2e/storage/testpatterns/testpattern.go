@@ -56,18 +56,31 @@ type TestSnapshotType string
 var (
 	// DynamicCreatedSnapshot represents a snapshot type for dynamic created snapshot
 	DynamicCreatedSnapshot TestSnapshotType = "DynamicSnapshot"
+	// PreprovisionedCreatedSnapshot represents a snapshot type for pre-provisioned snapshot
+	PreprovisionedCreatedSnapshot TestSnapshotType = "PreprovisionedSnapshot"
+)
+
+// TestSnapshotDeletionPolicy represents the deletion policy of the snapshot class
+type TestSnapshotDeletionPolicy string
+
+var (
+	// DeleteSnapshot represents delete policy
+	DeleteSnapshot TestSnapshotDeletionPolicy = "Delete"
+	// RetainSnapshot represents retain policy
+	RetainSnapshot TestSnapshotDeletionPolicy = "Retain"
 )
 
 // TestPattern represents a combination of parameters to be tested in a TestSuite
 type TestPattern struct {
-	Name           string                      // Name of TestPattern
-	FeatureTag     string                      // featureTag for the TestSuite
-	VolType        TestVolType                 // Volume type of the volume
-	FsType         string                      // Fstype of the volume
-	VolMode        v1.PersistentVolumeMode     // PersistentVolumeMode of the volume
-	SnapshotType   TestSnapshotType            // Snapshot type of the snapshot
-	BindingMode    storagev1.VolumeBindingMode // VolumeBindingMode of the volume
-	AllowExpansion bool                        // AllowVolumeExpansion flag of the StorageClass
+	Name                   string                      // Name of TestPattern
+	FeatureTag             string                      // featureTag for the TestSuite
+	VolType                TestVolType                 // Volume type of the volume
+	FsType                 string                      // Fstype of the volume
+	VolMode                v1.PersistentVolumeMode     // PersistentVolumeMode of the volume
+	SnapshotType           TestSnapshotType            // Snapshot type of the snapshot
+	SnapshotDeletionPolicy TestSnapshotDeletionPolicy  // Deletion policy of the snapshot class
+	BindingMode            storagev1.VolumeBindingMode // VolumeBindingMode of the volume
+	AllowExpansion         bool                        // AllowVolumeExpansion flag of the StorageClass
 }
 
 var (
@@ -95,8 +108,10 @@ var (
 	}
 	// DefaultFsDynamicPV is TestPattern for "Dynamic PV (default fs)"
 	DefaultFsDynamicPV = TestPattern{
-		Name:    "Dynamic PV (default fs)",
-		VolType: DynamicPV,
+		Name:                   "Dynamic PV (default fs)",
+		VolType:                DynamicPV,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for ext3
@@ -266,17 +281,42 @@ var (
 	}
 	// BlockVolModeDynamicPV is TestPattern for "Dynamic PV (block)"
 	BlockVolModeDynamicPV = TestPattern{
-		Name:    "Dynamic PV (block volmode)",
-		VolType: DynamicPV,
-		VolMode: v1.PersistentVolumeBlock,
+		Name:                   "Dynamic PV (block volmode)",
+		VolType:                DynamicPV,
+		VolMode:                v1.PersistentVolumeBlock,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for snapshot case
 
-	// DynamicSnapshot is TestPattern for "Dynamic snapshot"
-	DynamicSnapshot = TestPattern{
-		Name:         "Dynamic Snapshot",
-		SnapshotType: DynamicCreatedSnapshot,
+	// DynamicSnapshotDelete is TestPattern for "Dynamic snapshot"
+	DynamicSnapshotDelete = TestPattern{
+		Name:                   "Dynamic Snapshot (delete policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                DynamicPV,
+	}
+	// PreprovisionedSnapshotDelete is TestPattern for "Pre-provisioned snapshot"
+	PreprovisionedSnapshotDelete = TestPattern{
+		Name:                   "Pre-provisioned Snapshot (delete policy)",
+		SnapshotType:           PreprovisionedCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                DynamicPV,
+	}
+	// DynamicSnapshotRetain is TestPattern for "Dynamic snapshot"
+	DynamicSnapshotRetain = TestPattern{
+		Name:                   "Dynamic Snapshot (retain policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
+	}
+	// PreprovisionedSnapshotRetain is TestPattern for "Pre-provisioned snapshot"
+	PreprovisionedSnapshotRetain = TestPattern{
+		Name:                   "Pre-provisioned Snapshot (retain policy)",
+		SnapshotType:           PreprovisionedCreatedSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
 	}
 
 	// Definitions for volume expansion case
