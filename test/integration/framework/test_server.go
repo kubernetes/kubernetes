@@ -126,11 +126,18 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
+	// use a channel to hand off the error
+	errs := make(chan error, 1)
 	go func() {
 		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
-			t.Fatal(err)
+			errs <- err
 		}
 	}()
+	// wait for it
+	err = <-errs
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Adjust the loopback config for external use (external server name and CA)
 	kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
