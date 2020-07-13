@@ -3973,8 +3973,13 @@ type LoadBalancerIngress struct {
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 }
 
+const (
+	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
+	MaxServiceTopologyKeys = 16
+)
+
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
-// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+// to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 type IPFamily string
 
 const (
@@ -3982,8 +3987,29 @@ const (
 	IPv4Protocol IPFamily = "IPv4"
 	// IPv6Protocol indicates that this IP is IPv6 protocol
 	IPv6Protocol IPFamily = "IPv6"
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
+)
+
+// IPFamilyPolicyType represents the dual-stack-ness requested or required by a Service
+type IPFamilyPolicyType string
+
+const (
+	// IPFamilyPolicySingleStack indicates that this service is required to have a single IPFamily.
+	// The IPFamily assigned is based on the default IPFamily used by the cluster
+	// or as identified by service.spec.ipFamilies field
+	IPFamilyPolicySingleStack IPFamilyPolicyType = "SingleStack"
+	// IPFamilyPolicyPreferDualStack indicates that this service prefers dual-stack when
+	// the cluster is configured for dual-stack. If the cluster is not configured
+	// for dual-stack the service will be assigned a single IPFamily. If the IPFamily is not
+	// set in service.spec.ipFamilies then the service will be assigned the default IPFamily
+	// configured on the cluster
+	IPFamilyPolicyPreferDualStack IPFamilyPolicyType = "PreferDualStack"
+	// IPFamilyPolicyRequireDualStack indicates that this service requires dual-stack. Using
+	// IPFamilyPolicyRequireDualStack on a single stack cluster will result in validation errors. The
+	// IPFamilies (and their order) assigned  to this service is based on service.spec.ipFamilies. If
+	// service.spec.ipFamilies was not provided then it will be assigned according to how they are
+	// configured on the cluster. If service.spec.ipFamilies has only one entry then the alternative
+	// IPFamily will be added by apiserver
+	IPFamilyPolicyRequireDualStack IPFamilyPolicyType = "RequireDualStack"
 )
 
 // ServiceSpec describes the attributes that a user creates on a service.
@@ -4017,6 +4043,17 @@ type ServiceSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
 	ClusterIP string `json:"clusterIP,omitempty" protobuf:"bytes,3,opt,name=clusterIP"`
+
+	// ClusterIPs identifies all the ClusterIPs assigned to this
+	// service. ClusterIPs are assigned or reserved based on the values of
+	// service.spec.ipFamilies. A maximum of two entries (dual-stack IPs) are
+	// allowed in ClusterIPs. The IPFamily of each ClusterIP must match
+	// values provided in service.spec.ipFamilies. Clients using ClusterIPs must
+	// keep it in sync with ClusterIP (if provided) by having ClusterIP matching
+	// first element of ClusterIPs.
+	// +listType=atomic
+	// +optional
+	ClusterIPs []string `json:"clusterIPs,omitempty" protobuf:"bytes,18,opt,name=clusterIPs"`
 
 	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
 	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
@@ -4105,23 +4142,15 @@ type ServiceSpec struct {
 	// +optional
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
 
-	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g.
-	// IPv4 vs. IPv6) when the IPv6DualStack feature gate is enabled. In a dual-stack cluster,
-	// you can specify ipFamily when creating a ClusterIP Service to determine whether the
-	// controller will allocate an IPv4 or IPv6 IP for it, and you can specify ipFamily when
-	// creating a headless Service to determine whether it will have IPv4 or IPv6 Endpoints. In
-	// either case, if you do not specify an ipFamily explicitly, it will default to the
-	// cluster's primary IP family.
-	// This field is part of an alpha feature, and you should not make any assumptions about its
-	// semantics other than those described above. In particular, you should not assume that it
-	// can (or cannot) be changed after creation time; that it can only have the values "IPv4"
-	// and "IPv6"; or that its current value on a given Service correctly reflects the current
-	// state of that Service. (For ClusterIP Services, look at clusterIP to see if the Service
-	// is IPv4 or IPv6. For headless Services, look at the endpoints, which may be dual-stack in
-	// the future. For ExternalName Services, ipFamily has no meaning, but it may be set to an
-	// irrelevant value anyway.)
+	// IPFamilies identifies all the IPFamilies assigned for this Service. If a value
+	// was not provided for IPFamilies it will be defaulted based on the cluster
+	// configuration and the value of service.spec.ipFamilyPolicy. A maximum of two
+	// values (dual-stack IPFamilies) are allowed in IPFamilies. IPFamilies field is
+	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
+	// but it does not allow changing the primary IPFamily of the service.
+	// +listType=atomic
 	// +optional
-	IPFamily *IPFamily `json:"ipFamily,omitempty" protobuf:"bytes,15,opt,name=ipFamily,Configcasttype=IPFamily"`
+	IPFamilies []IPFamily `json:"ipFamilies,omitempty" protobuf:"bytes,19,opt,name=ipFamilies,casttype=IPFamily"`
 
 	// topologyKeys is a preference-order list of topology keys which
 	// implementations of services should use to preferentially sort endpoints
@@ -4137,6 +4166,17 @@ type ServiceSpec struct {
 	// If this is not specified or empty, no topology constraints will be applied.
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,16,opt,name=topologyKeys"`
+
+	// IPFamilyPolicy represents the dual-stack-ness requested or required by this
+	// Service. If there is no value provided, then this Service will be considered
+	// SingleStack (single IPFamily). Services can be SingleStack (single IPFamily),
+	// PreferDualStack (two dual-stack IPFamilies on dual-stack clusters or single
+	// IPFamily on single-stack clusters), or RequireDualStack (two dual-stack IPFamilies
+	// on dual-stack configured clusters, otherwise fail). The IPFamilies and ClusterIPs assigned
+	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
+	// respectively.
+	// +optional
+	IPFamilyPolicy *IPFamilyPolicyType `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicyType"`
 }
 
 // ServicePort contains information on service's port.
