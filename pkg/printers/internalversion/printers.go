@@ -1131,10 +1131,11 @@ func printService(obj *api.Service, options printers.GenerateOptions) ([]metav1.
 		Object: runtime.RawExtension{Object: obj},
 	}
 	svcType := obj.Spec.Type
-	internalIP := obj.Spec.ClusterIP
-	if len(internalIP) == 0 {
-		internalIP = "<none>"
+	internalIP := "<none>"
+	if len(obj.Spec.ClusterIPs) > 0 {
+		internalIP = obj.Spec.ClusterIPs[0]
 	}
+
 	externalIP := getServiceExternalIP(obj, options.Wide)
 	svcPorts := makePortString(obj.Spec.Ports)
 	if len(svcPorts) == 0 {
