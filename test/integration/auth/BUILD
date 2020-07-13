@@ -30,7 +30,6 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/auth/authorizer/abac:go_default_library",
-        "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/features:go_default_library",
