@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -2462,5 +2463,135 @@ func benchRepeatedUpdate(client kubernetes.Interface, podName string) func(*test
 				b.Fatalf("Failed to patch object: %v", err)
 			}
 		}
+	}
+}
+
+func TestUpgradeClientSideToServerSideApply(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  annotations:
+    "kubectl.kubernetes.io/last-applied-configuration": |
+      {"kind":"Deployment","apiVersion":"apps/v1","metadata":{"name":"my-deployment","labels":{"app":"my-app"}},"spec":{"replicas": 3,"template":{"metadata":{"labels":{"app":"my-app"}},"spec":{"containers":[{"name":"my-c","image":"my-image"}]}}}}
+  labels:
+    app: my-app
+spec:
+  replicas: 100000
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`)
+
+	deployment, err := yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(deployment).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	obj = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-new-label
+spec:
+  replicas: 3 # expect conflict
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`)
+
+	deployment, err = yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("Expected conflict error but got: %v", err)
+	}
+
+	obj = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-new-label
+spec:
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image-new
+`)
+
+	deployment, err = yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	deploymentObj, err := client.AppsV1().Deployments("default").Get(context.TODO(), "my-deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get object: %v", err)
+	}
+	if *deploymentObj.Spec.Replicas != 100000 {
+		t.Fatalf("expected to get obj with replicas %d, but got %d", 100000, *deploymentObj.Spec.Replicas)
+	}
+	if deploymentObj.Spec.Template.Spec.Containers[0].Image != "my-image-new" {
+		t.Fatalf("expected to get obj with image %s, but got %s", "my-image-new", deploymentObj.Spec.Template.Spec.Containers[0].Image)
 	}
 }
