@@ -23,10 +23,10 @@ go_library(
     srcs = ["helpers.go"],
     importpath = "k8s.io/kubernetes/pkg/api/v1/resource",
     deps = [
-        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
     ],
 )
 

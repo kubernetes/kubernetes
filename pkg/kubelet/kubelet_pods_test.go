@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed

@@ -17,8 +17,8 @@ limitations under the License.
 package features
 
 import (
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/component-base/featuregate"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 const (

@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )

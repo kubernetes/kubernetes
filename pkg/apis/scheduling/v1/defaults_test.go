@@ -24,8 +24,8 @@ import (
 	"k8s.io/api/kubefeaturegates"
 	v1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	// ensure types are installed

@@ -80,7 +80,6 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
@@ -93,6 +92,7 @@ go_library(
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
@@ -104,7 +104,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/duration:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
     ],
 )
 

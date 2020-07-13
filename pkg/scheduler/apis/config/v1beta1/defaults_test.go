@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/utils/pointer"
 )

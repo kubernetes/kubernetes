@@ -22,7 +22,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
     ],
 )
 

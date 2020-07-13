@@ -35,8 +35,8 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )

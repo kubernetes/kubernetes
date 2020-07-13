@@ -24,14 +24,14 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/storage:go_default_library",
-        "//pkg/features:go_default_library",
+        "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
     ],
 )
 

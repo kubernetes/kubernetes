@@ -26,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/component-base/featuregateinstance"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/featuregateinstance"
 )
 
 // RecommendedOptions contains the recommended options for running an API server.

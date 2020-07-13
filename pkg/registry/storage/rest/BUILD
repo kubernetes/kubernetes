@@ -12,12 +12,12 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/storage:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/registry/storage/csidriver/storage:go_default_library",
         "//pkg/registry/storage/csinode/storage:go_default_library",
         "//pkg/registry/storage/csistoragecapacity/storage:go_default_library",
         "//pkg/registry/storage/storageclass/storage:go_default_library",
         "//pkg/registry/storage/volumeattachment/storage:go_default_library",
+        "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
@@ -25,7 +25,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
     ],
 )
 

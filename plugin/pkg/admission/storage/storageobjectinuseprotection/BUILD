@@ -7,8 +7,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",

@@ -19,7 +19,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",

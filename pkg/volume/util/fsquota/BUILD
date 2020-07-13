@@ -11,10 +11,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/util/fsquota",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/features:go_default_library",
+        "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -39,21 +39,21 @@ go_test(
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//pkg/features:go_default_library",
             "//pkg/volume/util/fsquota/common:go_default_library",
+            "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+            "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/features:go_default_library",
             "//pkg/volume/util/fsquota/common:go_default_library",
+            "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+            "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "//conditions:default": [],

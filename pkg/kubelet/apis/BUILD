@@ -17,8 +17,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/features:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+            "//staging/src/k8s.io/api/kubefeaturegates:go_default_library",
+            "//staging/src/k8s.io/component-base/featuregateinstance:go_default_library",
         ],
         "//conditions:default": [],
     }),

@@ -58,8 +58,8 @@ import (
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
-	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/master"
