@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"

@@ -21,7 +21,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/utils/pointer"
 )
 

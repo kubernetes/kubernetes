@@ -25,7 +25,7 @@ import (
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )

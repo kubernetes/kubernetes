@@ -35,9 +35,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 
 	"k8s.io/api/kubefeaturegates"
 	// Initialize all known client auth plugins.

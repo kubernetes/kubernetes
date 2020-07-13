@@ -27,9 +27,9 @@ import (
 
 	kubefeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 )
 

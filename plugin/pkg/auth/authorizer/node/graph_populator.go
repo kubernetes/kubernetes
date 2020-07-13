@@ -24,10 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 type graphPopulator struct {

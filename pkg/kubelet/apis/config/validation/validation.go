@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/kubefeaturegates"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"

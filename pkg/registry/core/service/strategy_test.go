@@ -32,8 +32,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {

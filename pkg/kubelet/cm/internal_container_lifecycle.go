@@ -19,7 +19,7 @@ package cm
 import (
 	v1 "k8s.io/api/core/v1"
 	kubefeatures "k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )

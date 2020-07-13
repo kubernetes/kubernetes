@@ -18,7 +18,7 @@ package persistentvolume
 
 import (
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 

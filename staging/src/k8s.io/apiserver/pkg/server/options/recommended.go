@@ -24,9 +24,9 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregateinstance"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -72,7 +72,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		// Wired a global by default that sadly people will abuse to have different meanings in different repos.
 		// Please consider creating your own FeatureGate so you can have a consistent meaning for what a variable contains
 		// across different repos.  Future you will thank you.
-		FeatureGate:                feature.DefaultFeatureGate,
+		FeatureGate:                featuregateinstance.DefaultFeatureGate,
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
 		EgressSelector:             NewEgressSelectorOptions(),
@@ -123,7 +123,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
+	if featuregateinstance.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 		config.FlowControl = utilflowcontrol.New(
 			config.SharedInformerFactory,
 			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1alpha1(),

@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	// TODO: remove this import if

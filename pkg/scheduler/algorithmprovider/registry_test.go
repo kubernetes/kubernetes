@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"

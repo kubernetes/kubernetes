@@ -43,7 +43,7 @@ import (
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	versioninfo "k8s.io/component-base/version"
 )
 

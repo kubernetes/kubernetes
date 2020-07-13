@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	csidriverstore "k8s.io/kubernetes/pkg/registry/storage/csidriver/storage"

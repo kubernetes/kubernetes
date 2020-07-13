@@ -30,10 +30,9 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/util/feature"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	kubeexternalinformers "k8s.io/client-go/informers"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
@@ -58,7 +57,7 @@ func createAPIExtensionsConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		feature.DefaultFeatureGate,
+		utilfeature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err

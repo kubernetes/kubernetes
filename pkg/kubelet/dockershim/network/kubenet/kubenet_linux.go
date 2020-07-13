@@ -47,7 +47,7 @@ import (
 	utilexec "k8s.io/utils/exec"
 
 	kubefeatures "k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	netutils "k8s.io/utils/net"
 )
 

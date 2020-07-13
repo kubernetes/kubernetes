@@ -48,7 +48,7 @@ import (
 	netutil "k8s.io/utils/net"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.

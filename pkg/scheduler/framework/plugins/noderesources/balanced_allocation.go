@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 

@@ -19,7 +19,7 @@ package util
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 

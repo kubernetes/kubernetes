@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubefeatures "k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"

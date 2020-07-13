@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )

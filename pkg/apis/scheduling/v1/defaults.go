@@ -21,7 +21,7 @@ import (
 	"k8s.io/api/kubefeaturegates"
 	v1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {

@@ -37,10 +37,9 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/util/feature"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -73,7 +72,7 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		feature.DefaultFeatureGate,
+		utilfeature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err

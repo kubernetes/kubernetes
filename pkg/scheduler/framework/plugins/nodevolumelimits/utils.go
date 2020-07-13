@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"

@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

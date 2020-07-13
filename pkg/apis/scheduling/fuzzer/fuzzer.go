@@ -20,7 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"k8s.io/api/kubefeaturegates"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )

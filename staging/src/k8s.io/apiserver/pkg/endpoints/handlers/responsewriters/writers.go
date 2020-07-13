@@ -37,9 +37,9 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.

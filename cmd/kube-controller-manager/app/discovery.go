@@ -25,7 +25,7 @@ import (
 
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/klog/v2"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"

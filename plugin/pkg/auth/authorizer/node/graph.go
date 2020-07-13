@@ -21,7 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"

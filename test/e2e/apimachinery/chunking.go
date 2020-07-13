@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

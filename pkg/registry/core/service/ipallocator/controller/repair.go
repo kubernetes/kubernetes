@@ -38,7 +38,7 @@ import (
 	netutil "k8s.io/utils/net"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations

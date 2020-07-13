@@ -48,7 +48,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	"k8s.io/utils/exec"
 )

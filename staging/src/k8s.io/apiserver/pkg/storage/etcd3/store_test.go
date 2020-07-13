@@ -49,7 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
 )

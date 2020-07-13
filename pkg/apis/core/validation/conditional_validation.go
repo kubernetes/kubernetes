@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	netutils "k8s.io/utils/net"
 )

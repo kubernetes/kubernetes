@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 

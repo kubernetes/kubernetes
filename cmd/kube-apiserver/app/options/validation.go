@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/kubefeaturegates"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	netutils "k8s.io/utils/net"

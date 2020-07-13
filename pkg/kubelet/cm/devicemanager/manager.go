@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"

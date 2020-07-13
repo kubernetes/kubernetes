@@ -20,7 +20,7 @@ import (
 	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 )
 
 func init() {

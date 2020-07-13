@@ -27,7 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpath "k8s.io/utils/path"

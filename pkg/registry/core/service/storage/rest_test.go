@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 

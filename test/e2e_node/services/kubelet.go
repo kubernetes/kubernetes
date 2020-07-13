@@ -31,8 +31,8 @@ import (
 
 	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"

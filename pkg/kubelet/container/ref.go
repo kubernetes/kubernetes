@@ -21,8 +21,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ref "k8s.io/client-go/tools/reference"
+	utilfeature "k8s.io/component-base/featuregateinstance"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
