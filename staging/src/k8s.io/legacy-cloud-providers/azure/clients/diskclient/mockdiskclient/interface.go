@@ -79,6 +79,20 @@ func (mr *MockInterfaceMockRecorder) CreateOrUpdate(ctx, resourceGroupName, disk
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockInterface)(nil).CreateOrUpdate), ctx, resourceGroupName, diskName, diskParameter)
 }
 
+// Update mocks base method
+func (m *MockInterface) Update(ctx context.Context, resourceGroupName, diskName string, diskParameter compute.DiskUpdate) *retry.Error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, resourceGroupName, diskName, diskParameter)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
+}
+
+// Update indicates an expected call of Update
+func (mr *MockInterfaceMockRecorder) Update(ctx, resourceGroupName, diskName, diskParameter interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockInterface)(nil).Update), ctx, resourceGroupName, diskName, diskParameter)
+}
+
 // Delete mocks base method
 func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, diskName string) *retry.Error {
 	m.ctrl.T.Helper()
