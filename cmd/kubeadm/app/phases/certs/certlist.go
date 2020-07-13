@@ -28,6 +28,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
+const (
+	errInvalid = "invalid argument"
+	errExist   = "file already exists"
+)
+
 type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *pkiutil.CertConfig) error
 
 // KubeadmCert represents a certificate that Kubeadm will create to function properly.
@@ -396,4 +401,64 @@ func setCommonNameToNodeName() configMutatorsFunc {
 		cc.CommonName = mc.NodeRegistration.Name
 		return nil
 	}
+}
+
+// leafCertificates returns non-CA certificates from the supplied Certificates.
+func leafCertificates(c Certificates) (Certificates, error) {
+	certTree, err := c.AsMap().CertTree()
+	if err != nil {
+		return nil, err
+	}
+
+	var out Certificates
+	for _, leafCertificates := range certTree {
+		out = append(out, leafCertificates...)
+	}
+	return out, nil
+}
+
+func createKeyAndCSR(kubeadmConfig *kubeadmapi.InitConfiguration, cert *KubeadmCert) error {
+	if kubeadmConfig == nil {
+		return errors.Errorf("%s: kubeadmConfig was nil", errInvalid)
+	}
+	if cert == nil {
+		return errors.Errorf("%s: cert was nil", errInvalid)
+	}
+	certDir := kubeadmConfig.CertificatesDir
+	name := cert.BaseName
+	if pkiutil.CSROrKeyExist(certDir, name) {
+		return errors.Errorf("%s: key or CSR %s/%s", errExist, certDir, name)
+	}
+	cfg, err := cert.GetConfig(kubeadmConfig)
+	if err != nil {
+		return err
+	}
+	csr, key, err := pkiutil.NewCSRAndKey(cfg)
+	if err != nil {
+		return err
+	}
+	err = pkiutil.WriteKey(certDir, name, key)
+	if err != nil {
+		return err
+	}
+	err = pkiutil.WriteCSR(certDir, name, csr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateDefaultKeysAndCSRFiles is used in ExternalCA mode to create key files
+// and adjacent CSR files.
+func CreateDefaultKeysAndCSRFiles(config *kubeadmapi.InitConfiguration) error {
+	certificates, err := leafCertificates(GetDefaultCertList())
+	if err != nil {
+		return err
+	}
+	for _, cert := range certificates {
+		if err := createKeyAndCSR(config, cert); err != nil {
+			return err
+		}
+	}
+	return nil
 }

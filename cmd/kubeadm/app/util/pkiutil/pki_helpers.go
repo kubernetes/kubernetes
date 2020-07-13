@@ -291,16 +291,14 @@ func TryLoadKeyFromDisk(pkiPath, name string) (crypto.Signer, error) {
 
 // TryLoadCSRAndKeyFromDisk tries to load the CSR and key from the disk
 func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, crypto.Signer, error) {
-	csrPath := pathForCSR(pkiPath, name)
-
-	csr, err := CertificateRequestFromFile(csrPath)
+	csr, err := TryLoadCSRFromDisk(pkiPath, name)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load the certificate request %s", csrPath)
+		return nil, nil, errors.Wrap(err, "could not load CSR file")
 	}
 
 	key, err := TryLoadKeyFromDisk(pkiPath, name)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't load key file")
+		return nil, nil, errors.Wrap(err, "could not load key file")
 	}
 
 	return csr, key, nil
@@ -333,6 +331,18 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	p := pubKeys[0].(*rsa.PublicKey)
 
 	return k, p, nil
+}
+
+// TryLoadCSRFromDisk tries to load the CSR from the disk
+func TryLoadCSRFromDisk(pkiPath, name string) (*x509.CertificateRequest, error) {
+	csrPath := pathForCSR(pkiPath, name)
+
+	csr, err := CertificateRequestFromFile(csrPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not load the CSR %s", csrPath)
+	}
+
+	return csr, nil
 }
 
 // PathsForCertAndKey returns the paths for the certificate and key given the path and basename.
