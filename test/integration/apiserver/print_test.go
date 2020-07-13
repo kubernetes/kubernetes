@@ -184,7 +184,7 @@ func TestServerSidePrint(t *testing.T) {
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	configFlags := genericclioptions.NewTestConfigFlags().
-		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfigFromURL(s.URL), &clientcmd.ConfigOverrides{}))
 
 	restConfig, err := configFlags.ToRESTConfig()
 	if err != nil {
@@ -318,7 +318,7 @@ func decodeIntoTable(body []byte) (*metav1beta1.Table, error) {
 	return table, nil
 }
 
-func createKubeConfig(url string) *clientcmdapi.Config {
+func createKubeConfigFromURL(url string) *clientcmdapi.Config {
 	clusterNick := "cluster"
 	userNick := "user"
 	contextNick := "context"
