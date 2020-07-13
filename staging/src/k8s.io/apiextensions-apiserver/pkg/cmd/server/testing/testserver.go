@@ -151,7 +151,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create server: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 	go func(stopCh <-chan struct{}) {
 		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
 			errCh <- err
