@@ -161,6 +161,49 @@ func TestCreateOrUpdate(t *testing.T) {
 	assert.Equal(t, throttleErr, rerr)
 }
 
+func TestUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/disks/disk1"
+	diskUpdate := getTestDiskUpdate()
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+	}
+	armClient.EXPECT().PatchResource(gomock.Any(), resourceID, diskUpdate).Return(response, nil).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
+
+	diskClient := getTestDiskClient(armClient)
+	rerr := diskClient.Update(context.TODO(), "rg", "disk1", diskUpdate)
+	assert.Nil(t, rerr)
+
+	response = &http.Response{
+		StatusCode: http.StatusTooManyRequests,
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	throttleErr := &retry.Error{
+		HTTPStatusCode: http.StatusTooManyRequests,
+		RawError:       fmt.Errorf("error"),
+		Retriable:      true,
+		RetryAfter:     time.Unix(100, 0),
+	}
+
+	armClient.EXPECT().PatchResource(gomock.Any(), resourceID, diskUpdate).Return(response, throttleErr).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
+	rerr = diskClient.Update(context.TODO(), "rg", "disk1", diskUpdate)
+	assert.Equal(t, throttleErr, rerr)
+}
+
+func getTestDiskUpdate() compute.DiskUpdate {
+	return compute.DiskUpdate{
+		DiskUpdateProperties: &compute.DiskUpdateProperties{
+			DiskSizeGB: to.Int32Ptr(100),
+		},
+	}
+}
+
 func TestDelete(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
