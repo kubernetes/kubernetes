@@ -18,6 +18,7 @@ package autoscaling
 
 import (
 	"context"
+	"google.golang.org/api/option"
 	"math"
 	"time"
 
@@ -233,6 +234,9 @@ func (tc *CustomMetricTestCase) Run() {
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	if err != nil {
+		framework.Failf("Failed to create gcm default client, %v", err)
+	}
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
 	// If this is your use case, create application default credentials:
@@ -247,7 +251,7 @@ func (tc *CustomMetricTestCase) Run() {
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}

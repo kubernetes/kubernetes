@@ -29,7 +29,6 @@ import (
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
 var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
-	var rc *e2eautoscaling.ResourceConsumer
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
@@ -38,20 +37,20 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	SIGDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		ginkgo.It(titleUp, func() {
-			scaleUp("test-deployment", e2eautoscaling.KindDeployment, false, rc, f)
+			scaleUp("test-deployment", e2eautoscaling.KindDeployment, false, f)
 		})
 		ginkgo.It(titleDown, func() {
-			scaleDown("test-deployment", e2eautoscaling.KindDeployment, false, rc, f)
+			scaleDown("test-deployment", e2eautoscaling.KindDeployment, false, f)
 		})
 	})
 
 	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via ReplicaSets
 		ginkgo.It(titleUp, func() {
-			scaleUp("rs", e2eautoscaling.KindReplicaSet, false, rc, f)
+			scaleUp("rs", e2eautoscaling.KindReplicaSet, false, f)
 		})
 		ginkgo.It(titleDown, func() {
-			scaleDown("rs", e2eautoscaling.KindReplicaSet, false, rc, f)
+			scaleDown("rs", e2eautoscaling.KindReplicaSet, false, f)
 		})
 	})
 
@@ -59,10 +58,10 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
 		ginkgo.It(titleUp+" and verify decision stability", func() {
-			scaleUp("rc", e2eautoscaling.KindRC, true, rc, f)
+			scaleUp("rc", e2eautoscaling.KindRC, true, f)
 		})
 		ginkgo.It(titleDown+" and verify decision stability", func() {
-			scaleDown("rc", e2eautoscaling.KindRC, true, rc, f)
+			scaleDown("rc", e2eautoscaling.KindRC, true, f)
 		})
 	})
 
@@ -77,7 +76,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				maxPods:                     2,
 				firstScale:                  2,
 			}
-			scaleTest.run("rc-light", e2eautoscaling.KindRC, rc, f)
+			scaleTest.run("rc-light", e2eautoscaling.KindRC, f)
 		})
 		ginkgo.It("Should scale from 2 pods to 1 pod [Slow]", func() {
 			scaleTest := &HPAScaleTest{
@@ -89,7 +88,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				maxPods:                     2,
 				firstScale:                  1,
 			}
-			scaleTest.run("rc-light", e2eautoscaling.KindRC, rc, f)
+			scaleTest.run("rc-light", e2eautoscaling.KindRC, f)
 		})
 	})
 })
@@ -106,7 +105,6 @@ type HPAScaleTest struct {
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
 	secondScale                 int32
-	secondScaleStasis           time.Duration
 }
 
 // run is a method which runs an HPA lifecycle, from a starting state, to an expected
@@ -114,9 +112,9 @@ type HPAScaleTest struct {
 // The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
-func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *e2eautoscaling.ResourceConsumer, f *framework.Framework) {
+func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc = e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
 	defer rc.CleanUp()
 	hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer e2eautoscaling.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
@@ -131,7 +129,7 @@ func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc
 	}
 }
 
-func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc *e2eautoscaling.ResourceConsumer, f *framework.Framework) {
+func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -148,10 +146,10 @@ func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc 
 		cpuBurst:                    700,
 		secondScale:                 5,
 	}
-	scaleTest.run(name, kind, rc, f)
+	scaleTest.run(name, kind, f)
 }
 
-func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, rc *e2eautoscaling.ResourceConsumer, f *framework.Framework) {
+func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -168,5 +166,5 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, r
 		cpuBurst:                    10,
 		secondScale:                 1,
 	}
-	scaleTest.run(name, kind, rc, f)
+	scaleTest.run(name, kind, f)
 }
