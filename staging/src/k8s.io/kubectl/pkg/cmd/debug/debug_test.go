@@ -645,3 +645,162 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateNodeDebugPod(t *testing.T) {
+	defer func(old func(int) string) { nameSuffixFunc = old }(nameSuffixFunc)
+	var suffixCounter int
+	nameSuffixFunc = func(int) string {
+		suffixCounter++
+		return fmt.Sprint(suffixCounter)
+	}
+
+	for _, tc := range []struct {
+		name, nodeName string
+		opts           *DebugOptions
+		expected       *corev1.Pod
+	}{
+		{
+			name:     "minimum options",
+			nodeName: "node-XXX",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "debug args as container command",
+			nodeName: "node-XXX",
+			opts: &DebugOptions{
+				Args:       []string{"/bin/echo", "one", "two", "three"},
+				Container:  "custom-debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "custom-debugger",
+							Command:                  []string{"/bin/echo", "one", "two", "three"},
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "debug args as container args",
+			nodeName: "node-XXX",
+			opts: &DebugOptions{
+				ArgsOnly:   true,
+				Container:  "custom-debugger",
+				Args:       []string{"echo", "one", "two", "three"},
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "custom-debugger",
+							Args:                     []string{"echo", "one", "two", "three"},
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+			suffixCounter = 0
+
+			pod := tc.opts.generateNodeDebugPod(tc.nodeName)
+			if diff := cmp.Diff(tc.expected, pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
