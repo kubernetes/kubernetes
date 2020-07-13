@@ -52,6 +52,9 @@ type TestServerInstanceOptions struct {
 
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
+
+	// ModifyServerRunOptions allows for providing a custom function to modify ServerRunOption just before running the server
+	ModifyServerRunOptions func(opts *options.ServerRunOptions)
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -171,6 +174,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.ServiceClusterIPRanges = "10.0.0.0/16"
 	s.Etcd.StorageConfig = *storageConfig
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
+
+	if instanceOptions.ModifyServerRunOptions != nil {
+		instanceOptions.ModifyServerRunOptions(s)
+	}
 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err

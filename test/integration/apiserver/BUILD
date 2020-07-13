@@ -2,6 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
     "go_test",
 )
 
@@ -16,6 +17,7 @@ go_test(
         "patch_test.go",
         "print_test.go",
     ],
+    embed = [":go_default_library"],
     rundir = ".",
     tags = [
         "etcd",
@@ -97,4 +99,19 @@ filegroup(
         "//test/integration/apiserver/podlogs:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["util.go"],
+    importpath = "k8s.io/kubernetes/test/integration/apiserver",
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+    ],
 )
