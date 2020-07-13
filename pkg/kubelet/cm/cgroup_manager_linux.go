@@ -497,6 +497,14 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	}
 	cgroupConfig.Resources.SkipDevices = true
 
+	// if the hugetlb controller is missing
+	supportedControllers := getSupportedUnifiedControllers()
+	if !supportedControllers.Has("hugetlb") {
+		cgroupConfig.Resources.HugetlbLimit = nil
+		// the cgroup is not present, but its not required so skip it
+		klog.V(6).Infof("Optional subsystem not supported: hugetlb")
+	}
+
 	manager, err := cgroupfs2.NewManager(cgroupConfig, cgroupConfig.Path, false)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup v2 manager: %v", err)
