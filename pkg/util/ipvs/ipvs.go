@@ -83,6 +83,14 @@ const (
 	KernelModuleIPVSWRR string = "ip_vs_wrr"
 	// KernelModuleIPVSSH is the kernel module "ip_vs_sh"
 	KernelModuleIPVSSH string = "ip_vs_sh"
+	// KernelModuleIPVSLC is the kernel module "ip_vs_lc"
+	KernelModuleIPVSLC string = "ip_vs_lc"
+	// KernelModuleIPVSNQ is the kernel module "ip_vs_nq"
+	KernelModuleIPVSNQ string = "ip_vs_nq"
+	// KernelModuleIPVSDH is the kernel module "ip_vs_dh"
+	KernelModuleIPVSDH string = "ip_vs_dh"
+	// KernelModuleIPVSSED is the kernel module "ip_vs_sed"
+	KernelModuleIPVSSED string = "ip_vs_sed"
 	// KernelModuleNfConntrackIPV4 is the module "nf_conntrack_ipv4"
 	KernelModuleNfConntrackIPV4 string = "nf_conntrack_ipv4"
 	// KernelModuleNfConntrack is the kernel module "nf_conntrack"
@@ -138,4 +146,24 @@ func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
 // IsRsGracefulTerminationNeeded returns true if protocol requires graceful termination for the stale connections
 func IsRsGracefulTerminationNeeded(proto string) bool {
 	return !strings.EqualFold(proto, "UDP") && !strings.EqualFold(proto, "SCTP")
+}
+
+// GetRequiredSchedulerModules returns the required ipvs scheduler module for configured scheduler
+func GetRequiredSchedulerModules(scheduler string) string {
+	switch s := scheduler; s {
+	case "rr":
+		return KernelModuleIPVSRR
+	case "lc":
+		return KernelModuleIPVSLC
+	case "nq":
+		return KernelModuleIPVSNQ
+	case "dh":
+		return KernelModuleIPVSDH
+	case "sh":
+		return KernelModuleIPVSSH
+	case "sed":
+		return KernelModuleIPVSSED
+	default:
+		return KernelModuleIPVSRR
+	}
 }
