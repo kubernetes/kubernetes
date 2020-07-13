@@ -174,7 +174,7 @@ func TestInstanceID(t *testing.T) {
 			expectedErrMsg:      fmt.Errorf("failure of getting instance metadata"),
 		},
 		{
-			name:                "NodeAddresses should report error if cloud.vmSet is nil",
+			name:                "NodeAddresses should report error if cloud.VMSet is nil",
 			nodeName:            "vm1",
 			vmType:              vmTypeStandard,
 			useInstanceMetadata: true,
@@ -194,9 +194,9 @@ func TestInstanceID(t *testing.T) {
 
 	for _, test := range testcases {
 		if test.nilVMSet {
-			cloud.vmSet = nil
+			cloud.VMSet = nil
 		} else {
-			cloud.vmSet = newAvailabilitySet(cloud)
+			cloud.VMSet = newAvailabilitySet(cloud)
 		}
 		cloud.Config.VMType = test.vmType
 		cloud.Config.UseInstanceMetadata = test.useInstanceMetadata
@@ -445,7 +445,7 @@ func TestNodeAddresses(t *testing.T) {
 			expectedErrMsg:      fmt.Errorf("getError"),
 		},
 		{
-			name:                "NodeAddresses should report error if cloud.vmSet is nil",
+			name:                "NodeAddresses should report error if cloud.VMSet is nil",
 			nodeName:            "vm1",
 			vmType:              vmTypeStandard,
 			useInstanceMetadata: true,
@@ -518,9 +518,9 @@ func TestNodeAddresses(t *testing.T) {
 
 	for _, test := range testcases {
 		if test.nilVMSet {
-			cloud.vmSet = nil
+			cloud.VMSet = nil
 		} else {
-			cloud.vmSet = newAvailabilitySet(cloud)
+			cloud.VMSet = newAvailabilitySet(cloud)
 		}
 		cloud.Config.VMType = test.vmType
 		cloud.Config.UseInstanceMetadata = test.useInstanceMetadata
@@ -568,175 +568,6 @@ func TestNodeAddresses(t *testing.T) {
 		ipAddresses, err := cloud.NodeAddresses(context.Background(), types.NodeName(test.nodeName))
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedAddress, ipAddresses, test.name)
-	}
-}
-
-func TestIsCurrentInstance(t *testing.T) {
-	cloud := &Cloud{
-		Config: Config{
-			VMType: vmTypeStandard,
-		},
-	}
-	testcases := []struct {
-		nodeName       string
-		metadataVMName string
-		expected       bool
-		expectedErrMsg error
-	}{
-		{
-			nodeName:       "node1",
-			metadataVMName: "node1",
-			expected:       true,
-		},
-		{
-			nodeName:       "node1",
-			metadataVMName: "node2",
-			expected:       false,
-		},
-	}
-
-	for _, test := range testcases {
-		real, err := cloud.isCurrentInstance(types.NodeName(test.nodeName), test.metadataVMName)
-		assert.Equal(t, test.expectedErrMsg, err)
-		assert.Equal(t, test.expected, real)
-	}
-}
-
-func TestInstanceTypeByProviderID(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
-	cloud.Config.UseInstanceMetadata = true
-
-	testcases := []struct {
-		name              string
-		vmList            []string
-		vmSize            string
-		nodeName          string
-		vmType            string
-		providerID        string
-		metadataName      string
-		metadataTemplate  string
-		useCustomImsCache bool
-		expectedVMsize    string
-		expectedErrMsg    error
-	}{
-		{
-			name:           "InstanceTypeByProviderID should get InstanceType from Azure API if metadata.Compute.VMSize is nil",
-			vmList:         []string{"vm1"},
-			nodeName:       "vm1",
-			metadataName:   "vm1",
-			vmType:         vmTypeStandard,
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
-			expectedVMsize: "Standard_A0",
-		},
-		{
-			name:           "InstanceTypeByProviderID should get InstanceType from metedata if node's name are equal to metadataName and metadata.Compute.VMSize is not nil",
-			vmList:         []string{"vm1"},
-			vmSize:         "Standard_A0",
-			nodeName:       "vm1",
-			metadataName:   "vm1",
-			vmType:         vmTypeStandard,
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
-			expectedVMsize: "Standard_A0",
-		},
-		{
-			name:           "InstanceTypeByProviderID should get InstanceType from Azure API if node is not local instance",
-			vmList:         []string{"vm2"},
-			nodeName:       "vm2",
-			metadataName:   "vm1",
-			vmType:         vmTypeStandard,
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm2",
-			expectedVMsize: "Standard_A0",
-		},
-		{
-			name:       "InstanceTypeByProviderID should return nil if node is unmanaged",
-			providerID: "/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachine/vm1",
-		},
-		{
-			name:           "InstanceTypeByProviderID should report error if node doesn't exist",
-			vmList:         []string{"vm1"},
-			nodeName:       "vm3",
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm3",
-			expectedErrMsg: fmt.Errorf("instance not found"),
-		},
-		{
-			name:           "InstanceTypeByProviderID should report error if providerID is invalid",
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachine/vm3",
-			expectedErrMsg: fmt.Errorf("error splitting providerID"),
-		},
-		{
-			name:           "InstanceTypeByProviderID should report error if providerID is null",
-			expectedErrMsg: fmt.Errorf("providerID is empty, the node is not initialized yet"),
-		},
-		{
-			name:             "InstanceTypeByProviderID should report error if metadata.Compute is nil",
-			nodeName:         "vm1",
-			metadataName:     "vm1",
-			providerID:       "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
-			metadataTemplate: `{"network":{"interface":[]}}`,
-			expectedErrMsg:   fmt.Errorf("failure of getting instance metadata"),
-		},
-		{
-			name:              "NodeAddresses should report error when invoke GetMetadata",
-			nodeName:          "vm1",
-			metadataName:      "vm1",
-			providerID:        "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
-			vmType:            vmTypeStandard,
-			useCustomImsCache: true,
-			expectedErrMsg:    fmt.Errorf("getError"),
-		},
-	}
-
-	for _, test := range testcases {
-		cloud.Config.VMType = test.vmType
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if test.metadataTemplate != "" {
-				fmt.Fprintf(w, test.metadataTemplate)
-			} else {
-				fmt.Fprintf(w, "{\"compute\":{\"name\":\"%s\",\"vmsize\":\"%s\",\"subscriptionId\":\"subscription\",\"resourceGroupName\":\"rg\"}}", test.metadataName, test.vmSize)
-			}
-		}))
-		go func() {
-			http.Serve(listener, mux)
-		}()
-		defer listener.Close()
-
-		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		if test.useCustomImsCache {
-			cloud.metadata.imsCache, err = azcache.NewTimedcache(metadataCacheTTL, func(key string) (interface{}, error) {
-				return nil, fmt.Errorf("getError")
-			})
-			if err != nil {
-				t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-			}
-		}
-
-		vmListWithPowerState := make(map[string]string)
-		for _, vm := range test.vmList {
-			vmListWithPowerState[vm] = ""
-		}
-		expectedVMs := setTestVirtualMachines(cloud, vmListWithPowerState, false)
-		mockVMsClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm3", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
-		mockVMsClient.EXPECT().Update(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-
-		instanceType, err := cloud.InstanceTypeByProviderID(context.Background(), test.providerID)
-		assert.Equal(t, test.expectedErrMsg, err, test.name)
-		assert.Equal(t, test.expectedVMsize, instanceType, test.name)
 	}
 }
 
