@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package handlers
+package internal
 
 import (
 	"net/http"
@@ -27,16 +27,16 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
-// lazyTruncatedUserAgent implements String() string and it will
+// LazyTruncatedUserAgent implements String() string and it will
 // return user-agent which may be truncated.
-type lazyTruncatedUserAgent struct {
-	req *http.Request
+type LazyTruncatedUserAgent struct {
+	Req *http.Request
 }
 
-func (lazy *lazyTruncatedUserAgent) String() string {
+func (lazy *LazyTruncatedUserAgent) String() string {
 	ua := "unknown"
-	if lazy.req != nil {
-		ua = utilnet.GetHTTPClient(lazy.req)
+	if lazy.Req != nil {
+		ua = utilnet.GetHTTPClient(lazy.Req)
 		if len(ua) > maxUserAgentLength {
 			ua = ua[:maxUserAgentLength] + userAgentTruncateSuffix
 		}
@@ -46,13 +46,13 @@ func (lazy *lazyTruncatedUserAgent) String() string {
 
 // LazyClientIP implements String() string and it will
 // calls GetClientIP() lazily only when required.
-type lazyClientIP struct {
-	req *http.Request
+type LazyClientIP struct {
+	Req *http.Request
 }
 
-func (lazy *lazyClientIP) String() string {
-	if lazy.req != nil {
-		if ip := utilnet.GetClientIP(lazy.req); ip != nil {
+func (lazy *LazyClientIP) String() string {
+	if lazy.Req != nil {
+		if ip := utilnet.GetClientIP(lazy.Req); ip != nil {
 			return ip.String()
 		}
 	}
