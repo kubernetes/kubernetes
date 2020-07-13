@@ -79,6 +79,7 @@ func Test_getProxyMode(t *testing.T) {
 		kernelCompat  bool
 		ipsetError    error
 		expected      string
+		scheduler     string
 	}{
 		{ // flag says userspace
 			flag:     "userspace",
@@ -142,6 +143,14 @@ func Test_getProxyMode(t *testing.T) {
 			kernelCompat:  true,
 			expected:      proxyModeIPTables,
 		},
+		{ // flag says ipvs, ipset version ok, kernel modules installed for sed scheduler
+			flag:          "ipvs",
+			kmods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_sed"},
+			kernelVersion: "4.19",
+			ipsetVersion:  ipvs.MinIPSetCheckVersion,
+			expected:      proxyModeIPVS,
+			scheduler:     "sed",
+		},
 	}
 	for i, c := range cases {
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
@@ -150,7 +159,11 @@ func Test_getProxyMode(t *testing.T) {
 			modules:       c.kmods,
 			kernelVersion: c.kernelVersion,
 		}
-		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver)
+		scheduler := cases[i].scheduler
+		if scheduler == "" {
+			scheduler = "rr"
+		}
+		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver, scheduler)
 		r := getProxyMode(c.flag, canUseIPVS, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
