@@ -1,3 +1,4 @@
+// Copyright 2019, 2020 OCI Contributors
 // Copyright 2017 Docker, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,8 +30,13 @@
 //
 // 	sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc
 //
-// In this case, the string "sha256" is the algorithm and the hex bytes are
-// the "digest".
+// The "algorithm" portion defines both the hashing algorithm used to calculate
+// the digest and the encoding of the resulting digest, which defaults to "hex"
+// if not otherwise specified. Currently, all supported algorithms have their
+// digests encoded in hex strings.
+//
+// In the example above, the string "sha256" is the algorithm and the hex bytes
+// are the "digest".
 //
 // Because the Digest type is simply a string, once a valid Digest is
 // obtained, comparisons are cheap, quick and simple to express with the

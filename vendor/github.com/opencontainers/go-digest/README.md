@@ -8,20 +8,16 @@ Please see the [godoc](https://godoc.org/github.com/opencontainers/go-digest) fo
 
 # What is a digest?
 
-A digest is just a hash.
+A digest is just a [hash](https://en.wikipedia.org/wiki/Hash_function).
 
-The most common use case for a digest is to create a content
-identifier for use in [Content Addressable Storage](https://en.wikipedia.org/wiki/Content-addressable_storage)
-systems:
+The most common use case for a digest is to create a content identifier for use in [Content Addressable Storage](https://en.wikipedia.org/wiki/Content-addressable_storage) systems:
 
 ```go
 id := digest.FromBytes([]byte("my content"))
 ```
 
-In the example above, the id can be used to uniquely identify 
-the byte slice "my content". This allows two disparate applications
-to agree on a verifiable identifier without having to trust one
-another.
+In the example above, the id can be used to uniquely identify the byte slice "my content".
+This allows two disparate applications to agree on a verifiable identifier without having to trust one another.
 
 An identifying digest can be verified, as follows:
 
@@ -31,8 +27,7 @@ if id != digest.FromBytes([]byte("my content")) {
 }
 ```
 
-A `Verifier` type can be used to handle cases where an `io.Reader`
-makes more sense:
+A `Verifier` type can be used to handle cases where an `io.Reader` makes more sense:
 
 ```go
 rd := getContent()
@@ -44,33 +39,28 @@ if !verifier.Verified() {
 }
 ```
 
-Using [Merkle DAGs](https://en.wikipedia.org/wiki/Merkle_tree), this
-can power a rich, safe, content distribution system.
+Using [Merkle DAGs](https://en.wikipedia.org/wiki/Merkle_tree), this can power a rich, safe, content distribution system.
 
 # Usage
 
-While the [godoc](https://godoc.org/github.com/opencontainers/go-digest) is
-considered the best resource, a few important items need to be called 
-out when using this package.
+While the [godoc](https://godoc.org/github.com/opencontainers/go-digest) is considered the best resource, a few important items need to be called out when using this package.
 
-1. Make sure to import the hash implementations into your application
-    or the package will panic. You should have something like the 
-    following in the main (or other entrypoint) of your application:
+1. Make sure to import the hash implementations into your application or the package will panic.
+    You should have something like the following in the main (or other entrypoint) of your application:
    
     ```go
     import (
         _ "crypto/sha256"
-   	    _ "crypto/sha512"
+        _ "crypto/sha512"
     )
     ```
     This may seem inconvenient but it allows you replace the hash 
     implementations with others, such as https://github.com/stevvooe/resumable.
  
-2. Even though `digest.Digest` may be assemable as a string, _always_ 
-    verify your input with `digest.Parse` or use `Digest.Validate`
-    when accepting untrusted input. While there are measures to 
-    avoid common problems, this will ensure you have valid digests
-    in the rest of your application.
+2. Even though `digest.Digest` may be assemblable as a string, _always_ verify your input with `digest.Parse` or use `Digest.Validate` when accepting untrusted input.
+    While there are measures to avoid common problems, this will ensure you have valid digests in the rest of your application.
+
+3. While alternative encodings of hash values (digests) are possible (for example, base64), this package deals exclusively with hex-encoded digests.
 
 # Stability
 
@@ -80,25 +70,27 @@ As always, before using a package export, read the [godoc](https://godoc.org/git
 
 # Contributing
 
-This package is considered fairly complete. It has been in production
-in thousands (millions?) of deployments and is fairly battle-hardened.
-New additions will be met with skepticism. If you think there is a 
-missing feature, please file a bug clearly describing the problem and 
-the alternatives you tried before submitting a PR.
+This package is considered fairly complete.
+It has been in production in thousands (millions?) of deployments and is fairly battle-hardened.
+New additions will be met with skepticism.
+If you think there is a missing feature, please file a bug clearly describing the problem and the alternatives you tried before submitting a PR.
 
-# Reporting security issues
+## Code of Conduct
 
-Please DO NOT file a public issue, instead send your report privately to
-security@opencontainers.org.
+Participation in the OpenContainers community is governed by [OpenContainer's Code of Conduct][code-of-conduct].
 
-The maintainers take security seriously. If you discover a security issue,
-please bring it to their attention right away!
+## Security
 
-If you are reporting a security issue, do not create an issue or file a pull
-request on GitHub. Instead, disclose the issue responsibly by sending an email
-to security@opencontainers.org (which is inhabited only by the maintainers of
-the various OCI projects).
+If you find an issue, please follow the [security][security] protocol to report it.
 
 # Copyright and license
 
-Copyright © 2016 Docker, Inc. All rights reserved, except as follows. Code is released under the [Apache 2.0 license](LICENSE.code). This `README.md` file and the [`CONTRIBUTING.md`](CONTRIBUTING.md) file are licensed under the Creative Commons Attribution 4.0 International License under the terms and conditions set forth in the file [`LICENSE.docs`](LICENSE.docs). You may obtain a duplicate copy of the same license, titled CC BY-SA 4.0, at http://creativecommons.org/licenses/by-sa/4.0/.
+Copyright © 2019, 2020 OCI Contributors
+Copyright © 2016 Docker, Inc.
+All rights reserved, except as follows.
+Code is released under the [Apache 2.0 license](LICENSE).
+This `README.md` file and the [`CONTRIBUTING.md`](CONTRIBUTING.md) file are licensed under the Creative Commons Attribution 4.0 International License under the terms and conditions set forth in the file [`LICENSE.docs`](LICENSE.docs).
+You may obtain a duplicate copy of the same license, titled CC BY-SA 4.0, at http://creativecommons.org/licenses/by-sa/4.0/.
+
+[security]: https://github.com/opencontainers/org/blob/master/security
+[code-of-conduct]: https://github.com/opencontainers/org/blob/master/CODE_OF_CONDUCT.md
