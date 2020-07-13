@@ -92,3 +92,18 @@ func (mr *MockInterfaceMockRecorder) Delete(ctx, resourceGroupName, diskName int
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName, diskName)
 }
+
+// ListByResourceGroup mocks base method
+func (m *MockInterface) ListByResourceGroup(ctx context.Context, resourceGroupName string) ([]compute.Disk, *retry.Error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByResourceGroup", ctx, resourceGroupName)
+	ret0, _ := ret[0].([]compute.Disk)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
+}
+
+// ListByResourceGroup indicates an expected call of ListByResourceGroup
+func (mr *MockInterfaceMockRecorder) ListByResourceGroup(ctx, resourceGroupName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByResourceGroup", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName)
+}

@@ -42,4 +42,7 @@ type Interface interface {
 
 	// Delete deletes a Disk by name.
 	Delete(ctx context.Context, resourceGroupName string, diskName string) *retry.Error
+
+	// ListByResourceGroup lists all the disks under a resource group.
+	ListByResourceGroup(ctx context.Context, resourceGroupName string) ([]compute.Disk, *retry.Error)
 }
