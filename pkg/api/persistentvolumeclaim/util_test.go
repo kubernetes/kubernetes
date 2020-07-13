@@ -21,11 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestDropDisabledSnapshotDataSource(t *testing.T) {
@@ -72,7 +72,7 @@ func TestDropDisabledSnapshotDataSource(t *testing.T) {
 	}
 
 	// Ensure that any data sources aren't enabled for this test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.AnyVolumeDataSource, false)()
 
 	for _, enabled := range []bool{true, false} {
 		for _, oldpvcInfo := range pvcInfo {
@@ -84,7 +84,7 @@ func TestDropDisabledSnapshotDataSource(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldpvcInfo.description, newpvcInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSnapshotDataSource, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSnapshotDataSource, enabled)()
 
 					var oldpvcSpec *core.PersistentVolumeClaimSpec
 					if oldpvc != nil {
@@ -173,7 +173,7 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 	}
 
 	// Ensure that any data sources aren't enabled for this test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.AnyVolumeDataSource, false)()
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
@@ -282,8 +282,8 @@ func TestAnyDataSourceFilter(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSnapshotDataSource, test.snapshotEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSnapshotDataSource, test.snapshotEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.AnyVolumeDataSource, test.anyEnabled)()
 			DropDisabledFields(&test.spec, nil)
 			if test.spec.DataSource != test.want {
 				t.Errorf("expected condition was not met, test: %s, snapshotEnabled: %v, anyEnabled: %v, spec: %v, expected: %v",

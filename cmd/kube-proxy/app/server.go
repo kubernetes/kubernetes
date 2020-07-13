@@ -34,6 +34,7 @@ import (
 
 	gerrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,7 +63,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -85,6 +85,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
+
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 )
 
 const (
@@ -757,7 +759,7 @@ func (s *ProxyServer) Run() error {
 	// functions must configure their shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceTopology) {
 		// Make an informer that selects for our nodename.
 		currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
 			informers.WithTweakListOptions(func(options *metav1.ListOptions) {

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,7 +45,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -1189,7 +1189,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 			ns := "test"
 			addPods(podStore, ns, 1, 1, 0, tc.enableDualStackPod)
@@ -1979,7 +1979,7 @@ func TestEndpointPortFromServicePort(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.featureGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAppProtocol, tc.featureGateEnabled)()
 
 			epp := endpointPortFromServicePort(&v1.ServicePort{Name: "test", AppProtocol: tc.serviceAppProtocol}, 80)
 

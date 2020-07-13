@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -84,9 +84,9 @@ var (
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.tokenRequestEnabled = featureGates.Enabled(features.TokenRequest)
-	p.csiNodeInfoEnabled = featureGates.Enabled(features.CSINodeInfo)
-	p.expandPersistentVolumesEnabled = featureGates.Enabled(features.ExpandPersistentVolumes)
+	p.tokenRequestEnabled = featureGates.Enabled(kubefeaturegates.TokenRequest)
+	p.csiNodeInfoEnabled = featureGates.Enabled(kubefeaturegates.CSINodeInfo)
+	p.expandPersistentVolumesEnabled = featureGates.Enabled(kubefeaturegates.ExpandPersistentVolumes)
 }
 
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
@@ -171,7 +171,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		if p.csiNodeInfoEnabled {
 			return p.admitCSINode(nodeName, a)
 		}
-		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s", features.CSINodeInfo))
+		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s", kubefeaturegates.CSINodeInfo))
 
 	default:
 		return nil

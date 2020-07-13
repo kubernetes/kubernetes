@@ -35,6 +35,7 @@ import (
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	"k8s.io/api/kubefeaturegates"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -65,7 +66,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -513,7 +513,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "AttachRequired", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
 		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		csiDriverColumnDefinitions = append(csiDriverColumnDefinitions, metav1.TableColumnDefinition{
 			Name: "StorageCapacity", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["storageCapacity"],
 		})
@@ -1376,7 +1376,7 @@ func printCSIDriver(obj *storage.CSIDriver, options printers.GenerateOptions) ([
 	}
 
 	row.Cells = append(row.Cells, obj.Name, attachRequired, podInfoOnMount)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		storageCapacity := false
 		if obj.Spec.StorageCapacity != nil {
 			storageCapacity = *obj.Spec.StorageCapacity

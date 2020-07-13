@@ -21,10 +21,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	LSCIQuotaFeature = features.LocalStorageCapacityIsolationFSQuotaMonitoring
+	LSCIQuotaFeature = kubefeaturegates.LocalStorageCapacityIsolationFSQuotaMonitoring
 )
 
 func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {

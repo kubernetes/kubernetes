@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -33,7 +34,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
@@ -176,7 +176,7 @@ func TestMutateContainerNonmutating(t *testing.T) {
 }
 
 func TestValidatePodFailures(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 
 	failHostNetworkPod := defaultPod()
 	failHostNetworkPod.Spec.SecurityContext.HostNetwork = true
@@ -685,7 +685,7 @@ func TestValidateContainerFailures(t *testing.T) {
 }
 
 func TestValidatePodSuccess(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 
 	hostNetworkPSP := defaultPSP()
 	hostNetworkPSP.Spec.HostNetwork = true
@@ -1372,8 +1372,8 @@ func defaultV1Pod() *v1.Pod {
 // a pod with that type of volume and deny it, accept it explicitly, or accept it with
 // the FSTypeAll wildcard.
 func TestValidateAllowedVolumes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.GenericEphemeralVolume, true)()
 
 	val := reflect.ValueOf(api.VolumeSource{})
 

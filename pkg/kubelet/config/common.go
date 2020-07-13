@@ -22,7 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,7 +31,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -136,7 +136,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return true, pod, err
 	}
 	opts := validation.PodValidationOptions{
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HugePageStorageMediumSize),
 	}
 	if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
@@ -163,7 +163,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 	}
 
 	opts := validation.PodValidationOptions{
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HugePageStorageMediumSize),
 	}
 
 	// Apply default values and validate pods.

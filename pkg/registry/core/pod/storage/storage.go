@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -287,7 +287,7 @@ var _ = rest.Patcher(&EphemeralContainersREST{})
 
 // Get of this endpoint will return the list of ephemeral containers in this pod
 func (r *EphemeralContainersREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		return nil, errors.NewBadRequest("feature EphemeralContainers disabled")
 	}
 
@@ -306,7 +306,7 @@ func (r *EphemeralContainersREST) New() runtime.Object {
 
 // Update alters the EphemeralContainers field in PodSpec
 func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		return nil, false, errors.NewBadRequest("feature EphemeralContainers disabled")
 	}
 

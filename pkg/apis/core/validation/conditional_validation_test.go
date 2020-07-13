@@ -22,11 +22,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidatePodSCTP(t *testing.T) {
@@ -79,7 +79,7 @@ func TestValidatePodSCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.SCTPSupport, enabled)()
 					errs := ValidateConditionalPod(newPod, oldPod, nil)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.object()) {
@@ -153,7 +153,7 @@ func TestValidateServiceSCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldServiceInfo.description, newServiceInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.SCTPSupport, enabled)()
 					errs := ValidateConditionalService(newService, oldService, []api.IPFamily{api.IPv4Protocol})
 					// objects should never be changed
 					if !reflect.DeepEqual(oldService, oldServiceInfo.object()) {
@@ -227,7 +227,7 @@ func TestValidateEndpointsSCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldEndpointsInfo.description, newEndpointsInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.SCTPSupport, enabled)()
 					errs := ValidateConditionalEndpoints(newEndpoints, oldEndpoints)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldEndpoints, oldEndpointsInfo.object()) {
@@ -465,7 +465,7 @@ func TestValidateServiceIPFamily(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.dualStackEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.dualStackEnabled)()
 			oldSvc := tc.oldSvc.DeepCopy()
 			newSvc := tc.svc.DeepCopy()
 			originalNewSvc := newSvc.DeepCopy()

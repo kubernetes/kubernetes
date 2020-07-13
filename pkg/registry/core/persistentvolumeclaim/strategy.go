@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +33,6 @@ import (
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
@@ -99,7 +99,7 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx context.Context,
 	newPv := obj.(*api.PersistentVolumeClaim)
 	oldPv := old.(*api.PersistentVolumeClaim)
 	newPv.Spec = oldPv.Spec
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && oldPv.Status.Conditions == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) && oldPv.Status.Conditions == nil {
 		newPv.Status.Conditions = nil
 	}
 }

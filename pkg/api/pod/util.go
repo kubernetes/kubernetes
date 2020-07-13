@@ -19,11 +19,11 @@ package pod
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ContainerType signifies container type
@@ -45,7 +45,7 @@ const AllContainers ContainerType = (InitContainers | Containers | EphemeralCont
 // types except for the ones guarded by feature gate.
 func AllFeatureEnabledContainers() ContainerType {
 	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		containerType &= ^EphemeralContainers
 	}
 	return containerType
@@ -331,7 +331,7 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 // dropPodStatusDisabledFields removes disabled fields from the pod status
 func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.PodStatus) {
 	// trim PodIPs down to only one entry (non dual stack).
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) &&
 		!multiplePodIPsInUse(oldPodStatus) {
 		if len(podStatus.PodIPs) != 0 {
 			podStatus.PodIPs = podStatus.PodIPs[0:1]
@@ -349,7 +349,7 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) &&
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequestProjection) &&
 		!tokenRequestProjectionInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].Projected != nil {
@@ -361,7 +361,7 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.AppArmor) && !appArmorInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
 			if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 				delete(podAnnotations, k)
@@ -369,13 +369,13 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.Sysctls) && !sysctlsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.Sysctls = nil
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) && !emptyDirSizeLimitInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) && !emptyDirSizeLimitInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
 				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
@@ -383,7 +383,7 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.VolumeSubpath) && !subpathInUse(oldPodSpec) {
 		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			for i := range c.VolumeMounts {
@@ -392,11 +392,11 @@ func dropDisabledFields(
 			return true
 		})
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
 		podSpec.EphemeralContainers = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathExprInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.VolumeSubpath) && !subpathExprInUse(oldPodSpec) {
 		// drop subpath env expansion from the pod if subpath feature is disabled and the old spec did not specify subpath env expansion
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			for i := range c.VolumeMounts {
@@ -406,7 +406,7 @@ func dropDisabledFields(
 		})
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) && !startupProbeInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StartupProbe) && !startupProbeInUse(oldPodSpec) {
 		// drop startupProbe from all containers if the feature is disabled
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			c.StartupProbe = nil
@@ -418,12 +418,12 @@ func dropDisabledFields(
 
 	dropDisabledFSGroupFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.PodOverhead) && !overheadInUse(oldPodSpec) {
 		// Set Overhead to nil only if the feature is disabled and it is not used
 		podSpec.Overhead = nil
 	}
@@ -433,14 +433,14 @@ func dropDisabledFields(
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
 	dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.NonPreemptingPriority) &&
 		!podPriorityInUse(oldPodSpec) {
 		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
 		podSpec.PreemptionPolicy = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SetHostnameAsFQDN) && !setHostnameAsFQDNInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.SetHostnameAsFQDN) && !setHostnameAsFQDNInUse(oldPodSpec) {
 		// Set SetHostnameAsFQDN to nil only if feature is disabled and it is not used
 		podSpec.SetHostnameAsFQDN = nil
 	}
@@ -450,7 +450,7 @@ func dropDisabledFields(
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
 // to RunAsGroup
 func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && !runAsGroupInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RunAsGroup) && !runAsGroupInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
 		}
@@ -466,7 +466,7 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledProcMountField removes disabled fields from PodSpec related
 // to ProcMount only if it is not already used by the old spec
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ProcMountType) && !procMountInUse(oldPodSpec) {
 		defaultProcMount := api.DefaultProcMount
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 			if c.SecurityContext != nil && c.SecurityContext.ProcMount != nil {
@@ -481,7 +481,7 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 }
 
 func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
 		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
 		// if ConfigurableFSGroupPolicy feature is disabled
 		if podSpec.SecurityContext != nil {
@@ -493,7 +493,7 @@ func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
 // This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
 func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) && !csiInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			podSpec.Volumes[i].CSI = nil
 		}
@@ -503,7 +503,7 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledEphemeralVolumeSourceAlphaFields removes disabled alpha fields from []EphemeralVolumeSource.
 // This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a EphemeralVolumeSource
 func dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) && !csiInUse(oldPodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume) && !csiInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			podSpec.Volumes[i].Ephemeral = nil
 		}

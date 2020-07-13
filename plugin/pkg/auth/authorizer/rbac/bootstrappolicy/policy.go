@@ -18,6 +18,7 @@ package bootstrappolicy
 
 import (
 	capi "k8s.io/api/certificates/v1beta1"
+	"k8s.io/api/kubefeaturegates"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Write and other vars are slices of the allowed verbs.
@@ -155,14 +155,14 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) {
 		// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
 		// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
 		pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) {
 		// Use the Node authorization to limit a node to create tokens for service accounts running on that node
 		// Use the NodeRestriction admission plugin to limit a node to create tokens bound to pods on that node
 		tokenRequestRule := rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie()
@@ -172,13 +172,13 @@ func NodeRules() []rbacv1.PolicyRule {
 	// CSI
 	csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
 	nodePolicyRules = append(nodePolicyRules, csiDriverRule)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
 	}
 
 	// RuntimeClass
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RuntimeClass) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
 	}
 	return nodePolicyRules
@@ -485,7 +485,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAccountIssuerDiscovery) {
 		// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
 		roles = append(roles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
@@ -505,7 +505,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 		eventsRule(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSlice) {
 		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
@@ -541,7 +541,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// Needed for volume limits
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
 			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
@@ -580,7 +580,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAccountIssuerDiscovery) {
 		// Allow all in-cluster workloads (via their service accounts) to read the OIDC discovery endpoints.
 		// Users with certain forms of write access (create pods, create secrets, create service accounts, etc)
 		// can gain access to a service account identity which would allow them to access this information.

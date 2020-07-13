@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +36,6 @@ import (
 	volerr "k8s.io/cloud-provider/volume/errors"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -1606,7 +1606,7 @@ func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
 }
 
 func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOpts volume.NodeResizeOptions) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) {
 		klog.V(4).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
 		return true, nil
 	}

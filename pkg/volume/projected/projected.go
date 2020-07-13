@@ -21,13 +21,13 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
@@ -322,7 +322,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[k] = v
 			}
 		case source.ServiceAccountToken != nil:
-			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+			if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequestProjection) {
 				errlist = append(errlist, fmt.Errorf("pod request ServiceAccountToken projection but the TokenRequestProjection feature was not enabled"))
 				continue
 			}

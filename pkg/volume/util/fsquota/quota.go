@@ -19,10 +19,10 @@ package fsquota
 import (
 	"k8s.io/utils/mount"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Interface -- quota interface
@@ -46,5 +46,5 @@ type Interface interface {
 }
 
 func enabledQuotasForMonitoring() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }

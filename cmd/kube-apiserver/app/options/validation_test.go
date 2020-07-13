@@ -20,9 +20,9 @@ import (
 	"net"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *ServerRunOptions {
@@ -130,7 +130,7 @@ func TestClusterSerivceIPRange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			errs := validateClusterIPFlags(tc.options)
 			if len(errs) > 0 && !tc.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)

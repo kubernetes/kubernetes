@@ -22,12 +22,12 @@ import (
 	"net"
 	"strings"
 
+	"k8s.io/api/kubefeaturegates"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -56,8 +56,8 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 
 	// Secondary IP validation
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		errs = append(errs, fmt.Errorf("--secondary-service-cluster-ip-range can only be used if %v feature is enabled", string(features.IPv6DualStack)))
+	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
+		errs = append(errs, fmt.Errorf("--secondary-service-cluster-ip-range can only be used if %v feature is enabled", string(kubefeaturegates.IPv6DualStack)))
 	}
 
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
@@ -117,15 +117,15 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 	enableSucceeded := options.ServiceAccountIssuer != nil
 
-	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) {
 		errs = append(errs, errors.New("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --api-audiences flags were passed"))
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.BoundServiceAccountTokenVolume) && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) {
 		errs = append(errs, errors.New("the BoundServiceAccountTokenVolume feature depends on the TokenRequest feature, but the TokenRequest features is not enabled"))
 	}
 
-	if !enableAttempted && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if !enableAttempted && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.BoundServiceAccountTokenVolume) {
 		errs = append(errs, errors.New("--service-account-signing-key-file and --service-account-issuer are required flags"))
 	}
 

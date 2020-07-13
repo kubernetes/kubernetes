@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -33,7 +34,6 @@ import (
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -236,7 +236,7 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
-	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) {
 		return nil
 	}
 
@@ -324,7 +324,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// evict pods if there is a resource usage violation from local volume temporary storage
 	// If eviction happens in localStorageEviction function, skip the rest of eviction action
-	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) {
 		if evictedPods := m.localStorageEviction(activePods, statsFunc); len(evictedPods) > 0 {
 			return evictedPods
 		}

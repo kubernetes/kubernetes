@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	k8sfeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,7 +30,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	k8sfeatures "k8s.io/kubernetes/pkg/features"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )

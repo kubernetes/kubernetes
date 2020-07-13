@@ -25,10 +25,10 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -672,7 +672,7 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 			return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 		}
 		if podObj.fsResizeRequired &&
-			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+			utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandInUsePersistentVolumes) {
 			return true, volumeObj.devicePath, newFsResizeRequiredError(volumeObj.volumeName, podObj.podName)
 		}
 	}

@@ -21,10 +21,10 @@ import (
 	"net"
 	"strings"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -34,7 +34,7 @@ import (
 func ValidateConditionalService(service, oldService *api.Service, allowedIPFamilies []api.IPFamily) field.ErrorList {
 	var errs field.ErrorList
 	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(serviceSCTPFields(oldService)) == 0 {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.SCTPSupport) && len(serviceSCTPFields(oldService)) == 0 {
 		for _, f := range serviceSCTPFields(service) {
 			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
 		}
@@ -55,7 +55,7 @@ func validateIPFamily(service, oldService *api.Service, allowedIPFamilies []api.
 	}
 
 	// If the gate is off, setting or changing IPFamily is not allowed, but clearing it is
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 		if service.Spec.IPFamily != nil {
 			if oldService != nil {
 				errs = append(errs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
@@ -132,7 +132,7 @@ func serviceSCTPFields(service *api.Service) []*field.Path {
 func ValidateConditionalEndpoints(endpoints, oldEndpoints *api.Endpoints) field.ErrorList {
 	var errs field.ErrorList
 	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(endpointsSCTPFields(oldEndpoints)) == 0 {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.SCTPSupport) && len(endpointsSCTPFields(oldEndpoints)) == 0 {
 		for _, f := range endpointsSCTPFields(endpoints) {
 			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
 		}
@@ -196,7 +196,7 @@ func validateConditionalPodSpec(podSpec, oldPodSpec *api.PodSpec, fldPath *field
 	errs := field.ErrorList{}
 
 	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(podSCTPFields(oldPodSpec, nil)) == 0 {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.SCTPSupport) && len(podSCTPFields(oldPodSpec, nil)) == 0 {
 		for _, f := range podSCTPFields(podSpec, fldPath) {
 			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
 		}

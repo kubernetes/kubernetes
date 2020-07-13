@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -35,7 +36,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -73,7 +73,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	resourceConfig := master.DefaultAPIResourceConfigSource()
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		resourceConfig.EnableVersions(schema.GroupVersion{
 			Group:   "storage.k8s.io",
 			Version: "v1alpha1",

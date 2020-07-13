@@ -27,11 +27,11 @@ import (
 
 	"k8s.io/utils/mount"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
@@ -580,7 +580,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 }
 
 func testAddRemoveQuotas(t *testing.T, enabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
 	tmpProjectsFile, err := ioutil.TempFile("", "projects")
 	if err == nil {
 		_, err = tmpProjectsFile.WriteString(projectsHeader)

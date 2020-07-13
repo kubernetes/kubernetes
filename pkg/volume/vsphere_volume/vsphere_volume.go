@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -74,8 +74,8 @@ func (plugin *vsphereVolumePlugin) GetPluginName() string {
 }
 
 func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationvSphere)
 }
 
 func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {

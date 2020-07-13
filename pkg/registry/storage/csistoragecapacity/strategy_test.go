@@ -19,6 +19,7 @@ package csistoragecapacity
 import (
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +28,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // getValidCSIStorageCapacity returns a fully-populated CSIStorageCapacity.
@@ -159,7 +159,7 @@ func TestCSIStorageCapacityValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIStorageCapacity, true)()
 
 			oldCapacity := test.old.DeepCopy()
 			Strategy.PrepareForCreate(ctx, oldCapacity)

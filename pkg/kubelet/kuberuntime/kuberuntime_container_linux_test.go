@@ -26,12 +26,12 @@ import (
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -302,7 +302,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)

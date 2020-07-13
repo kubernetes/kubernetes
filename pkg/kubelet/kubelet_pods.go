@@ -33,6 +33,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,7 +48,6 @@ import (
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -169,7 +169,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 		subPath := mount.SubPath
 		if mount.SubPathExpr != "" {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
+			if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.VolumeSubpath) {
 				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
 			}
 
@@ -181,7 +181,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		if subPath != "" {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
+			if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.VolumeSubpath) {
 				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
 			}
 
@@ -1269,7 +1269,7 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 	if !found {
 		cStatus, found = podutil.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
 	}
-	if !found && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !found && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		cStatus, found = podutil.GetContainerStatus(podStatus.EphemeralContainerStatuses, containerName)
 	}
 	if !found {
@@ -1575,7 +1575,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		len(pod.Spec.InitContainers) > 0,
 		true,
 	)
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		var ecSpecs []v1.Container
 		for i := range pod.Spec.EphemeralContainers {
 			ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))

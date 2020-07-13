@@ -20,9 +20,9 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
@@ -167,7 +167,7 @@ func getClusterAutoscalerConfig() *schedulerapi.Plugins {
 }
 
 func applyFeatureGates(config *schedulerapi.Plugins) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DefaultPodTopologySpread) {
 		// When feature is enabled, the default spreading is done by
 		// PodTopologySpread plugin, which is enabled by default.
 		klog.Infof("Registering SelectorSpread plugin")

@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/api/node/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -332,8 +332,8 @@ func newRuntimeClassForTest(runtimeClassEnabled bool,
 
 	if featureInspection {
 		relevantFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
-			features.RuntimeClass: {Default: runtimeClassEnabled},
-			features.PodOverhead:  {Default: false},
+			kubefeaturegates.RuntimeClass: {Default: runtimeClassEnabled},
+			kubefeaturegates.PodOverhead:  {Default: false},
 		}
 		fg := featuregate.NewFeatureGate()
 		fg.Add(relevantFeatures)

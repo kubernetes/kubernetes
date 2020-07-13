@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +37,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -996,7 +996,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 // Mark volume as fsResizeRequired in ASW.
 // Verifies volume's fsResizeRequired flag is cleared later.
 func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandInUsePersistentVolumes, true)()
 	blockMode := v1.PersistentVolumeBlock
 	fsMode := v1.PersistentVolumeFilesystem
 

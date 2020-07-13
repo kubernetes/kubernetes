@@ -19,10 +19,10 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -44,7 +44,7 @@ func appendPluginBasedOnMigrationFeatureFlags(plugins []volume.VolumePlugin, inT
 		klog.Warningf("Unexpected CSI Migration Feature Flags combination detected: %v. CSI Migration may not take effect", err)
 		// TODO: fail and return here once alpha only tests can set the feature flags for a plugin correctly
 	}
-	if featureGate.Enabled(features.CSIMigration) && featureGate.Enabled(pluginMigration) && featureGate.Enabled(pluginMigrationComplete) {
+	if featureGate.Enabled(kubefeaturegates.CSIMigration) && featureGate.Enabled(pluginMigration) && featureGate.Enabled(pluginMigrationComplete) {
 		klog.Infof("Skip registration of plugin %s since feature flag %v is enabled", inTreePluginName, pluginMigrationComplete)
 		return plugins, nil
 	}
@@ -60,12 +60,12 @@ type pluginInfo struct {
 
 func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
-	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAWS, pluginMigrationCompleteFeature: features.CSIMigrationAWSComplete, pluginProbeFunction: awsebs.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationGCE, pluginMigrationCompleteFeature: features.CSIMigrationGCEComplete, pluginProbeFunction: gcepd.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationOpenStack, pluginMigrationCompleteFeature: features.CSIMigrationOpenStackComplete, pluginProbeFunction: cinder.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginMigrationCompleteFeature: features.CSIMigrationAzureDiskComplete, pluginProbeFunction: azure_dd.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginMigrationCompleteFeature: features.CSIMigrationAzureFileComplete, pluginProbeFunction: azure_file.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginMigrationCompleteFeature: features.CSIMigrationvSphereComplete, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: kubefeaturegates.CSIMigrationAWS, pluginMigrationCompleteFeature: kubefeaturegates.CSIMigrationAWSComplete, pluginProbeFunction: awsebs.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: kubefeaturegates.CSIMigrationGCE, pluginMigrationCompleteFeature: kubefeaturegates.CSIMigrationGCEComplete, pluginProbeFunction: gcepd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: kubefeaturegates.CSIMigrationOpenStack, pluginMigrationCompleteFeature: kubefeaturegates.CSIMigrationOpenStackComplete, pluginProbeFunction: cinder.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: kubefeaturegates.CSIMigrationAzureDisk, pluginMigrationCompleteFeature: kubefeaturegates.CSIMigrationAzureDiskComplete, pluginProbeFunction: azure_dd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: kubefeaturegates.CSIMigrationAzureFile, pluginMigrationCompleteFeature: kubefeaturegates.CSIMigrationAzureFileComplete, pluginProbeFunction: azure_file.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: kubefeaturegates.CSIMigrationvSphere, pluginMigrationCompleteFeature: kubefeaturegates.CSIMigrationvSphereComplete, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
 
 	var err error
 	for pluginName, pluginInfo := range pluginMigrationStatus {

@@ -26,6 +26,7 @@ import (
 
 	coordination "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	policy "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +38,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
 )
@@ -53,10 +53,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	)
 
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.DynamicKubeletConfig, true)()
 
 	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSINodeInfo, true)()
 
 	tokenFile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
@@ -558,12 +558,12 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, createNode2NormalPod(superuserClient))
 
 	// ExpandPersistentVolumes feature disabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandPersistentVolumes, false)()
 	expectForbidden(t, updatePVCCapacity(node1Client))
 	expectForbidden(t, updatePVCCapacity(node2Client))
 
 	// ExpandPersistentVolumes feature enabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandPersistentVolumes, true)()
 	expectForbidden(t, updatePVCCapacity(node1Client))
 	expectAllowed(t, updatePVCCapacity(node2Client))
 	expectForbidden(t, updatePVCPhase(node2Client))

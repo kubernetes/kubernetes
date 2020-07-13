@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/cobra"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -66,7 +67,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -620,7 +620,7 @@ func readCA(file string) ([]byte, error) {
 }
 
 func shouldTurnOnDynamicClient(client clientset.Interface) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) {
 		return false
 	}
 	apiResourceList, err := client.Discovery().ServerResourcesForGroupVersion(v1.SchemeGroupVersion.String())

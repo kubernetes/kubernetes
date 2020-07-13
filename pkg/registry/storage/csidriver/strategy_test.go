@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidCSIDriver(name string) *storage.CSIDriver {
@@ -114,8 +114,8 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.withCapacity)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.withInline)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIStorageCapacity, test.withCapacity)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, test.withInline)()
 
 			csiDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -295,8 +295,8 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	runAll := func(t *testing.T, withCapacity, withInline bool) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, withCapacity)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, withInline)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIStorageCapacity, withCapacity)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, withInline)()
 
 				csiDriver := test.update.DeepCopy()
 				Strategy.PrepareForUpdate(ctx, csiDriver, test.old)

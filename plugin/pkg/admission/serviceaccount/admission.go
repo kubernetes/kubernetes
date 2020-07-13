@@ -26,6 +26,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -122,7 +122,7 @@ func NewServiceAccount() *Plugin {
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (s *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	s.boundServiceAccountTokenVolume = featureGates.Enabled(features.BoundServiceAccountTokenVolume)
+	s.boundServiceAccountTokenVolume = featureGates.Enabled(kubefeaturegates.BoundServiceAccountTokenVolume)
 }
 
 // SetExternalKubeClientSet sets the client for the plugin

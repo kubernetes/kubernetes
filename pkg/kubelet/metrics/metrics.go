@@ -25,10 +25,10 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -394,7 +394,7 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.S
 		legacyregistry.MustRegister(RunningPodCount)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) {
 			legacyregistry.MustRegister(AssignedConfig)
 			legacyregistry.MustRegister(ActiveConfig)
 			legacyregistry.MustRegister(LastKnownGoodConfig)

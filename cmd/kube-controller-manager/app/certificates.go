@@ -26,6 +26,7 @@ import (
 
 	"net/http"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -154,7 +154,7 @@ func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.BoundServiceAccountTokenVolume) {
 		return nil, false, nil
 	}
 

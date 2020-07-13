@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -32,7 +33,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -42,7 +42,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	protocolICMP := api.Protocol("ICMP")
 	protocolSCTP := api.ProtocolSCTP
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.SCTPSupport, true)()
 
 	successCases := []networking.NetworkPolicy{
 		{

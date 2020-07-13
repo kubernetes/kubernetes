@@ -20,10 +20,10 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )
@@ -380,7 +380,7 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		claimName := ""
 		if v.PersistentVolumeClaim != nil {
 			claimName = v.PersistentVolumeClaim.ClaimName
-		} else if v.Ephemeral != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		} else if v.Ephemeral != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume) {
 			claimName = pod.Name + "-" + v.Name
 		}
 		if claimName != "" {

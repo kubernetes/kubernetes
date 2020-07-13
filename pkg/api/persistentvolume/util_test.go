@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestDropDisabledFields(t *testing.T) {
@@ -79,7 +79,7 @@ func TestDropDisabledFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandCSIVolumes, tc.csiExpansionEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandCSIVolumes, tc.csiExpansionEnabled)()
 
 			DropDisabledFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {

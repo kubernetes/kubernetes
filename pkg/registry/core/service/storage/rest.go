@@ -47,8 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutil "k8s.io/utils/net"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
@@ -543,7 +543,7 @@ func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableO
 
 // When allocating we always use BySpec, when releasing we always use ByClusterIP
 func (r *REST) getAllocatorByClusterIP(service *api.Service) ipallocator.Interface {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || r.secondaryServiceIPs == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) || r.secondaryServiceIPs == nil {
 		return r.serviceIPs
 	}
 
@@ -556,7 +556,7 @@ func (r *REST) getAllocatorByClusterIP(service *api.Service) ipallocator.Interfa
 }
 
 func (r *REST) getAllocatorBySpec(service *api.Service) ipallocator.Interface {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) ||
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) ||
 		service.Spec.IPFamily == nil ||
 		r.secondaryServiceIPs == nil {
 		return r.serviceIPs
@@ -683,7 +683,7 @@ func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool,
 	// assuming the object was valid prior to setting, always force the IPFamily
 	// to match the allocated IP at this point
 	if allocatedIP != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 			ipFamily := api.IPv4Protocol
 			if netutil.IsIPv6(allocatedIP) {
 				ipFamily = api.IPv6Protocol

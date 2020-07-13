@@ -42,8 +42,8 @@ import (
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
 
+	"k8s.io/api/kubefeaturegates"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -96,7 +96,7 @@ func TestDisabledSubpath(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSubpath, false)()
 	for name, test := range cases {
 		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", []string{}, podVolumes, fhu, fsp, nil)
 		if err != nil && !test.expectError {

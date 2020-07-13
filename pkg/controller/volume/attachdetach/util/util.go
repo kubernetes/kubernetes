@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -46,7 +46,7 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 		claimName = pvcSource.ClaimName
 		readOnly = pvcSource.ReadOnly
 	}
-	if ephemeralSource := podVolume.VolumeSource.Ephemeral; ephemeralSource != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+	if ephemeralSource := podVolume.VolumeSource.Ephemeral; ephemeralSource != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume) {
 		claimName = pod.Name + "-" + podVolume.Name
 		readOnly = ephemeralSource.ReadOnly
 	}
@@ -310,8 +310,8 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 }
 
 func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) ||
+		!utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		// If CSIMigration is disabled, CSI migration paths will not be taken for
 		// the node. If CSINodeInfo is disabled, checking of installation status
 		// of a migrated CSI plugin cannot be performed. Therefore stick to

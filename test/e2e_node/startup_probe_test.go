@@ -21,9 +21,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
 			}
-			initialConfig.FeatureGates[string(features.StartupProbe)] = true
+			initialConfig.FeatureGates[string(kubefeaturegates.StartupProbe)] = true
 		})
 
 		/*

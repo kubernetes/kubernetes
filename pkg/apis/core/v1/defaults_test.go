@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +34,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
@@ -1129,7 +1129,7 @@ func TestSetDefaultServiceIPFamily(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			tweakedIn := tc.inSvcTweak(svc)
 			expectedSvc := tc.outSvcTweak(svc)
 			defaulted := roundTrip(t, runtime.Object(&tweakedIn))

@@ -23,11 +23,11 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -262,7 +262,7 @@ func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin,
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
 	var capacityCheck *scheduling.CapacityCheck
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		capacityCheck = &scheduling.CapacityCheck{
 			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1alpha1().CSIStorageCapacities(),
@@ -271,7 +271,7 @@ func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin,
 	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	return &VolumeBinding{
 		Binder:                               binder,
-		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
+		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume),
 	}, nil
 }
 

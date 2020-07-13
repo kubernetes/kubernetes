@@ -31,9 +31,9 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
@@ -262,7 +262,7 @@ func TestBeforeCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			testStrategy, _ := newStrategy(tc.cidr, tc.configureDualStack)
 			ctx := genericapirequest.NewDefaultContext()
 			err := rest.BeforeCreate(testStrategy, ctx, runtime.Object(tc.in))
@@ -352,7 +352,7 @@ func TestBeforeUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			var cidr string
 			if tc.defaultIPv6 {
 				cidr = "ffd0::/64"
@@ -472,7 +472,7 @@ func TestDropDisabledField(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			old := tc.oldSvc.DeepCopy()
 			dropServiceDisabledFields(tc.svc, tc.oldSvc)
 

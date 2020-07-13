@@ -20,15 +20,15 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestVisitContainersWithPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	testCases := []struct {
 		description string

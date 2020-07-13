@@ -19,6 +19,7 @@ package volumeattachment
 import (
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidVolumeAttachment(name string) *storage.VolumeAttachment {
@@ -127,7 +127,7 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 
 	volumeAttachment := getValidVolumeAttachmentWithInlineSpec("valid-attachment")
 	volumeAttachmentSaved := volumeAttachment.DeepCopy()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
 	Strategy.PrepareForCreate(ctx, volumeAttachment)
 	if volumeAttachment.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForCreate")
@@ -139,7 +139,7 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 	if volumeAttachmentSaved.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForUpdate")
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, false)()
 	Strategy.PrepareForUpdate(ctx, volumeAttachmentSaved, volumeAttachment)
 	if volumeAttachmentSaved.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForUpdate")
@@ -147,7 +147,7 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 
 	volumeAttachment = getValidVolumeAttachmentWithInlineSpec("valid-attachment")
 	volumeAttachmentNew := volumeAttachment.DeepCopy()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, false)()
 	Strategy.PrepareForCreate(ctx, volumeAttachment)
 	if volumeAttachment.Spec.Source.InlineVolumeSpec != nil {
 		t.Errorf("InlineVolumeSpec unexpectedly not dropped during PrepareForCreate")

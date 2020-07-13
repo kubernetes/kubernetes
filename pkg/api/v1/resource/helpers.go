@@ -21,10 +21,10 @@ import (
 	"math"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // addResourceList adds the resources in newList to list
@@ -72,7 +72,7 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 
 	// if PodOverhead feature is supported, add overhead for running a pod
 	// to the sum of reqeuests and to non-zero limits:
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.PodOverhead) {
 		addResourceList(reqs, pod.Spec.Overhead)
 
 		for name, quantity := range pod.Spec.Overhead {
@@ -99,7 +99,7 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
 
-	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) {
 		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk
 		return requestQuantity
 	}
@@ -120,7 +120,7 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 
 	// if PodOverhead feature is supported, add overhead for running a pod
 	// to the total requests if the resource total is non-zero
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.PodOverhead) {
 		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !requestQuantity.IsZero() {
 			requestQuantity.Add(podOverhead)
 		}

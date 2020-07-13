@@ -55,6 +55,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 )
 
 // Option configures a framework.Registry.

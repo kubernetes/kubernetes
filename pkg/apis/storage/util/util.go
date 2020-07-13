@@ -17,14 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // DropDisabledFields removes disabled fields from the StorageClass object.
 func DropDisabledFields(class, oldClass *storage.StorageClass) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && !allowVolumeExpansionInUse(oldClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) && !allowVolumeExpansionInUse(oldClass) {
 		class.AllowVolumeExpansion = nil
 	}
 }

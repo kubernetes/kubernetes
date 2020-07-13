@@ -29,13 +29,13 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -599,7 +599,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 		case volume.PersistentVolumeClaim != nil:
 			pvcName = volume.PersistentVolumeClaim.ClaimName
 		case volume.Ephemeral != nil &&
-			utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
+			utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume):
 			pvcName = pod.Name + "-" + volume.Name
 			ephemeral = true
 		default:

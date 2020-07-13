@@ -26,7 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -46,7 +47,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
@@ -93,7 +93,7 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	pod := obj.(*api.Pod)
 	opts := validation.PodValidationOptions{
 		// Allow multiple huge pages on pod create if feature is enabled
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HugePageStorageMediumSize),
 	}
 	allErrs := validation.ValidatePodCreate(pod, opts)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
@@ -115,7 +115,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldFailsSingleHugepagesValidation := len(validation.ValidatePodSingleHugePageResources(old.(*api.Pod), field.NewPath("spec"))) > 0
 	opts := validation.PodValidationOptions{
 		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
-		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HugePageStorageMediumSize),
 	}
 	errorList := validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
@@ -382,7 +382,7 @@ func LogLocation(
 		RawQuery: params.Encode(),
 	}
 
-	if opts.InsecureSkipTLSVerifyBackend && utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
+	if opts.InsecureSkipTLSVerifyBackend && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.AllowInsecureBackendProxy) {
 		return loc, nodeInfo.InsecureSkipTLSVerifyTransport, nil
 	}
 	return loc, nodeInfo.Transport, nil

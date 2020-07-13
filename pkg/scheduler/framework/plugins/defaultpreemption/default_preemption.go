@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,7 +37,6 @@ import (
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"

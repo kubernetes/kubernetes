@@ -25,12 +25,12 @@ import (
 
 	"k8s.io/klog/v2"
 
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {

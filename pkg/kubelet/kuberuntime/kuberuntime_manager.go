@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -40,7 +41,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -516,7 +516,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	}
 
 	// Ephemeral containers may be started even if initialization is not yet complete.
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		for i := range pod.Spec.EphemeralContainers {
 			c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
 
@@ -807,7 +807,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
 	// containers cannot be specified on pod creation.
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		for _, idx := range podContainerChanges.EphemeralContainersToStart {
 			start("ephemeral container", ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 		}

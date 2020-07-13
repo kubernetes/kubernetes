@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -28,7 +29,6 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -1259,7 +1259,7 @@ func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 
 	for name, testCase := range satisfyingTestCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
 
 			err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
 			// expected to match but got an error
@@ -1306,7 +1306,7 @@ func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 	for name, testCase := range filteringTestCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
 
 			pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
 			// expected to match but either got an error or no returned pvmatch

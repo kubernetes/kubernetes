@@ -19,9 +19,9 @@ package e2enode
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 		})
 
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.CRIContainerLogRotation)] = true
+			initialConfig.FeatureGates[string(kubefeaturegates.CRIContainerLogRotation)] = true
 			initialConfig.ContainerLogMaxFiles = testContainerLogMaxFiles
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})

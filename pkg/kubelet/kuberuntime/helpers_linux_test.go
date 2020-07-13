@@ -19,9 +19,9 @@ package kuberuntime
 import (
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestMilliCPUToQuota(t *testing.T) {
@@ -89,7 +89,7 @@ func TestMilliCPUToQuota(t *testing.T) {
 }
 
 func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUCFSQuotaPeriod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CPUCFSQuotaPeriod, true)()
 
 	for _, testCase := range []struct {
 		msg      string

@@ -24,7 +24,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -33,7 +34,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestVisitContainers(t *testing.T) {
@@ -189,7 +189,7 @@ func TestVisitContainers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.ephemeralContainersEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, tc.ephemeralContainersEnabled)()
 				tc.mask = AllFeatureEnabledContainers()
 			}
 
@@ -224,7 +224,7 @@ func TestVisitContainers(t *testing.T) {
 }
 
 func TestPodSecrets(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
@@ -408,7 +408,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 }
 
 func TestPodConfigmaps(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	// Stub containing all possible ConfigMap references in a pod.
 	// The names of the referenced ConfigMaps match struct paths detected by reflection.
@@ -588,7 +588,7 @@ func TestDropFSGroupFields(t *testing.T) {
 	}
 	for _, podInfo := range podInfos {
 		t.Run(podInfo.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, podInfo.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ConfigurableFSGroupPolicy, podInfo.featureEnabled)()
 			oldPod := podInfo.pod()
 			newPod := oldPod.DeepCopy()
 			if oldPod == nil && podInfo.newPodHasFSGroupChangePolicy {
@@ -677,7 +677,7 @@ func TestDropSubPath(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSubpath, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -766,7 +766,7 @@ func TestDropRuntimeClass(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.RuntimeClass, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -874,7 +874,7 @@ func TestDropProcMount(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ProcMountType, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -984,7 +984,7 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -1070,7 +1070,7 @@ func TestDropAppArmor(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.AppArmor, enabled)()
 
 					DropDisabledPodFields(newPod, oldPod)
 
@@ -1185,7 +1185,7 @@ func TestDropTokenRequestProjection(t *testing.T) {
 					continue
 				}
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequestProjection, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.TokenRequestProjection, enabled)()
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
@@ -1317,7 +1317,7 @@ func TestDropRunAsGroup(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RunAsGroup, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.RunAsGroup, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -1419,7 +1419,7 @@ func TestDropPodSysctls(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Sysctls, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.Sysctls, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -1636,7 +1636,7 @@ func TestDropStatusPodIPs(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			dropPodStatusDisabledFields(tc.podStatus, tc.oldPodStatus)
 
 			old := tc.oldPodStatus.DeepCopy()
@@ -1701,7 +1701,7 @@ func TestDropEphemeralContainers(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {

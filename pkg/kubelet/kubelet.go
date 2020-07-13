@@ -40,6 +40,7 @@ import (
 	utilnet "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -61,7 +62,6 @@ import (
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -522,7 +522,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
-		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
+		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
 	}
@@ -580,7 +580,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.criHandler = kubeDeps.criHandler
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.KubeClient != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RuntimeClass) && kubeDeps.KubeClient != nil {
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
 
@@ -661,7 +661,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.imageManager = imageManager
 
-	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
+	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CRIContainerLogRotation) {
 		// setup containerLogManager for CRI container runtime
 		containerLogManager, err := logs.NewContainerLogManager(
 			klet.runtimeService,
@@ -676,7 +676,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerLogManager = logs.NewStubContainerLogManager()
 	}
 
-	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RotateKubeletServerCertificate) {
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
@@ -752,7 +752,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.Sysctls) {
 		// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
 		// Hence, we concatenate those two lists.
 		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)

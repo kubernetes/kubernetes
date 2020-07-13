@@ -25,13 +25,13 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
 	utilptr "k8s.io/utils/pointer"
@@ -774,7 +774,7 @@ func TestMakeAbsolutePath(t *testing.T) {
 }
 
 func TestGetPodVolumeNames(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 	tests := []struct {
 		name            string
 		pod             *v1.Pod

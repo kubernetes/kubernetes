@@ -35,12 +35,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
@@ -285,7 +285,7 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	klog.V(2).Infof("iptables(%s) masquerade mark: %s", ipt.Protocol(), masqueradeMark)
 
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
@@ -565,7 +565,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying) {
 		proxier.setInitialized(proxier.endpointSlicesSynced)
 	} else {
 		proxier.setInitialized(proxier.endpointsSynced)
@@ -1000,7 +1000,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// 2. ServiceTopology is not enabled.
 		// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
 		// to get topology information).
-		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying) {
 			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
 			hasEndpoints = len(allEndpoints) > 0
 		}
@@ -1105,7 +1105,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 				destChain := svcXlbChain
 				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster.
-				if !(utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints()) {
+				if !(utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints()) {
 					destChain = svcChain
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 				}

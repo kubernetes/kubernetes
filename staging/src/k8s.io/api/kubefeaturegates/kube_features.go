@@ -14,12 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package features
+package kubefeaturegates
 
 import (
-	"k8s.io/apimachinery/pkg/util/runtime"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -635,8 +632,8 @@ const (
 	WinDSR featuregate.Feature = "WinDSR"
 )
 
-func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+func AddCurrentKubernetesSpecificFeatureGates(featureGates featuregate.MutableFeatureGate) error {
+	return featureGates.Add(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -730,18 +727,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SetHostnameAsFQDN:                              {Default: false, PreRelease: featuregate.Alpha},
 	WinOverlay:                                     {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
-
-	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
-	// unintentionally on either side:
-	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Deprecated},
-	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

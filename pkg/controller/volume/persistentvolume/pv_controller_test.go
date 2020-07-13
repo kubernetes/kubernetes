@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 )
 
@@ -484,7 +484,7 @@ func TestDelayBindingMode(t *testing.T) {
 }
 
 func TestAnnealMigrationAnnotations(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
 
 	const testPlugin = "non-migrated-plugin"
 	const gcePlugin = "kubernetes.io/gce-pd"
@@ -503,7 +503,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
-			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			migratedDriverGates:  []featuregate.Feature{kubefeaturegates.CSIMigrationGCE},
 		},
 		{
 			name:                 "migration off for GCE",
@@ -527,7 +527,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: testPlugin},
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: testPlugin},
-			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			migratedDriverGates:  []featuregate.Feature{kubefeaturegates.CSIMigrationGCE},
 		},
 		{
 			name:                 "not dynamically provisioned migration off for GCE",
@@ -543,7 +543,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expVolumeAnnotations: map[string]string{},
 			claimAnnotations:     map[string]string{},
 			expClaimAnnotations:  map[string]string{},
-			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			migratedDriverGates:  []featuregate.Feature{kubefeaturegates.CSIMigrationGCE},
 		},
 		{
 			name:                 "nil annotations migration off for GCE",
@@ -559,7 +559,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expVolumeAnnotations: nil,
 			claimAnnotations:     nil,
 			expClaimAnnotations:  nil,
-			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+			migratedDriverGates:  []featuregate.Feature{kubefeaturegates.CSIMigrationGCE},
 		},
 	}
 

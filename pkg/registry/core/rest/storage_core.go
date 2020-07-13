@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -39,7 +40,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
@@ -181,7 +181,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 
 	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) {
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store, c.ExtendExpiration)
 	} else {
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil, false)
@@ -218,7 +218,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	// allocator for secondary service ip range
 	var secondaryServiceClusterIPAllocator ipallocator.Interface
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
 		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
 		secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 			mem := allocator.NewAllocationMap(max, rangeSpec)
@@ -323,7 +323,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if serviceAccountStorage.Token != nil {
 		restStorageMap["serviceaccounts/token"] = serviceAccountStorage.Token
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EphemeralContainers) {
 		restStorageMap["pods/ephemeralcontainers"] = podStorage.EphemeralContainers
 	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap

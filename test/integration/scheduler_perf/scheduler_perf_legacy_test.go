@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/csi-translation-lib/plugins"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -171,8 +171,8 @@ func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
 	for _, test := range defaultTests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
-			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigrationAWS, true)()
 			nodeStrategies := []testutils.CountToStrategy{{Count: test.nodes, Strategy: nodeStrategy}}
 			benchmarkScheduling(test.existingPods, test.minPods, nodeStrategies, testStrategy, b)
 		})

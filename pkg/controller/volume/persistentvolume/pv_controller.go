@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -269,7 +269,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	requestedSize := requestedQty.Value()
 
 	// check if PV's DeletionTimeStamp is set, if so, return error.
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StorageObjectInUseProtection) {
 		if volume.ObjectMeta.DeletionTimestamp != nil {
 			return fmt.Errorf("the volume is marked for deletion %q", volume.Name)
 		}

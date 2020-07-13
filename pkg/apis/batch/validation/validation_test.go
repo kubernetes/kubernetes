@@ -20,13 +20,13 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidManualSelector() *metav1.LabelSelector {
@@ -218,9 +218,9 @@ func TestValidateJob(t *testing.T) {
 	}
 
 	for _, setFeature := range []bool{true, false} {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, setFeature)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.TTLAfterFinished, setFeature)()
 		ttlCase := "spec.ttlSecondsAfterFinished:must be greater than or equal to 0"
-		if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished) {
 			errorCases[ttlCase] = batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
@@ -608,7 +608,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished) {
 		errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",

@@ -17,18 +17,18 @@ limitations under the License.
 package validation
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateConditionalNetworkPolicy validates conditionally valid fields.
 func ValidateConditionalNetworkPolicy(np, oldNP *networking.NetworkPolicy) field.ErrorList {
 	var errs field.ErrorList
 	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(sctpFields(oldNP)) == 0 {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.SCTPSupport) && len(sctpFields(oldNP)) == 0 {
 		for _, f := range sctpFields(np) {
 			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
 		}

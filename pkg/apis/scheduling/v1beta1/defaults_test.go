@@ -21,12 +21,12 @@ import (
 	"testing"
 
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -57,7 +57,7 @@ func TestSetDefaultPreempting(t *testing.T) {
 	priorityClass := &v1beta1.PriorityClass{}
 
 	// set NonPreemptingPriority true
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.NonPreemptingPriority, true)()
 
 	output := roundTrip(t, runtime.Object(priorityClass)).(*v1beta1.PriorityClass)
 	if output.PreemptionPolicy == nil || *output.PreemptionPolicy != apiv1.PreemptLowerPriority {

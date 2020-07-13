@@ -34,10 +34,10 @@ import (
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )

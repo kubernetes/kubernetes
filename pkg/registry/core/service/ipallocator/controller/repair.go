@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -37,8 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	netutil "k8s.io/utils/net"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -124,7 +124,7 @@ func (c *Repair) selectAllocForIP(ip net.IP, primary ipallocator.Interface, seco
 
 // shouldWorkOnSecondary returns true if the repairer should perform work for secondary network (dual stack)
 func (c *Repair) shouldWorkOnSecondary() bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 		return false
 	}
 

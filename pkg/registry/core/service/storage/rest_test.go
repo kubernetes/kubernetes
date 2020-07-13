@@ -47,9 +47,9 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -430,7 +430,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 
 			storage, registry, server := NewTestREST(t, nil, tc.families)
 			defer server.Terminate(t)
@@ -648,7 +648,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			storage, registry, server := NewTestREST(t, nil, tc.families)
 			defer server.Terminate(t)
 
@@ -1112,7 +1112,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			ctx := genericapirequest.NewDefaultContext()
 			storage, registry, server := NewTestREST(t, nil, tc.families)
 			defer server.Terminate(t)
@@ -2458,7 +2458,7 @@ func TestInitClusterIP(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 
 			storage, _, server := NewTestREST(t, nil, tc.families)
 			defer server.Terminate(t)
@@ -3160,7 +3160,7 @@ func TestAllocGetters(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 			storage, _, server := NewTestREST(t, nil, tc.families)
 			defer server.Terminate(t)
 

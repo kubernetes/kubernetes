@@ -29,12 +29,12 @@ import (
 
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/utils/mount"
@@ -152,7 +152,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	switch {
 	case volSrc != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 			return fmt.Errorf("CSIInlineVolume feature required")
 		}
 		if c.volumeLifecycleMode != storage.VolumeLifecycleEphemeral {
@@ -325,7 +325,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
 		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
 	}
 

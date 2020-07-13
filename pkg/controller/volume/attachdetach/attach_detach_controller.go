@@ -29,6 +29,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -134,8 +134,8 @@ func NewAttachDetachController(
 		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		adc.csiNodeLister = csiNodeInformer.Lister()
 		adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
 	}

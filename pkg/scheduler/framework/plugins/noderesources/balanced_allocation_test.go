@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -46,7 +46,7 @@ func getExistingVolumeCountForNode(podInfos []*framework.PodInfo, maxVolumes int
 
 func TestNodeResourcesBalancedAllocation(t *testing.T) {
 	// Enable volumesOnNodeForBalancing to do balanced node resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.BalanceAttachedNodeVolumes, true)()
 	podwithVol1 := v1.PodSpec{
 		Containers: []v1.Container{
 			{

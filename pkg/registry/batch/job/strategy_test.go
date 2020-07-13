@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func newBool(a bool) *bool {
@@ -42,7 +42,7 @@ func newInt32(i int32) *int32 {
 }
 
 func TestJobStrategy(t *testing.T) {
-	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
+	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -90,11 +90,11 @@ func TestJobStrategy(t *testing.T) {
 	}
 	if ttlEnabled && job.Spec.TTLSecondsAfterFinished == nil {
 		// When the TTL feature is enabled, the TTL field can be set
-		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", kubefeaturegates.TTLAfterFinished)
 	}
 	if !ttlEnabled && job.Spec.TTLSecondsAfterFinished != nil {
 		// When the TTL feature is disabled, the TTL field cannot be set
-		t.Errorf("Job should not allow setting .spec.ttlSecondsAfterFinished when %v feature is disabled", features.TTLAfterFinished)
+		t.Errorf("Job should not allow setting .spec.ttlSecondsAfterFinished when %v feature is disabled", kubefeaturegates.TTLAfterFinished)
 	}
 
 	parallelism := int32(10)
@@ -119,7 +119,7 @@ func TestJobStrategy(t *testing.T) {
 		t.Errorf("Expected a validation error")
 	}
 	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil || updatedJob.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", kubefeaturegates.TTLAfterFinished)
 	}
 
 	// set TTLSecondsAfterFinished on both old and new jobs
@@ -127,14 +127,14 @@ func TestJobStrategy(t *testing.T) {
 	updatedJob.Spec.TTLSecondsAfterFinished = newInt32(2)
 
 	// Existing TTLSecondsAfterFinished should be preserved when feature is on
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.TTLAfterFinished, true)()
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
 		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
 	}
 
 	// Existing TTLSecondsAfterFinished should be preserved when feature is off
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.TTLAfterFinished, false)()
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
 		t.Errorf("existing TTLSecondsAfterFinished should be preserved")

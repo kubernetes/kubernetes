@@ -23,13 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -509,7 +509,7 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 }
 
 func TestOrderedByExceedsRequestDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, true)()
 	below := newPod("below-requests", -1, []v1.Container{
 		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
 	}, nil)
@@ -558,7 +558,7 @@ func TestOrderedByPriority(t *testing.T) {
 }
 
 func TestOrderedbyDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
 		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -625,7 +625,7 @@ func TestOrderedbyDisk(t *testing.T) {
 
 // Tests that we correctly ignore disk requests when the local storage feature gate is disabled.
 func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, false)()
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
 		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -691,7 +691,7 @@ func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
 }
 
 func TestOrderedbyInodes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, true)()
 	low := newPod("low", defaultPriority, []v1.Container{
 		newContainer("low", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -734,7 +734,7 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{

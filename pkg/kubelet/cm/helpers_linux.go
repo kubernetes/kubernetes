@@ -27,13 +27,13 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 

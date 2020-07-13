@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +49,6 @@ import (
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	"k8s.io/kubernetes/pkg/features"
 	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	utilnet "k8s.io/utils/net"
 )
@@ -213,7 +213,7 @@ func (e *EndpointController) addPod(obj interface{}) {
 }
 
 func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointAddress, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 		return podToEndpointAddress(pod), nil
 	}
 
@@ -617,7 +617,7 @@ func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.E
 		Port:     int32(portNum),
 		Protocol: servicePort.Protocol,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAppProtocol) {
 		epp.AppProtocol = servicePort.AppProtocol
 	}
 	return epp

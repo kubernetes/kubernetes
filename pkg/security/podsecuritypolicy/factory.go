@@ -19,8 +19,8 @@ package podsecuritypolicy
 import (
 	"fmt"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -51,7 +51,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 	}
 
 	var groupStrat group.GroupStrategy
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RunAsGroup) {
 		groupStrat, err = createRunAsGroupStrategy(psp.Spec.RunAsGroup)
 		if err != nil {
 			errs = append(errs, err)

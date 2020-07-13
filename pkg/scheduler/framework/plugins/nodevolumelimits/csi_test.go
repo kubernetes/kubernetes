@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -450,12 +450,12 @@ func TestCSILimits(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
 			if test.migrationEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigrationAWS, true)()
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			} else {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, false)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigrationAWS, false)()
 			}
 
 			p := &CSILimits{

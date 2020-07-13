@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -157,7 +157,7 @@ func TestMounterSetUp(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Modes must be set if (and only if) CSIInlineVolume is enabled.
 			var modes []storage.VolumeLifecycleMode
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolume)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, test.csiInlineVolume)()
 			if test.csiInlineVolume {
 				modes = append(modes, storage.VolumeLifecyclePersistent)
 			}
@@ -493,7 +493,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 }
 
 func TestMounterSetUpWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 
 	testCases := []struct {
 		name       string

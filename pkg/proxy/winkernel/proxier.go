@@ -34,6 +34,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,8 +42,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -579,7 +578,7 @@ func NewProxier(
 	}
 
 	isIPv6 := utilnet.IsIPv6(nodeIP)
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying)
+	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsEndpointSliceProxying)
 	proxier := &Proxier{
 		endPointsRefCount:   make(endPointsReferenceCountMap),
 		portsMap:            make(map[utilproxy.LocalPort]utilproxy.Closeable),
@@ -779,7 +778,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsEndpointSliceProxying) {
 		proxier.setInitialized(proxier.endpointSlicesSynced)
 	} else {
 		proxier.setInitialized(proxier.endpointsSynced)

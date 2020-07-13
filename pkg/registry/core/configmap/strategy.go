@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for ConfigMap objects
@@ -91,7 +91,7 @@ func isImmutableInUse(configMap *api.ConfigMap) bool {
 }
 
 func dropDisabledFields(configMap *api.ConfigMap, oldConfigMap *api.ConfigMap) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && !isImmutableInUse(oldConfigMap) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ImmutableEphemeralVolumes) && !isImmutableInUse(oldConfigMap) {
 		configMap.Immutable = nil
 	}
 }

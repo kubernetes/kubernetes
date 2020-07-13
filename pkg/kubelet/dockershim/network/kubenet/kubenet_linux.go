@@ -46,8 +46,8 @@ import (
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 

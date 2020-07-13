@@ -37,6 +37,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -52,7 +53,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -64,8 +64,8 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 -----END EC PRIVATE KEY-----`
 
 func TestServiceAccountTokenCreate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountIssuerDiscovery, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.TokenRequest, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAccountIssuerDiscovery, true)()
 
 	// Build client config, clientset, and informers
 	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))

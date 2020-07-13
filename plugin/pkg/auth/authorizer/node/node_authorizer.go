@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/api/kubefeaturegates"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -32,7 +33,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
@@ -112,7 +112,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case configMapResource:
 			return r.authorizeReadNamespacedObject(nodeName, configMapVertexType, attrs)
 		case pvcResource:
-			if r.features.Enabled(features.ExpandPersistentVolumes) {
+			if r.features.Enabled(kubefeaturegates.ExpandPersistentVolumes) {
 				if attrs.GetSubresource() == "status" {
 					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
 				}
@@ -123,17 +123,17 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case vaResource:
 			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
-			if r.features.Enabled(features.TokenRequest) {
+			if r.features.Enabled(kubefeaturegates.TokenRequest) {
 				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", kubefeaturegates.TokenRequest), nil
 		case leaseResource:
 			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:
-			if r.features.Enabled(features.CSINodeInfo) {
+			if r.features.Enabled(kubefeaturegates.CSINodeInfo) {
 				return r.authorizeCSINode(nodeName, attrs)
 			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s", features.CSINodeInfo), nil
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s", kubefeaturegates.CSINodeInfo), nil
 		}
 
 	}

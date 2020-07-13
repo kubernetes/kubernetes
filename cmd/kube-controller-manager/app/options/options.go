@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 )
 
 const (

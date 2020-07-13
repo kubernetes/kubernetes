@@ -32,6 +32,7 @@ import (
 
 	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"

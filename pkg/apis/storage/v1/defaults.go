@@ -18,10 +18,10 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -49,11 +49,11 @@ func SetDefaults_CSIDriver(obj *storagev1.CSIDriver) {
 		obj.Spec.PodInfoOnMount = new(bool)
 		*(obj.Spec.PodInfoOnMount) = false
 	}
-	if obj.Spec.StorageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if obj.Spec.StorageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		obj.Spec.StorageCapacity = new(bool)
 		*(obj.Spec.StorageCapacity) = false
 	}
-	if len(obj.Spec.VolumeLifecycleModes) == 0 && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if len(obj.Spec.VolumeLifecycleModes) == 0 && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		obj.Spec.VolumeLifecycleModes = append(obj.Spec.VolumeLifecycleModes, storagev1.VolumeLifecyclePersistent)
 	}
 }

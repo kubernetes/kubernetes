@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,7 +31,6 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -225,7 +225,7 @@ func FindMatchingVolume(
 		}
 
 		// check if PV's DeletionTimeStamp is set, if so, skip this volume.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StorageObjectInUseProtection) {
 			if volume.ObjectMeta.DeletionTimestamp != nil {
 				continue
 			}

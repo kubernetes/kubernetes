@@ -39,6 +39,7 @@ import (
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,7 +75,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -102,6 +102,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/exec"
+
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 )
 
 const (
@@ -703,7 +705,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return err
 		}
 
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
+		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DevicePlugins)
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
@@ -772,7 +774,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && len(s.DynamicConfigDir.Value()) > 0 &&
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) && len(s.DynamicConfigDir.Value()) > 0 &&
 		kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
 		if err := kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName)); err != nil {
 			return err
@@ -1162,7 +1164,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), enableCAdvisorJSONEndpoints)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.KubeletPodResources) {
 		go k.ListenAndServePodResources()
 	}
 }
@@ -1248,7 +1250,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		switch v1.ResourceName(k) {
 		// CPU, memory, local storage, and PID resources are supported.
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
-			if v1.ResourceName(k) != pidlimit.PIDs || utilfeature.DefaultFeatureGate.Enabled(features.SupportNodePidsLimit) {
+			if v1.ResourceName(k) != pidlimit.PIDs || utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.SupportNodePidsLimit) {
 				q, err := resource.ParseQuantity(v)
 				if err != nil {
 					return nil, err
@@ -1267,7 +1269,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
 func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamickubeletconfig.TransformFunc) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) {
 		return nil, nil, fmt.Errorf("failed to bootstrap Kubelet config controller, you must enable the DynamicKubeletConfig feature gate")
 	}
 	if len(dynamicConfigDir) == 0 {

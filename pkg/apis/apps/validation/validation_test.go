@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -30,7 +31,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateStatefulSet(t *testing.T) {
@@ -1779,7 +1779,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 }
 
 func TestValidateDaemonSet(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -2043,7 +2043,7 @@ func validDeployment() *apps.Deployment {
 }
 
 func TestValidateDeployment(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	successCases := []*apps.Deployment{
 		validDeployment(),

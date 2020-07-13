@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,7 +39,6 @@ import (
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -211,8 +211,8 @@ func TestPodDeletionWithDswp(t *testing.T) {
 }
 
 func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	}
 	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)

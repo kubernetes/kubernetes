@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -59,7 +59,7 @@ func PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled bool) func(obj interfa
 // AddPodPVCIndexerIfNotPresent adds the PodPVCIndexFunc with the current global setting for GenericEphemeralVolume.
 func AddPodPVCIndexerIfNotPresent(indexer cache.Indexer) error {
 	return AddIndexerIfNotPresent(indexer, PodPVCIndex,
-		PodPVCIndexFunc(utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume)))
+		PodPVCIndexFunc(utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume)))
 }
 
 // AddIndexerIfNotPresent adds the index function with the name into the cache indexer if not present

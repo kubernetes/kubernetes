@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	pkgfeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	pkgfeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // getResourceList returns a ResourceList with the

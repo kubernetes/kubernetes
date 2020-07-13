@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/api/kubefeaturegates"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -537,7 +537,7 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 	// Enable NonPreemptingPriority feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.NonPreemptingPriority, true)()
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass

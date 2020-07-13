@@ -30,13 +30,13 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -192,7 +192,7 @@ func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	// Map unique pod name to outer volume name to MountedVolume.
 	mountedVolumesForPod := make(map[volumetypes.UniquePodName]map[string]cache.MountedVolume)
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandInUsePersistentVolumes) {
 		for _, mountedVolume := range dswp.actualStateOfWorld.GetMountedVolumes() {
 			mountedVolumes, exist := mountedVolumesForPod[mountedVolume.PodName]
 			if !exist {
@@ -306,7 +306,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	allVolumesAdded := true
 	mounts, devices := util.GetPodVolumeNames(pod)
 
-	expandInUsePV := utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes)
+	expandInUsePV := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandInUsePersistentVolumes)
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
@@ -496,7 +496,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	ephemeral := false
 	if pvcSource == nil &&
 		podVolume.VolumeSource.Ephemeral != nil &&
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume) {
 		// Generic ephemeral inline volumes are handled the
 		// same way as a PVC reference. The only additional
 		// constraint (checked below) is that the PVC must be
@@ -625,7 +625,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StorageObjectInUseProtection) {
 		// Pods that uses a PVC that is being deleted must not be started.
 		//
 		// In case an old kubelet is running without this check or some kubelets

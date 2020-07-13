@@ -22,11 +22,11 @@ import (
 	"k8s.io/klog/v2"
 
 	capi "k8s.io/api/certificates/v1beta1"
+	"k8s.io/api/kubefeaturegates"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const saRolePrefix = "system:controller:"
@@ -74,7 +74,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		}
 
 		role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie())
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
 		}
 
@@ -148,7 +148,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSlice) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpointslice-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -174,7 +174,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "expand-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -190,7 +190,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ephemeral-volume-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -388,7 +388,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ttl-after-finished-controller"},
 			Rules: []rbacv1.PolicyRule{
@@ -398,7 +398,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.BoundServiceAccountTokenVolume) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "root-ca-cert-publisher"},
 			Rules: []rbacv1.PolicyRule{

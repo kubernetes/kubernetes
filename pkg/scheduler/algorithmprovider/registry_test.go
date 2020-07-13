@@ -23,9 +23,9 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -218,7 +218,7 @@ func TestApplyFeatureGates(t *testing.T) {
 		},
 		{
 			name:    "NewDefaultPodTopologySpread enabled",
-			feature: features.DefaultPodTopologySpread,
+			feature: kubefeaturegates.DefaultPodTopologySpread,
 			wantConfig: &schedulerapi.Plugins{
 				QueueSort: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{

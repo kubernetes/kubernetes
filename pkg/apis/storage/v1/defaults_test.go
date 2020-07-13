@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -51,7 +51,7 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 }
 
 func TestSetDefaultStorageCapacityEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIStorageCapacity, true)()
 	driver := &storagev1.CSIDriver{}
 
 	// field should be defaulted
@@ -66,7 +66,7 @@ func TestSetDefaultStorageCapacityEnabled(t *testing.T) {
 }
 
 func TestSetDefaultStorageCapacityDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIStorageCapacity, false)()
 	driver := &storagev1.CSIDriver{}
 
 	// field should not be defaulted

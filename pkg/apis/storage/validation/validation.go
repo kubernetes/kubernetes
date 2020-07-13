@@ -32,8 +32,8 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -175,7 +175,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 	allErrs := field.ErrorList{}
 	switch {
 	case source.InlineVolumeSpec == nil && source.PersistentVolumeName == nil:
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) {
 			allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
 		} else {
 			allErrs = append(allErrs, field.Required(fldPath, "must specify persistentVolumeName when CSIMigration feature is disabled"))
@@ -448,7 +448,7 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 // validateStorageCapacity tests if storageCapacity is set for CSIDriver.
 func validateStorageCapacity(storageCapacity *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if storageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if storageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 

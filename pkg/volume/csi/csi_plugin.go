@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +40,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
 )
@@ -69,7 +69,7 @@ type csiPlugin struct {
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	p := &csiPlugin{
 		host:         nil,
-		blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
+		blockEnabled: utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIBlockVolume),
 	}
 	return []volume.VolumePlugin{p}
 }
@@ -212,30 +212,30 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	var migratedPlugins = map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+			return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationGCE)
 		},
 		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+			return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAWS)
 		},
 		csitranslationplugins.CinderInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+			return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationOpenStack)
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+			return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureDisk)
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
+			return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+			return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationvSphere)
 		},
 	}
 
 	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) &&
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) {
 		// This function prevents Kubelet from posting Ready status until CSINode
 		// is both installed and initialized
 		if err := initializeCSINode(host); err != nil {
@@ -326,7 +326,7 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec == nil {
 		return false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil) ||
 			(spec.Volume != nil && spec.Volume.CSI != nil)
 	}
@@ -355,7 +355,7 @@ func (p *csiPlugin) NewMounter(
 	)
 
 	switch {
-	case volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume):
+	case volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume):
 		volumeHandle = makeVolumeHandle(string(pod.UID), spec.Name())
 		driverName = volSrc.Driver
 		if volSrc.ReadOnly != nil {
@@ -481,7 +481,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
 	var spec *volume.Spec
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
+	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume)
 
 	// If inlineEnabled is true and mode is VolumeLifecycleEphemeral,
 	// use constructVolSourceSpec to construct volume source spec.
@@ -560,7 +560,7 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
+	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume)
 	if inlineEnabled {
 		volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
 		if err != nil {
@@ -590,7 +590,7 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 
 // CanDeviceMount returns true if the spec supports device mount
 func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
+	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume)
 	if !inlineEnabled {
 		// No need to check anything, we assume it is a persistent volume.
 		return true, nil
@@ -773,7 +773,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storage.VolumeLifecycleMode) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		// Feature disabled, therefore only "persistent" volumes are supported.
 		if volumeMode != storage.VolumeLifecyclePersistent {
 			return fmt.Errorf("CSIInlineVolume feature not enabled, %q volumes not supported", volumeMode)
@@ -840,7 +840,7 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 		return "", err
 	}
 
-	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		return storage.VolumeLifecycleEphemeral, nil
 	}
 	return storage.VolumeLifecyclePersistent, nil

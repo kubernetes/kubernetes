@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,7 +41,6 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/features"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
@@ -925,7 +925,7 @@ func TestSetMigrationAnnotation(t *testing.T) {
 }
 
 func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSINodeInfo, true)()
 
 	driverName := "com.example.csi/driver1"
 	nodeID := "com.example.csi/some-node"
@@ -1012,7 +1012,7 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 }
 
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSINodeInfo, csiNodeInfoEnabled)()
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)

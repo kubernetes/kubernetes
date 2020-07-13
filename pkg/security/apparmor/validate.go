@@ -26,9 +26,9 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpath "k8s.io/utils/path"
 )
@@ -97,7 +97,7 @@ func (v *validator) ValidateHost() error {
 // Verify that the host and runtime is capable of enforcing AppArmor profiles.
 func validateHost(runtime string) error {
 	// Check feature-gates
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.AppArmor) {
 		return errors.New("AppArmor disabled by feature-gate")
 	}
 

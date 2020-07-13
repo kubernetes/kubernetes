@@ -48,6 +48,7 @@ import (
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	"k8s.io/api/kubefeaturegates"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -79,7 +80,6 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/controller/clusterauthenticationtrust"
@@ -233,7 +233,7 @@ type Master struct {
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	var endpointSliceClient discoveryclient.EndpointSlicesGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSlice) {
 		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	}
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
@@ -248,7 +248,7 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	var endpointSliceClient discoveryclient.EndpointSlicesGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSlice) {
 		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	}
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
@@ -348,7 +348,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAccountIssuerDiscovery) {
 		// Metadata and keys are expected to only change across restarts at present,
 		// so we just marshal immediately and serve the cached JSON bytes.
 		md, err := serviceaccount.NewOpenIDMetadata(

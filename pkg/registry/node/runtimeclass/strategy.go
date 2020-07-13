@@ -19,6 +19,7 @@ package runtimeclass
 import (
 	"context"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements verification logic for RuntimeClass.
@@ -60,7 +60,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	rc := obj.(*node.RuntimeClass)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && rc != nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.PodOverhead) && rc != nil {
 		// Set Overhead to nil only if the feature is disabled and it is not used
 		rc.Overhead = nil
 	}

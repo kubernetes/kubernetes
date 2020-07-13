@@ -19,14 +19,14 @@ package v1
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	utilpointer "k8s.io/utils/pointer"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -137,7 +137,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	// Spec.IPFamily correctly. This is to cover the case
 	// when an existing cluster have been converted to dualstack
 	// i.e. it already contain services with Spec.IPFamily==nil
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) &&
 		obj.Spec.Type != v1.ServiceTypeExternalName &&
 		obj.Spec.ClusterIP != "" && /*has an ip already set*/
 		obj.Spec.ClusterIP != "None" && /* not converting from ExternalName to other */

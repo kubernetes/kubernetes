@@ -34,12 +34,12 @@ import (
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -272,7 +272,7 @@ func (rc *reconciler) mountAttachVolumes() {
 				}
 			}
 		} else if cache.IsFSResizeRequiredError(err) &&
-			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+			utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandInUsePersistentVolumes) {
 			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandInUseVolume", ""))
 			err := rc.operationExecutor.ExpandInUseVolume(
 				volumeToMount.VolumeToMount,

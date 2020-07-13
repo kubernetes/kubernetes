@@ -25,14 +25,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -105,7 +105,7 @@ func TestPluginHugetlbfs(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
 			doTestPlugin(t, pluginTestConfig{
 				medium:                        tc.medium,
 				expectedSetupMounts:           1,
@@ -572,7 +572,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, testCase.enableHugePageStorageMediumSize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.HugePageStorageMediumSize, testCase.enableHugePageStorageMediumSize)()
 			value, err := getPageSizeMountOption(testCase.medium, testCase.pod)
 			if testCase.shouldFail && err == nil {
 				t.Errorf("%s: Unexpected success", testCaseName)

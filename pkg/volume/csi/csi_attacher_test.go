@@ -28,6 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +46,6 @@ import (
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -241,7 +241,7 @@ func TestAttacherAttach(t *testing.T) {
 }
 
 func TestAttacherAttachWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 	testCases := []struct {
 		name                string
 		nodeName            string
@@ -556,7 +556,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 }
 
 func TestAttacherWaitForAttachWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 
 	tests := []struct {
 		name             string
@@ -831,7 +831,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 }
 
 func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 	type attachedSpec struct {
 		volName  string
 		spec     *volume.Spec
@@ -1241,7 +1241,7 @@ func TestAttacherMountDevice(t *testing.T) {
 }
 
 func TestAttacherMountDeviceWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 	pvName := "test-pv"
 	testCases := []struct {
 		testName        string

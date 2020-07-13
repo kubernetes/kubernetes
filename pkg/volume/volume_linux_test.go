@@ -26,10 +26,10 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type localFakeMounter struct {
@@ -290,7 +290,7 @@ func TestSetVolumeOwnership(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, test.featureGate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ConfigurableFSGroupPolicy, test.featureGate)()
 			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)

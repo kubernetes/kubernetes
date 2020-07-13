@@ -21,13 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -152,7 +152,7 @@ func TestValidateStorageClass(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
 	volumeName := "pv-name"
 	empty := ""
 	migrationEnabledSuccessCases := []storage.VolumeAttachment{
@@ -380,7 +380,7 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 	}
 
 	// validate with CSIMigration disabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, false)()
 
 	migrationDisabledSuccessCases := []storage.VolumeAttachment{
 		{
@@ -414,7 +414,7 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 }
 
 func TestVolumeAttachmentUpdateValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
 	volumeName := "foo"
 	newVolumeName := "bar"
 

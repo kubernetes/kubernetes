@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -27,7 +28,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	csidriverstore "k8s.io/kubernetes/pkg/registry/storage/csidriver/storage"
 	csinodestore "k8s.io/kubernetes/pkg/registry/storage/csinode/storage"
 	csistoragecapacitystore "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity/storage"
@@ -78,7 +78,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
 
 	// register csistoragecapacity if CSIStorageCapacity feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
 		if err != nil {
 			return storage, err
@@ -106,7 +106,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
 
 	// register csinodes if CSINodeInfo feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		csiNodeStorage, err := csinodestore.NewStorage(restOptionsGetter)
 		if err != nil {
 			return storage, err
@@ -144,7 +144,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 
 	// register csinodes if CSINodeInfo feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		csiNodeStorage, err := csinodestore.NewStorage(restOptionsGetter)
 		if err != nil {
 			return nil, err

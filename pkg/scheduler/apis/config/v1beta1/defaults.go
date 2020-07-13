@@ -21,11 +21,11 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 
@@ -192,7 +192,7 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 }
 
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
-	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+	if !feature.DefaultFeatureGate.Enabled(kubefeaturegates.DefaultPodTopologySpread) {
 		// When feature is disabled, the default spreading is done by legacy
 		// SelectorSpread plugin.
 		return

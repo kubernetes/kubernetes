@@ -29,6 +29,7 @@ import (
 	_ "net/http/pprof"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -104,7 +104,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
 		klog.V(0).Info("Using Kernelspace Proxier.")
-		isIPv6DualStackEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
+		isIPv6DualStackEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack)
 		if isIPv6DualStackEnabled {
 			klog.V(0).Info("creating dualStackProxier for Windows kernel.")
 
@@ -174,7 +174,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		OOMScoreAdj:         config.OOMScoreAdj,
 		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
 		HealthzServer:       healthzServer,
-		UseEndpointSlices:   utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying),
+		UseEndpointSlices:   utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.WindowsEndpointSliceProxying),
 	}, nil
 }
 

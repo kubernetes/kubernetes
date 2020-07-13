@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,7 +39,6 @@ import (
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -406,7 +406,7 @@ func TestGetPods(t *testing.T) {
 
 func TestKillPod(t *testing.T) {
 	// Tests that KillPod also kills Ephemeral Containers
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -1189,7 +1189,7 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 }
 
 func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 	// Make sure existing test cases pass with feature enabled
 	TestComputePodActions(t)
 	TestComputePodActionsWithInitContainers(t)

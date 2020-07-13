@@ -29,10 +29,10 @@ import (
 
 	"regexp"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -116,7 +116,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = map[string]bool{}
 			}
-			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
+			initialConfig.FeatureGates[string(kubefeaturegates.KubeletPodResources)] = true
 		})
 		ginkgo.It("Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")

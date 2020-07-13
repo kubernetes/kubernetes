@@ -27,6 +27,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,7 +40,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
@@ -455,7 +455,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandPersistentVolumes, true)()
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
@@ -510,7 +510,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandPersistentVolumes, true)()
 
 	// start up quota system
 	stopCh := make(chan struct{})

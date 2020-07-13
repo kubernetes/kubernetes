@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/api/kubefeaturegates"
 	v1beta1 "k8s.io/api/node/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +41,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 	nodev1beta1 "k8s.io/kubernetes/pkg/apis/node/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 )
 
@@ -81,8 +81,8 @@ func (r *RuntimeClass) SetExternalKubeClientSet(client kubernetes.Interface) {
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (r *RuntimeClass) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	r.runtimeClassEnabled = featureGates.Enabled(features.RuntimeClass)
-	r.podOverheadEnabled = featureGates.Enabled(features.PodOverhead)
+	r.runtimeClassEnabled = featureGates.Enabled(kubefeaturegates.RuntimeClass)
+	r.podOverheadEnabled = featureGates.Enabled(kubefeaturegates.PodOverhead)
 	r.inspectedFeatures = true
 }
 

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -30,7 +31,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -220,8 +220,8 @@ func TestDropFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, tc.enableNodeDynamicConfig)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.DynamicKubeletConfig, tc.enableNodeDynamicConfig)()
 
 			dropDisabledFields(tc.node, tc.oldNode)
 

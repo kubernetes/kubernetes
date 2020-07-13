@@ -24,15 +24,15 @@ import (
 	"net/http"
 
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSlice) {
 		klog.V(2).Infof("Not starting endpointslice-controller since EndpointSlice feature gate is disabled")
 		return nil, false, nil
 	}
@@ -55,7 +55,7 @@ func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, er
 }
 
 func startEndpointSliceMirroringController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSlice) {
 		klog.V(2).Infof("Not starting endpointslicemirroring-controller since EndpointSlice feature gate is disabled")
 		return nil, false, nil
 	}

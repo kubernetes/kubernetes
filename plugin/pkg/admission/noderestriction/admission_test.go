@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/utils/pointer"
 )
@@ -56,16 +56,16 @@ var (
 func init() {
 	// all features need to be set on all featuregates for the tests.  We set everything and then then the if's below override it.
 	relevantFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
-		features.TokenRequest:            {Default: false},
-		features.CSINodeInfo:             {Default: false},
-		features.ExpandPersistentVolumes: {Default: false},
+		kubefeaturegates.TokenRequest:            {Default: false},
+		kubefeaturegates.CSINodeInfo:             {Default: false},
+		kubefeaturegates.ExpandPersistentVolumes: {Default: false},
 	}
 	utilruntime.Must(trEnabledFeature.Add(relevantFeatures))
 	utilruntime.Must(csiNodeInfoEnabledFeature.Add(relevantFeatures))
 	utilruntime.Must(csiNodeInfoDisabledFeature.Add(relevantFeatures))
 
-	utilruntime.Must(trEnabledFeature.SetFromMap(map[string]bool{string(features.TokenRequest): true}))
-	utilruntime.Must(csiNodeInfoEnabledFeature.SetFromMap(map[string]bool{string(features.CSINodeInfo): true}))
+	utilruntime.Must(trEnabledFeature.SetFromMap(map[string]bool{string(kubefeaturegates.TokenRequest): true}))
+	utilruntime.Must(csiNodeInfoEnabledFeature.SetFromMap(map[string]bool{string(kubefeaturegates.CSINodeInfo): true}))
 }
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -1226,7 +1226,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "disallowed create CSINode - feature disabled",
 			attributes: admission.NewAttributesRecord(nodeInfo, nil, csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			features:   csiNodeInfoDisabledFeature,
-			err:        fmt.Sprintf("forbidden: disabled by feature gates %s", features.CSINodeInfo),
+			err:        fmt.Sprintf("forbidden: disabled by feature gates %s", kubefeaturegates.CSINodeInfo),
 		},
 		{
 			name:       "disallowed create another node's CSINode - feature enabled",

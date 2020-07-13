@@ -25,6 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -1199,8 +1199,8 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigrationGCE, true)()
 
 		// Setup
 		testEnv := newTestBinder(t, ctx.Done())
@@ -1805,8 +1805,8 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, scenario.migrationEnabled)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, scenario.migrationEnabled)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, scenario.migrationEnabled)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigrationGCE, scenario.migrationEnabled)()
 
 		// Setup
 		pod := makePod(nil)

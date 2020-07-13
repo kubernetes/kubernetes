@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -52,7 +53,6 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -2033,7 +2033,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		allErrs = append(allErrs, ValidateImmutableAnnotation(newPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], oldPvc.ObjectMeta.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) {
 		// lets make sure storage values are same.
 		if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
 			newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"]
@@ -4437,7 +4437,7 @@ func ValidateServiceExternalTrafficFieldsCombination(service *core.Service) fiel
 // ValidateServiceCreate validates Services as they are created.
 func ValidateServiceCreate(service *core.Service) field.ErrorList {
 	// allow AppProtocol value if the feature gate is set.
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAppProtocol)
 
 	return ValidateService(service, allowAppProtocol)
 }
@@ -4456,7 +4456,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 
 	// allow AppProtocol value if the feature gate is set or the field is
 	// already set on the resource.
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAppProtocol)
 	if !allowAppProtocol {
 		for _, port := range oldService.Spec.Ports {
 			if port.AppProtocol != nil {
@@ -5653,7 +5653,7 @@ func ValidateEndpoints(endpoints *core.Endpoints, allowAppProtocol bool) field.E
 
 // ValidateEndpointsCreate validates Endpoints on create.
 func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAppProtocol)
 	return ValidateEndpoints(endpoints, allowAppProtocol)
 }
 
@@ -5663,7 +5663,7 @@ func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
 // happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
+	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAppProtocol)
 	if !allowAppProtocol {
 		for _, oldSubset := range oldEndpoints.Subsets {
 			for _, port := range oldSubset.Ports {

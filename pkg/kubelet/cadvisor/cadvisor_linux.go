@@ -44,9 +44,9 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 

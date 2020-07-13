@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +32,6 @@ import (
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -877,7 +877,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 		reconcileASW(fakeASW, fakeDSW, t)
 
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, tc.enableResize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandInUsePersistentVolumes, tc.enableResize)()
 
 			tc.resize(t, pv, pvc, dswp)
 

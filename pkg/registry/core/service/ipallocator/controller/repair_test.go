@@ -28,9 +28,9 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type mockRangeRegistry struct {
@@ -266,7 +266,7 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, tc.enableDualStack)()
 
 			fakeClient := makeFakeClientSet()
 			primaryRegistry := makeRangeRegistry(t, tc.primaryNet.String())
@@ -285,7 +285,7 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 }
 
 func TestRepairDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, true)()
 
 	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
@@ -325,7 +325,7 @@ func TestRepairDualStack(t *testing.T) {
 }
 
 func TestRepairLeakDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, true)()
 
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous, err := ipallocator.NewCIDRRange(cidr)
@@ -418,7 +418,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 }
 
 func TestRepairWithExistingDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.IPv6DualStack, true)()
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous, err := ipallocator.NewCIDRRange(cidr)
 	if err != nil {

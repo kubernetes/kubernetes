@@ -25,13 +25,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestFindPort(t *testing.T) {
@@ -355,7 +355,7 @@ func TestVisitContainers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.ephemeralContainersEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, tc.ephemeralContainersEnabled)()
 				tc.mask = AllFeatureEnabledContainers()
 			}
 
@@ -390,7 +390,7 @@ func TestVisitContainers(t *testing.T) {
 }
 
 func TestPodSecrets(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
@@ -574,7 +574,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 }
 
 func TestPodConfigmaps(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	// Stub containing all possible ConfigMap references in a pod.
 	// The names of the referenced ConfigMaps match struct paths detected by reflection.

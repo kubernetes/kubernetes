@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,7 +31,6 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	netutils "k8s.io/utils/net"
 )

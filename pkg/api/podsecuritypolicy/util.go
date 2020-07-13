@@ -17,28 +17,28 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // DropDisabledFields removes disabled fields from the pod security policy spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a od security policy spec.
 func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !allowedProcMountTypesInUse(oldPSPSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ProcMountType) && !allowedProcMountTypesInUse(oldPSPSpec) {
 		pspSpec.AllowedProcMountTypes = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && (oldPSPSpec == nil || oldPSPSpec.RunAsGroup == nil) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RunAsGroup) && (oldPSPSpec == nil || oldPSPSpec.RunAsGroup == nil) {
 		pspSpec.RunAsGroup = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPSPSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.Sysctls) && !sysctlsInUse(oldPSPSpec) {
 		pspSpec.AllowedUnsafeSysctls = nil
 		pspSpec.ForbiddenSysctls = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		pspSpec.AllowedCSIDrivers = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) &&
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RuntimeClass) &&
 		(oldPSPSpec == nil || oldPSPSpec.RuntimeClass == nil) {
 		pspSpec.RuntimeClass = nil
 	}

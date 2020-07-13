@@ -22,6 +22,7 @@ import (
 	"io"
 
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -83,7 +83,7 @@ func (p *Plugin) ValidateInitialization() error {
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.nonPreemptingPriority = featureGates.Enabled(features.NonPreemptingPriority)
+	p.nonPreemptingPriority = featureGates.Enabled(kubefeaturegates.NonPreemptingPriority)
 }
 
 // SetExternalKubeClientSet implements the WantsInternalKubeClientSet interface.

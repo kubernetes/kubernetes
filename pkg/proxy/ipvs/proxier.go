@@ -37,13 +37,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
@@ -437,7 +437,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying)
 
 	var incorrectAddresses []string
 	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, isIPv6)
@@ -872,7 +872,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying) {
 		proxier.setInitialized(proxier.endpointSlicesSynced)
 	} else {
 		proxier.setInitialized(proxier.endpointsSynced)
@@ -1263,7 +1263,7 @@ func (proxier *Proxier) syncProxyRules() {
 				SetType:  utilipset.HashIPPort,
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints() {
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints() {
 				if valid := proxier.ipsetList[kubeExternalIPLocalSet].validateEntry(entry); !valid {
 					klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeExternalIPLocalSet].Name))
 					continue
@@ -1294,7 +1294,7 @@ func (proxier *Proxier) syncProxyRules() {
 				activeBindAddrs[serv.Address.String()] = true
 
 				onlyNodeLocalEndpoints := false
-				if utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) {
+				if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExternalPolicyForExternalIP) {
 					onlyNodeLocalEndpoints = svcInfo.OnlyNodeLocalEndpoints()
 				}
 				if err := proxier.syncEndpoint(svcName, onlyNodeLocalEndpoints, serv); err != nil {
@@ -2001,7 +2001,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	// 2. ServiceTopology is not enabled.
 	// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
 	// to get topology information).
-	if !onlyNodeLocalEndpoints && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+	if !onlyNodeLocalEndpoints && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying) {
 		endpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, proxier.serviceMap[svcPortName].TopologyKeys(), endpoints)
 	}
 

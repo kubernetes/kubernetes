@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -392,7 +392,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 		},
 		{
 			name:    "PodTopologySpreadArgs resources empty, NewPodTopologySpread feature enabled",
-			feature: features.DefaultPodTopologySpread,
+			feature: kubefeaturegates.DefaultPodTopologySpread,
 			in:      &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{

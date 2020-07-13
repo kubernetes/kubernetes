@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -40,7 +40,7 @@ func TestIsMigratable(t *testing.T) {
 	}{
 		{
 			name:                 "GCE PD PV source with CSIMigrationGCE enabled",
-			pluginFeature:        features.CSIMigrationGCE,
+			pluginFeature:        kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled: true,
 			isMigratable:         true,
 			csiMigrationEnabled:  true,
@@ -61,7 +61,7 @@ func TestIsMigratable(t *testing.T) {
 		},
 		{
 			name:                 "GCE PD PV Source with CSIMigrationGCE disabled",
-			pluginFeature:        features.CSIMigrationGCE,
+			pluginFeature:        kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled: false,
 			isMigratable:         false,
 			csiMigrationEnabled:  true,
@@ -82,7 +82,7 @@ func TestIsMigratable(t *testing.T) {
 		},
 		{
 			name:                 "AWS EBS PV with CSIMigrationAWS enabled",
-			pluginFeature:        features.CSIMigrationAWS,
+			pluginFeature:        kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled: true,
 			isMigratable:         true,
 			csiMigrationEnabled:  true,
@@ -103,7 +103,7 @@ func TestIsMigratable(t *testing.T) {
 		},
 		{
 			name:                 "AWS EBS PV with CSIMigration and CSIMigrationAWS disabled",
-			pluginFeature:        features.CSIMigrationAWS,
+			pluginFeature:        kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled: false,
 			isMigratable:         false,
 			csiMigrationEnabled:  false,
@@ -127,7 +127,7 @@ func TestIsMigratable(t *testing.T) {
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			migratable, err := pm.IsMigratable(test.spec)
 			if migratable != test.isMigratable {
@@ -152,44 +152,44 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 	}{
 		{
 			name:                         "plugin specific feature flag enabled with migration flag disabled",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationGCEComplete,
 			pluginFeatureCompleteEnabled: false,
 			result:                       false,
 		},
 		{
 			name:                         "plugin specific complete flag enabled but plugin specific feature flag disabled",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled:         false,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationAWSComplete,
 			pluginFeatureCompleteEnabled: true,
 			result:                       false,
 		},
 		{
 			name:                         "plugin specific complete feature disabled but plugin specific migration feature and CSI migration flag enabled",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationGCEComplete,
 			pluginFeatureCompleteEnabled: false,
 			result:                       true,
 		},
 		{
 			name:                         "all features enabled",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationAWSComplete,
 			pluginFeatureCompleteEnabled: true,
 			result:                       true,
 		},
 	}
 	for _, test := range testCases {
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
 			err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureComplete)
@@ -218,10 +218,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
 			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled:         false,
 			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationGCEComplete,
 			pluginFeatureCompleteEnabled: false,
 			csiMigrationResult:           false,
 			csiMigrationCompleteResult:   false,
@@ -229,10 +229,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
 			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled:         false,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationGCEComplete,
 			pluginFeatureCompleteEnabled: false,
 			csiMigrationResult:           false,
 			csiMigrationCompleteResult:   false,
@@ -240,10 +240,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
 			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationGCEComplete,
 			pluginFeatureCompleteEnabled: false,
 			csiMigrationResult:           true,
 			csiMigrationCompleteResult:   false,
@@ -251,10 +251,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
 			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                kubefeaturegates.CSIMigrationGCE,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationGCEComplete,
 			pluginFeatureCompleteEnabled: true,
 			csiMigrationResult:           true,
 			csiMigrationCompleteResult:   true,
@@ -262,10 +262,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
 			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled:         false,
 			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationAWSComplete,
 			pluginFeatureCompleteEnabled: false,
 			csiMigrationResult:           false,
 			csiMigrationCompleteResult:   false,
@@ -273,10 +273,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
 			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled:         false,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationAWSComplete,
 			pluginFeatureCompleteEnabled: false,
 			csiMigrationResult:           false,
 			csiMigrationCompleteResult:   false,
@@ -284,10 +284,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "aws-ebs migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
 			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationAWSComplete,
 			pluginFeatureCompleteEnabled: false,
 			csiMigrationResult:           true,
 			csiMigrationCompleteResult:   false,
@@ -295,10 +295,10 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		{
 			name:                         "aws-ebs migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
 			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                kubefeaturegates.CSIMigrationAWS,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        kubefeaturegates.CSIMigrationAWSComplete,
 			pluginFeatureCompleteEnabled: true,
 			csiMigrationResult:           true,
 			csiMigrationCompleteResult:   true,
@@ -308,7 +308,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
 

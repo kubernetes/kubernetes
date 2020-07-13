@@ -20,12 +20,12 @@ import (
 	"context"
 	"io"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -131,7 +131,7 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 }
 
 func (c *storageProtectionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	c.storageObjectInUseProtection = featureGates.Enabled(features.StorageObjectInUseProtection)
+	c.storageObjectInUseProtection = featureGates.Enabled(kubefeaturegates.StorageObjectInUseProtection)
 }
 
 func (c *storageProtectionPlugin) ValidateInitialization() error {

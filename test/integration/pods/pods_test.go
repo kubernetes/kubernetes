@@ -22,7 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +32,6 @@ import (
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -188,7 +188,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 }
 
 func TestPodCreateEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
@@ -262,7 +262,7 @@ func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, cont
 }
 
 func TestPodPatchEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
@@ -468,7 +468,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 }
 
 func TestPodUpdateEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()

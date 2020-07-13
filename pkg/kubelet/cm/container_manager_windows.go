@@ -28,11 +28,11 @@ import (
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"

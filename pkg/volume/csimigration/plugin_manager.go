@@ -20,11 +20,11 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -59,17 +59,17 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWSComplete)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAWSComplete)
 	case csilibplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCEComplete)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationGCEComplete)
 	case csilibplugins.AzureFileInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFileComplete)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureFileComplete)
 	case csilibplugins.AzureDiskInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDiskComplete)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureDiskComplete)
 	case csilibplugins.CinderInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStackComplete)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationOpenStackComplete)
 	case csilibplugins.VSphereInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphereComplete)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationvSphereComplete)
 	default:
 		return false
 	}
@@ -79,23 +79,23 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 // for a particular storage plugin
 func (pm PluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
 	// CSIMigration feature should be enabled along with the plugin-specific one
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) {
 		return false
 	}
 
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAWS)
 	case csilibplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationGCE)
 	case csilibplugins.AzureFileInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureFile)
 	case csilibplugins.AzureDiskInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureDisk)
 	case csilibplugins.CinderInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationOpenStack)
 	case csilibplugins.VSphereInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationvSphere)
 	default:
 		return false
 	}
@@ -150,7 +150,7 @@ func TranslateInTreeSpecToCSI(spec *volume.Spec, translator InTreeToCSITranslato
 // CheckMigrationFeatureFlags checks the configuration of feature flags related
 // to CSI Migration is valid
 func CheckMigrationFeatureFlags(f featuregate.FeatureGate, pluginMigration, pluginMigrationComplete featuregate.Feature) error {
-	if f.Enabled(pluginMigration) && !f.Enabled(features.CSIMigration) {
+	if f.Enabled(pluginMigration) && !f.Enabled(kubefeaturegates.CSIMigration) {
 		return fmt.Errorf("enabling %q requires CSIMigration to be enabled", pluginMigration)
 	}
 	if f.Enabled(pluginMigrationComplete) && !f.Enabled(pluginMigration) {

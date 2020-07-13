@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package features
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/kubefeaturegates"
-	v1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return RegisterDefaults(scheme)
-}
-
-// SetDefaults_PriorityClass sets additional defaults compared to its counterpart
-// in extensions.
-func SetDefaults_PriorityClass(obj *v1.PriorityClass) {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.NonPreemptingPriority) && obj.PreemptionPolicy == nil {
-		preemptLowerPriority := apiv1.PreemptLowerPriority
-		obj.PreemptionPolicy = &preemptLowerPriority
-	}
+func init() {
+	runtime.Must(kubefeaturegates.AddCurrentKubernetesSpecificFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	runtime.Must(genericfeatures.AddCurrentGenericAPIServerFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }

@@ -23,11 +23,11 @@ import (
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -52,7 +52,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 	}
 
 	runtimeHandler := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && m.runtimeClassManager != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RuntimeClass) && m.runtimeClassManager != nil {
 		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
 		if err != nil {
 			message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
@@ -154,7 +154,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	}
 
 	sysctls := make(map[string]string)
-	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.Sysctls) {
 		if pod.Spec.SecurityContext != nil {
 			for _, c := range pod.Spec.SecurityContext.Sysctls {
 				sysctls[c.Name] = c.Value

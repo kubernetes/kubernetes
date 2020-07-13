@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
@@ -81,17 +81,17 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	// Nodes allow *all* fields, including status, to be set on create.
 	// for create
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && oldNode == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) && oldNode == nil {
 		node.Spec.ConfigSource = nil
 		node.Status.Config = nil
 	}
 
 	// for update
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) && oldNode != nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) && oldNode != nil {
 		node.Spec.ConfigSource = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !multiNodeCIDRsInUse(oldNode) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) && !multiNodeCIDRsInUse(oldNode) {
 		if len(node.Spec.PodCIDRs) > 1 {
 			node.Spec.PodCIDRs = node.Spec.PodCIDRs[0:1]
 		}
@@ -168,7 +168,7 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeStatusConfigInUse(oldNode) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) && !nodeStatusConfigInUse(oldNode) {
 		newNode.Status.Config = nil
 	}
 }

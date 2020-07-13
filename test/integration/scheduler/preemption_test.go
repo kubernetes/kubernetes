@@ -25,6 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -434,7 +434,7 @@ func TestPreemption(t *testing.T) {
 
 // TestNonPreemption tests NonPreempt option of PriorityClass of scheduler works as expected.
 func TestNonPreemption(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.NonPreemptingPriority, true)()
 
 	var preemptNever = v1.PreemptNever
 	// Initialize scheduler.

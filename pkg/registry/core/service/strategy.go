@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	netutil "k8s.io/utils/net"
 )
 
@@ -95,7 +95,7 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamily == nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) && service.Spec.IPFamily == nil {
 		family := strategy.ipFamilies[0]
 		service.Spec.IPFamily = &family
 	}
@@ -109,7 +109,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && newService.Spec.IPFamily == nil {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) && newService.Spec.IPFamily == nil {
 		if oldService.Spec.IPFamily != nil {
 			newService.Spec.IPFamily = oldService.Spec.IPFamily
 		} else {
@@ -176,12 +176,12 @@ func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) e
 //     }
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	// Drop IPFamily if DualStack is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceIPFamilyInUse(oldSvc) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) && !serviceIPFamilyInUse(oldSvc) {
 		newSvc.Spec.IPFamily = nil
 	}
 
 	// Drop TopologyKeys if ServiceTopology is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceTopology) && !topologyKeysInUse(oldSvc) {
 		newSvc.Spec.TopologyKeys = nil
 	}
 }

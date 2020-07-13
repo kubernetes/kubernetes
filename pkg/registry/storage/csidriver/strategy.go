@@ -19,6 +19,7 @@ package csidriver
 import (
 	"context"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // csiDriverStrategy implements behavior for CSIDriver objects
@@ -45,11 +45,11 @@ func (csiDriverStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the fields for which the corresponding feature is disabled.
 func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		csiDriver := obj.(*storage.CSIDriver)
 		csiDriver.Spec.StorageCapacity = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		csiDriver := obj.(*storage.CSIDriver)
 		csiDriver.Spec.VolumeLifecycleModes = nil
 	}
@@ -77,12 +77,12 @@ func (csiDriverStrategy) AllowCreateOnUpdate() bool {
 // downgrading to a version that has the feature disabled.
 func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	if old.(*storage.CSIDriver).Spec.StorageCapacity == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		!utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIStorageCapacity) {
 		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.StorageCapacity = nil
 	}
 	if old.(*storage.CSIDriver).Spec.VolumeLifecycleModes == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		!utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
 	}

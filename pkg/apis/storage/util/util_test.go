@@ -21,11 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestDropAllowVolumeExpansion(t *testing.T) {
@@ -71,7 +71,7 @@ func TestDropAllowVolumeExpansion(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old StorageClass %v, new StorageClass %v", enabled, oldStorageClassInfo.description, newStorageClassInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandPersistentVolumes, enabled)()
 
 					DropDisabledFields(newStorageClass, oldStorageClass)
 

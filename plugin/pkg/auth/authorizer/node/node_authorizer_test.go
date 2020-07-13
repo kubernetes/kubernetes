@@ -29,6 +29,7 @@ import (
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +38,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -49,16 +49,16 @@ var (
 )
 
 func init() {
-	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
+	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeaturegates.TokenRequest: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
+	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeaturegates.TokenRequest: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeaturegates.CSINodeInfo: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
+	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeaturegates.CSINodeInfo: {Default: false}}); err != nil {
 		panic(err)
 	}
 }

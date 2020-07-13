@@ -23,7 +23,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,7 +32,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -292,7 +292,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
-			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) {
 				// if the local storage capacity isolation feature gate is disabled, pods request 0 disk.
 				r.EphemeralStorage += rQuant.Value()
 			}
@@ -569,7 +569,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.PodOverhead) {
 		resPtr.Add(pod.Spec.Overhead)
 		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
 			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()

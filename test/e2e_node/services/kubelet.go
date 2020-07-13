@@ -29,12 +29,12 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -233,7 +233,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		kc.FeatureGates = framework.TestContext.FeatureGates
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) {
 		// Enable dynamic config if the feature gate is enabled
 		dynamicConfigDir, err := getDynamicConfigDir()
 		if err != nil {

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -114,7 +114,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 		updateNodeIDInNode(driverName, driverNodeID),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
 	}
 
@@ -123,7 +123,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 		return fmt.Errorf("error updating Node object with CSI driver node info: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		err = nim.updateCSINode(driverName, driverNodeID, maxAttachLimit, topology)
 		if err != nil {
 			return fmt.Errorf("error updating CSINode object with CSI driver node info: %v", err)
@@ -137,7 +137,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 // If multiple calls to UninstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINode update conflicts, which causes the function to retry the corresponding update.
 func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		err := nim.uninstallDriverFromCSINode(driverName)
 		if err != nil {
 			return fmt.Errorf("error uninstalling CSI driver from CSINode object %v", err)

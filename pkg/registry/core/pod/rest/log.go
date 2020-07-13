@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -28,7 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 
@@ -74,7 +74,7 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.AllowInsecureBackendProxy) {
 		logOpts.InsecureSkipTLSVerifyBackend = false
 	}
 

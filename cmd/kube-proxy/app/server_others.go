@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -46,7 +47,6 @@ import (
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -189,7 +189,7 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 			klog.V(0).Info("creating dualStackProxier for iptables.")
 
 			// Create iptables handlers for both families, one is already created
@@ -257,7 +257,7 @@ func newProxyServer(
 		proxymetrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 			klog.V(0).Info("creating dualStackProxier for ipvs.")
 
 			// Create iptables handlers for both families, one is already created
@@ -380,7 +380,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
-		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying),
+		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.EndpointSliceProxying),
 	}, nil
 }
 

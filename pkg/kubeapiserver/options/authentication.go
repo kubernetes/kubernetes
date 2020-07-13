@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
@@ -173,8 +173,8 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
 		}
 	}
-	if s.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+	if s.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.BoundServiceAccountTokenVolume) {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequestProjection) {
 			allErrors = append(allErrors, errors.New("if the BoundServiceAccountTokenVolume feature is enabled,"+
 				" the TokenRequest and TokenRequestProjection features must also be enabled"))
 		}
@@ -187,7 +187,7 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 	}
 
 	if s.ServiceAccounts != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAccountIssuerDiscovery) {
 			// Validate the JWKS URI when it is explicitly set.
 			// When unset, it is later derived from ExternalHost.
 			if s.ServiceAccounts.JWKSURI != "" {
@@ -444,7 +444,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
 	}
 
-	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TokenRequest) {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
 			extclient,
 			versionedInformer.Core().V1().Secrets().Lister(),

@@ -25,9 +25,9 @@ import (
 	"os"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -44,7 +44,7 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		return nil
 	}
 
-	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
+	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ConfigurableFSGroupPolicy)
 
 	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
 

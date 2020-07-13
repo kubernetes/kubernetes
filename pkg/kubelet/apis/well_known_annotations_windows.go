@@ -19,8 +19,8 @@ limitations under the License.
 package apis
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -34,7 +34,7 @@ const (
 
 // ShouldIsolatedByHyperV returns true if a windows container should be run with hyperv isolation.
 func ShouldIsolatedByHyperV(annotations map[string]string) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HyperVContainer) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HyperVContainer) {
 		return false
 	}
 

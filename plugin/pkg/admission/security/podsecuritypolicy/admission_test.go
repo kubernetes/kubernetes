@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +44,6 @@ import (
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -629,8 +629,8 @@ func TestAdmitCaps(t *testing.T) {
 }
 
 func TestAdmitVolumes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.GenericEphemeralVolume, true)()
 
 	val := reflect.ValueOf(kapi.VolumeSource{})
 

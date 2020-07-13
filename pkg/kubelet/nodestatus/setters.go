@@ -26,7 +26,8 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -36,7 +37,6 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -305,7 +305,7 @@ func MachineInfo(nodeName string,
 			}
 			node.Status.NodeInfo.BootID = info.BootID
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) {
 				// TODO: all the node resources should use ContainerManager.GetCapacity instead of deriving the
 				// capacity for every node status request
 				initialCapacity := capacityFunc()
@@ -493,7 +493,7 @@ func ReadyCondition(
 		}
 		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
-		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.LocalStorageCapacityIsolation) {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
 		}
 		missingCapacities := []string{}

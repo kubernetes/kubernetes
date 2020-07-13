@@ -22,13 +22,13 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -157,7 +157,7 @@ func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.PodOverhead) {
 		result.Add(pod.Spec.Overhead)
 	}
 

@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -77,7 +77,7 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
 
@@ -90,7 +90,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
 		newJob.Spec.TTLSecondsAfterFinished = nil
 	}
 

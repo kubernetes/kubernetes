@@ -25,7 +25,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +40,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 
 	// ensure types are installed
@@ -326,7 +326,7 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 }
 
 func TestCheckLogLocation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 	ctx := genericapirequest.NewDefaultContext()
 	fakePodName := "test"
 	tcs := []struct {

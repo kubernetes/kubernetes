@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -3594,8 +3594,8 @@ func Test_isNodeExcludedFromDisruptionChecks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDisruptionExclusion, tt.enableExclusion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LegacyNodeRoleBehavior, tt.enableLegacy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.NodeDisruptionExclusion, tt.enableExclusion)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LegacyNodeRoleBehavior, tt.enableLegacy)()
 
 			if result := isNodeExcludedFromDisruptionChecks(tt.input); result != tt.want {
 				t.Errorf("isNodeExcludedFromDisruptionChecks() = %v, want %v", result, tt.want)

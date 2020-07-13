@@ -21,7 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -30,7 +31,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -446,7 +446,7 @@ func parseQuantity(value string) resource.Quantity {
 }
 
 func TestDiskPressureNodeFs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, true)()
 
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
@@ -783,7 +783,7 @@ func TestMinReclaim(t *testing.T) {
 }
 
 func TestNodeReclaimFuncs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.LocalStorageCapacityIsolation, true)()
 
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats

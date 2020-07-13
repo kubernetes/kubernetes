@@ -25,10 +25,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -326,7 +326,7 @@ func TestExpandVolumeMountsWithSubpath(t *testing.T) {
 }
 
 func TestGetContainerSpec(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.EphemeralContainers, true)()
 	for _, tc := range []struct {
 		name          string
 		havePod       *v1.Pod

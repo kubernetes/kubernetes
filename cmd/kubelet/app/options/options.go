@@ -26,13 +26,13 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -195,7 +195,7 @@ func NewKubeletFlags() *KubeletFlags {
 // ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
-	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.DynamicKubeletConfig) {
 		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
 	}
 

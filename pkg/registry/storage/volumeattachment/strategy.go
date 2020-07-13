@@ -19,6 +19,7 @@ package volumeattachment
 import (
 	"context"
 
+	"k8s.io/api/kubefeaturegates"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // volumeAttachmentStrategy implements behavior for VolumeAttachment objects
@@ -64,7 +64,7 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 		volumeAttachment.Status = storage.VolumeAttachmentStatus{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) {
 		volumeAttachment.Spec.Source.InlineVolumeSpec = nil
 	}
 
@@ -118,7 +118,7 @@ func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 		// No need to increment Generation because we don't allow updates to spec
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && oldVolumeAttachment.Spec.Source.InlineVolumeSpec == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) && oldVolumeAttachment.Spec.Source.InlineVolumeSpec == nil {
 		newVolumeAttachment.Spec.Source.InlineVolumeSpec = nil
 	}
 }

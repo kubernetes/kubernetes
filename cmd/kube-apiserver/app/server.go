@@ -32,6 +32,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/kubefeaturegates"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -68,7 +69,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -408,7 +408,7 @@ func CreateKubeAPIServerConfig(
 		config.ExtraConfig.ProxyTransport = c
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ServiceAccountIssuerDiscovery) {
 		// Load the public keys.
 		var pubKeys []interface{}
 		for _, f := range s.Authentication.ServiceAccounts.KeyFiles {

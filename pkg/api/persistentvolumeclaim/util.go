@@ -17,9 +17,9 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -47,7 +47,7 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 
 func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 	if pvcSpec.DataSource != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.AnyVolumeDataSource) {
 			return true
 		}
 
@@ -61,7 +61,7 @@ func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) &&
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.VolumeSnapshotDataSource) &&
 			pvcSpec.DataSource.Kind == volumeSnapshot &&
 			apiGroup == "snapshot.storage.k8s.io" {
 			return true

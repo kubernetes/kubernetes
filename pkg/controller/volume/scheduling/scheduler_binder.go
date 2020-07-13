@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +47,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -668,7 +668,7 @@ func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, p
 	case vol.PersistentVolumeClaim != nil:
 		pvcName = vol.PersistentVolumeClaim.ClaimName
 	case vol.Ephemeral != nil &&
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume):
 		// Generic ephemeral inline volumes also use a PVC,
 		// just with a computed name, and...
 		pvcName = pod.Name + "-" + vol.Name
@@ -988,13 +988,13 @@ func (a byPVCSize) Less(i, j int) bool {
 func isCSIMigrationOnForPlugin(pluginName string) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAWS)
 	case csiplugins.GCEPDInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationGCE)
 	case csiplugins.AzureDiskInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationAzureDisk)
 	case csiplugins.CinderInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+		return utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigrationOpenStack)
 	}
 	return false
 }
@@ -1028,7 +1028,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return pv, nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIMigration) {
 		return pv, nil
 	}
 

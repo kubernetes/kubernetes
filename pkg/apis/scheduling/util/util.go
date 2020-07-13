@@ -17,14 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"k8s.io/api/kubefeaturegates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // DropDisabledFields removes disabled fields from the PriorityClass object.
 func DropDisabledFields(class, oldClass *scheduling.PriorityClass) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) && !preemptingPriorityInUse(oldClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.NonPreemptingPriority) && !preemptingPriorityInUse(oldClass) {
 		class.PreemptionPolicy = nil
 	}
 }

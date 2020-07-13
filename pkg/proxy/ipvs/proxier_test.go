@@ -29,13 +29,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
+	"k8s.io/api/kubefeaturegates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
@@ -1266,7 +1266,7 @@ func TestExternalIPs(t *testing.T) {
 
 func TestOnlyLocalExternalIPs(t *testing.T) {
 	// TODO(freehan): remove this in k8s 1.19
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalPolicyForExternalIP, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExternalPolicyForExternalIP, true)()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()

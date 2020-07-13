@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
+	kubefeatures "k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -33,8 +34,6 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -258,7 +257,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 	}
-	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
+	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.BalanceAttachedNodeVolumes) {
 		nodeInfo.TransientInfo.TransientLock.Lock()
 		defer nodeInfo.TransientInfo.TransientLock.Unlock()
 		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = maxAttachLimit - numExistingVolumes

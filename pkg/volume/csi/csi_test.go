@@ -26,6 +26,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,6 @@ import (
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -46,7 +46,7 @@ import (
 // TestCSI_VolumeAll runs a close approximation of volume workflow
 // based on operations from the volume manager/reconciler/operation executor
 func TestCSI_VolumeAll(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIInlineVolume, true)()
 
 	tests := []struct {
 		name       string

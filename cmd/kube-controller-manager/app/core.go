@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	storagev1informer "k8s.io/client-go/informers/storage/v1"
@@ -62,7 +63,6 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -110,7 +110,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	}
 
 	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
 	}
 
@@ -142,7 +142,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	// the following checks are triggered if both serviceCIDR and secondaryServiceCIDR are provided
 	if serviceCIDR != nil && secondaryServiceCIDR != nil {
 		// should have dual stack flag enabled
-		if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 			return nil, false, fmt.Errorf("secondary service cidr is provided and IPv6DualStack feature is not enabled")
 		}
 
@@ -157,7 +157,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	}
 
 	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
 		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(ctx.ComponentConfig.NodeIPAMController)
@@ -257,7 +257,7 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 	}
 
 	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
 	}
 
@@ -314,7 +314,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 	var (
 		csiNodeInformer storagev1informer.CSINodeInformer
 	)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSINodeInfo) {
 		csiNodeInformer = ctx.InformerFactory.Storage().V1().CSINodes()
 	}
 	csiDriverInformer := ctx.InformerFactory.Storage().V1().CSIDrivers()
@@ -349,7 +349,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 }
 
 func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ExpandPersistentVolumes) {
 		plugins, err := ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
@@ -375,7 +375,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 }
 
 func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.GenericEphemeralVolume) {
 		ephemeralController, err := ephemeral.NewController(
 			ctx.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
 			ctx.InformerFactory.Core().V1().Pods(),
@@ -555,8 +555,8 @@ func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
-		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StorageObjectInUseProtection),
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StorageObjectInUseProtection),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
@@ -569,13 +569,13 @@ func startPVProtectionController(ctx ControllerContext) (http.Handler, bool, err
 	go pvprotection.NewPVProtectionController(
 		ctx.InformerFactory.Core().V1().PersistentVolumes(),
 		ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
-		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+		utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.StorageObjectInUseProtection),
 	).Run(1, ctx.Stop)
 	return nil, true, nil
 }
 
 func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.TTLAfterFinished) {
 		return nil, false, nil
 	}
 	go ttlafterfinished.New(

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,7 +39,6 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
@@ -163,7 +163,7 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
 	}
-	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
+	v, ok := cfgz.FeatureGates[string(kubefeaturegates.DynamicKubeletConfig)]
 	if !ok {
 		return true, nil
 	}

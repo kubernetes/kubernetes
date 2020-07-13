@@ -27,6 +27,7 @@ import (
 	asserttestify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,7 +37,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -1808,7 +1808,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ExpandPersistentVolumes, scenario.enableResize)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -4207,7 +4207,7 @@ func TestHugePagesIsolation(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
 			errs := ValidatePodCreate(tc.pod, PodValidationOptions{tc.enableHugePageStorageMediumSize})
 			if tc.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
@@ -4410,7 +4410,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 }
 
 func TestValidatePorts(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.SCTPSupport, true)()
 	successCase := []core.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
@@ -5158,7 +5158,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 }
 
 func TestValidateDisabledSubpath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSubpath, false)()
 
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
@@ -5220,7 +5220,7 @@ func TestValidateDisabledSubpath(t *testing.T) {
 
 func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 	// Enable feature VolumeSubpath
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSubpath, true)()
 
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
@@ -5361,7 +5361,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 	}
 
 	// Repeat with subpath feature gate off
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.VolumeSubpath, false)()
 	cases = map[string]struct {
 		mounts      []core.VolumeMount
 		expectError bool
@@ -9894,8 +9894,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 }
 
 func TestValidateServiceCreate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.SCTPSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceTopology, true)()
 
 	testCases := []struct {
 		name               string
@@ -10678,7 +10678,7 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAppProtocol, true)()
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -12640,7 +12640,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAppProtocol, tc.appProtocolEnabled)()
 
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
@@ -13998,7 +13998,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAppProtocol, tc.appProtocolEnabled)()
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -14187,7 +14187,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, v.appProtocolEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAppProtocol, v.appProtocolEnabled)()
 			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
 			}
@@ -14251,7 +14251,7 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.ServiceAppProtocol, tc.appProtocolEnabled)()
 			oldEndpoints := baseEndpoints.DeepCopy()
 			tc.tweakOldEndpoints(oldEndpoints)
 			newEndpoints := baseEndpoints.DeepCopy()

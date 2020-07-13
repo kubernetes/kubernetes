@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/kubefeaturegates"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -27,7 +28,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -110,7 +110,7 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 	// 0 when HPA scale-to-zero feature is enabled
 	var minReplicasLowerBound int32
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HPAScaleToZero) {
 		minReplicasLowerBound = 0
 	} else {
 		minReplicasLowerBound = 1
@@ -128,7 +128,7 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 	// 0 when HPA scale-to-zero feature is enabled or HPA object already has minReplicas=0
 	var minReplicasLowerBound int32
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || (oldAutoscaler.Spec.MinReplicas != nil && *oldAutoscaler.Spec.MinReplicas == 0) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.HPAScaleToZero) || (oldAutoscaler.Spec.MinReplicas != nil && *oldAutoscaler.Spec.MinReplicas == 0) {
 		minReplicasLowerBound = 0
 	} else {
 		minReplicasLowerBound = 1

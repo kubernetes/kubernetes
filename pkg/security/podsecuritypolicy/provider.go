@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/kubefeaturegates"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,7 +29,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
-	"k8s.io/kubernetes/pkg/features"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -140,7 +140,7 @@ func (s *simpleProvider) mutateContainer(pod *api.Pod, container *api.Container)
 		sc.SetRunAsUser(uid)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RunAsGroup) {
 		if sc.RunAsGroup() == nil {
 			gid, err := s.strategies.RunAsGroupStrategy.GenerateSingle(pod)
 			if err != nil {
@@ -304,7 +304,7 @@ func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
 				}
 
 			case policy.CSI:
-				if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+				if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.CSIInlineVolume) {
 					if len(s.psp.Spec.AllowedCSIDrivers) > 0 {
 						found := false
 						driver := v.CSI.Driver
@@ -338,7 +338,7 @@ func (s *simpleProvider) validateContainer(pod *api.Pod, container *api.Containe
 	scPath := containerPath.Child("securityContext")
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(scPath, pod, container, sc.RunAsNonRoot(), sc.RunAsUser())...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.RunAsGroup) {
 		var runAsGroups []int64
 		if sc.RunAsGroup() != nil {
 			runAsGroups = []int64{*sc.RunAsGroup()}

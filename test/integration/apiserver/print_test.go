@@ -32,6 +32,7 @@ import (
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	"k8s.io/api/kubefeaturegates"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -157,7 +157,7 @@ var unservedTypes = map[schema.GroupVersionKind]bool{
 }
 
 func TestServerSidePrint(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeaturegates.CSIStorageCapacity, true)()
 
 	s, _, closeFn := setupWithResources(t,
 		// additional groupversions needed for the test to run

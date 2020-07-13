@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/api/kubefeaturegates"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for Secret objects
@@ -85,7 +85,7 @@ func isImmutableInUse(secret *api.Secret) bool {
 }
 
 func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && !isImmutableInUse(oldSecret) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeaturegates.ImmutableEphemeralVolumes) && !isImmutableInUse(oldSecret) {
 		secret.Immutable = nil
 	}
 }
