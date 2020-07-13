@@ -427,6 +427,11 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	if err := kl.updateNodeStatus(); err != nil {
 		klog.Errorf("Unable to update node status: %v", err)
+
+		// treat failure to update node status as fatal if `maxRegistrationAttempts` set
+		if kl.maxRegistrationAttempts > 0 {
+			klog.Fatal(err)
+		}
 	}
 }
 
@@ -434,7 +439,7 @@ func (kl *Kubelet) syncNodeStatus() {
 // change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus() error {
 	klog.V(5).Infof("Updating node status")
-	for i := 0; i < nodeStatusUpdateRetry; i++ {
+	for i := 0; kl.maxRegistrationAttempts == 0 || i < kl.maxRegistrationAttempts; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()

@@ -126,9 +126,6 @@ const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
 
-	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
-	nodeStatusUpdateRetry = 5
-
 	// ContainerLogsDir is the location of container logs.
 	ContainerLogsDir = "/var/log/containers"
 
@@ -363,6 +360,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
+	maxRegistrationAttempts int,
 	allowedUnsafeSysctls []string,
 	experimentalMounterPath string,
 	kernelMemcgNotification bool,
@@ -504,6 +502,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                            registerNode,
 		registerWithTaints:                      registerWithTaints,
+		maxRegistrationAttempts:					 maxRegistrationAttempts,
 		registerSchedulable:                     registerSchedulable,
 		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                           serviceLister,
@@ -881,6 +880,8 @@ type Kubelet struct {
 	registerWithTaints []api.Taint
 	// Set to true to have the node register itself as schedulable.
 	registerSchedulable bool
+	// number of attempts to (re-)register node before exiting with fatal error
+	maxRegistrationAttempts int
 	// for internal book keeping; access only from within registerWithApiserver
 	registrationCompleted bool
 

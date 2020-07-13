@@ -61,6 +61,7 @@ import (
 
 const (
 	maxImageTagsForTest = 20
+	nodeStatusUpdateRetry = 5
 )
 
 // generateTestingImageLists generate randomly generated image list and corresponding expectedImageList.
