@@ -111,7 +111,7 @@ func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]st
 	var privateIPs []string
 	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
-		privateIPs, retryErr = az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
+		privateIPs, retryErr = az.VMSet.GetPrivateIPsByNodeName(string(nodeName))
 		if retryErr != nil {
 			// won't retry since the instance doesn't exist on Azure.
 			if retryErr == cloudprovider.InstanceNotFound {
@@ -135,7 +135,7 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 	var ip, publicIP string
 	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
-		ip, publicIP, retryErr = az.vmSet.GetIPByNodeName(string(name))
+		ip, publicIP, retryErr = az.VMSet.GetIPByNodeName(string(name))
 		if retryErr != nil {
 			klog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
 			return false, nil

@@ -248,7 +248,7 @@ type Cloud struct {
 
 	ResourceRequestBackoff wait.Backoff
 	metadata               *InstanceMetadataService
-	vmSet                  VMSet
+	VMSet                  VMSet
 
 	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
 	ipv6DualStackEnabled bool
@@ -491,12 +491,12 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	}
 
 	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
-		az.vmSet, err = newScaleSet(az)
+		az.VMSet, err = newScaleSet(az)
 		if err != nil {
 			return err
 		}
 	} else {
-		az.vmSet = newAvailabilitySet(az)
+		az.VMSet = newAvailabilitySet(az)
 	}
 
 	az.vmCache, err = az.newVMCache()
