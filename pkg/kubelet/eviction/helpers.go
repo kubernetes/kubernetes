@@ -18,6 +18,7 @@ package eviction
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -415,7 +416,7 @@ func localEphemeralVolumeNames(pod *v1.Pod) []string {
 }
 
 // podLocalEphemeralStorageUsage aggregates pod local ephemeral storage usage and inode consumption for the specified stats to measure.
-func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType, etcHostsPath string) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.DecimalSI}
 
@@ -428,6 +429,12 @@ func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, stat
 		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
 		disk.Add(podLocalVolumeUsageList[v1.ResourceEphemeralStorage])
 		inodes.Add(podLocalVolumeUsageList[resourceInodes])
+	}
+	if len(etcHostsPath) > 0 {
+		if stat, err := os.Stat(etcHostsPath); err == nil {
+			disk.Add(*resource.NewQuantity(int64(stat.Size()), resource.BinarySI))
+			inodes.Add(*resource.NewQuantity(int64(1), resource.DecimalSI))
+		}
 	}
 	return v1.ResourceList{
 		v1.ResourceEphemeralStorage: disk,
