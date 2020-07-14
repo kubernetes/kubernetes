@@ -255,6 +255,10 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 		if d.SnapshotClass.FromName || d.SnapshotClass.FromFile != "" || d.SnapshotClass.FromExistingClassName != "" {
 			supported = true
 		}
+	case testpatterns.PreprovisionedCreatedSnapshot:
+		if d.SnapshotClass.FromName || d.SnapshotClass.FromFile != "" || d.SnapshotClass.FromExistingClassName != "" {
+			supported = true
+		}
 	}
 	if !supported {
 		e2eskipper.Skipf("Driver %q does not support snapshot type %q - skipping", d.DriverInfo.Name, pattern.SnapshotType)
