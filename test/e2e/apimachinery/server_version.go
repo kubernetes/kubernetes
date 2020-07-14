@@ -26,7 +26,14 @@ import (
 
 var _ = SIGDescribe("server version", func() {
 	f := framework.NewDefaultFramework("server-version")
-	ginkgo.It("should find the server version", func() {
+
+	/*
+	   Release : v1.19
+	   Testname: Confirm a server version
+	   Description: Ensure that an API server version can be retrieved.
+	   Both the major and minor versions MUST only be an integer.
+	*/
+	framework.ConformanceIt("should find the server version", func() {
 
 		ginkgo.By("Request ServerVersion")
 
