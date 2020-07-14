@@ -748,7 +748,7 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 	return namespace
 }
 
-// WaitForGVRDeletion waits until an object has been deleted
+// WaitForGVRDeletion waits until a non-namespaced object has been deleted
 func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
@@ -758,7 +758,7 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
 			return true
 		} else if err != nil {
-			framework.Logf("Get $s %v returned an error: %v", objectName, err.Error())
+			framework.Logf("Get %s returned an error: %v", objectName, err.Error())
 		} else {
 			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
 		}
@@ -769,6 +769,29 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 	}
 
 	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
+func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+
+	if successful := WaitUntil(poll, timeout, func() bool {
+		_, err := c.Resource(gvr).Namespace(ns).Get(context.TODO(), objectName, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			framework.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
+			return true
+		} else if err != nil {
+			framework.Logf("Get %s in namespace %s returned an error: %v", objectName, ns, err.Error())
+		} else {
+			framework.Logf("%s %s has been found in namespace %s and is not deleted", gvr.Resource, objectName, ns)
+		}
+
+		return false
+	}); successful {
+		return nil
+	}
+
+	return fmt.Errorf("%s %s in namespace %s is not deleted within %v", gvr.Resource, objectName, ns, timeout)
 }
 
 // WaitUntil runs checkDone until a timeout is reached
