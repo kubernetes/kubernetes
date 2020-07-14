@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
+	apps "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -179,15 +178,15 @@ func (dc *DisruptionController) finders() []podControllerFinder {
 }
 
 var (
-	controllerKindRS  = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindRS  = apps.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindSS  = apps.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKindRC  = v1.SchemeGroupVersion.WithKind("ReplicationController")
-	controllerKindDep = v1beta1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindDep = apps.SchemeGroupVersion.WithKind("Deployment")
 )
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
 func (dc *DisruptionController) getPodReplicaSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
-	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
+	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps"})
 	if !ok || err != nil {
 		return nil, err
 	}
@@ -227,7 +226,7 @@ func (dc *DisruptionController) getPodStatefulSet(controllerRef *metav1.OwnerRef
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
-	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
+	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps"})
 	if !ok || err != nil {
 		return nil, err
 	}
@@ -244,7 +243,7 @@ func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerRefe
 		return nil, nil
 	}
 
-	ok, err = verifyGroupKind(controllerRef, controllerKindDep.Kind, []string{"apps", "extensions"})
+	ok, err = verifyGroupKind(controllerRef, controllerKindDep.Kind, []string{"apps"})
 	if !ok || err != nil {
 		return nil, err
 	}

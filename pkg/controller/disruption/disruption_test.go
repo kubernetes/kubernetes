@@ -952,7 +952,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 		"happy path": {
 			rsApiVersion:  "apps/v1",
 			rsKind:        controllerKindRS.Kind,
-			depApiVersion: "extensions/v1",
+			depApiVersion: "apps/v1",
 			depKind:       controllerKindDep.Kind,
 			findsScale:    true,
 			expectedScale: 10,
@@ -972,7 +972,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 			findsScale:    false,
 		},
 		"invalid deployment apiVersion": {
-			rsApiVersion:  "extensions/v1",
+			rsApiVersion:  "apps/v1",
 			rsKind:        controllerKindRS.Kind,
 			depApiVersion: "deployment/v1",
 			depKind:       controllerKindDep.Kind,
@@ -981,7 +981,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 		"invalid deployment kind": {
 			rsApiVersion:  "apps/v1",
 			rsKind:        controllerKindRS.Kind,
-			depApiVersion: "extensions/v1",
+			depApiVersion: "apps/v1",
 			depKind:       "InvalidKind",
 			findsScale:    false,
 		},
