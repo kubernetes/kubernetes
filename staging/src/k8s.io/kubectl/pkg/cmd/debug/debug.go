@@ -51,12 +51,28 @@ import (
 )
 
 var (
-	debugLong = templates.LongDesc(i18n.T(`Tools for debugging Kubernetes resources`))
+	debugLong = templates.LongDesc(i18n.T(`
+		Debug cluster resources using interactive debugging containers.
+
+		'debug' provides automation for common debugging tasks for cluster objects identified by
+		resource and name. Pods will be used by default if resource is not specified.
+
+		The action taken by 'debug' varies depending on what resource is specified. Supported
+		actions include:
+
+		* Workload: Create a copy of an existing pod with certain attributes changed,
+	                for example changing the image tag to a new version.
+		* Workload: Add an ephemeral container to an already running pod, for example to add
+		            debugging utilities without restarting the pod.
+		* Node: Create a new pod that runs in the node's host namespaces and can access
+		        the node's filesystem.
+
+		Alpha disclaimer: command line flags may change`))
 
 	debugExample = templates.Examples(i18n.T(`
 		# Create an interactive debugging session in pod mypod and immediately attach to it.
 		# (requires the EphemeralContainers feature to be enabled in the cluster)
-		kubectl alpha debug mypod -i --image=busybox
+		kubectl alpha debug mypod -it --image=busybox
 
 		# Create a debug container named debugger using a custom automated debugging image.
 		# (requires the EphemeralContainers feature to be enabled in the cluster)
@@ -67,6 +83,10 @@ var (
 
 		# Create a copy of mypod named my-debugger with my-container's image changed to busybox
 		kubectl alpha debug mypod --image=busybox --container=my-container --copy-to=my-debugger -- sleep 1d
+
+		# Create an interactive debugging session on a node and immediately attach to it.
+		# The container will run in the host namespaces and the host's filesystem will be mounted at /host
+		kubectl alpha debug node/mynode -it --image=busybox
 `))
 )
 
@@ -133,7 +153,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVar(&opt.ArgsOnly, "arguments-only", opt.ArgsOnly, i18n.T("If specified, everything after -- will be passed to the new container as Args instead of Command."))
-	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, i18n.T("If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true."))
+	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, i18n.T("If true, wait for the container to start running, and then attach as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true."))
 	cmd.Flags().StringVarP(&opt.Container, "container", "c", opt.Container, i18n.T("Container name to use for debug container."))
 	cmd.Flags().StringVar(&opt.CopyTo, "copy-to", opt.CopyTo, i18n.T("Create a copy of the target Pod with this name."))
 	cmd.Flags().BoolVar(&opt.Replace, "replace", opt.Replace, i18n.T("When used with '--copy-to', delete the original Pod"))
@@ -142,11 +162,11 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", string(corev1.PullIfNotPresent), i18n.T("The image pull policy for the container."))
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
-	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, i18n.T("If true, suppress prompt messages."))
-	cmd.Flags().BoolVar(&opt.SameNode, "same-node", opt.SameNode, i18n.T("Schedule the copy of target Pod on the same node."))
+	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, i18n.T("If true, suppress informational messages."))
+	cmd.Flags().BoolVar(&opt.SameNode, "same-node", opt.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
 	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
-	cmd.Flags().StringVar(&opt.Target, "target", "", i18n.T("Target processes in this container name."))
-	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocated a TTY for each container in the pod."))
+	cmd.Flags().StringVar(&opt.Target, "target", "", i18n.T("When debugging a pod, target processes in this container name."))
+	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -221,6 +241,11 @@ func (o *DebugOptions) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid image pull policy: %s", o.PullPolicy)
 	}
 
+	// Target
+	if len(o.Target) > 0 && len(o.CopyTo) > 0 {
+		return fmt.Errorf("--target is incompatible with --copy-to. Use --share-processes instead.")
+	}
+
 	// TTY
 	if o.TTY && !o.Interactive {
 		return fmt.Errorf("-i/--stdin is required for containers with -t/--tty=true")
@@ -253,6 +278,8 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			visitErr      error
 		)
 		switch obj := info.Object.(type) {
+		case *corev1.Node:
+			debugPod, containerName, visitErr = o.visitNode(ctx, obj)
 		case *corev1.Pod:
 			debugPod, containerName, visitErr = o.visitPod(ctx, obj)
 		default:
@@ -291,6 +318,18 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	})
 
 	return err
+}
+
+// visitNode handles debugging for node targets by creating a privileged pod running in the host namespaces.
+// Returns an already created pod and container name for subsequent attach, if applicable.
+func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
+	pods := o.podClient.Pods(o.Namespace)
+	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node.Name), metav1.CreateOptions{})
+	if err != nil {
+		return nil, "", err
+	}
+
+	return newPod, newPod.Spec.Containers[0].Name, nil
 }
 
 // visitPod handles debugging for pod targets by (depending on options):
@@ -371,6 +410,71 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 	return ec
 }
 
+// generateNodeDebugPod generates a debugging pod that schedules on the specified node.
+// The generated pod will run in the host PID, Network & IPC namespaces, and it will have the node's filesystem mounted at /host.
+func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
+	cn := "debugger"
+	// Setting a user-specified container name doesn't make much difference when there's only one container,
+	// but the argument exists for pod debugging so it might be confusing if it didn't work here.
+	if len(o.Container) > 0 {
+		cn = o.Container
+	}
+
+	// The name of the debugging pod is based on the target node, and it's not configurable to
+	// limit the number of command line flags. There may be a collision on the name, but this
+	// should be rare enough that it's not worth the API round trip to check.
+	pn := fmt.Sprintf("node-debugger-%s-%s", node, nameSuffixFunc(5))
+	if !o.Quiet {
+		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node)
+	}
+
+	p := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pn,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:                     cn,
+					Env:                      o.Env,
+					Image:                    o.Image,
+					ImagePullPolicy:          o.PullPolicy,
+					Stdin:                    o.Interactive,
+					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					TTY:                      o.TTY,
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							MountPath: "/host",
+							Name:      "host-root",
+						},
+					},
+				},
+			},
+			HostIPC:       true,
+			HostNetwork:   true,
+			HostPID:       true,
+			NodeName:      node,
+			RestartPolicy: corev1.RestartPolicyNever,
+			Volumes: []corev1.Volume{
+				{
+					Name: "host-root",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+					},
+				},
+			},
+		},
+	}
+
+	if o.ArgsOnly {
+		p.Spec.Containers[0].Args = o.Args
+	} else {
+		p.Spec.Containers[0].Command = o.Args
+	}
+
+	return p
+}
+
 // generatePodCopy takes a Pod and returns a copy and the debug container name of that copy
 func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*corev1.Pod, string) {
 	copied := &corev1.Pod{
@@ -426,7 +530,7 @@ func (o *DebugOptions) computeDebugContainerName(pod *corev1.Pod) string {
 			cn = fmt.Sprintf("debugger-%s", nameSuffixFunc(5))
 		}
 		if !o.Quiet {
-			fmt.Fprintf(o.ErrOut, "Defaulting debug container name to %s.\n", cn)
+			fmt.Fprintf(o.Out, "Defaulting debug container name to %s.\n", cn)
 		}
 		name = cn
 	}

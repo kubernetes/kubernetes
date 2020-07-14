@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package handlers
+package internal
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLazyTruncatedUserAgent(t *testing.T) {
@@ -29,7 +30,7 @@ func TestLazyTruncatedUserAgent(t *testing.T) {
 
 	ua := "short-agent"
 	req.Header.Set("User-Agent", ua)
-	uaNotTruncated := &lazyTruncatedUserAgent{req}
+	uaNotTruncated := &LazyTruncatedUserAgent{req}
 	assert.Equal(t, ua, fmt.Sprintf("%v", uaNotTruncated))
 
 	ua = ""
@@ -37,10 +38,10 @@ func TestLazyTruncatedUserAgent(t *testing.T) {
 		ua = ua + "a"
 	}
 	req.Header.Set("User-Agent", ua)
-	uaTruncated := &lazyTruncatedUserAgent{req}
+	uaTruncated := &LazyTruncatedUserAgent{req}
 	assert.NotEqual(t, ua, fmt.Sprintf("%v", uaTruncated))
 
-	usUnknown := &lazyTruncatedUserAgent{}
+	usUnknown := &LazyTruncatedUserAgent{}
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", usUnknown))
 }
 
@@ -51,9 +52,9 @@ func TestLazyClientIP(t *testing.T) {
 	ip := "127.0.0.1"
 	req.Header.Set("X-Forwarded-For", ip)
 
-	clientIPWithReq := &lazyClientIP{req}
+	clientIPWithReq := &LazyClientIP{req}
 	assert.Equal(t, ip, fmt.Sprintf("%v", clientIPWithReq))
 
-	clientIPWithoutReq := &lazyClientIP{}
+	clientIPWithoutReq := &LazyClientIP{}
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", clientIPWithoutReq))
 }
