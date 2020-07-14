@@ -1,0 +1,76 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: featuregates.config.openshift.io
+spec:
+  group: config.openshift.io
+  version: v1
+  scope: Cluster
+  preserveUnknownFields: false
+  names:
+    kind: FeatureGate
+    singular: featuregate
+    plural: featuregates
+    listKind: FeatureGateList
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  subresources:
+    status: {}
+  "validation":
+    "openAPIV3Schema":
+      description: Feature holds cluster-wide information about feature gates.  The
+        canonical name is `cluster`
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec holds user settable values for configuration
+          type: object
+          properties:
+            customNoUpgrade:
+              description: customNoUpgrade allows the enabling or disabling of any
+                feature. Turning this feature set on IS NOT SUPPORTED, CANNOT BE UNDONE,
+                and PREVENTS UPGRADES. Because of its nature, this setting cannot
+                be validated.  If you have any typos or accidentally apply invalid
+                combinations your cluster may fail in an unrecoverable way.  featureSet
+                must equal "CustomNoUpgrade" must be set to use this field.
+              type: object
+              properties:
+                disabled:
+                  description: disabled is a list of all feature gates that you want
+                    to force off
+                  type: array
+                  items:
+                    type: string
+                enabled:
+                  description: enabled is a list of all feature gates that you want
+                    to force on
+                  type: array
+                  items:
+                    type: string
+              nullable: true
+            featureSet:
+              description: featureSet changes the list of features in the cluster.  The
+                default is empty.  Be very careful adjusting this setting. Turning
+                on or off features may cause irreversible changes in your cluster
+                which cannot be undone.
+              type: string
+        status:
+          description: status holds observed values from the cluster. They may not
+            be overridden.
+          type: object

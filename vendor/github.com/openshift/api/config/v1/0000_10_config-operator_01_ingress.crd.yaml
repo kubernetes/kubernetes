@@ -1,0 +1,55 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: ingresses.config.openshift.io
+spec:
+  group: config.openshift.io
+  names:
+    kind: Ingress
+    listKind: IngressList
+    plural: ingresses
+    singular: ingress
+  scope: Cluster
+  preserveUnknownFields: false
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  subresources:
+    status: {}
+  "validation":
+    "openAPIV3Schema":
+      description: Ingress holds cluster-wide information about ingress, including
+        the default ingress domain used for routes. The canonical name is `cluster`.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec holds user settable values for configuration
+          type: object
+          properties:
+            domain:
+              description: "domain is used to generate a default host name for a route
+                when the route's host name is empty. The generated host name will
+                follow this pattern: \"<route-name>.<route-namespace>.<domain>\".
+                \n It is also used as the default wildcard domain suffix for ingress.
+                The default ingresscontroller domain will follow this pattern: \"*.<domain>\".
+                \n Once set, changing domain is not currently supported."
+              type: string
+        status:
+          description: status holds observed values from the cluster. They may not
+            be overridden.
+          type: object

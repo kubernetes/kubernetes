@@ -1,0 +1,100 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: proxies.config.openshift.io
+spec:
+  group: config.openshift.io
+  scope: Cluster
+  preserveUnknownFields: false
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  names:
+    kind: Proxy
+    listKind: ProxyList
+    plural: proxies
+    singular: proxy
+  subresources:
+    status: {}
+  "validation":
+    "openAPIV3Schema":
+      description: Proxy holds cluster-wide information on how to configure default
+        proxies for the cluster. The canonical name is `cluster`
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec holds user-settable values for the proxy configuration
+          type: object
+          properties:
+            httpProxy:
+              description: httpProxy is the URL of the proxy for HTTP requests.  Empty
+                means unset and will not result in an env var.
+              type: string
+            httpsProxy:
+              description: httpsProxy is the URL of the proxy for HTTPS requests.  Empty
+                means unset and will not result in an env var.
+              type: string
+            noProxy:
+              description: noProxy is a comma-separated list of hostnames and/or CIDRs
+                for which the proxy should not be used. Empty means unset and will
+                not result in an env var.
+              type: string
+            readinessEndpoints:
+              description: readinessEndpoints is a list of endpoints used to verify
+                readiness of the proxy.
+              type: array
+              items:
+                type: string
+            trustedCA:
+              description: "trustedCA is a reference to a ConfigMap containing a CA
+                certificate bundle. The trustedCA field should only be consumed by
+                a proxy validator. The validator is responsible for reading the certificate
+                bundle from the required key \"ca-bundle.crt\", merging it with the
+                system default trust bundle, and writing the merged trust bundle to
+                a ConfigMap named \"trusted-ca-bundle\" in the \"openshift-config-managed\"
+                namespace. Clients that expect to make proxy connections must use
+                the trusted-ca-bundle for all HTTPS requests to the proxy, and may
+                use the trusted-ca-bundle for non-proxy HTTPS requests as well. \n
+                The namespace for the ConfigMap referenced by trustedCA is \"openshift-config\".
+                Here is an example ConfigMap (in yaml): \n apiVersion: v1 kind: ConfigMap
+                metadata:  name: user-ca-bundle  namespace: openshift-config  data:
+                \   ca-bundle.crt: |      -----BEGIN CERTIFICATE-----      Custom
+                CA certificate bundle.      -----END CERTIFICATE-----"
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  description: name is the metadata.name of the referenced config
+                    map
+                  type: string
+        status:
+          description: status holds observed values from the cluster. They may not
+            be overridden.
+          type: object
+          properties:
+            httpProxy:
+              description: httpProxy is the URL of the proxy for HTTP requests.
+              type: string
+            httpsProxy:
+              description: httpsProxy is the URL of the proxy for HTTPS requests.
+              type: string
+            noProxy:
+              description: noProxy is a comma-separated list of hostnames and/or CIDRs
+                for which the proxy should not be used.
+              type: string

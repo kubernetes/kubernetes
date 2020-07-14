@@ -1,0 +1,205 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: rolebindingrestrictions.authorization.openshift.io
+spec:
+  group: authorization.openshift.io
+  names:
+    kind: RoleBindingRestriction
+    listKind: RoleBindingRestrictionList
+    plural: rolebindingrestrictions
+    singular: rolebindingrestriction
+  scope: Namespaced
+  preserveUnknownFields: false
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  "validation":
+    "openAPIV3Schema":
+      description: RoleBindingRestriction is an object that can be matched against
+        a subject (user, group, or service account) to determine whether rolebindings
+        on that subject are allowed in the namespace to which the RoleBindingRestriction
+        belongs.  If any one of those RoleBindingRestriction objects matches a subject,
+        rolebindings on that subject in the namespace are allowed.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: Spec defines the matcher.
+          type: object
+          properties:
+            grouprestriction:
+              description: GroupRestriction matches against group subjects.
+              type: object
+              properties:
+                groups:
+                  description: Groups is a list of groups used to match against an
+                    individual user's groups. If the user is a member of one of the
+                    whitelisted groups, the user is allowed to be bound to a role.
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                labels:
+                  description: Selectors specifies a list of label selectors over
+                    group labels.
+                  type: array
+                  items:
+                    description: A label selector is a label query over a set of resources.
+                      The result of matchLabels and matchExpressions are ANDed. An
+                      empty label selector matches all objects. A null label selector
+                      matches no objects.
+                    type: object
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        type: array
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          type: object
+                          required:
+                          - key
+                          - operator
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              type: array
+                              items:
+                                type: string
+                      matchLabels:
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                        additionalProperties:
+                          type: string
+                  nullable: true
+              nullable: true
+            serviceaccountrestriction:
+              description: ServiceAccountRestriction matches against service-account
+                subjects.
+              type: object
+              properties:
+                namespaces:
+                  description: Namespaces specifies a list of literal namespace names.
+                  type: array
+                  items:
+                    type: string
+                serviceaccounts:
+                  description: ServiceAccounts specifies a list of literal service-account
+                    names.
+                  type: array
+                  items:
+                    description: ServiceAccountReference specifies a service account
+                      and namespace by their names.
+                    type: object
+                    properties:
+                      name:
+                        description: Name is the name of the service account.
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace of the service account.  Service
+                          accounts from inside the whitelisted namespaces are allowed
+                          to be bound to roles.  If Namespace is empty, then the namespace
+                          of the RoleBindingRestriction in which the ServiceAccountReference
+                          is embedded is used.
+                        type: string
+              nullable: true
+            userrestriction:
+              description: UserRestriction matches against user subjects.
+              type: object
+              properties:
+                groups:
+                  description: Groups specifies a list of literal group names.
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                labels:
+                  description: Selectors specifies a list of label selectors over
+                    user labels.
+                  type: array
+                  items:
+                    description: A label selector is a label query over a set of resources.
+                      The result of matchLabels and matchExpressions are ANDed. An
+                      empty label selector matches all objects. A null label selector
+                      matches no objects.
+                    type: object
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        type: array
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          type: object
+                          required:
+                          - key
+                          - operator
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              type: array
+                              items:
+                                type: string
+                      matchLabels:
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                        additionalProperties:
+                          type: string
+                  nullable: true
+                users:
+                  description: Users specifies a list of literal user names.
+                  type: array
+                  items:
+                    type: string
+              nullable: true
