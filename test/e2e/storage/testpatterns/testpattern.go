@@ -70,6 +70,10 @@ var (
 	RetainSnapshot TestSnapshotDeletionPolicy = "Retain"
 )
 
+func (t TestSnapshotDeletionPolicy) String() string {
+	return string(t)
+}
+
 // TestPattern represents a combination of parameters to be tested in a TestSuite
 type TestPattern struct {
 	Name                   string                      // Name of TestPattern
