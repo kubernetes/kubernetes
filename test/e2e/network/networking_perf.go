@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -143,7 +144,7 @@ func networkingIPerfTest(isIPv6 bool) {
 			// For each builds up a collection of IPerfRecords
 			iperfClusterVerification.ForEach(
 				func(p v1.Pod) {
-					resultS, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "iperf-client", "0-", 1*time.Second)
+					resultS, err := e2ekubectl.LookForStringInLog(f.Namespace.Name, p.Name, "iperf-client", "0-", 1*time.Second)
 					if err == nil {
 						framework.Logf(resultS)
 						iperfResults.Add(NewIPerf(resultS))

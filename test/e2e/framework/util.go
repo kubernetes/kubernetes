@@ -494,33 +494,6 @@ func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
 
-// LookForStringInPodExec looks for the given string in the output of a command
-// executed in a specific pod container.
-// TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		// use the first container
-		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
-		args = append(args, command...)
-		return RunKubectlOrDie(ns, args...)
-	})
-}
-
-// lookForString looks for the given string in the output of fn, repeatedly calling fn until
-// the timeout is reached or the string is found. Returns last log and possibly
-// error if the string was not found.
-// TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func lookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
-	for t := time.Now(); time.Since(t) < timeout; time.Sleep(Poll) {
-		result = fn()
-		if strings.Contains(result, expectedString) {
-			return
-		}
-	}
-	err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedString, result)
-	return
-}
-
 // KubectlBuilder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
 type KubectlBuilder struct {
@@ -1135,13 +1108,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		return fmt.Errorf("Not ready nodes: %#v", msg)
 	}
 	return nil
-}
-
-// LookForStringInLog looks for the given string in the log of a specific pod container
-func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie(ns, "logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
-	})
 }
 
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created

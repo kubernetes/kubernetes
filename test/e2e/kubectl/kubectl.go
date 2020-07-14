@@ -1260,7 +1260,7 @@ metadata:
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
 				framework.Logf("wait on agnhost-primary startup in %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "agnhost-primary", "Paused", framework.PodStartTimeout)
+				e2ekubectl.LookForStringInLog(ns, pod.Name, "agnhost-primary", "Paused", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -1441,7 +1441,7 @@ metadata:
 			}
 
 			ginkgo.By("checking for a matching strings")
-			_, err := framework.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", framework.PodStartTimeout)
+			_, err := e2ekubectl.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", framework.PodStartTimeout)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("limiting log lines")

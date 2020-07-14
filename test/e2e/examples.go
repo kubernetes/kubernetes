@@ -32,6 +32,7 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
@@ -127,7 +128,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if secret was read correctly")
-			_, err = framework.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			_, err = e2ekubectl.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
 			framework.ExpectNoError(err)
 		})
 	})
@@ -145,9 +146,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if name and namespace were passed correctly")
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
+			_, err = e2ekubectl.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
 			framework.ExpectNoError(err)
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
+			_, err = e2ekubectl.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
 			framework.ExpectNoError(err)
 		})
 	})
