@@ -259,6 +259,13 @@
     and FOOSERVICE_PORT_8765_TCP_ADDR that are populated with proper values.
   release: v1.9
   file: test/e2e/common/pods.go
+- testname: Pods, delete a collection
+  codename: '[k8s.io] Pods should delete a collection of pods [Conformance]'
+  description: A set of pods is created with a label selector which MUST be found
+    when listed. The set of pods is deleted and MUST NOT show up when listed by its
+    label selector.
+  release: v1.19
+  file: test/e2e/common/pods.go
 - testname: Pods, assigned hostip
   codename: '[k8s.io] Pods should get a host IP [NodeConformance] [Conformance]'
   description: Create a Pod. Pod status MUST return successfully and contains a valid
