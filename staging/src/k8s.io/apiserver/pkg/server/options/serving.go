@@ -260,6 +260,10 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 			return err
 		}
 		c.CipherSuites = cipherSuites
+
+		for _, cipherName := range cliflag.InsecureTLSCipherNamesUsed(s.CipherSuites) {
+			klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
+		}
 	}
 
 	var err error

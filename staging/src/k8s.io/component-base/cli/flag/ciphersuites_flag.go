@@ -58,16 +58,6 @@ var insecureCiphers = map[string]uint16{
 	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
 }
 
-// InsecureTLSCiphers returns the cipher suites implemented by crypto/tls which have
-// security issues.
-func InsecureTLSCiphers() map[string]uint16 {
-	cipherKeys := make(map[string]uint16, len(insecureCiphers))
-	for k, v := range insecureCiphers {
-		cipherKeys[k] = v
-	}
-	return cipherKeys
-}
-
 // InsecureTLSCipherNames returns a list of cipher suite names implemented by crypto/tls
 // which have security issues.
 func InsecureTLSCipherNames() []string {
@@ -96,6 +86,20 @@ func allCiphers() map[string]uint16 {
 		acceptedCiphers[k] = v
 	}
 	return acceptedCiphers
+}
+
+// InsecureTLSCipherNamesUsed returns the cipher suites names implemented by crypto/tls which have
+// security issues.
+func InsecureTLSCipherNamesUsed(cipherNames []string) []string {
+	insecureCipherNamesMatched := make([]string, 0)
+
+	for _, cipherName := range cipherNames {
+		if _, ok := insecureCiphers[cipherName]; ok {
+			insecureCipherNamesMatched = append(insecureCipherNamesMatched, cipherName)
+		}
+	}
+
+	return insecureCipherNamesMatched
 }
 
 // TLSCipherPossibleValues returns all acceptable cipher suite names.

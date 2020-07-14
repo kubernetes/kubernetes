@@ -113,3 +113,14 @@ func TestConstantMaps(t *testing.T) {
 		}
 	}
 }
+
+func TestInsecureTLSCipherNamesUsed(t *testing.T) {
+	cipherNames := []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA"}
+
+	expect := []string{"TLS_RSA_WITH_RC4_128_SHA"}
+	actual := InsecureTLSCipherNamesUsed(cipherNames)
+
+	if reflect.DeepEqual(actual, expect) == false {
+		t.Errorf("expected %+v, got %+v", expect, actual)
+	}
+}
