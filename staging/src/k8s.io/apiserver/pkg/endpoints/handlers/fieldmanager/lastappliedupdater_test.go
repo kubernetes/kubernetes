@@ -28,6 +28,7 @@ import (
 
 func TestLastAppliedUpdater(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
+		false,
 		func(m fieldmanager.Manager) fieldmanager.Manager {
 			return fieldmanager.NewLastAppliedUpdater(m)
 		})

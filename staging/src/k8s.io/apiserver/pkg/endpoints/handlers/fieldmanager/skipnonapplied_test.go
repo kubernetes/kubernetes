@@ -43,7 +43,7 @@ func (f *fakeObjectCreater) New(_ schema.GroupVersionKind) (runtime.Object, erro
 }
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), func(m fieldmanager.Manager) fieldmanager.Manager {
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), false, func(m fieldmanager.Manager) fieldmanager.Manager {
 		return fieldmanager.NewSkipNonAppliedManager(
 			m,
 			&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
@@ -83,7 +83,7 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 }
 
 func TestUpdateBeforeFirstApply(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), func(m fieldmanager.Manager) fieldmanager.Manager {
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), false, func(m fieldmanager.Manager) fieldmanager.Manager {
 		return fieldmanager.NewSkipNonAppliedManager(
 			m,
 			&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},

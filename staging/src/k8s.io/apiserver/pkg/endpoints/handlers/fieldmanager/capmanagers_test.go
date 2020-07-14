@@ -48,6 +48,7 @@ func (*fakeManager) Apply(_, _ runtime.Object, _ fieldmanager.Managed, _ string,
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
+		false,
 		func(m fieldmanager.Manager) fieldmanager.Manager {
 			return fieldmanager.NewCapManagersManager(m, 3)
 		})
@@ -113,6 +114,7 @@ func TestCapManagersManagerMergesEntries(t *testing.T) {
 
 func TestCapUpdateManagers(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
+		false,
 		func(m fieldmanager.Manager) fieldmanager.Manager {
 			return fieldmanager.NewCapManagersManager(m, 3)
 		})

@@ -205,6 +205,9 @@ func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiext
 					Storage: false,
 				},
 			},
+			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
+				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+			},
 		},
 	}
 }

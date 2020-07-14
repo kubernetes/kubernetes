@@ -570,6 +570,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
+			isSubresource,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)
