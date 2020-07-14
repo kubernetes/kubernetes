@@ -294,7 +294,7 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	mountComplete := false
-	err = wait.Poll(5*time.Second, 10*time.Minute, func() (bool, error) {
+	err = wait.PollImmediate(1*time.Second, 2*time.Minute, func() (bool, error) {
 		err := b.mounter.Mount(source, dir, "cifs", mountOptions)
 		mountComplete = true
 		return true, err
