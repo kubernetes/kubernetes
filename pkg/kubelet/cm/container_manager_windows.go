@@ -192,3 +192,7 @@ func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	return
 }
+
+func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
+	return nil
+}

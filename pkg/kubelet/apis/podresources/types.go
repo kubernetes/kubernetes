@@ -31,3 +31,8 @@ type DevicesProvider interface {
 type PodsProvider interface {
 	GetPods() []*v1.Pod
 }
+
+// CPUsProvider knows how to provide the cpus used by the given container
+type CPUsProvider interface {
+	GetCPUs(podUID, containerName string) []int64
+}

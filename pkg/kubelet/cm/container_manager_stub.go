@@ -125,6 +125,10 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 	return
 }
 
+func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
+	return nil
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }

@@ -28,14 +28,16 @@ import (
 type v1PodResourcesServer struct {
 	podsProvider    PodsProvider
 	devicesProvider DevicesProvider
+	cpusProvider    CPUsProvider
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider) v1.PodResourcesListerServer {
+func NewV1PodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider, cpusProvider CPUsProvider) v1.PodResourcesListerServer {
 	return &v1PodResourcesServer{
 		podsProvider:    podsProvider,
 		devicesProvider: devicesProvider,
+		cpusProvider:    cpusProvider,
 	}
 }
 
@@ -58,6 +60,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 			pRes.Containers[j] = &v1.ContainerResources{
 				Name:    container.Name,
 				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
+				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 			}
 		}
 		podResources[i] = &pRes

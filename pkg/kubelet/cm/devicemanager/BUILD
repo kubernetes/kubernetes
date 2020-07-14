@@ -48,11 +48,13 @@ go_test(
     srcs = [
         "endpoint_test.go",
         "manager_test.go",
+        "pod_devices_test.go",
         "topology_hints_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/cm/devicemanager/checkpoint:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
         "//pkg/kubelet/cm/topologymanager/bitmask:go_default_library",
         "//pkg/kubelet/config:go_default_library",

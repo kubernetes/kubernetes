@@ -31,24 +31,30 @@ func TestListPodResourcesV1(t *testing.T) {
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
+	numaID := int64(1)
 
 	devs := []*podresourcesapi.ContainerDevices{
 		{
 			ResourceName: "resource",
 			DeviceIds:    []string{"dev0", "dev1"},
+			Topology:     &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 	}
+
+	cpus := []int64{12, 23, 30}
 
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
 		devices          []*podresourcesapi.ContainerDevices
+		cpus             []int64
 		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
 			devices:          []*podresourcesapi.ContainerDevices{},
+			cpus:             []int64{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
 		{
@@ -70,6 +76,7 @@ func TestListPodResourcesV1(t *testing.T) {
 				},
 			},
 			devices: []*podresourcesapi.ContainerDevices{},
+			cpus:    []int64{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -104,6 +111,7 @@ func TestListPodResourcesV1(t *testing.T) {
 				},
 			},
 			devices: devs,
+			cpus:    cpus,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -113,6 +121,7 @@ func TestListPodResourcesV1(t *testing.T) {
 							{
 								Name:    containerName,
 								Devices: devs,
+								CpuIds:  cpus,
 							},
 						},
 					},
@@ -124,8 +133,9 @@ func TestListPodResourcesV1(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
+			m.On("GetCPUs", string(podUID), containerName).Return(tc.cpus)
 			m.On("UpdateAllocatedDevices").Return()
-			server := NewV1PodResourcesServer(m, m)
+			server := NewV1PodResourcesServer(m, m, m)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)

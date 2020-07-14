@@ -404,7 +404,7 @@ func TestGetTopologyHints(t *testing.T) {
 		for p := range tc.allocatedDevices {
 			for c := range tc.allocatedDevices[p] {
 				for r, devices := range tc.allocatedDevices[p][c] {
-					m.podDevices.insert(p, c, r, sets.NewString(devices...), nil)
+					m.podDevices.insert(p, c, r, constructDevices(devices), nil)
 
 					m.allocatedDevices[r] = sets.NewString()
 					for _, d := range devices {
