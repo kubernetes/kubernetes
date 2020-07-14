@@ -182,7 +182,7 @@ type KubeletConfiguration struct {
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// disabling it may disrupt the Kubelet's ability to authenticate with the API server
 	// after the current certificate expires.
-	// Default: false
+	// Default: true
 	// +optional
 	RotateCertificates bool `json:"rotateCertificates,omitempty"`
 	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
