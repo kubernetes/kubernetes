@@ -148,8 +148,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			Privileged:         kubecontainer.HasPrivilegedContainer(pod),
-			SeccompProfilePath: m.getSeccompProfile(pod.Annotations, "", pod.Spec.SecurityContext, nil),
+			Privileged: kubecontainer.HasPrivilegedContainer(pod),
+
+			// Forcing sandbox to run as `runtime/default` allow users to
+			// use least privileged seccomp profiles at pod level. Issue #84623
+			SeccompProfilePath: v1.SeccompProfileRuntimeDefault,
 		},
 	}
 

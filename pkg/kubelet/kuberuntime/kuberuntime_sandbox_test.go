@@ -67,37 +67,29 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 		expectedProfile string
 	}{
 		{
-			description:     "no seccomp defined at pod level should return empty",
-			pod:             newSeccompPod(nil, nil, "", ""),
-			expectedProfile: "",
+			description:     "no seccomp defined at pod level should return runtime/default",
+			pod:             newSeccompPod(nil, nil, "", "runtime/default"),
+			expectedProfile: "runtime/default",
 		},
 		{
-			description:     "seccomp field defined at pod level should be honoured",
-			pod:             newSeccompPod(&v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}, nil, "", ""),
+			description:     "seccomp field defined at pod level should not be honoured",
+			pod:             newSeccompPod(&v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}, nil, "", ""),
 			expectedProfile: "runtime/default",
 		},
 		{
 			description:     "seccomp field defined at container level should not be honoured",
-			pod:             newSeccompPod(nil, &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}, "", ""),
-			expectedProfile: "",
+			pod:             newSeccompPod(nil, &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}, "", ""),
+			expectedProfile: "runtime/default",
 		},
 		{
-			description:     "seccomp annotation defined at pod level should be honoured",
-			pod:             newSeccompPod(nil, nil, v1.SeccompProfileRuntimeDefault, ""),
+			description:     "seccomp annotation defined at pod level should not be honoured",
+			pod:             newSeccompPod(nil, nil, "unconfined", ""),
 			expectedProfile: "runtime/default",
 		},
 		{
 			description:     "seccomp annotation defined at container level should not be honoured",
-			pod:             newSeccompPod(nil, nil, "", v1.SeccompProfileRuntimeDefault),
-			expectedProfile: "",
-		},
-		{
-			description: "prioritise pod field over pod annotation",
-			pod: newSeccompPod(&v1.SeccompProfile{
-				Type:             v1.SeccompProfileTypeLocalhost,
-				LocalhostProfile: pointer.StringPtr("pod-field"),
-			}, nil, "localhost/pod-annotation", ""),
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "pod-field"),
+			pod:             newSeccompPod(nil, nil, "", "unconfined"),
+			expectedProfile: "runtime/default",
 		},
 	}
 
