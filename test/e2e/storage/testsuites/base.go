@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"context"
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	"math"
@@ -571,6 +572,64 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 	}
 
 	return snapshot
+}
+func getPreProvisionedSnapshot(snapshotContentName, ns, snapshotHandle string) *unstructured.Unstructured {
+	snapshot := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshot",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name":      getPreProvisionedSnapshotName(snapshotHandle),
+				"namespace": ns,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"volumeSnapshotContentName": snapshotContentName,
+				},
+			},
+		},
+	}
+
+	return snapshot
+}
+func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName, volumeSnapshotClassName string) *unstructured.Unstructured {
+	snapshotContent := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshotContent",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name": getPreProvisionedSnapshotContentName(snapshotHandle),
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"snapshotHandle": snapshotHandle,
+				},
+				"volumeSnapshotRef": map[string]interface{}{
+					"name":      snapshotName,
+					"namespace": snapshotNamespace,
+				},
+				"driver":                  csiDriverName,
+				"deletionPolicy":          deletionPolicy,
+				"volumeSnapshotClassName": volumeSnapshotClassName,
+			},
+		},
+	}
+
+	return snapshotContent
+}
+
+func genShortHash(s string) string {
+	h := sha1.New()
+	h.Write([]byte(s))
+	bs := h.Sum(nil)
+	return fmt.Sprintf("%x", bs)[:7]
+}
+func getPreProvisionedSnapshotContentName(snapshotHandle string) string {
+	return fmt.Sprintf("pre-provisioned-snapcontent-%s", genShortHash(snapshotHandle))
+}
+
+func getPreProvisionedSnapshotName(snapshotHandle string) string {
+	return fmt.Sprintf("pre-provisioned-snapshot-%s", genShortHash(snapshotHandle))
 }
 
 // StartPodLogs begins capturing log output and events from current
