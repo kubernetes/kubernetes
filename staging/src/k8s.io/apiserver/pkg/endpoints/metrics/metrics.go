@@ -256,8 +256,8 @@ func Register() {
 
 // Reset all metrics.
 func Reset() {
-	for _, metric := range metrics {
-		metric.Reset()
+	for i := range metrics {
+		metrics[i].Reset()
 	}
 }
 
