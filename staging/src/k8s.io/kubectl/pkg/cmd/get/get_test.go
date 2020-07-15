@@ -2882,7 +2882,8 @@ func componentStatusTableObjBody(codec runtime.Codec, componentStatuses ...corev
 			{Name: "Error", Type: "string", Format: ""},
 		},
 	}
-	for _, v := range componentStatuses {
+	for i := range componentStatuses {
+		v := componentStatuses[i]
 		b := bytes.NewBuffer(nil)
 		codec.Encode(&v, b)
 		var status string
