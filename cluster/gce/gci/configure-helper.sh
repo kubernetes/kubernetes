@@ -915,6 +915,20 @@ kind: AdmissionConfiguration
 plugins:
 EOF
 
+    # Add resourcequota config to limit critical pods to kube-system by default
+    cat <<EOF >>/etc/srv/kubernetes/admission_controller_config.yaml
+- name: "ResourceQuota"
+  configuration:
+    apiVersion: apiserver.config.k8s.io/v1
+    kind: ResourceQuotaConfiguration
+    limitedResources:
+    - resource: pods
+      matchScopes:
+      - scopeName: PriorityClass 
+        operator: In
+        values: ["system-node-critical", "system-cluster-critical"]
+EOF
+
     if [[ "${ADMISSION_CONTROL:-}" == *"ImagePolicyWebhook"* ]]; then
       if [[ -z "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
         1>&2 echo "The ImagePolicyWebhook admission control plugin was requested, but GCP_IMAGE_VERIFICATION_URL was not provided."
@@ -2528,6 +2542,7 @@ EOF
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range" "gce"
   fi
+  setup-addon-manifests "addons" "admission-resource-quota-critical-pods"
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
