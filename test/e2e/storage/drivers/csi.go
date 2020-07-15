@@ -567,7 +567,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
 
-	if err = waitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
+	if err = WaitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
 		framework.Failf("waiting for csi driver node registration on: %v", err)
 	}
 
@@ -602,7 +602,9 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	}, cleanupFunc
 }
 
-func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
+// WaitForCSIDriverRegistrationOnAllNodes waits for the CSINode object to be updated
+// with the given driver on all schedulable nodes.
+func WaitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
 	if err != nil {
 		return err
