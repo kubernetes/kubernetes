@@ -829,13 +829,11 @@ func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state *f
 }
 
 func (f *frameworkImpl) runReservePluginUnreserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) {
-	if !state.ShouldRecordPluginMetrics() {
-		pl.Unreserve(ctx, state, pod, nodeName)
-		return
-	}
 	startTime := time.Now()
 	pl.Unreserve(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(unreserve, pl.Name(), nil, metrics.SinceInSeconds(startTime))
+	if state.ShouldRecordPluginMetrics() {
+		f.metricsRecorder.observePluginDurationAsync(unreserve, pl.Name(), nil, metrics.SinceInSeconds(startTime))
+	}
 }
 
 // RunPermitPlugins runs the set of configured permit plugins. If any of these
