@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -256,58 +255,66 @@ func TestPodToEndpoint(t *testing.T) {
 }
 
 func TestPodChangedWithPodEndpointChanged(t *testing.T) {
-	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
-	ns := "test"
-	podStore.Add(newPod(1, ns, true, 1))
-	pods := podStore.List()
-	if len(pods) != 1 {
-		t.Errorf("podStore size: expected: %d, got: %d", 1, len(pods))
-		return
-	}
-	oldPod := pods[0].(*v1.Pod)
-	newPod := oldPod.DeepCopy()
+	testCases := []struct {
+		testName      string
+		modifier      func(*v1.Pod, *v1.Pod)
+		expectChanged bool
+	}{{
+		testName:      "no changes",
+		modifier:      func(old, new *v1.Pod) {},
+		expectChanged: false,
+	}, {
+		testName: "change NodeName",
+		modifier: func(old, new *v1.Pod) {
+			new.Spec.NodeName = "changed"
+		},
+		expectChanged: true,
+	}, {
+		testName: "change ResourceVersion",
+		modifier: func(old, new *v1.Pod) {
+			new.ObjectMeta.ResourceVersion = "changed"
+		},
+		expectChanged: false,
+	}, {
+		testName: "change IPv4",
+		modifier: func(old, new *v1.Pod) {
+			new.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.1"}}
+		},
+		expectChanged: true,
+	}, {
+		testName: "change IPv6",
+		modifier: func(old, new *v1.Pod) {
+			old.Status.PodIPs = []v1.PodIP{}
+			new.Status.PodIPs = []v1.PodIP{{IP: "fd00:10:96::1"}}
+		},
+		expectChanged: true,
+	}, {
+		testName: "change readiness",
+		modifier: func(old, new *v1.Pod) {
+			new.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: "false"}}
+		},
+		expectChanged: true,
+	}, {
+		testName: "mark for deletion",
+		modifier: func(old, new *v1.Pod) {
+			now := metav1.NewTime(time.Now().UTC())
+			new.ObjectMeta.DeletionTimestamp = &now
+		},
+		expectChanged: true,
+	}}
 
-	if podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be unchanged for copied pod")
-	}
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			old := newPod(1, "test", true, 1)
+			new := old.DeepCopy()
+			tc.modifier(old, new)
 
-	newPod.Spec.NodeName = "changed"
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed for pod with NodeName changed")
+			actualChanged, _ := endpointutil.PodChanged(old, new, podEndpointChanged)
+			if actualChanged != tc.expectChanged {
+				t.Errorf("Expected changed to be %t, got %t", tc.expectChanged, actualChanged)
+			}
+		})
 	}
-	newPod.Spec.NodeName = oldPod.Spec.NodeName
-
-	newPod.ObjectMeta.ResourceVersion = "changed"
-	if podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be unchanged for pod with only ResourceVersion changed")
-	}
-	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
-
-	newPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.1"}}
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with pod IP address change")
-	}
-	newPod.Status.PodIPs = oldPod.Status.PodIPs
-
-	newPod.ObjectMeta.Name = "wrong-name"
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with pod name change")
-	}
-	newPod.ObjectMeta.Name = oldPod.ObjectMeta.Name
-
-	saveConditions := oldPod.Status.Conditions
-	oldPod.Status.Conditions = nil
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with pod readiness change")
-	}
-	oldPod.Status.Conditions = saveConditions
-
-	now := metav1.NewTime(time.Now().UTC())
-	newPod.ObjectMeta.DeletionTimestamp = &now
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with DeletionTimestamp change")
-	}
-	newPod.ObjectMeta.DeletionTimestamp = oldPod.ObjectMeta.DeletionTimestamp.DeepCopy()
 }
 
 func TestServiceControllerKey(t *testing.T) {
@@ -544,9 +551,4 @@ func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, s
 		AddressType: endpointMeta.AddressType,
 		Endpoints:   []discovery.Endpoint{},
 	}
-}
-
-func podChangedHelper(oldPod, newPod *v1.Pod, endpointChanged endpointutil.EndpointsMatch) bool {
-	podChanged, _ := endpointutil.PodChanged(oldPod, newPod, podEndpointChanged)
-	return podChanged
 }

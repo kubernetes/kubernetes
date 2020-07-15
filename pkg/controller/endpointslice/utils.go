@@ -128,12 +128,19 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 }
 
 // getEndpointAddresses returns a list of addresses generated from a pod status.
+// There are 2 similar but distinct uses for this function:
+// 1. Get the IPs from a Pod that should be added to EndpointSlices.
+// 2. Get the IPs from a Pod to see if they are different from a previous Pod.
 func getEndpointAddresses(podStatus corev1.PodStatus, service *corev1.Service) []string {
 	addresses := []string{}
 
 	for _, podIP := range podStatus.PodIPs {
 		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
-		if isIPv6PodIP == isIPv6Service(service) {
+		// If the service.Name is empty we know this method is only being used
+		// to determine if IP addresses have changed for a Pod and we don't have
+		// access to the full Service. In that case we can't determine if the IP
+		// family matches and it doesn't matter for the purposes of diffing.
+		if isIPv6PodIP == isIPv6Service(service) || service.Name == "" {
 			addresses = append(addresses, podIP.IP)
 		}
 	}
