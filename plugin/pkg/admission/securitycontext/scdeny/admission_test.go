@@ -139,8 +139,8 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 			errorExpected: true,
 		},
 	}
-	for _, test := range tests {
-		pod.Spec.SecurityContext = &test.securityContext
+	for i, test := range tests {
+		pod.Spec.SecurityContext = &tests[i].securityContext
 		err := handler.Validate(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil), nil)
 
 		if test.errorExpected && err == nil {
