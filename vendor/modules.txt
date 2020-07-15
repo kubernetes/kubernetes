@@ -44,7 +44,7 @@ github.com/MakeNowJust/heredoc
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.8.9 => github.com/Microsoft/hcsshim v0.8.9
+# github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990 => github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/hcn
 github.com/Microsoft/hcsshim/internal/cni
@@ -145,7 +145,7 @@ github.com/cilium/ebpf/internal/unix
 github.com/clusterhq/flocker-go
 # github.com/container-storage-interface/spec v1.2.0 => github.com/container-storage-interface/spec v1.2.0
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f => github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f
+# github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
 github.com/containerd/console

@@ -26,6 +26,7 @@ import (
 //sys hcsResumeComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) = vmcompute.HcsResumeComputeSystem?
 //sys hcsGetComputeSystemProperties(computeSystem HcsSystem, propertyQuery string, properties **uint16, result **uint16) (hr error) = vmcompute.HcsGetComputeSystemProperties?
 //sys hcsModifyComputeSystem(computeSystem HcsSystem, configuration string, result **uint16) (hr error) = vmcompute.HcsModifyComputeSystem?
+//sys hcsModifyServiceSettings(settings string, result **uint16) (hr error) = vmcompute.HcsModifyServiceSettings?
 //sys hcsRegisterComputeSystemCallback(computeSystem HcsSystem, callback uintptr, context uintptr, callbackHandle *HcsCallback) (hr error) = vmcompute.HcsRegisterComputeSystemCallback?
 //sys hcsUnregisterComputeSystemCallback(callbackHandle HcsCallback) (hr error) = vmcompute.HcsUnregisterComputeSystemCallback?
 
@@ -330,6 +331,27 @@ func HcsModifyComputeSystem(ctx gcontext.Context, computeSystem HcsSystem, confi
 	return result, execute(ctx, timeout.SyscallWatcher, func() error {
 		var resultp *uint16
 		err := hcsModifyComputeSystem(computeSystem, configuration, &resultp)
+		if resultp != nil {
+			result = interop.ConvertAndFreeCoTaskMemString(resultp)
+		}
+		return err
+	})
+}
+
+func HcsModifyServiceSettings(ctx gcontext.Context, settings string) (result string, hr error) {
+	ctx, span := trace.StartSpan(ctx, "HcsModifyServiceSettings")
+	defer span.End()
+	defer func() {
+		if result != "" {
+			span.AddAttributes(trace.StringAttribute("result", result))
+		}
+		oc.SetSpanStatus(span, hr)
+	}()
+	span.AddAttributes(trace.StringAttribute("settings", settings))
+
+	return result, execute(ctx, timeout.SyscallWatcher, func() error {
+		var resultp *uint16
+		err := hcsModifyServiceSettings(settings, &resultp)
 		if resultp != nil {
 			result = interop.ConvertAndFreeCoTaskMemString(resultp)
 		}
