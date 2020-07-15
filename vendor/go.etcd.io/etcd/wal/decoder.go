@@ -59,6 +59,11 @@ func (d *decoder) decode(rec *walpb.Record) error {
 	return d.decodeRecord(rec)
 }
 
+// raft max message size is set to 1 MB in etcd server
+// assume projects set reasonable message size limit,
+// thus entry size should never exceed 10 MB
+const maxWALEntrySizeLimit = int64(10 * 1024 * 1024)
+
 func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	if len(d.brs) == 0 {
 		return io.EOF
@@ -79,6 +84,9 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	}
 
 	recBytes, padBytes := decodeFrameSize(l)
+	if recBytes >= maxWALEntrySizeLimit-padBytes {
+		return ErrMaxWALEntrySizeLimitExceeded
+	}
 
 	data := make([]byte, recBytes+padBytes)
 	if _, err = io.ReadFull(d.brs[0], data); err != nil {

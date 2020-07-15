@@ -465,6 +465,9 @@ func startNode(cfg ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id
 			plog.Panicf("create wal error: %v", err)
 		}
 	}
+	if cfg.UnsafeNoFsync {
+		w.SetUnsafeNoFsync()
+	}
 	peers := make([]raft.Peer, len(ids))
 	for i, id := range ids {
 		var ctx []byte
@@ -527,7 +530,7 @@ func restartNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types.ID, *member
 	if snapshot != nil {
 		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
-	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap)
+	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
 
 	if cfg.Logger != nil {
 		cfg.Logger.Info(
@@ -582,7 +585,7 @@ func restartAsStandaloneNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types
 	if snapshot != nil {
 		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
-	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap)
+	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
 
 	// discard the previously uncommitted entries
 	for i, ent := range ents {

@@ -82,7 +82,7 @@ func (st *storage) Release(snap raftpb.Snapshot) error {
 // readWAL reads the WAL at the given snap and returns the wal, its latest HardState and cluster ID, and all entries that appear
 // after the position of the given snap in the WAL.
 // The snap must have been previously saved to the WAL, or this call will panic.
-func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, st raftpb.HardState, ents []raftpb.Entry) {
+func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot, unsafeNoFsync bool) (w *wal.WAL, id, cid types.ID, st raftpb.HardState, ents []raftpb.Entry) {
 	var (
 		err       error
 		wmetadata []byte
@@ -96,6 +96,9 @@ func readWAL(lg *zap.Logger, waldir string, snap walpb.Snapshot) (w *wal.WAL, id
 			} else {
 				plog.Fatalf("open wal error: %v", err)
 			}
+		}
+		if unsafeNoFsync {
+			w.SetUnsafeNoFsync()
 		}
 		if wmetadata, st, ents, err = w.ReadAll(); err != nil {
 			w.Close()
