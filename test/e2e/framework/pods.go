@@ -237,10 +237,10 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)
 		}
-		for _, e := range evnts.Items {
+		for i, e := range evnts.Items {
 			switch e.Reason {
 			case killingContainer, failedToCreateContainer, forbiddenReason:
-				ev = &e
+				ev = &evnts.Items[i]
 				return true, nil
 			case startedContainer:
 				return true, nil
