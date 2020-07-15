@@ -29,6 +29,7 @@ import (
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
+// BuiltInAuthorizationOptions contains all build-in authorization options for APIServer
 type BuiltInAuthorizationOptions struct {
 	Modes                       []string
 	PolicyFile                  string
@@ -38,6 +39,7 @@ type BuiltInAuthorizationOptions struct {
 	WebhookCacheUnauthorizedTTL time.Duration
 }
 
+// NewBuiltInAuthorizationOptions create a BuiltInAuthorizationOptions with default value
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
 		Modes:                       []string{authzmodes.ModeAlwaysAllow},
@@ -47,6 +49,7 @@ func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	}
 }
 
+// Validate checks invalid config combination
 func (s *BuiltInAuthorizationOptions) Validate() []error {
 	if s == nil {
 		return nil
@@ -89,6 +92,7 @@ func (s *BuiltInAuthorizationOptions) Validate() []error {
 	return allErrors
 }
 
+// AddFlags returns flags of authorization for a APIServer
 func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.Modes, "authorization-mode", s.Modes, ""+
 		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
@@ -113,6 +117,7 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
+// ToAuthorizationConfig convert BuiltInAuthorizationOptions to authorizer.Config
 func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.Config {
 	return authorizer.Config{
 		AuthorizationModes:          s.Modes,

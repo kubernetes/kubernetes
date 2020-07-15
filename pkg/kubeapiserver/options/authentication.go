@@ -37,6 +37,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
+// BuiltInAuthenticationOptions contains all build-in authentication options for APIServer
 type BuiltInAuthenticationOptions struct {
 	APIAudiences    []string
 	Anonymous       *AnonymousAuthenticationOptions
@@ -59,14 +61,17 @@ type BuiltInAuthenticationOptions struct {
 	TokenFailureCacheTTL time.Duration
 }
 
+// AnonymousAuthenticationOptions contains anonymous authentication options for APIServer
 type AnonymousAuthenticationOptions struct {
 	Allow bool
 }
 
+// BootstrapTokenAuthenticationOptions contains bootstrap token authentication options for APIServer
 type BootstrapTokenAuthenticationOptions struct {
 	Enable bool
 }
 
+// OIDCAuthenticationOptions contains OIDC authentication options for APIServer
 type OIDCAuthenticationOptions struct {
 	CAFile         string
 	ClientID       string
@@ -79,6 +84,7 @@ type OIDCAuthenticationOptions struct {
 	RequiredClaims map[string]string
 }
 
+// ServiceAccountAuthenticationOptions contains service account authentication options for APIServer
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles         []string
 	Lookup           bool
@@ -88,16 +94,19 @@ type ServiceAccountAuthenticationOptions struct {
 	ExtendExpiration bool
 }
 
+// TokenFileAuthenticationOptions contains token file authentication options for APIServer
 type TokenFileAuthenticationOptions struct {
 	TokenFile string
 }
 
+// WebHookAuthenticationOptions contains web hook authentication options for APIServer
 type WebHookAuthenticationOptions struct {
 	ConfigFile string
 	Version    string
 	CacheTTL   time.Duration
 }
 
+// NewBuiltInAuthenticationOptions create a new BuiltInAuthenticationOptions, just set default token cache TTL
 func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
 	return &BuiltInAuthenticationOptions{
 		TokenSuccessCacheTTL: 10 * time.Second,
@@ -105,6 +114,7 @@ func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
 	}
 }
 
+// WithAll set default value for every build-in authentication option
 func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 	return s.
 		WithAnonymous().
@@ -117,41 +127,49 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithWebHook()
 }
 
+// WithAnonymous set default value for anonymous authentication
 func (s *BuiltInAuthenticationOptions) WithAnonymous() *BuiltInAuthenticationOptions {
 	s.Anonymous = &AnonymousAuthenticationOptions{Allow: true}
 	return s
 }
 
+// WithBootstrapToken set default value for bootstrap token authentication
 func (s *BuiltInAuthenticationOptions) WithBootstrapToken() *BuiltInAuthenticationOptions {
 	s.BootstrapToken = &BootstrapTokenAuthenticationOptions{}
 	return s
 }
 
+// WithClientCert set default value for client cert
 func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOptions {
 	s.ClientCert = &genericoptions.ClientCertAuthenticationOptions{}
 	return s
 }
 
+// WithOIDC set default value for OIDC authentication
 func (s *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
 	s.OIDC = &OIDCAuthenticationOptions{}
 	return s
 }
 
+// WithRequestHeader set default value for request header authentication
 func (s *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticationOptions {
 	s.RequestHeader = &genericoptions.RequestHeaderAuthenticationOptions{}
 	return s
 }
 
+// WithServiceAccounts set default value for service account authentication
 func (s *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
 	s.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true}
 	return s
 }
 
+// WithTokenFile set default value for token file authentication
 func (s *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOptions {
 	s.TokenFile = &TokenFileAuthenticationOptions{}
 	return s
 }
 
+// WithWebHook set default value for web hook authentication
 func (s *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptions {
 	s.WebHook = &WebHookAuthenticationOptions{
 		Version:  "v1beta1",
@@ -205,6 +223,7 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 	return allErrors
 }
 
+// AddFlags returns flags of authentication for a APIServer
 func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.APIAudiences, "api-audiences", s.APIAudiences, ""+
 		"Identifiers of the API. The service account token authenticator will validate that "+
@@ -339,6 +358,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
+// ToAuthenticationConfig convert BuiltInAuthenticationOptions to kubeauthenticator.Config
 func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticator.Config, error) {
 	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
@@ -414,8 +434,8 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 }
 
 // ApplyTo requires already applied OpenAPIConfig and EgressSelector if present.
-func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, egressSelector *egressselector.EgressSelector, openAPIConfig *openapicommon.Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory) error {
-	if o == nil {
+func (s *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, egressSelector *egressselector.EgressSelector, openAPIConfig *openapicommon.Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory) error {
+	if s == nil {
 		return nil
 	}
 
@@ -423,7 +443,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		return errors.New("uninitialized OpenAPIConfig")
 	}
 
-	authenticatorConfig, err := o.ToAuthenticationConfig()
+	authenticatorConfig, err := s.ToAuthenticationConfig()
 	if err != nil {
 		return err
 	}
@@ -439,12 +459,12 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		}
 	}
 
-	authInfo.APIAudiences = o.APIAudiences
-	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
-		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+	authInfo.APIAudiences = s.APIAudiences
+	if s.ServiceAccounts != nil && s.ServiceAccounts.Issuer != "" && len(s.APIAudiences) == 0 {
+		authInfo.APIAudiences = authenticator.Audiences{s.ServiceAccounts.Issuer}
 	}
 
-	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if s.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
 			extclient,
 			versionedInformer.Core().V1().Secrets().Lister(),
@@ -473,15 +493,15 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 }
 
 // ApplyAuthorization will conditionally modify the authentication options based on the authorization options
-func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
-	if o == nil || authorization == nil || o.Anonymous == nil {
+func (s *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
+	if s == nil || authorization == nil || s.Anonymous == nil {
 		return
 	}
 
 	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
 	// in such a case the AnonymousAuth is stomped to false and you get a message
-	if o.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
+	if s.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
 		klog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
-		o.Anonymous.Allow = false
+		s.Anonymous.Allow = false
 	}
 }
