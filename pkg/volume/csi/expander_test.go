@@ -20,19 +20,24 @@ import (
 	"os"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestNodeExpand(t *testing.T) {
 	tests := []struct {
-		name            string
-		nodeExpansion   bool
-		nodeStageSet    bool
-		volumePhase     volume.CSIVolumePhaseType
-		success         bool
-		fsVolume        bool
-		deviceStagePath string
+		name                string
+		nodeExpansion       bool
+		nodeStageSet        bool
+		volumePhase         volume.CSIVolumePhaseType
+		success             bool
+		fsVolume            bool
+		grpcError           error
+		hasVolumeInUseError bool
+		deviceStagePath     string
 	}{
 		{
 			name:    "when node expansion is not set",
@@ -76,6 +81,26 @@ func TestNodeExpand(t *testing.T) {
 			success:       true,
 			fsVolume:      false,
 		},
+		{
+			name:                "when nodeExpansion=on, nodeStage=on, volumePhase=published has grpc volume-in-use error",
+			nodeExpansion:       true,
+			nodeStageSet:        true,
+			volumePhase:         volume.CSIVolumePublished,
+			success:             false,
+			fsVolume:            true,
+			grpcError:           status.Error(codes.FailedPrecondition, "volume-in-use"),
+			hasVolumeInUseError: true,
+		},
+		{
+			name:                "when nodeExpansion=on, nodeStage=on, volumePhase=published has other grpc error",
+			nodeExpansion:       true,
+			nodeStageSet:        true,
+			volumePhase:         volume.CSIVolumePublished,
+			success:             false,
+			fsVolume:            true,
+			grpcError:           status.Error(codes.InvalidArgument, "invalid-argument"),
+			hasVolumeInUseError: false,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,7 +124,18 @@ func TestNodeExpand(t *testing.T) {
 
 			fakeCSIClient, _ := csClient.(*fakeCsiDriverClient)
 			fakeNodeClient := fakeCSIClient.nodeClient
+
+			if tc.grpcError != nil {
+				fakeNodeClient.SetNextError(tc.grpcError)
+			}
+
 			ok, err := plug.nodeExpandWithClient(resizeOptions, csiSource, csClient, tc.fsVolume)
+
+			if tc.hasVolumeInUseError {
+				if !volumetypes.IsFailedPreconditionError(err) {
+					t.Errorf("expected failed precondition error got: %v", err)
+				}
+			}
 
 			// verify device staging targer path
 			stagingTargetPath := fakeNodeClient.FakeNodeExpansionRequest.GetStagingTargetPath()

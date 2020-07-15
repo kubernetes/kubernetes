@@ -89,6 +89,9 @@ const (
 	// SuccessAndFailOnMountDeviceName will cause first mount operation to succeed but subsequent attempts to fail
 	SuccessAndFailOnMountDeviceName = "success-and-failed-mount-device-name"
 
+	// FailWithInUseVolumeName will cause NodeExpandVolume to result in FailedPrecondition error
+	FailWithInUseVolumeName = "fail-expansion-in-use"
+
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
 	deviceMounted        = "deviceMounted"
@@ -658,6 +661,9 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 }
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
+	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
+		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
+	}
 	return true, nil
 }
 
