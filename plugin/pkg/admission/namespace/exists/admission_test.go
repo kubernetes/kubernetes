@@ -112,8 +112,8 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		actions := ""
-		for _, action := range mockClient.Actions() {
-			actions = actions + action.GetVerb() + ":" + action.GetResource().Resource + ":" + action.GetSubresource() + ", "
+		for i := range mockClient.Actions() {
+			actions = actions + actions[i].GetVerb() + ":" + actions[i].GetResource().Resource + ":" + actions[i].GetSubresource() + ", "
 		}
 		t.Errorf("expected error returned from admission handler: %v", actions)
 	}
