@@ -115,6 +115,11 @@ func (in *APIServiceSpec) DeepCopyInto(out *APIServiceSpec) {
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.URL != nil {
+		in, out := &in.URL, &out.URL
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

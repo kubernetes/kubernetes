@@ -89,6 +89,32 @@ type APIServiceSpec struct {
 
 	// leaving this here so everyone remembers why proto index 6 is skipped
 	// Priority int64 `json:"priority" protobuf:"varint,6,opt,name=priority"`
+
+	// URL gives the location of the API server, in standard URL form
+	// (`scheme://host:port/path`). Only one of `url` or `service`
+	// should be specified.
+	//
+	// The `host` should not refer to a service running in the cluster; use
+	// the `service` field instead. The host might be resolved via external
+	// DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
+	// in-cluster DNS as that would be a layering violation). `host` may
+	// also be an IP address.
+	//
+	// The scheme must be "https"; the URL must begin with "https://".
+	//
+	// A path is optional, and if present may be any string permissible in
+	// a URL. You may use the path to pass an arbitrary string to the
+	// API server, for example, a cluster identifier.
+	//
+	// Attempting to use a user or basic auth e.g. "user:password@" is not
+	// allowed. Fragments ("#...") and query parameters ("?...") are not
+	// allowed, either.
+	//
+	// When egress configuration is given `master` network context is used
+	// to dial API server calls.
+	//
+	// +optional
+	URL *string `json:"url,omitempty" protobuf:"bytes,9,opt,name=url"`
 }
 
 // ConditionStatus indicates the status of a condition (true, false, or unknown).
