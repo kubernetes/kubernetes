@@ -198,7 +198,7 @@ dependencies:
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
 
   - name: "repo-infra"
-    version: 0.0.6
+    version: 0.0.7
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
