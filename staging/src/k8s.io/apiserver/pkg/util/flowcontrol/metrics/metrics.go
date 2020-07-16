@@ -102,7 +102,7 @@ var (
 	)
 
 	// PriorityLevelConcurrencyObserverPairGenerator creates pairs that observe concurrency for priority levels
-	PriorityLevelConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
+	PriorityLevelConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Second,
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
@@ -122,7 +122,7 @@ var (
 		[]string{priorityLevel})
 
 	// ReadWriteConcurrencyObserverPairGenerator creates pairs that observe concurrency broken down by mutating vs readonly
-	ReadWriteConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
+	ReadWriteConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Second,
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
