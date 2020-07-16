@@ -99,6 +99,9 @@ type Config struct {
 	// server.
 	DisableCompression bool
 
+	// FollowRedirect makes the internal HTTP client follow redirects automatically
+	FollowRedirect bool
+
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options. Use WrapTransport
 	// to provide additional per-server middleware behavior.
@@ -287,6 +290,11 @@ type ContentConfig struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 }
 
+// notFollowRedirect always returns http.ErrUseLastResponse
+func notFollowRedirect(req *http.Request, via []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
 // object. Note that a RESTClient may require fields that are optional when initializing a Client.
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
@@ -309,12 +317,16 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	var httpClient *http.Client
+	httpClient := &http.Client{}
 	if transport != http.DefaultTransport {
-		httpClient = &http.Client{Transport: transport}
+		httpClient.Transport = transport
 		if config.Timeout > 0 {
 			httpClient.Timeout = config.Timeout
 		}
+	}
+
+	if !config.FollowRedirect {
+		httpClient.CheckRedirect = notFollowRedirect
 	}
 
 	rateLimiter := config.RateLimiter
@@ -367,12 +379,16 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	var httpClient *http.Client
+	httpClient := &http.Client{}
 	if transport != http.DefaultTransport {
-		httpClient = &http.Client{Transport: transport}
+		httpClient.Transport = transport
 		if config.Timeout > 0 {
 			httpClient.Timeout = config.Timeout
 		}
+	}
+
+	if !config.FollowRedirect {
+		httpClient.CheckRedirect = notFollowRedirect
 	}
 
 	rateLimiter := config.RateLimiter
@@ -577,6 +593,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		WarningHandler:     config.WarningHandler,
 		UserAgent:          config.UserAgent,
 		DisableCompression: config.DisableCompression,
+		FollowRedirect:     config.FollowRedirect,
 		QPS:                config.QPS,
 		Burst:              config.Burst,
 		Timeout:            config.Timeout,
@@ -616,6 +633,7 @@ func CopyConfig(config *Config) *Config {
 		},
 		UserAgent:          config.UserAgent,
 		DisableCompression: config.DisableCompression,
+		FollowRedirect:     config.FollowRedirect,
 		Transport:          config.Transport,
 		WrapTransport:      config.WrapTransport,
 		QPS:                config.QPS,

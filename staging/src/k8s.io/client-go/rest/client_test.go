@@ -372,6 +372,63 @@ func TestCreateBackoffManager(t *testing.T) {
 
 }
 
+func TestNotFollowRedirect(t *testing.T) {
+	testServer := httptest.NewServer(&utiltesting.FakeHandler{
+		StatusCode: 301,
+		ResponseHeaders: map[string]string{
+			"Location": "http://foo.com/",
+		},
+		T: t,
+	})
+	defer testServer.Close()
+
+	c, err := restClient(testServer)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	result := c.Get().Do(context.Background())
+	if result.statusCode != 301 {
+		t.Errorf("Unexpected status code: %d", result.statusCode)
+	}
+}
+
+func TestFollowRedirect(t *testing.T) {
+	server1, _, _ := testServerEnv(t, 200)
+	defer server1.Close()
+
+	server2 := httptest.NewServer(&utiltesting.FakeHandler{
+		StatusCode: 301,
+		ResponseHeaders: map[string]string{
+			"Location": server1.URL,
+		},
+		T: t,
+	})
+	defer server2.Close()
+
+	c, err := RESTClientFor(&Config{
+		Host: server2.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &v1.SchemeGroupVersion,
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		},
+		FollowRedirect: true,
+		Username:       "user",
+		Password:       "pass",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result := c.Get().Do(context.Background())
+	if result.Error() != nil {
+		t.Fatalf("Unexpected error: %v", result.Error())
+	}
+	if result.statusCode != 200 {
+		t.Errorf("Unexpected status code: %d", result.statusCode)
+	}
+}
+
 func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *metav1.Status) {
 	status := &metav1.Status{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: fmt.Sprintf("%s", metav1.StatusSuccess)}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), status)

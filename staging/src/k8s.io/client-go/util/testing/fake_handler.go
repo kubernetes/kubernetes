@@ -43,6 +43,7 @@ type FakeHandler struct {
 	RequestReceived *http.Request
 	RequestBody     string
 	StatusCode      int
+	ResponseHeaders map[string]string
 	ResponseBody    string
 	// For logging - you can use a *testing.T
 	// This will keep log messages associated with the test.
@@ -79,6 +80,9 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	}
 
 	f.RequestReceived = request
+	for k, v := range f.ResponseHeaders {
+		response.Header().Set(k, v)
+	}
 	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(f.StatusCode)
 	response.Write([]byte(f.ResponseBody))
