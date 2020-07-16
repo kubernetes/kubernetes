@@ -9,7 +9,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aggregator.go",
-        "apigroup_preferred_version.go",
         "certs.go",
         "chunking.go",
         "crd_conversion_webhook.go",
