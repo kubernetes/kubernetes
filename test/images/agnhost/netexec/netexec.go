@@ -94,6 +94,13 @@ var CmdNetexec = &cobra.Command{
   Returns a JSON with the fields "output" (containing the file's name on the server) and
   "error" containing any potential server side errors.
 
+If "--tls-cert-file" is added (ideally in conjunction with "--tls-private-key-file", the HTTP server
+will be upgraded to HTTPS. The image has default, "localhost"-based cert/privkey files at
+"/localhost.crt" and "/localhost.key" (see: "porter" subcommand)
+
+If "--http-override" is set, the HTTP(S) server will always serve the override path & options,
+ignoring the request URL.
+
 It will also start a UDP server on the indicated UDP port that responds to the following commands:
 
 - "hostname": Returns the server's hostname
