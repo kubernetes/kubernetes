@@ -294,11 +294,8 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
 		}
-		item, ok := f.items[id]
-		if !ok {
-			// Item may have been deleted subsequently.
-			continue
-		}
+
+		item := f.items[id]
 		delete(f.items, id)
 		err := process(item)
 		if e, ok := err.(ErrRequeue); ok {
