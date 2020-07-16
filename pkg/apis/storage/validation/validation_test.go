@@ -1665,6 +1665,9 @@ func TestCSIDriverValidation(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	supportedFSGroupPolicy := storage.FileFSGroupPolicy
+	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	invalidFSGroupPolicy = "invalid-mode"
 	successCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1769,6 +1772,14 @@ func TestCSIDriverValidation(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				FSGroupPolicy:  &supportedFSGroupPolicy,
+			},
+		},
 	}
 
 	for _, csiDriver := range successCases {
@@ -1816,6 +1827,15 @@ func TestCSIDriverValidation(t *testing.T) {
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					"no-such-mode",
 				},
+			},
+		},
+		{
+			// invalid fsGroupPolicy
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				FSGroupPolicy:  &invalidFSGroupPolicy,
 			},
 		},
 	}

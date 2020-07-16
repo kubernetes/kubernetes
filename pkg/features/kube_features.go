@@ -435,6 +435,12 @@ const (
 	// Expects vSphere CSI Driver to be installed and configured on all nodes.
 	CSIMigrationvSphereComplete featuregate.Feature = "CSIMigrationvSphereComplete"
 
+	// owner: @huffmanca
+	// alpha: v1.19
+	//
+	// Determines if a CSI Driver supports applying fsGroup.
+	CSIVolumeFSGroupPolicy featuregate.Feature = "CSIVolumeFSGroupPolicy"
+
 	// owner: @gnufied
 	// alpha: v1.18
 	// Allows user to configure volume permission change policy for fsGroups when mounting
@@ -697,6 +703,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
+	CSIVolumeFSGroupPolicy:         {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: true, PreRelease: featuregate.Beta},

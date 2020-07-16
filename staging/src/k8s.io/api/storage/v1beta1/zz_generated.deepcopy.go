@@ -108,6 +108,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.FSGroupPolicy != nil {
+		in, out := &in.FSGroupPolicy, &out.FSGroupPolicy
+		*out = new(FSGroupPolicy)
+		**out = **in
+	}
 	return
 }
 

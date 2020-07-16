@@ -28,7 +28,6 @@ import (
 	"k8s.io/klog/v2"
 
 	api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -66,6 +65,7 @@ type csiMountMgr struct {
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
+	fsGroupPolicy       storage.FSGroupPolicy
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
@@ -277,17 +277,16 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 	}
 
-	// apply volume ownership
-	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
-	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
-	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
-	err = c.applyFSGroup(fsType, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
-	if err != nil {
-		// At this point mount operation is successful:
-		//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
-		//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
-		//      cleaned up.
-		return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
+	if c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
+		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		if err != nil {
+			// At this point mount operation is successful:
+			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
+			//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
+			//      cleaned up.
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
+		}
+		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *mounterArgs.FsGroup, c.volumeID))
 	}
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
@@ -372,41 +371,30 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	return nil
 }
 
-// applyFSGroup applies the volume ownership it derives its logic
-// from https://github.com/kubernetes/kubernetes/issues/66323
-// 1) if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
-// 2) if fstype is provided and pv.AccessMode == ReadWriteOnly and !c.spec.ReadOnly then apply fsgroup
-func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
-	if fsGroup != nil {
-		if fsType == "" {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
-			return nil
-		}
-
-		accessModes := c.spec.PersistentVolume.Spec.AccessModes
-		if c.spec.PersistentVolume.Spec.AccessModes == nil {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-			return nil
-		}
-		if !hasReadWriteOnce(accessModes) {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-			return nil
-		}
-
-		if c.readOnly {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
-			return nil
-		}
-
-		err := volume.SetVolumeOwnership(c, fsGroup, fsGroupChangePolicy)
-		if err != nil {
-			return err
-		}
-
-		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolicy storage.FSGroupPolicy) bool {
+	if fsGroup == nil || driverPolicy == storage.NoneFSGroupPolicy || c.readOnly {
+		return false
 	}
 
-	return nil
+	if driverPolicy == storage.FileFSGroupPolicy {
+		return true
+	}
+
+	if fsType == "" {
+		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
+		return false
+	}
+
+	accessModes := c.spec.PersistentVolume.Spec.AccessModes
+	if c.spec.PersistentVolume.Spec.AccessModes == nil {
+		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+		return false
+	}
+	if !hasReadWriteOnce(accessModes) {
+		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+		return false
+	}
+	return true
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
