@@ -567,8 +567,12 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
 
+	if err = WaitForPDCSIController(driverNamespace, f.ClientSet); err != nil {
+		framework.Failf("waitig for csi gce-pd controller: %v", err)
+	}
+
 	if err = waitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
-		framework.Failf("waiting for csi driver node registration on: %v", err)
+		framework.Failf("waiting for csi gce-pd node registration on: %v", err)
 	}
 
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
@@ -600,6 +604,26 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		Framework:       f,
 		DriverNamespace: driverNamespace,
 	}, cleanupFunc
+}
+
+func WaitForPDCSIController(driverNamespace *v1.Namespace, cs clientset.Interface) error {
+	const ssName = "csi-gce-pd-controller"  // Taken from testing-manifests/storage-csi/gce-pd/controller_ss.yaml.
+	const csiPDDriverDeployTimeout = 5 * time.Minute
+
+	waitErr := wait.PollImmediate(10*time.Second, csiPDDriverDeployTimeout, func() (bool, error) {
+		_, err := cs.AppsV1().StatefulSets(driverNamespace.Name).Get(context.TODO(), ssName, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		if err != nil {  // apierrors.IsNotFound(err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("waiting on StatefulSet %s/%s: %v", driverNamespace.Name, ssName, waitErr)
+	}
+	return nil
 }
 
 func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
