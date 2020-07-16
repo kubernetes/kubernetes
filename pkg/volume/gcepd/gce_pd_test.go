@@ -222,10 +222,11 @@ func TestPlugin(t *testing.T) {
 	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
 	if r == nil {
 		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
-	}
-	sort.Strings(r.Values)
-	if !reflect.DeepEqual(r.Values, zones.List()) {
-		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+	} else {
+		sort.Strings(r.Values)
+		if !reflect.DeepEqual(r.Values, zones.List()) {
+			t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+		}
 	}
 
 	// Test Deleter
