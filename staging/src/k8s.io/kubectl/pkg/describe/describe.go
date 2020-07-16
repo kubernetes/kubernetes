@@ -3506,10 +3506,10 @@ func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string,
 		w.Write(LEVEL_0, "\n")
 	}
 
-	CommonName := cr.Subject.CommonName
+	commonName := cr.Subject.CommonName
 	reg, err := regexp.Compile("[^a-zA-Z0-9: ]")
 	if err == nil {
-		CommonName = reg.ReplaceAllString(cr.Subject.CommonName, "")
+		commonName = reg.ReplaceAllString(cr.Subject.CommonName, "")
 	}
 
 	return tabbedString(func(out io.Writer) error {
@@ -3525,7 +3525,7 @@ func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string,
 		w.Write(LEVEL_0, "Status:\t%s\n", status)
 
 		w.Write(LEVEL_0, "Subject:\n")
-		w.Write(LEVEL_0, "\tCommon Name:\t%q\n", CommonName)
+		w.Write(LEVEL_0, "\tCommon Name:\t%q\n", commonName)
 		w.Write(LEVEL_0, "\tSerial Number:\t%q\n", cr.Subject.SerialNumber)
 		printListHelper(w, "\t", "Organization", cr.Subject.Organization)
 		printListHelper(w, "\t", "Organizational Unit", cr.Subject.OrganizationalUnit)
