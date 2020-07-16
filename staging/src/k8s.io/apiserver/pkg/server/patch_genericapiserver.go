@@ -41,10 +41,12 @@ type terminationLoggingListener struct {
 	lateStopCh <-chan struct{}
 }
 
+type eventfFunc func(eventType, reason, messageFmt string, args ...interface{})
+
 var (
 	lateConnectionRemoteAddrsLock sync.RWMutex
-	lateConnectionRemoteAddrs     map[string]bool = map[string]bool{}
-	lateConnectionEventf          func(eventType, reason, messageFmt string, args ...interface{})
+	lateConnectionRemoteAddrs     = map[string]bool{}
+	lateConnectionEventf          atomic.Value    // of type eventfFunc
 )
 
 func (l *terminationLoggingListener) Accept() (net.Conn, error) {
@@ -90,8 +92,8 @@ func WithLateConnectionFilter(handler http.Handler) http.Handler {
 					klog.Warningf("Request from %s to %q (user agent %q) through connection created very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.URL.Path, r.UserAgent())
 
 					// create only one event to avoid event spam.
-					if swapped := lateRequestReceived.CAS(false, true); swapped && lateConnectionEventf != nil {
-						lateConnectionEventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections (e.g. from %q, user agent %q) very late in the graceful termination process, possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.UserAgent())
+					if swapped, eventf := lateRequestReceived.CAS(false, true), lateConnectionEventf.Load(); swapped && eventf != nil {
+						eventf.(eventfFunc)(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections (e.g. from %q, user agent %q) very late in the graceful termination process, possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.UserAgent())
 					}
 				}
 			}
