@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -56,6 +57,29 @@ var Strategy = nodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (nodeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		fields["v1"].Insert(fieldpath.MakePathOrDie("spec", "configSource"))
+		fields["v1"].Insert(fieldpath.MakePathOrDie("status", "config"))
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		// TODO: probably not correct, as reset only resets to the first entry
+		// maybe only insert index 0+
+		fields["v1"].Insert(fieldpath.MakePathOrDie("spec", "podCIDRs"))
+	}
+
+	return fields
 }
 
 // AllowCreateOnUpdate is false for nodes.
@@ -162,6 +186,22 @@ type nodeStatusStrategy struct {
 }
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (nodeStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		fields["v1"].Insert(fieldpath.MakePathOrDie("status", "config"))
+	}
+
+	return fields
+}
 
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
