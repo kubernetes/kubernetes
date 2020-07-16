@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -264,6 +266,105 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	return newScale, false, err
+}
+
+// List returns a list of items matching labels and field according to the store's PredicateFunc.
+func (r *ScaleREST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	l, err := r.store.List(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	// TODO pointer or value
+	scaleList := &autoscalingv1.ScaleList{TypeMeta: metav1.TypeMeta{
+		APIVersion: "autoscaling/v1",
+		Kind:       "Scale",
+	}}
+	// Shallow copy ObjectMeta in returned list for each item. Native types have `Items []Item` fields and therefore
+	// implicitly shallow copy ObjectMeta. The generic store sets the self-link for each item. So this is necessary
+	// to avoid mutation of the objects from the cache.
+	if ul, ok := l.(*unstructured.UnstructuredList); ok {
+		for i := range ul.Items {
+			scaleObject, replicasFound, err := scaleFromCustomResource(&ul.Items[i], r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
+			if err != nil {
+				return nil, err
+			}
+			if !replicasFound {
+				return nil, apierrors.NewInternalError(fmt.Errorf("the spec replicas field %q does not exist", r.specReplicasPath))
+			}
+			scaleList.Items = append(scaleList.Items, *scaleObject)
+		}
+	}
+	return scaleList, nil
+}
+
+func (r *ScaleREST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	watcher, err := r.store.Watch(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return &scaleWatch{
+		stop: make(chan struct{}), watcher: watcher, eventChan: make(chan watch.Event, cap(watcher.ResultChan())),
+		convert: func(obj runtime.Object) (scale *autoscalingv1.Scale, b bool, err error) {
+			cr, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				return nil, false, fmt.Errorf("unable to convert obj to unstructured")
+			}
+			return scaleFromCustomResource(cr, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
+		},
+	}, nil
+}
+
+type scaleWatch struct {
+	watcher   watch.Interface
+	stop      chan struct{}
+	once      sync.Once
+	convert   func(obj runtime.Object) (*autoscalingv1.Scale, bool, error)
+	eventChan chan watch.Event
+}
+
+// Stops watching. Will close the channel returned by ResultChan(). Releases
+// any resources used by the watch.
+func (s *scaleWatch) Stop() {
+	select {
+	case <-s.stop:
+		return
+	default:
+	}
+	close(s.stop)
+}
+
+// Returns a chan which will receive all the events. If an error occurs
+// or Stop() is called, the implementation will close this channel and
+// release any resources used by the watch.
+func (s *scaleWatch) ResultChan() <-chan watch.Event {
+	s.once.Do(func() {
+		go func() {
+			for {
+				select {
+				case <-s.stop:
+					return
+				case event := <-s.watcher.ResultChan():
+					converted, replicasFound, err := s.convert(event.Object)
+					if err == nil && replicasFound {
+						event.Object = converted
+					}
+					s.eventChan <- event
+				}
+			}
+		}()
+	})
+	return s.eventChan
+}
+
+func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+func (r *ScaleREST) NewList() runtime.Object {
+	// lists are never stored, only manufactured, so stomp in the right kind
+	ret := &unstructured.UnstructuredList{}
+	ret.SetGroupVersionKind(r.GroupVersionKind(schema.GroupVersion{}))
+	return ret
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc, specReplicasPath, statusReplicasPath, labelSelectorPath string) rest.ValidateObjectFunc {

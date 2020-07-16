@@ -126,6 +126,19 @@ type Scale struct {
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// list of Scale objects.
+type ScaleList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// list of horizontal pod autoscaler objects.
+	Items []Scale `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
 // ScaleSpec describes the attributes of a scale subresource.
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.

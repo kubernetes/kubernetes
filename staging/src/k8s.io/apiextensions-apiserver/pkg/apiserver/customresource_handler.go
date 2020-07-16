@@ -444,8 +444,13 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, terminating bool, supportedTypes []string) http.HandlerFunc {
 	requestScope := crdInfo.scaleRequestScopes[requestInfo.APIVersion]
 	storage := crdInfo.storages[requestInfo.APIVersion].Scale
-
 	switch requestInfo.Verb {
+	case "list":
+		forceWatch := false
+		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
+	case "watch":
+		forceWatch := true
+		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
