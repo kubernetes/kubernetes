@@ -59,3 +59,11 @@ func hasSubdir(root, dir string) (rel string, ok bool) {
 func BoilerplatePath() string {
 	return path.Join(reflect.TypeOf(empty{}).PkgPath(), "/../../hack/boilerplate.go.txt")
 }
+
+// Vendorless trims vendor prefix from a package path to make it canonical
+func Vendorless(p string) string {
+	if pos := strings.LastIndex(p, "/vendor/"); pos != -1 {
+		return p[pos+len("/vendor/"):]
+	}
+	return p
+}
