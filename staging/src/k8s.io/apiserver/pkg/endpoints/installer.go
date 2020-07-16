@@ -46,6 +46,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 const (
@@ -263,10 +264,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isCreater = true
 	}
 
-	var resetFields rest.ResetFields
+	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		if resetFieldsProvider, isResetFieldsProvider := storage.(rest.ResetFieldsProvider); isResetFieldsProvider {
-			resetFields = resetFieldsProvider.ResetFields()
+		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+			resetFields = resetFieldsStrategy.GetResetFields()
 			// TODO(kwiesmueller): remove debug logging
 			klog.Infof("---- +ResetFields: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)
 		} else {

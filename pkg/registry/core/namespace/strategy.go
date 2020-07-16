@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -49,10 +48,10 @@ func (namespaceStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// ResetFields returns the set of fields that get reset by the strategy
+// GetResetFields returns the set of fields that get reset by the strategy
 // and should not be modified by the user.
-func (namespaceStrategy) ResetFields() rest.ResetFields {
-	return rest.ResetFields{
+func (namespaceStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
 		"v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 			fieldpath.MakePathOrDie("spec.finalizers"),
@@ -124,10 +123,10 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
-// ResetFields returns the set of fields that get reset by the strategy
+// GetResetFields returns the set of fields that get reset by the strategy
 // and should not be modified by the user.
-func (namespaceStatusStrategy) ResetFields() rest.ResetFields {
-	return rest.ResetFields{
+func (namespaceStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
 		"v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
@@ -154,10 +153,10 @@ func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old ru
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
-// ResetFields returns the set of fields that get reset by the strategy
+// GetResetFields returns the set of fields that get reset by the strategy
 // and should not be modified by the user.
-func (namespaceFinalizeStrategy) ResetFields() rest.ResetFields {
-	return rest.ResetFields{
+func (namespaceFinalizeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
 		"v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 			fieldpath.MakePathOrDie("spec.finalizers"),

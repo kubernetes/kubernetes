@@ -351,11 +351,8 @@ type StorageVersionProvider interface {
 	StorageVersion() runtime.GroupVersioner
 }
 
-// ResetFields maps versions to the sets of fields that will be reset by the storage strategy.
-type ResetFields map[fieldpath.APIVersion]*fieldpath.Set
-
-// ResetFieldsProvider is an optional interface that a storage object can
+// ResetFieldsStrategy is an optional interface that a storage object can
 // implement if it wishes to provide the fields reset by its strategies.
-type ResetFieldsProvider interface {
-	ResetFields() ResetFields
+type ResetFieldsStrategy interface {
+	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
 }

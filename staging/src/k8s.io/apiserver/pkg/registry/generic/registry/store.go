@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 
 	"k8s.io/klog/v2"
 )
@@ -180,7 +181,7 @@ type Store struct {
 
 	// ResetFieldsStrategy provides the fields reset by the strategy that
 	// should not be modified by the user.
-	ResetFieldsStrategy rest.ResetFieldsProvider
+	ResetFieldsStrategy rest.ResetFieldsStrategy
 
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
@@ -1401,12 +1402,12 @@ func (e *Store) StorageVersion() runtime.GroupVersioner {
 	return e.StorageVersioner
 }
 
-// ResetFields implements rest.ResetFieldsProvider
-func (e *Store) ResetFields() rest.ResetFields {
+// GetResetFields implements rest.ResetFieldsStrategy
+func (e *Store) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	if e.ResetFieldsStrategy == nil {
 		return nil
 	}
-	return e.ResetFieldsStrategy.ResetFields()
+	return e.ResetFieldsStrategy.GetResetFields()
 }
 
 // validateIndexers will check the prefix of indexers.

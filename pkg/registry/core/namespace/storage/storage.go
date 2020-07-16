@@ -24,6 +24,7 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -31,13 +32,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
-
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // rest implements a RESTStorage for namespaces
@@ -297,9 +297,9 @@ func (r *REST) StorageVersion() runtime.GroupVersioner {
 	return r.store.StorageVersion()
 }
 
-// ResetFields implements rest.ResetFieldsProvider
-func (r *REST) ResetFields() rest.ResetFields {
-	return r.store.ResetFields()
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *REST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
@@ -317,9 +317,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
-// ResetFields implements rest.ResetFieldsProvider
-func (r *StatusREST) ResetFields() rest.ResetFields {
-	return r.store.ResetFields()
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
@@ -332,7 +332,7 @@ func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.Upd
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
-// ResetFields implements rest.ResetFieldsProvider
-func (r *FinalizeREST) ResetFields() rest.ResetFields {
-	return r.store.ResetFields()
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *FinalizeREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

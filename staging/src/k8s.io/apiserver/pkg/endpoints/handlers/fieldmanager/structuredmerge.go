@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 )
@@ -36,14 +35,14 @@ type structuredMergeManager struct {
 	groupVersion    schema.GroupVersion
 	hubVersion      schema.GroupVersion
 	updater         merge.Updater
-	resetFields     rest.ResetFields
+	resetFields     map[fieldpath.APIVersion]*fieldpath.Set
 }
 
 var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields rest.ResetFields) (Manager, error) {
+func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (Manager, error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -60,7 +59,7 @@ func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConve
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields rest.ResetFields, preserveUnknownFields bool) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set, preserveUnknownFields bool) (_ Manager, err error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,

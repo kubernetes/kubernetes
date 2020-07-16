@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -68,10 +67,10 @@ func (podStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetFields returns the set of fields that get reset by the strategy
+// GetResetFields returns the set of fields that get reset by the strategy
 // and should not be modified by the user.
-func (podStrategy) ResetFields() rest.ResetFields {
-	fields := rest.ResetFields{
+func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 			// TODO: add fields reset by podutil.DropDisabledPodFields
@@ -183,10 +182,10 @@ type podStatusStrategy struct {
 // StatusStrategy wraps and exports the used podStrategy for the storage package.
 var StatusStrategy = podStatusStrategy{Strategy}
 
-// ResetFields returns the set of fields that get reset by the strategy
+// GetResetFields returns the set of fields that get reset by the strategy
 // and should not be modified by the user.
-func (podStatusStrategy) ResetFields() rest.ResetFields {
-	return rest.ResetFields{
+func (podStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
 		"v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 			fieldpath.MakePathOrDie("metadata", "deletionTimestamp"),

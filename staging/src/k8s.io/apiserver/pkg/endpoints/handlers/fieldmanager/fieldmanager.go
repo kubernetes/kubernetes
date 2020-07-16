@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/klog/v2"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -80,7 +79,7 @@ func NewFieldManager(f Manager, ignoreManagedFieldsFromRequestObject bool) *Fiel
 
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, resetFields rest.ResetFields, ignoreManagedFieldsFromRequestObject bool) (*FieldManager, error) {
+func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set, ignoreManagedFieldsFromRequestObject bool) (*FieldManager, error) {
 	typeConverter, err := internal.NewTypeConverter(models, false)
 	if err != nil {
 		return nil, err
@@ -96,7 +95,7 @@ func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, resetFields rest.ResetFields, preserveUnknownFields, ignoreManagedFieldsFromRequestObject bool) (_ *FieldManager, err error) {
+func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set, preserveUnknownFields, ignoreManagedFieldsFromRequestObject bool) (_ *FieldManager, err error) {
 	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
 	if models != nil {
 		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)

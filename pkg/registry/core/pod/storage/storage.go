@@ -44,6 +44,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -280,9 +281,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
-// ResetFields implements rest.ResetFieldsProvider
-func (r *StatusREST) ResetFields() rest.ResetFields {
-	return r.store.ResetFields()
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 // EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
