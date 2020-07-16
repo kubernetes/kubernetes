@@ -33,3 +33,4 @@ filters:
   "metrics\\.go$":
     labels:
       - sig/instrumentation
+      - triage/needs-information
