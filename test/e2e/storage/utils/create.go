@@ -110,10 +110,12 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 // This is done by:
 // - creating namespaced items inside the test's namespace
 // - changing the name of non-namespaced items like ClusterRole
+// - substituting the namespace into container arguments with $(PDCSI_NAMESPACE).
 //
 // PatchItems has some limitations:
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
+// - templating is not supported, $(PDCSI_NAMESPACE) is handled manually.
 func PatchItems(f *framework.Framework, driverNamspace *v1.Namespace, items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
@@ -274,6 +276,7 @@ var factories = map[What]ItemFactory{
 	{"ClusterRoleBinding"}: &clusterRoleBindingFactory{},
 	{"CSIDriver"}:          &csiDriverFactory{},
 	{"DaemonSet"}:          &daemonSetFactory{},
+	{"Deployment"}:         &deploymentFactory{},
 	{"Role"}:               &roleFactory{},
 	{"RoleBinding"}:        &roleBindingFactory{},
 	{"Secret"}:             &secretFactory{},
@@ -356,6 +359,15 @@ func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace,
 	case *v1.Service:
 		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 	case *appsv1.StatefulSet:
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
+		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := patchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
+	case *appsv1.Deployment:
+		// This is identical to StatefulSet, above, but due to the magic of type switches cannot be combined.
 		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
@@ -544,6 +556,27 @@ func (*daemonSetFactory) Create(f *framework.Framework, ns *v1.Namespace, i inte
 	client := f.ClientSet.AppsV1().DaemonSets(ns.Name)
 	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create DaemonSet")
+	}
+	return func() error {
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+	}, nil
+}
+
+type deploymentFactory struct{}
+
+func (f *deploymentFactory) New() runtime.Object {
+	return &appsv1.Deployment{}
+}
+
+func (*deploymentFactory) Create(f *framework.Framework, ns *v1.Namespace, i interface{}) (func() error, error) {
+	item, ok := i.(*appsv1.Deployment)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.AppsV1().Deployments(ns.Name)
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
+		return nil, errors.Wrap(err, "create Deployment")
 	}
 	return func() error {
 		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})

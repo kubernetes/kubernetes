@@ -1,4 +1,4 @@
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: csi-gce-pd-controller
@@ -25,7 +25,14 @@ spec:
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
           imagePullPolicy: Always
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -35,6 +42,14 @@ spec:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
             - "--feature-gates=Topology=true"
+            - "--enable-leader-election"
+            - "--leader-election-type=leases"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -43,6 +58,13 @@ spec:
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -51,6 +73,13 @@ spec:
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -60,6 +89,10 @@ spec:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"
           env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: "/etc/cloud-sa/cloud-sa.json"
           volumeMounts:

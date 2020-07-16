@@ -53,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -559,7 +560,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
-		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
+		"test/e2e/testing-manifests/storage-csi/gce-pd/controller.yaml",
 	}
 
 	cleanup, err := utils.CreateFromManifests(f, driverNamespace, nil, manifests...)
@@ -567,8 +568,17 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
 
-	if err = WaitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
-		framework.Failf("waiting for csi driver node registration on: %v", err)
+	const driverName = "csi-gce-pd-controller" // From testing-manifests/storage-csi/gce-pd/controller.yaml
+	driverDeployment, err := f.ClientSet.AppsV1().Deployments(driverNamespace.Name).Get(context.TODO(), driverName, metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("getting csi gce-pd deployment: %v", err)
+	}
+	if err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, driverDeployment); err != nil {
+		framework.Failf("waiting for csi gce-pd controller: %v", err)
+	}
+
+	if err = waitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
+		framework.Failf("waiting for csi gce-pd node registration on: %v", err)
 	}
 
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
