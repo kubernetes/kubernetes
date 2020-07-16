@@ -34,20 +34,20 @@ const (
 	queryIncludeRequestDetails = "includeRequestDetails"
 )
 
-func (cfgCtlr *configController) Install(c *mux.PathRecorderMux) {
+func (cfgCtl *configController) Install(c *mux.PathRecorderMux) {
 	// TODO(yue9944882): handle "Accept" header properly
 	// debugging dumps a CSV content for three levels of granularity
 	// 1. row per priority-level
-	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_priority_levels", cfgCtlr.dumpPriorityLevels)
+	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_priority_levels", cfgCtl.dumpPriorityLevels)
 	// 2. row per queue
-	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_queues", cfgCtlr.dumpQueues)
+	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_queues", cfgCtl.dumpQueues)
 	// 3. row per request
-	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_requests", cfgCtlr.dumpRequests)
+	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_requests", cfgCtl.dumpRequests)
 }
 
-func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *http.Request) {
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+func (cfgCtl *configController) dumpPriorityLevels(w http.ResponseWriter, r *http.Request) {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
 	tabWriter := tabwriter.NewWriter(w, 8, 0, 1, ' ', 0)
 	columnHeaders := []string{
 		"PriorityLevelName", // 1
@@ -59,7 +59,7 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endline(tabWriter)
-	for _, plState := range cfgCtlr.priorityLevelStates {
+	for _, plState := range cfgCtl.priorityLevelStates {
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
 				plState.pl.Name, // 1
@@ -93,9 +93,9 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 	runtime.HandleError(tabWriter.Flush())
 }
 
-func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Request) {
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+func (cfgCtl *configController) dumpQueues(w http.ResponseWriter, r *http.Request) {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
 	tabWriter := tabwriter.NewWriter(w, 8, 0, 1, ' ', 0)
 	columnHeaders := []string{
 		"PriorityLevelName", // 1
@@ -106,7 +106,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endline(tabWriter)
-	for _, plState := range cfgCtlr.priorityLevelStates {
+	for _, plState := range cfgCtl.priorityLevelStates {
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
 				plState.pl.Name, // 1
@@ -133,9 +133,9 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 	runtime.HandleError(tabWriter.Flush())
 }
 
-func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Request) {
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+func (cfgCtl *configController) dumpRequests(w http.ResponseWriter, r *http.Request) {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
 
 	includeRequestDetails := len(r.URL.Query().Get(queryIncludeRequestDetails)) > 0
 
@@ -161,7 +161,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 		}))
 	}
 	endline(tabWriter)
-	for _, plState := range cfgCtlr.priorityLevelStates {
+	for _, plState := range cfgCtl.priorityLevelStates {
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
 				plState.pl.Name, // 1

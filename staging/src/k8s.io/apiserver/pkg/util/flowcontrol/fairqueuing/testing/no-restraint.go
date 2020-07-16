@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
-	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 // NewNoRestraintFactory makes a QueueSetFactory that produces
@@ -39,7 +38,7 @@ type noRestraint struct{}
 
 type noRestraintRequest struct{}
 
-func (noRestraintFactory) BeginConstruction(fq.QueuingConfig, metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
+func (noRestraintFactory) BeginConstruction(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
 	return noRestraintCompleter{}, nil
 }
 
@@ -55,7 +54,7 @@ func (noRestraint) IsIdle() bool {
 	return false
 }
 
-func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (fq.Request, bool) {
+func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
 	return noRestraintRequest{}, false
 }
 
