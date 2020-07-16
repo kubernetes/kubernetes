@@ -3,33 +3,28 @@
 filters:
   ".*":
     reviewers:
-      - brendandburns
-      - dchen1107
-      - lavalamp
-      - smarterclayton
-      - thockin
-      - liggitt
+    - bparees
+    - deads2k
+    - sjenning
+    - smarterclayton
+    - soltysh
+    - tbielawa
     approvers:
-      - bgrant0607
-      - brendandburns
-      - dchen1107
-      - lavalamp
-      - smarterclayton
-      - thockin
-      - wojtek-t
-      - liggitt
-    emeritus_approvers:
-      - jbeda
-
-  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
-  # dep-approvers
-  "go\\.(mod|sum)$":
-    required_reviewers:
-      - kubernetes/dep-approvers
+    - bparees
+    - deads2k
+    - derekwaynecarr
+    - eparis
+    - knobunc  # Network, Multi-cluster, Storage
+    - mfojtik
+    - pweil-
+    - sjenning
+    - soltysh
+    - sttts
+    - smarterclayton
+    - tbielawa # also for build and automated release tooling changes
+  "^\\.go.(mod|sum)$":
     labels:
-      - area/dependency
-  # metrics.go files are sig-instrumentation related, and should be tagged
-  # and reviewed by sig-instrumentation
-  "metrics\\.go$":
+    - "vendor-update"
+  "^vendor/.*":
     labels:
-      - sig/instrumentation
+    - "vendor-update"
