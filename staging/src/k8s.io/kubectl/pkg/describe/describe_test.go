@@ -3173,7 +3173,7 @@ Spec:
         Except: 192.168.3.0/24, 192.168.4.0/24
     ----------
     To Port: <any> (traffic allowed to all ports)
-    To: <any> (traffic not restricted by source)
+    To: <any> (traffic not restricted by destination)
   Policy Types: Ingress, Egress
 `
 
