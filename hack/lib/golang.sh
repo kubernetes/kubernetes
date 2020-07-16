@@ -78,6 +78,7 @@ kube::golang::server_targets() {
     cmd/kube-scheduler
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
+    cmd/watch-termination
   )
   echo "${targets[@]}"
 }
