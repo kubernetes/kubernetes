@@ -1971,6 +1971,21 @@ $FLUENTBIT_CONFIG = @'
     #   time_format %m%d %H:%M:%S.%N
 
 
+# Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+# Example:
+# I0716 02:08:55.559351    3356 log_spam.go:42] Command line arguments:
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/gke-metadata-server/*.log.INFO*
+  pos_file /etc/kubernetes/logs/gcp-gke-metadata-server.log.pos
+  tag gke-metadata-server
+</source>
+
 # Example:
 # I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
 [INPUT]

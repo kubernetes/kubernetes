@@ -167,6 +167,9 @@ try {
   $config = New-FileRotationConfig
   # TODO(random-liu): Generate containerd log into the log directory.
   Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
+  if (Test-EnableWorkloadIdentity $kube_env) {
+    Schedule-LogRotation -Pattern '.*\.log.*' -Path ${env:LOGS_DIR}\gke-metadata-server -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
+  }
 
   Pull-InfraContainer
   # Flush cache to disk to persist the setup status
