@@ -354,7 +354,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		Listener:   s.SecureServingInfo.Listener,
 		lateStopCh: lateStopCh,
 	}
-	lateConnectionEventf = s.Eventf
+	lateConnectionEventf.Store(eventfFunc(s.Eventf))
 
 	// close socket after delayed stopCh
 	stoppedCh, err := s.NonBlockingRun(delayedStopCh)
