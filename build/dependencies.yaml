@@ -77,13 +77,13 @@ dependencies:
       match: GOLANG_VERSION
 
   - name: "k8s.gcr.io/debian-base"
-    version: 2.1.0
+    version: 2.1.1
     refPaths:
     - path: build/debian-base/Makefile
       match: TAG \?=
 
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: 2.1.0
+    version: 2.1.1
     refPaths:
     - path: build/common.sh
       match: debian_base_version=
