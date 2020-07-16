@@ -79,7 +79,7 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 	// For more versions, loop here
 	// This should not be done at every call as currently the result can not change at runtime
-	podutil.AddDisabledFields(fields["v1"])
+	podutil.AddDisabledFieldsTo(fields["v1"])
 
 	return fields
 }

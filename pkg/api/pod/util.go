@@ -19,7 +19,7 @@ package pod
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -329,11 +329,11 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 	dropPodStatusDisabledFields(podStatus, oldPodStatus)
 }
 
-// AddDisabledFields to the provided set of resetFields
+// AddDisabledFieldsTo the provided set of resetFields
 // This should be called with the resetFields for all resources containing a Pod
-func AddDisabledFields(to *fieldpath.Set) {
-	addDisabledStatusFields(to)
-	addDisabledFields(to)
+func AddDisabledFieldsTo(resetFields *fieldpath.Set) {
+	addDisabledStatusFieldsTo(resetFields)
+	addDisabledFieldsTo(resetFields)
 }
 
 // dropPodStatusDisabledFields removes disabled fields from the pod status
@@ -347,9 +347,9 @@ func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.Pod
 	}
 }
 
-func addDisabledStatusFields(to *fieldpath.Set) {
+func addDisabledStatusFieldsTo(resetFields *fieldpath.Set) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		to.Insert(fieldpath.MakePathOrDie("status", "podIPs"))
+		resetFields.Insert(fieldpath.MakePathOrDie("status", "podIPs"))
 	}
 }
 
@@ -453,12 +453,12 @@ func dropDisabledFields(
 
 }
 
-// dropDisabledFields removes disabled fields from the pod metadata and spec.
-func addDisabledFields(to *fieldpath.Set) {
+// addDisabledFields removes disabled fields from the pod metadata and spec.
+func addDisabledFieldsTo(resetFields *fieldpath.Set) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
 		// TODO: add the actual fieldpath here, this is just a probably wrong dummy based on
 		// podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken
-		to.Insert(fieldpath.MakePathOrDie("spec", "volumes", "projected", "sources", "serviceAccountToken"))
+		resetFields.Insert(fieldpath.MakePathOrDie("spec", "volumes", "projected", "sources", "serviceAccountToken"))
 	}
 	// TODO: add all the fields from podutil.DropDisabledPodFields (a lot)
 
@@ -475,7 +475,7 @@ func addDisabledFields(to *fieldpath.Set) {
 		// if podSpec.SecurityContext != nil {
 		// 	podSpec.SecurityContext.Sysctls = nil
 		// }
-		to.Insert(fieldpath.MakePathOrDie("spec", "securityContext", "sysctls"))
+		resetFields.Insert(fieldpath.MakePathOrDie("spec", "securityContext", "sysctls"))
 	}
 }
 
