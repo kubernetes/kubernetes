@@ -46,6 +46,14 @@ func Handler() http.Handler {
 	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
 
+// HandlerWithReset returns an HTTP handler for the DefaultGatherer but invokes
+// registry reset if the http method is DELETE.
+func HandlerWithReset() http.Handler {
+	return promhttp.InstrumentMetricHandler(
+		prometheus.DefaultRegisterer,
+		metrics.HandlerWithReset(defaultRegistry, metrics.HandlerOpts{}))
+}
+
 // Register registers a collectable metric but uses the global registry
 func Register(c metrics.Registerable) error {
 	err := defaultRegistry.Register(c)
@@ -82,4 +90,9 @@ func CustomMustRegister(cs ...metrics.StableCollector) {
 	for _, c := range cs {
 		prometheus.MustRegister(c)
 	}
+}
+
+// Reset calls reset on the global registry
+func Reset() {
+	defaultRegistry.Reset()
 }
