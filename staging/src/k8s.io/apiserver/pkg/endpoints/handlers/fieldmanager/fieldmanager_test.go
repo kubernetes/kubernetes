@@ -111,6 +111,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, chainFieldManager func(fie
 	f = fieldmanager.NewStripMetaManager(f)
 	f = fieldmanager.NewManagedFieldsUpdater(f)
 	f = fieldmanager.NewBuildManagerInfoManager(f, gvk.GroupVersion())
+	f = fieldmanager.NewProbabilisticSkipNonAppliedManager(f, &fakeObjectCreater{gvk: gvk}, gvk, fieldmanager.DefaultTrackOnCreateProbability)
 	f = fieldmanager.NewLastAppliedManager(f, typeConverter, objectConverter, gvk.GroupVersion())
 	f = fieldmanager.NewLastAppliedUpdater(f)
 	if chainFieldManager != nil {
@@ -1035,6 +1036,145 @@ spec:
 		t.Errorf("failed to get last applied: %v", err)
 	}
 	if !strings.Contains(lastApplied, "my-image-v2") {
+		t.Errorf("expected last applied annotation to be updated, but got: %q", lastApplied)
+	}
+}
+
+func TestNoTrackManagedFieldsForClientSideApply(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+
+	// create object
+	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment := []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := f.Update(newObj, "test_kubectl_create"); err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) == 0 {
+		t.Errorf("expected to have managed fields, but got: %v", m)
+	}
+
+	// stop tracking managed fields
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  managedFields: [] # stop tracking managed fields
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	newObj.SetUID("nonempty")
+	if err := f.Update(newObj, "test_kubectl_replace"); err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) != 0 {
+		t.Errorf("expected to have stop tracking managed fields, but got: %v", m)
+	}
+
+	// check that we still don't track managed fields
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := setLastAppliedFromEncoded(newObj, deployment); err != nil {
+		t.Errorf("failed to set last applied: %v", err)
+	}
+	if err := f.Update(newObj, "test_k_client_side_apply"); err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) != 0 {
+		t.Errorf("expected to continue to not track managed fields, but got: %v", m)
+	}
+	lastApplied, err := getLastApplied(f.liveObj)
+	if err != nil {
+		t.Errorf("failed to get last applied: %v", err)
+	}
+	if !strings.Contains(lastApplied, "my-app") {
+		t.Errorf("expected last applied annotation to be set properly, but got: %q", lastApplied)
+	}
+
+	// start tracking managed fields
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := f.Apply(newObj, "test_server_side_apply_without_upgrade", false); err != nil {
+		t.Errorf("error applying object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) < 2 {
+		t.Errorf("expected to start tracking managed fields with at least 2 field managers, but got: %v", m)
+	}
+	if e, a := "test_server_side_apply_without_upgrade", f.ManagedFields()[0].Manager; e != a {
+		t.Fatalf("exected first manager name to be %v, but got %v: %#v", e, a, f.ManagedFields())
+	}
+	if e, a := "before-first-apply", f.ManagedFields()[1].Manager; e != a {
+		t.Fatalf("exected second manager name to be %v, but got %v: %#v", e, a, f.ManagedFields())
+	}
+
+	// upgrade management of the object from client-side apply to server-side apply
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app-v2 # change
+spec:
+  replicas: 8 # change
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := f.Apply(newObj, "kubectl", false); err != nil {
+		t.Errorf("error applying object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) == 0 {
+		t.Errorf("expected to track managed fields, but got: %v", m)
+	}
+	lastApplied, err = getLastApplied(f.liveObj)
+	if err != nil {
+		t.Errorf("failed to get last applied: %v", err)
+	}
+	if !strings.Contains(lastApplied, "my-app-v2") {
 		t.Errorf("expected last applied annotation to be updated, but got: %q", lastApplied)
 	}
 }
