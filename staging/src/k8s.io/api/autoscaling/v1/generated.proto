@@ -397,6 +397,16 @@ message Scale {
   optional ScaleStatus status = 3;
 }
 
+// list of Scale objects.
+message ScaleList {
+  // Standard list metadata.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // list of horizontal pod autoscaler objects.
+  repeated Scale items = 2;
+}
+
 // ScaleSpec describes the attributes of a scale subresource.
 message ScaleSpec {
   // desired number of instances for the scaled object.
