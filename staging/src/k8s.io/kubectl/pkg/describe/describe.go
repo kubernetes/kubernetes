@@ -4157,7 +4157,7 @@ func printNetworkPolicySpecEgressTo(npers []networkingv1.NetworkPolicyEgressRule
 			}
 		}
 		if len(nper.To) == 0 {
-			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To: <any> (traffic not restricted by source)")
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To: <any> (traffic not restricted by destination)")
 		} else {
 			for _, to := range nper.To {
 				w.Write(LEVEL_0, "%s%s\n", initialIndent, "To:")
