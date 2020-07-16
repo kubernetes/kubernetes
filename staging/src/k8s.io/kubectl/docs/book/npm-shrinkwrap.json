@@ -1335,9 +1335,9 @@
       "integrity": "sha1-Xee/afqisPnYXoMyCZtw5BmoRdU="
     },
     "lodash": {
-      "version": "4.17.13",
-      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.13.tgz",
-      "integrity": "sha512-vm3/XWXfWtRua0FkUyEHBZy8kCPjErNBT9fJx8Zvs+U6zjqPbTUOpkaoum3O5uiA8sm+yNMHXfYkTUHFoMxFNA=="
+      "version": "4.17.19",
+      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.19.tgz",
+      "integrity": "sha512-JNvd8XER9GQX0v2qJgsaN/mzFCNA5BRe/j8JN9d+tWyGLSodKQHKFicdwNYzWwI3wjRnaKPsGj1XkBjx/F96DQ=="
     },
     "markdown-link": {
       "version": "0.1.1",

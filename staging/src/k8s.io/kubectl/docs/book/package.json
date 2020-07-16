@@ -18,7 +18,7 @@
     "gitbook-plugin-sequence-diagrams": "^1.1.0",
     "gitbook-plugin-theme-api": "^1.1.2",
     "gitbook-plugin-toc": "0.0.2",
-    "lodash": "4.17.13",
+    "lodash": "4.17.19",
     "phantomjs-prebuilt": "^2.1.16",
     "underscore.string": "^3.3.5"
   },
