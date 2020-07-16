@@ -29,6 +29,18 @@ var (
 	defaultRegistry = metrics.NewKubeRegistry()
 	// DefaultGatherer exposes the global registry gatherer
 	DefaultGatherer metrics.Gatherer = defaultRegistry
+	// Reset calls reset on the global registry
+	Reset = defaultRegistry.Reset
+	// MustRegister registers registerable metrics but uses the global registry.
+	MustRegister = defaultRegistry.MustRegister
+	// RawMustRegister registers prometheus collectors but uses the global registry, this
+	// bypasses the metric stability framework
+	//
+	// Deprecated
+	RawMustRegister = defaultRegistry.RawMustRegister
+
+	// Register registers a collectable metric but uses the global registry
+	Register = defaultRegistry.Register
 )
 
 func init() {
@@ -54,25 +66,6 @@ func HandlerWithReset() http.Handler {
 		metrics.HandlerWithReset(defaultRegistry, metrics.HandlerOpts{}))
 }
 
-// Register registers a collectable metric but uses the global registry
-func Register(c metrics.Registerable) error {
-	err := defaultRegistry.Register(c)
-	return err
-}
-
-// MustRegister registers registerable metrics but uses the global registry.
-func MustRegister(cs ...metrics.Registerable) {
-	defaultRegistry.MustRegister(cs...)
-}
-
-// RawMustRegister registers prometheus collectors but uses the global registry, this
-// bypasses the metric stability framework
-//
-// Deprecated
-func RawMustRegister(cs ...prometheus.Collector) {
-	defaultRegistry.RawMustRegister(cs...)
-}
-
 // CustomRegister registers a custom collector but uses the global registry.
 func CustomRegister(c metrics.StableCollector) error {
 	err := defaultRegistry.CustomRegister(c)
@@ -90,9 +83,4 @@ func CustomMustRegister(cs ...metrics.StableCollector) {
 	for _, c := range cs {
 		prometheus.MustRegister(c)
 	}
-}
-
-// Reset calls reset on the global registry
-func Reset() {
-	defaultRegistry.Reset()
 }
