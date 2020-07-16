@@ -20,6 +20,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // DropDisabledFields removes disabled fields from the pv spec.
@@ -29,6 +30,15 @@ func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Persist
 		if pvSpec.CSI != nil {
 			pvSpec.CSI.ControllerExpandSecretRef = nil
 		}
+	}
+}
+
+// AddDisabledFieldsTo to the provided set of resetFields
+// This should be called with the resetFields for all resources containing a Pod
+func AddDisabledFieldsTo(resetFields *fieldpath.Set) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) {
+		// TODO: make sure this path is correct, the api type has some inlines
+		resetFields.Insert(fieldpath.MakePathOrDie("spec", "csi", "controllerExpandSecretRef"))
 	}
 }
 
