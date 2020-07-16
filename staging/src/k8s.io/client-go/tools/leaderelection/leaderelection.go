@@ -294,7 +294,7 @@ func (le *LeaderElector) release() bool {
 		LeaderTransitions: le.observedRecord.LeaderTransitions,
 	}
 	if err := le.config.Lock.Update(context.TODO(), leaderElectionRecord); err != nil {
-		klog.Errorf("Failed to release lock: %v", err)
+		klog.Errorf("Failed to update lock: %v", err)
 		return false
 	}
 	le.observedRecord = leaderElectionRecord
