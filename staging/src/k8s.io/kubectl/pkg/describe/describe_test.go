@@ -18,6 +18,11 @@ package describe
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -29,6 +34,8 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -4244,5 +4251,123 @@ func TestControllerRef(t *testing.T) {
 	}
 	if !strings.Contains(out, "1 Running") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+// helper function to generate pem with group/org name and commonName template
+func generatePemWithCNAndGroupTemplate(commonName string, group string) []byte {
+	// form the the certificate request template using the CN and org/group name
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+			Organization: []string{group},
+		},
+	}
+
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	csr, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	if err != nil {
+		panic(err)
+	}
+
+	csrPemBlk := &pem.Block{
+		Type: "CERTIFICATE REQUEST",
+		Bytes: csr,
+	}
+
+	pemKey := pem.EncodeToMemory(csrPemBlk)
+	if pemKey == nil {
+		panic("invalid pen block")
+	}
+
+	return pemKey
+}
+
+func TestV1beta1DescribeCertificateSigningRequest(t *testing.T) {
+	commonName := "system:master:user1"
+	groupName := "system:master"
+	csrRequest := generatePemWithCNAndGroupTemplate(commonName, groupName)
+	signerv1beta1 := certificatesv1beta1.KubeAPIServerClientSignerName
+	signerv1 := certificatesv1.KubeAPIServerClientSignerName
+
+	tests := [] struct {
+		expectedOutput		string
+		csr					*fake.Clientset
+	}{
+		{
+			expectedOutput: `Name:               user1
+Labels:             <none>
+Annotations:        <none>
+CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
+Requesting User:    sample-userv1beta1
+Signer:             kubernetes.io/kube-apiserver-client
+Status:             Pending
+Subject:
+         Common Name:    "system:master:user1"
+         Serial Number:  ""
+         Organization:   "system:master"
+Events:  <none>` + "\n",
+			csr: fake.NewSimpleClientset(&certificatesv1beta1.CertificateSigningRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "certificates.k8s.io/v1beta1",
+					Kind:       "CertificateSigningRequest",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "user1",
+				},
+				Spec: certificatesv1beta1.CertificateSigningRequestSpec{
+					Request:    csrRequest,
+					Username:   "sample-userv1beta1",
+					SignerName: &signerv1beta1,
+				},
+			}),
+		},
+		{
+			expectedOutput: `Name:               user1
+Labels:             <none>
+Annotations:        <none>
+CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
+Requesting User:    sample-userv1
+Signer:             kubernetes.io/kube-apiserver-client
+Status:             Pending
+Subject:
+         Common Name:    "system:master:user1"
+         Serial Number:  ""
+         Organization:   "system:master"
+Events:  <none>` + "\n",
+			csr : fake.NewSimpleClientset(&certificatesv1.CertificateSigningRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "certificates.k8s.io/v1",
+					Kind:       "CertificateSigningRequest",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "user1",
+				},
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Request:    csrRequest,
+					Username:   "sample-userv1",
+					SignerName: signerv1,
+				},
+			}),
+		},
+	}
+
+	for _, test := range tests {
+		c := &describeClient{T: t, Namespace: "foo", Interface: test.csr}
+		d := CertificateSigningRequestDescriber{c}
+
+		out, err := d.Describe("foo", "user1", DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("unexpected error : %v", err)
+		}
+
+		if !reflect.DeepEqual(out, test.expectedOutput) {
+			t.Errorf("actual out:%s", out)
+			t.Errorf("Expected is : %s", test.expectedOutput)
+		}
 	}
 }
