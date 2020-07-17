@@ -113,7 +113,7 @@ dependencies:
     - path: build/build-image/cross/VERSION
 
   - name: "repo-infra"
-    version: 0.0.5
+    version: 0.0.8
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
