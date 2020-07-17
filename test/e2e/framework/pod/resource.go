@@ -105,6 +105,7 @@ func (r ProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 			Resource("pods").
 			SubResource("proxy").
 			Name(string(pod.Name)).
+			Suffix("/").
 			Do(ctx).
 			Raw()
 
