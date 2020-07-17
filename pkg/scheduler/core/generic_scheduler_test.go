@@ -33,9 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -1196,5 +1199,90 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		if g.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
 			t.Errorf("got %d lastProcessedNodeIndex, want %d", g.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
 		}
+	}
+}
+
+func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
+	tests := []struct {
+		name                  string
+		feature               bool
+		pod                   *v1.Pod
+		nodeReturnCodeMap     map[string]framework.Code
+		expectedCount         int32
+		expectedPatchRequests int
+	}{
+		{
+			name:          "Enable the feature, pod has the nominated node set, filter is called only once",
+			feature:       true,
+			pod:           st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			expectedCount: 1,
+		},
+		{
+			name:          "Disable the feature, pod has the nominated node, filter is called for each node",
+			feature:       false,
+			pod:           st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			expectedCount: 3,
+		},
+		{
+			name:          "pod without the nominated pod, filter is called for each node",
+			feature:       true,
+			pod:           st.MakePod().Name("p_without_nominated_node").UID("p").Priority(highPriority).Obj(),
+			expectedCount: 3,
+		},
+		{
+			name:              "nominated pod cannot pass the filter, filter is called for each node",
+			feature:           true,
+			pod:               st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			nodeReturnCodeMap: map[string]framework.Code{"node1": framework.Unschedulable},
+			expectedCount:     4,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, test.feature)()
+			// create three nodes in the cluster.
+			nodes := makeNodeList([]string{"node1", "node2", "node3"})
+			client := &clientsetfake.Clientset{}
+			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			for _, n := range nodes {
+				cache.AddNode(n)
+			}
+			plugin := st.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
+			registerFakeFilterFunc := st.RegisterFilterPlugin(
+				"FakeFilter",
+				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return &plugin, nil
+				},
+			)
+			registerPlugins := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				registerFakeFilterFunc,
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			fwk, err := st.NewFramework(
+				registerPlugins,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			scheduler := NewGenericScheduler(
+				cache,
+				snapshot,
+				[]framework.Extender{},
+				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectedCount != plugin.NumFilterCalled {
+				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
+			}
+		})
 	}
 }
