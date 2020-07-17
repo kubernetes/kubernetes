@@ -206,6 +206,14 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/events/v1
+		gvr("events.k8s.io", "v1", "events"): {
+			Stub:             `{"metadata": {"name": "event3"}, "regarding": {"namespace": "` + namespace + `"}, "note": "some data here", "eventTime": "2017-08-09T15:04:05.000000Z", "reportingInstance": "node-xyz", "reportingController": "k8s.io/my-controller", "action": "DidNothing", "reason": "Laziness", "type": "Normal"}`,
+			ExpectedEtcdPath: "/registry/events/" + namespace + "/event3",
+			ExpectedGVK:      gvkP("", "v1", "Event"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/events/v1beta1
 		gvr("events.k8s.io", "v1beta1", "events"): {
 			Stub:             `{"metadata": {"name": "event2"}, "regarding": {"namespace": "` + namespace + `"}, "note": "some data here", "eventTime": "2017-08-09T15:04:05.000000Z", "reportingInstance": "node-xyz", "reportingController": "k8s.io/my-controller", "action": "DidNothing", "reason": "Laziness"}`,

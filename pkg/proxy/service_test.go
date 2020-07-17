@@ -85,7 +85,7 @@ func makeServicePortName(ns, name, port string, protocol v1.Protocol) ServicePor
 }
 
 func TestServiceToServiceMap(t *testing.T) {
-	svcTracker := NewServiceChangeTracker(nil, nil, nil)
+	svcTracker := NewServiceChangeTracker(nil, nil, nil, nil)
 
 	trueVal := true
 	falseVal := false
@@ -449,9 +449,9 @@ type FakeProxier struct {
 func newFakeProxier() *FakeProxier {
 	return &FakeProxier{
 		serviceMap:       make(ServiceMap),
-		serviceChanges:   NewServiceChangeTracker(nil, nil, nil),
+		serviceChanges:   NewServiceChangeTracker(nil, nil, nil, nil),
 		endpointsMap:     make(EndpointsMap),
-		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, nil, nil, false),
+		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, nil, nil, false, nil),
 	}
 }
 

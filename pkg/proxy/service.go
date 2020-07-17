@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -198,6 +198,10 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServiceInfo) ServicePort
 
+// This handler is invoked by the apply function on every change. This function should not modify the
+// ServiceMap's but just use the changes for any Proxier specific cleanup.
+type processServiceMapChangeFunc func(previous, current ServiceMap)
+
 // serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
 // changes are accumulated, i.e. previous is state from before applying the changes,
 // current is state after applying all of the changes.
@@ -214,19 +218,21 @@ type ServiceChangeTracker struct {
 	// items maps a service to its serviceChange.
 	items map[types.NamespacedName]*serviceChange
 	// makeServiceInfo allows proxier to inject customized information when processing service.
-	makeServiceInfo makeServicePortFunc
+	makeServiceInfo         makeServicePortFunc
+	processServiceMapChange processServiceMapChangeFunc
 	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
 	isIPv6Mode *bool
 	recorder   record.EventRecorder
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
-func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, isIPv6Mode *bool, recorder record.EventRecorder) *ServiceChangeTracker {
+func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, isIPv6Mode *bool, recorder record.EventRecorder, processServiceMapChange processServiceMapChangeFunc) *ServiceChangeTracker {
 	return &ServiceChangeTracker{
-		items:           make(map[types.NamespacedName]*serviceChange),
-		makeServiceInfo: makeServiceInfo,
-		isIPv6Mode:      isIPv6Mode,
-		recorder:        recorder,
+		items:                   make(map[types.NamespacedName]*serviceChange),
+		makeServiceInfo:         makeServiceInfo,
+		isIPv6Mode:              isIPv6Mode,
+		recorder:                recorder,
+		processServiceMapChange: processServiceMapChange,
 	}
 }
 
@@ -307,8 +313,8 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	if service == nil {
 		return nil
 	}
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if utilproxy.ShouldSkipService(svcName, service) {
+
+	if utilproxy.ShouldSkipService(service) {
 		return nil
 	}
 
@@ -322,6 +328,7 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	}
 
 	serviceMap := make(ServiceMap)
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name, Protocol: servicePort.Protocol}
@@ -337,10 +344,14 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 
 // apply the changes to ServiceMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
 // udp protocol service cluster ip when service is deleted from the ServiceMap.
+// apply triggers processServiceMapChange on every change.
 func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
+		if changes.processServiceMapChange != nil {
+			changes.processServiceMapChange(change.previous, change.current)
+		}
 		sm.merge(change.current)
 		// filter out the Update event of current changes from previous changes before calling unmerge() so that can
 		// skip deleting the Update events.

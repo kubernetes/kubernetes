@@ -42,6 +42,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
@@ -92,6 +93,7 @@ var groups = []runtime.SchemeBuilder{
 	coordinationv1.SchemeBuilder,
 	coordinationv1beta1.SchemeBuilder,
 	corev1.SchemeBuilder,
+	eventsv1.SchemeBuilder,
 	eventsv1beta1.SchemeBuilder,
 	extensionsv1beta1.SchemeBuilder,
 	imagepolicyv1alpha1.SchemeBuilder,

@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -91,7 +91,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
 				{Name: tainttoleration.Name},
-				{Name: defaultpodtopologyspread.Name},
+				{Name: selectorspread.Name},
 			},
 		},
 		Score: &schedulerapi.PluginSet{
@@ -104,15 +104,10 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodepreferavoidpods.Name, Weight: 10000},
 				{Name: podtopologyspread.Name, Weight: 2},
 				{Name: tainttoleration.Name, Weight: 1},
-				{Name: defaultpodtopologyspread.Name, Weight: 1},
+				{Name: selectorspread.Name, Weight: 1},
 			},
 		},
 		Reserve: &schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{
-				{Name: volumebinding.Name},
-			},
-		},
-		Unreserve: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
 			},
@@ -125,11 +120,6 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 		Bind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultbinder.Name},
-			},
-		},
-		PostBind: &schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{
-				{Name: volumebinding.Name},
 			},
 		},
 	}
@@ -193,7 +183,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
 						{Name: tainttoleration.Name},
-						{Name: defaultpodtopologyspread.Name},
+						{Name: selectorspread.Name},
 					},
 				},
 				Score: &schedulerapi.PluginSet{
@@ -206,15 +196,10 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
 						{Name: podtopologyspread.Name, Weight: 2},
 						{Name: tainttoleration.Name, Weight: 1},
-						{Name: defaultpodtopologyspread.Name, Weight: 1},
+						{Name: selectorspread.Name, Weight: 1},
 					},
 				},
 				Reserve: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
-					},
-				},
-				Unreserve: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
 					},
@@ -227,11 +212,6 @@ func TestApplyFeatureGates(t *testing.T) {
 				Bind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultbinder.Name},
-					},
-				},
-				PostBind: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
 					},
 				},
 			},
@@ -302,11 +282,6 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: volumebinding.Name},
 					},
 				},
-				Unreserve: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
-					},
-				},
 				PreBind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
@@ -315,11 +290,6 @@ func TestApplyFeatureGates(t *testing.T) {
 				Bind: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultbinder.Name},
-					},
-				},
-				PostBind: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: volumebinding.Name},
 					},
 				},
 			},

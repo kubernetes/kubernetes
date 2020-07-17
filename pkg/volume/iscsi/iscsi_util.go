@@ -491,6 +491,22 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
 		return err
 	}
+
+	if b.volumeMode == v1.PersistentVolumeFilesystem {
+		notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+		if err != nil {
+			return err
+		}
+		if !notMnt {
+			// The volume is already mounted, therefore the previous WaitForAttach must have
+			// persisted the volume metadata. In addition, the metadata is actually *inside*
+			// globalPDPath and we can't write it here, because it was shadowed by the volume
+			// mount.
+			klog.V(4).Infof("Skipping persistISCSI, the volume is already mounted at %s", globalPDPath)
+			return nil
+		}
+	}
+
 	// Persist iscsi disk config to json file for DetachDisk path
 	return util.persistISCSIFile(*(b.iscsiDisk), globalPDPath)
 }

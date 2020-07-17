@@ -17,8 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 
+	"github.com/opencontainers/selinux/pkg/pwalk"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -31,13 +31,13 @@ const (
 	// Disabled constant to indicate SELinux is disabled
 	Disabled = -1
 
+	contextFile      = "/usr/share/containers/selinux/contexts"
 	selinuxDir       = "/etc/selinux/"
 	selinuxConfig    = selinuxDir + "config"
 	selinuxfsMount   = "/sys/fs/selinux"
 	selinuxTypeTag   = "SELINUXTYPE"
 	selinuxTag       = "SELINUX"
 	xattrNameSelinux = "security.selinux"
-	stRdOnly         = 0x01
 )
 
 type selinuxState struct {
@@ -103,13 +103,13 @@ func SetDisabled() {
 }
 
 func verifySELinuxfsMount(mnt string) bool {
-	var buf syscall.Statfs_t
+	var buf unix.Statfs_t
 	for {
-		err := syscall.Statfs(mnt, &buf)
+		err := unix.Statfs(mnt, &buf)
 		if err == nil {
 			break
 		}
-		if err == syscall.EAGAIN {
+		if err == unix.EAGAIN {
 			continue
 		}
 		return false
@@ -118,7 +118,7 @@ func verifySELinuxfsMount(mnt string) bool {
 	if uint32(buf.Type) != uint32(unix.SELINUX_MAGIC) {
 		return false
 	}
-	if (buf.Flags & stRdOnly) != 0 {
+	if (buf.Flags & unix.ST_RDONLY) != 0 {
 		return false
 	}
 
@@ -251,10 +251,10 @@ func isProcHandle(fh *os.File) error {
 	var buf unix.Statfs_t
 	err := unix.Fstatfs(int(fh.Fd()), &buf)
 	if err != nil {
-		return fmt.Errorf("statfs(%q) failed: %v", fh.Name(), err)
+		return errors.Wrapf(err, "statfs(%q) failed", fh.Name())
 	}
 	if buf.Type != unix.PROC_SUPER_MAGIC {
-		return fmt.Errorf("file %q is not on procfs", fh.Name())
+		return errors.Errorf("file %q is not on procfs", fh.Name())
 	}
 
 	return nil
@@ -282,12 +282,29 @@ func readCon(fpath string) (string, error) {
 	return strings.Trim(retval, "\x00"), nil
 }
 
+// ClassIndex returns the int index for an object class in the loaded policy, or -1 and an error
+func ClassIndex(class string) (int, error) {
+	permpath := fmt.Sprintf("class/%s/index", class)
+	indexpath := filepath.Join(getSelinuxMountPoint(), permpath)
+
+	indexB, err := ioutil.ReadFile(indexpath)
+	if err != nil {
+		return -1, err
+	}
+	index, err := strconv.Atoi(string(indexB))
+	if err != nil {
+		return -1, err
+	}
+
+	return index, nil
+}
+
 // SetFileLabel sets the SELinux label for this path or returns an error.
 func SetFileLabel(fpath string, label string) error {
 	if fpath == "" {
 		return ErrEmptyPath
 	}
-	if err := lsetxattr(fpath, xattrNameSelinux, []byte(label), 0); err != nil {
+	if err := unix.Lsetxattr(fpath, xattrNameSelinux, []byte(label), 0); err != nil {
 		return errors.Wrapf(err, "failed to set file label on %s", fpath)
 	}
 	return nil
@@ -390,7 +407,7 @@ func attrPath(attr string) string {
 		return path.Join(threadSelfPrefix, attr)
 	}
 
-	return path.Join("/proc/self/task/", strconv.Itoa(syscall.Gettid()), "/attr/", attr)
+	return path.Join("/proc/self/task/", strconv.Itoa(unix.Gettid()), "/attr/", attr)
 }
 
 func readAttr(attr string) (string, error) {
@@ -408,6 +425,18 @@ can be used to see if two contexts are equivalent
 */
 func CanonicalizeContext(val string) (string, error) {
 	return readWriteCon(filepath.Join(getSelinuxMountPoint(), "context"), val)
+}
+
+/*
+ComputeCreateContext requests the type transition from source to target for class  from the kernel.
+*/
+func ComputeCreateContext(source string, target string, class string) (string, error) {
+	classidx, err := ClassIndex(class)
+	if err != nil {
+		return "", err
+	}
+
+	return readWriteCon(filepath.Join(getSelinuxMountPoint(), "create"), fmt.Sprintf("%s %s %d", source, target, classidx))
 }
 
 func readWriteCon(fpath string, val string) (string, error) {
@@ -461,17 +490,17 @@ func SocketLabel() (string, error) {
 
 // PeerLabel retrieves the label of the client on the other side of a socket
 func PeerLabel(fd uintptr) (string, error) {
-	return unix.GetsockoptString(int(fd), syscall.SOL_SOCKET, syscall.SO_PEERSEC)
+	return unix.GetsockoptString(int(fd), unix.SOL_SOCKET, unix.SO_PEERSEC)
 }
 
 // SetKeyLabel takes a process label and tells the kernel to assign the
 // label to the next kernel keyring that gets created
 func SetKeyLabel(label string) error {
 	err := writeCon("/proc/self/attr/keycreate", label)
-	if os.IsNotExist(err) {
+	if os.IsNotExist(errors.Cause(err)) {
 		return nil
 	}
-	if label == "" && os.IsPermission(err) {
+	if label == "" && os.IsPermission(errors.Cause(err)) {
 		return nil
 	}
 	return err
@@ -656,23 +685,26 @@ func ROFileLabel() string {
 	return roFileLabel
 }
 
-/*
-ContainerLabels returns an allocated processLabel and fileLabel to be used for
-container labeling by the calling process.
-*/
-func ContainerLabels() (processLabel string, fileLabel string) {
+func openContextFile() (*os.File, error) {
+	if f, err := os.Open(contextFile); err == nil {
+		return f, nil
+	}
+	lxcPath := filepath.Join(getSELinuxPolicyRoot(), "/contexts/lxc_contexts")
+	return os.Open(lxcPath)
+}
+
+var labels = loadLabels()
+
+func loadLabels() map[string]string {
 	var (
 		val, key string
 		bufin    *bufio.Reader
 	)
 
-	if !GetEnabled() {
-		return "", ""
-	}
-	lxcPath := fmt.Sprintf("%s/contexts/lxc_contexts", getSELinuxPolicyRoot())
-	in, err := os.Open(lxcPath)
+	labels := make(map[string]string)
+	in, err := openContextFile()
 	if err != nil {
-		return "", ""
+		return labels
 	}
 	defer in.Close()
 
@@ -684,7 +716,7 @@ func ContainerLabels() (processLabel string, fileLabel string) {
 			if err == io.EOF {
 				done = true
 			} else {
-				goto exit
+				break
 			}
 		}
 		line = strings.TrimSpace(line)
@@ -698,26 +730,64 @@ func ContainerLabels() (processLabel string, fileLabel string) {
 		}
 		if groups := assignRegex.FindStringSubmatch(line); groups != nil {
 			key, val = strings.TrimSpace(groups[1]), strings.TrimSpace(groups[2])
-			if key == "process" {
-				processLabel = strings.Trim(val, "\"")
-			}
-			if key == "file" {
-				fileLabel = strings.Trim(val, "\"")
-			}
-			if key == "ro_file" {
-				roFileLabel = strings.Trim(val, "\"")
-			}
+			labels[key] = strings.Trim(val, "\"")
 		}
 	}
 
-	if processLabel == "" || fileLabel == "" {
+	return labels
+}
+
+/*
+KVMContainerLabels returns the default processLabel and mountLabel to be used
+for kvm containers by the calling process.
+*/
+func KVMContainerLabels() (string, string) {
+	processLabel := labels["kvm_process"]
+	if processLabel == "" {
+		processLabel = labels["process"]
+	}
+
+	return addMcs(processLabel, labels["file"])
+}
+
+/*
+InitContainerLabels returns the default processLabel and file labels to be
+used for containers running an init system like systemd by the calling process.
+*/
+func InitContainerLabels() (string, string) {
+	processLabel := labels["init_process"]
+	if processLabel == "" {
+		processLabel = labels["process"]
+	}
+
+	return addMcs(processLabel, labels["file"])
+}
+
+/*
+ContainerLabels returns an allocated processLabel and fileLabel to be used for
+container labeling by the calling process.
+*/
+func ContainerLabels() (processLabel string, fileLabel string) {
+	if !GetEnabled() {
 		return "", ""
+	}
+
+	processLabel = labels["process"]
+	fileLabel = labels["file"]
+	roFileLabel = labels["ro_file"]
+
+	if processLabel == "" || fileLabel == "" {
+		return "", fileLabel
 	}
 
 	if roFileLabel == "" {
 		roFileLabel = fileLabel
 	}
-exit:
+
+	return addMcs(processLabel, fileLabel)
+}
+
+func addMcs(processLabel, fileLabel string) (string, string) {
 	scon, _ := NewContext(processLabel)
 	if scon["level"] != "" {
 		mcs := uniqMcs(1024)
@@ -772,14 +842,14 @@ func badPrefix(fpath string) error {
 	badPrefixes := []string{"/usr"}
 	for _, prefix := range badPrefixes {
 		if strings.HasPrefix(fpath, prefix) {
-			return fmt.Errorf("relabeling content in %s is not allowed", prefix)
+			return errors.Errorf("relabeling content in %s is not allowed", prefix)
 		}
 	}
 	return nil
 }
 
-// Chcon changes the `fpath` file object to the SELinux label `label`.
-// If `fpath` is a directory and `recurse`` is true, Chcon will walk the
+// Chcon changes the fpath file object to the SELinux label label.
+// If fpath is a directory and recurse is true, Chcon will walk the
 // directory tree setting the label.
 func Chcon(fpath string, label string, recurse bool) error {
 	if fpath == "" {
@@ -791,19 +861,19 @@ func Chcon(fpath string, label string, recurse bool) error {
 	if err := badPrefix(fpath); err != nil {
 		return err
 	}
-	callback := func(p string, info os.FileInfo, err error) error {
+
+	if !recurse {
+		return SetFileLabel(fpath, label)
+	}
+
+	return pwalk.Walk(fpath, func(p string, info os.FileInfo, err error) error {
 		e := SetFileLabel(p, label)
-		if os.IsNotExist(e) {
+		// Walk a file tree can race with removal, so ignore ENOENT
+		if os.IsNotExist(errors.Cause(e)) {
 			return nil
 		}
 		return e
-	}
-
-	if recurse {
-		return filepath.Walk(fpath, callback)
-	}
-
-	return SetFileLabel(fpath, label)
+	})
 }
 
 // DupSecOpt takes an SELinux process label and returns security options that

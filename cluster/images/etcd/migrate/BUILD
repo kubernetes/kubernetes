@@ -3,11 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "copy_file.go",
         "data_dir.go",
         "migrate.go",
         "migrate_client.go",
         "migrate_server.go",
         "migrator.go",
+        "options.go",
         "util_others.go",
         "utils_windows.go",
         "versions.go",
@@ -17,6 +19,7 @@ go_library(
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/go.etcd.io/etcd/client:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
@@ -69,6 +72,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "data_dir_test.go",
+        "options_test.go",
         "versions_test.go",
     ],
     data = glob(["testdata/**"]),

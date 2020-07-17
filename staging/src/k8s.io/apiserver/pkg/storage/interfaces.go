@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -189,17 +190,20 @@ type Interface interface {
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
-	// The returned contents may be delayed according to the semantics of GetOptions.ResourceVersion.
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	// The returned contents may be delayed according to the semantics of ListOptions.ResourceVersion.
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
-	// The returned contents may be delayed according to the semantics of ListOptions.ResourceVersion.
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	List(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
@@ -260,6 +264,9 @@ type ListOptions struct {
 	// ResourceVersion. The newest available data is preferred, but any data not older than this
 	// ResourceVersion may be served.
 	ResourceVersion string
+	// ResourceVersionMatch provides the rule for how the resource version constraint applies. If set
+	// to the default value "" the legacy resource version semantic apply.
+	ResourceVersionMatch metav1.ResourceVersionMatch
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
 }

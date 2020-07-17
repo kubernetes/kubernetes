@@ -134,7 +134,8 @@ func TestVolumeBinding(t *testing.T) {
 				boundClaims: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "pv-a", waitSC.Name),
 				},
-				claimsToBind: []*v1.PersistentVolumeClaim{},
+				claimsToBind:     []*v1.PersistentVolumeClaim{},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 		},
 		{
@@ -158,6 +159,7 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "", waitSC.Name),
 				},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonBindConflict)),
 		},
@@ -199,6 +201,7 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-b", "", waitSC.Name),
 				},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonNodeConflict), string(scheduling.ErrReasonBindConflict)),
 		},
@@ -221,7 +224,8 @@ func TestVolumeBinding(t *testing.T) {
 				boundClaims: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "pv-a", waitSC.Name),
 				},
-				claimsToBind: []*v1.PersistentVolumeClaim{},
+				claimsToBind:     []*v1.PersistentVolumeClaim{},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 			wantFilterStatus: framework.NewStatus(framework.Error, `could not find v1.PersistentVolume "pv-a"`),
 		},
@@ -229,7 +233,8 @@ func TestVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			opts := []runtime.Option{
@@ -256,15 +261,11 @@ func TestVolumeBinding(t *testing.T) {
 			if item.node != nil {
 				client.CoreV1().Nodes().Create(ctx, item.node, metav1.CreateOptions{})
 			}
-			if len(item.pvcs) > 0 {
-				for _, pvc := range item.pvcs {
-					client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
-				}
+			for _, pvc := range item.pvcs {
+				client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
 			}
-			if len(item.pvs) > 0 {
-				for _, pv := range item.pvs {
-					client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
-				}
+			for _, pv := range item.pvs {
+				client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 			}
 			caches := informerFactory.WaitForCacheSync(ctx.Done())
 			for _, synced := range caches {

@@ -23,8 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
 # Ensure sort order doesn't depend on locale
 export LANG=C
 export LC_ALL=C
@@ -327,8 +327,16 @@ go mod vendor >>"${LOG_FILE}" 2>&1
 
 # sort recorded packages for a given vendored dependency in modules.txt.
 # `go mod vendor` outputs in imported order, which means slight go changes (or different platforms) can result in a differently ordered modules.txt.
-# scan                 | prefix comment lines with the module name       | sort field 1  | strip leading text on comment lines
-awk '{if($1=="#") print $2 " " $0; else print}' < vendor/modules.txt | sort -k1,1 -s | sed 's/.*#/#/' > "${TMP_DIR}/modules.txt.tmp"
+# 1. prefix '#' lines with the module name and capture the module name
+# 2. prefix '##' with the most recently captured module name
+# 3. output other lines as-is
+# sort lines
+# strip anything before '#'
+awk '{
+  if($1=="#")       { current_module=$2; print $2 " " $0;      }
+  else if($1=="##") { print current_module " " $0; }
+  else              { print }
+}' < vendor/modules.txt | sort -k1,1 -s | sed 's/[^#]*#/#/' > "${TMP_DIR}/modules.txt.tmp"
 mv "${TMP_DIR}/modules.txt.tmp" vendor/modules.txt
 
 # create a symlink in vendor directory pointing to the staging components.
@@ -358,3 +366,5 @@ cat <<__EOF__ > "vendor/OWNERS"
 approvers:
 - dep-approvers
 __EOF__
+
+kube::log::status "NOTE: don't forget to handle vendor/* files that were added or removed"

@@ -49,17 +49,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -86,7 +90,7 @@ func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOpt
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
+	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -309,6 +313,207 @@ func Test202StatusCode(t *testing.T) {
 	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
 }
 
+var (
+	invalidContinueToken        = "invalidContinueToken"
+	invalidResourceVersion      = "invalid"
+	invalidResourceVersionMatch = metav1.ResourceVersionMatch("InvalidMatch")
+)
+
+// TestListOptions ensures that list works as expected for valid and invalid combinations of limit, continue,
+// resourceVersion and resourceVersionMatch.
+func TestListOptions(t *testing.T) {
+	for _, watchCacheEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
+			etcdOptions := framework.DefaultEtcdOptions()
+			etcdOptions.EnableWatchCache = watchCacheEnabled
+			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			defer closeFn()
+
+			ns := framework.CreateTestingNamespace("list-options", s, t)
+			defer framework.DeleteTestingNamespace(ns, s, t)
+
+			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
+
+			var compactedRv, oldestUncompactedRv string
+			for i := 0; i < 15; i++ {
+				rs := newRS(ns.Name)
+				rs.Name = fmt.Sprintf("test-%d", i)
+				created, err := rsClient.Create(context.Background(), rs, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if i == 0 {
+					compactedRv = created.ResourceVersion // We compact this first resource version below
+				}
+				// delete the first 5, and then compact them
+				if i < 5 {
+					var zero int64
+					if err := rsClient.Delete(context.Background(), rs.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil {
+						t.Fatal(err)
+					}
+					oldestUncompactedRv = created.ResourceVersion
+				}
+			}
+
+			// compact some of the revision history in etcd so we can test "too old" resource versions
+			_, kvClient, err := integration.GetEtcdClients(etcdOptions.StorageConfig.Transport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			revision, err := strconv.Atoi(oldestUncompactedRv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = kvClient.Compact(context.Background(), int64(revision))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			listObj, err := rsClient.List(context.Background(), metav1.ListOptions{
+				Limit: 6,
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			validContinueToken := listObj.Continue
+
+			// test all combinations of these, for both watch cache enabled and disabled:
+			limits := []int64{0, 6}
+			continueTokens := []string{"", validContinueToken, invalidContinueToken}
+			rvs := []string{"", "0", compactedRv, invalidResourceVersion}
+			rvMatches := []metav1.ResourceVersionMatch{
+				"",
+				metav1.ResourceVersionMatchNotOlderThan,
+				metav1.ResourceVersionMatchExact,
+				invalidResourceVersionMatch,
+			}
+
+			for _, limit := range limits {
+				for _, continueToken := range continueTokens {
+					for _, rv := range rvs {
+						for _, rvMatch := range rvMatches {
+							name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueToken, rv, rvMatch)
+							t.Run(name, func(t *testing.T) {
+								opts := metav1.ListOptions{
+									ResourceVersion:      rv,
+									ResourceVersionMatch: rvMatch,
+									Continue:             continueToken,
+									Limit:                limit,
+								}
+								testListOptionsCase(t, rsClient, watchCacheEnabled, opts, compactedRv)
+							})
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watchCacheEnabled bool, opts metav1.ListOptions, compactedRv string) {
+	listObj, err := rsClient.List(context.Background(), opts)
+
+	// check for expected validation errors
+	if opts.ResourceVersion == "" && opts.ResourceVersionMatch != "" {
+		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch is forbidden unless resourceVersion is provided") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
+	if opts.Continue != "" && opts.ResourceVersionMatch != "" {
+		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch is forbidden when continue is provided") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersionMatch == invalidResourceVersionMatch {
+		if err == nil || !strings.Contains(err.Error(), "supported values") {
+			t.Fatalf("expected not supported error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact && opts.ResourceVersion == "0" {
+		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch \"exact\" is forbidden for resourceVersion \"0\"") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersion == invalidResourceVersion {
+		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
+			t.Fatalf("expecting invalid value error, but got: %v", err)
+		}
+		return
+	}
+	if opts.Continue == invalidContinueToken {
+		if err == nil || !strings.Contains(err.Error(), "continue key is not valid") {
+			t.Fatalf("expected continue key not valid error, but got: %v", err)
+		}
+		return
+	}
+	// Should not be allowed for any resource version, but tightening the validation would be a breaking change
+	if opts.Continue != "" && !(opts.ResourceVersion == "" || opts.ResourceVersion == "0") {
+		if err == nil || !strings.Contains(err.Error(), "specifying resource version is not allowed when using continue") {
+			t.Fatalf("expected not allowed error, but got: %v", err)
+		}
+		return
+	}
+
+	// Check for too old errors
+	isExact := opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	// Legacy corner cases that can be avoided by using an explicit resourceVersionMatch value
+	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#the-resourceversion-parameter
+	isLegacyExact := opts.Limit > 0 && opts.ResourceVersionMatch == ""
+
+	if opts.ResourceVersion == compactedRv && (isExact || isLegacyExact) {
+		if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+			t.Fatalf("expected too old error, but got: %v", err)
+		}
+		return
+	}
+
+	// test successful responses
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, err := meta.ExtractList(listObj)
+	if err != nil {
+		t.Fatalf("Failed to extract list from %v", listObj)
+	}
+	count := int64(len(items))
+
+	// Cacher.GetToList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// the limit is respected when testing here.
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	hasContinuation := pagingEnabled && len(opts.Continue) > 0
+	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
+	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
+	usingWatchCache := watchCacheEnabled && !skipWatchCache
+
+	if usingWatchCache { // watch cache does not respect limit and is not used for continue
+		if count != 10 {
+			t.Errorf("Expected list size to be 10 but got %d", count) // limit is ignored if watch cache is hit
+		}
+		return
+	}
+
+	if opts.Continue != "" {
+		if count != 4 {
+			t.Errorf("Expected list size of 4 but got %d", count)
+		}
+		return
+	}
+	if opts.Limit > 0 {
+		if count != opts.Limit {
+			t.Errorf("Expected list size to be limited to %d but got %d", opts.Limit, count)
+		}
+		return
+	}
+	if count != 10 {
+		t.Errorf("Expected list size to be 10 but got %d", count)
+	}
+}
+
 func TestListResourceVersion0(t *testing.T) {
 	var testcases = []struct {
 		name              string
@@ -341,6 +546,20 @@ func TestListResourceVersion0(t *testing.T) {
 				rs.Name = fmt.Sprintf("test-%d", i)
 				if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
+				}
+			}
+
+			if tc.watchCacheEnabled {
+				// poll until the watch cache has the full list in memory
+				err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+					list, err := clientSet.AppsV1().ReplicaSets(ns.Name).List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+					if err != nil {
+						return false, err
+					}
+					return len(list.Items) == 10, nil
+				})
+				if err != nil {
+					t.Fatalf("error waiting for watch cache to observe the full list: %v", err)
 				}
 			}
 

@@ -127,6 +127,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	pod := a.GetObject().(*api.Pod)
 	if len(pod.Spec.Tolerations) > 0 {
 		whitelist, err := p.getNamespaceTolerationsWhitelist(a.GetNamespace())
+		whitelistScope := "namespace"
 		if err != nil {
 			return err
 		}
@@ -135,12 +136,13 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		// fall back to cluster's whitelist of tolerations.
 		if whitelist == nil {
 			whitelist = p.pluginConfig.Whitelist
+			whitelistScope = "cluster"
 		}
 
 		if len(whitelist) > 0 {
 			// check if the merged pod tolerations satisfy its namespace whitelist
 			if !tolerations.VerifyAgainstWhitelist(pod.Spec.Tolerations, whitelist) {
-				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its namespace whitelist")
+				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its %s whitelist", whitelistScope)
 			}
 		}
 	}

@@ -363,8 +363,9 @@ func GetReadyNodesIncludingTainted(c clientset.Interface) (nodes *v1.NodeList, e
 	return nodes, nil
 }
 
-// GetMasterAndWorkerNodes will return a list masters and schedulable worker nodes
-func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, error) {
+// DeprecatedGetMasterAndWorkerNodes will return a list masters and schedulable worker nodes
+// NOTE: This function has been deprecated because of calling DeprecatedMightBeMasterNode().
+func DeprecatedGetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, error) {
 	nodes := &v1.NodeList{}
 	masters := sets.NewString()
 	all, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
@@ -374,7 +375,7 @@ func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, 
 	for _, n := range all.Items {
 		if system.DeprecatedMightBeMasterNode(n.Name) {
 			masters.Insert(n.Name)
-		} else if IsNodeSchedulable(&n) && isNodeUntainted(&n) {
+		} else if isNodeSchedulableWithoutTaints(&n) {
 			nodes.Items = append(nodes.Items, n)
 		}
 	}
@@ -476,6 +477,14 @@ func IsNodeReady(node *v1.Node) bool {
 	networkReady := isConditionUnset(node, v1.NodeNetworkUnavailable) ||
 		IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
 	return nodeReady && networkReady
+}
+
+// isNodeSchedulableWithoutTaints returns true if:
+// 1) doesn't have "unschedulable" field set
+// 2) it also returns true from IsNodeReady
+// 3) it also returns true from isNodeUntainted
+func isNodeSchedulableWithoutTaints(node *v1.Node) bool {
+	return IsNodeSchedulable(node) && isNodeUntainted(node)
 }
 
 // hasNonblockingTaint returns true if the node contains at least

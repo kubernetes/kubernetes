@@ -243,10 +243,10 @@ func (gv GroupVersion) WithResource(resource string) GroupVersionResource {
 type GroupVersions []GroupVersion
 
 // Identifier implements runtime.GroupVersioner interface.
-func (gv GroupVersions) Identifier() string {
-	groupVersions := make([]string, 0, len(gv))
-	for i := range gv {
-		groupVersions = append(groupVersions, gv[i].String())
+func (gvs GroupVersions) Identifier() string {
+	groupVersions := make([]string, 0, len(gvs))
+	for i := range gvs {
+		groupVersions = append(groupVersions, gvs[i].String())
 	}
 	return fmt.Sprintf("[%s]", strings.Join(groupVersions, ","))
 }

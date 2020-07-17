@@ -8,24 +8,27 @@ set -o pipefail
 if [[ "${1:-}" = "--in-vm" ]]; then
   shift
 
-  readonly home="$(mktemp --directory)"
-
   mount -t bpf bpf /sys/fs/bpf
   export CGO_ENABLED=0
-  export HOME="$home"
+  export GOFLAGS=-mod=readonly
+  export GOPATH=/run/go-path
+  export GOPROXY=file:///run/go-root/pkg/mod/cache/download
+  export GOCACHE=/run/go-cache
+
+  elfs=""
+  if [[ -d "/run/input/bpf" ]]; then
+    elfs="/run/input/bpf"
+  fi
 
   echo Running tests...
-  /usr/local/bin/go test -mod=vendor -coverprofile="$1/coverage.txt" -covermode=atomic -v ./...
+  /usr/local/bin/go test -coverprofile="$1/coverage.txt" -covermode=atomic -v -elfs "$elfs" ./...
   touch "$1/success"
   exit 0
 fi
 
-# Force Go modules, so that vendoring and building are easier.
-export GO111MODULE=on
-
 # Pull all dependencies, so that we can run tests without the
 # vm having network access.
-go mod vendor
+go mod download
 
 # Use sudo if /dev/kvm isn't accessible by the current user.
 sudo=""
@@ -41,16 +44,34 @@ if [[ -z "${kernel_version}" ]]; then
 fi
 
 readonly kernel="linux-${kernel_version}.bz"
+readonly selftests="linux-${kernel_version}-selftests-bpf.bz"
+readonly input="$(mktemp -d)"
 readonly output="$(mktemp -d)"
-readonly tmp_dir="$(mktemp -d)"
+readonly tmp_dir="${TMPDIR:-/tmp}"
+readonly branch="${BRANCH:-master}"
 
-test -e "${tmp_dir}/${kernel}" || {
-  echo Fetching ${kernel}
-  curl --fail -L "https://github.com/newtools/ci-kernels/blob/master/${kernel}?raw=true" -o "${tmp_dir}/${kernel}"
+fetch() {
+    echo Fetching "${1}"
+    wget -nv -N -P "${tmp_dir}" "https://github.com/cilium/ci-kernels/raw/${branch}/${1}"
 }
 
-echo Testing on ${kernel_version}
-$sudo virtme-run --kimg "${tmp_dir}/${kernel}" --memory 256M --pwd --rwdir=/run/output="${output}" --script-sh "$(realpath "$0") --in-vm /run/output" --qemu-opts -smp 2
+fetch "${kernel}"
+
+if fetch "${selftests}"; then
+  mkdir "${input}/bpf"
+  tar --strip-components=4 -xjf "${tmp_dir}/${selftests}" -C "${input}/bpf"
+else
+  echo "No selftests found, disabling"
+fi
+
+echo Testing on "${kernel_version}"
+$sudo virtme-run --kimg "${tmp_dir}/${kernel}" --memory 512M --pwd \
+  --rwdir=/run/input="${input}" \
+  --rwdir=/run/output="${output}" \
+  --rodir=/run/go-path="$(go env GOPATH)" \
+  --rwdir=/run/go-cache="$(go env GOCACHE)" \
+  --script-sh "$(realpath "$0") --in-vm /run/output" \
+  --qemu-opts -smp 2 # need at least two CPUs for some tests
 
 if [[ ! -e "${output}/success" ]]; then
   echo "Test failed on ${kernel_version}"
@@ -64,4 +85,5 @@ else
   fi
 fi
 
+$sudo rm -r "${input}"
 $sudo rm -r "${output}"

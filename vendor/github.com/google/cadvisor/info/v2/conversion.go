@@ -155,6 +155,12 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		if len(val.PerfStats) > 0 {
 			stat.PerfStats = val.PerfStats
 		}
+		if len(val.PerfUncoreStats) > 0 {
+			stat.PerfUncoreStats = val.PerfUncoreStats
+		}
+		if len(val.Resctrl.MemoryBandwidth) > 0 || len(val.Resctrl.Cache) > 0 {
+			stat.Resctrl = val.Resctrl
+		}
 		// TODO(rjnagal): Handle load stats.
 		newStats = append(newStats, stat)
 	}
@@ -169,6 +175,7 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 			Timestamp:        val.Timestamp,
 			HasCpu:           cont.Spec.HasCpu,
 			HasMemory:        cont.Spec.HasMemory,
+			HasHugetlb:       cont.Spec.HasHugetlb,
 			HasNetwork:       cont.Spec.HasNetwork,
 			HasFilesystem:    cont.Spec.HasFilesystem,
 			HasDiskIo:        cont.Spec.HasDiskIo,
@@ -188,6 +195,9 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 		if stat.HasMemory {
 			stat.Memory = val.Memory
 		}
+		if stat.HasHugetlb {
+			stat.Hugetlb = val.Hugetlb
+		}
 		if stat.HasNetwork {
 			stat.Network.Interfaces = val.Network.Interfaces
 		}
@@ -202,6 +212,15 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 		}
 		if stat.HasCustomMetrics {
 			stat.CustomMetrics = val.CustomMetrics
+		}
+		if len(val.PerfStats) > 0 {
+			stat.PerfStats = val.PerfStats
+		}
+		if len(val.PerfUncoreStats) > 0 {
+			stat.PerfUncoreStats = val.PerfUncoreStats
+		}
+		if len(val.Resctrl.MemoryBandwidth) > 0 || len(val.Resctrl.Cache) > 0 {
+			stat.Resctrl = val.Resctrl
 		}
 		// TODO(rjnagal): Handle load stats.
 		stats = append(stats, stat)

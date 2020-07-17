@@ -63,6 +63,11 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	_ "k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient"
+	// ensure the newly added package from azure-sdk-for-go is in vendor/
+	_ "k8s.io/legacy-cloud-providers/azure/clients/deploymentclient"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -248,7 +253,7 @@ type Cloud struct {
 	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
 	ipv6DualStackEnabled bool
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
-	nodeCachesLock sync.Mutex
+	nodeCachesLock sync.RWMutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
 	// it is updated by the nodeInformer
 	nodeZones map[string]sets.String
@@ -386,7 +391,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		// No credentials provided, useInstanceMetadata should be enabled for Kubelet.
 		// TODO(feiskyer): print different error message for Kubelet and controller-manager, as they're
 		// requiring different credential settings.
-		if !config.UseInstanceMetadata && az.Config.CloudConfigType == cloudConfigTypeFile {
+		if !config.UseInstanceMetadata && config.CloudConfigType == cloudConfigTypeFile {
 			return fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 		}
 
@@ -659,6 +664,11 @@ func (az *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return az, true
 }
 
+// InstancesV2 returns an instancesV2 interface. Also returns true if the interface is supported, false otherwise.
+func (az *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) Zones() (cloudprovider.Zones, bool) {
 	return az, true
@@ -802,8 +812,8 @@ func (az *Cloud) GetActiveZones() (sets.String, error) {
 		return nil, fmt.Errorf("Azure cloud provider doesn't have informers set")
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetActiveZones")
 	}
@@ -829,8 +839,8 @@ func (az *Cloud) GetNodeResourceGroup(nodeName string) (string, error) {
 		return az.ResourceGroup, nil
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return "", fmt.Errorf("node informer is not synced when trying to GetNodeResourceGroup")
 	}
@@ -851,8 +861,8 @@ func (az *Cloud) GetResourceGroups() (sets.String, error) {
 		return sets.NewString(az.ResourceGroup), nil
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetResourceGroups")
 	}
@@ -872,8 +882,8 @@ func (az *Cloud) GetUnmanagedNodes() (sets.String, error) {
 		return nil, nil
 	}
 
-	az.nodeCachesLock.Lock()
-	defer az.nodeCachesLock.Unlock()
+	az.nodeCachesLock.RLock()
+	defer az.nodeCachesLock.RUnlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetUnmanagedNodes")
 	}

@@ -238,6 +238,7 @@ type mockCSIDriver struct {
 	driverInfo          testsuites.DriverInfo
 	manifests           []string
 	podInfo             *bool
+	storageCapacity     *bool
 	attachable          bool
 	attachLimit         int
 	enableTopology      bool
@@ -251,6 +252,7 @@ type CSIMockDriverOpts struct {
 	RegisterDriver      bool
 	DisableAttach       bool
 	PodInfo             *bool
+	StorageCapacity     *bool
 	AttachLimit         int
 	EnableTopology      bool
 	EnableResizing      bool
@@ -301,6 +303,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		},
 		manifests:           driverManifests,
 		podInfo:             driverOpts.PodInfo,
+		storageCapacity:     driverOpts.StorageCapacity,
 		enableTopology:      driverOpts.EnableTopology,
 		attachable:          !driverOpts.DisableAttach,
 		attachLimit:         driverOpts.AttachLimit,
@@ -392,6 +395,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 node.Name,
 		PodInfo:                  m.podInfo,
+		StorageCapacity:          m.storageCapacity,
 		CanAttach:                &m.attachable,
 		VolumeLifecycleModes: &[]storagev1.VolumeLifecycleMode{
 			storagev1.VolumeLifecyclePersistent,

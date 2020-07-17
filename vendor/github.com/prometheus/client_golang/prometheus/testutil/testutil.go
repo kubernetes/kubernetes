@@ -112,31 +112,43 @@ func ToFloat64(c prometheus.Collector) float64 {
 	panic(fmt.Errorf("collected a non-gauge/counter/untyped metric: %s", pb))
 }
 
-// CollectAndCount collects all Metrics from the provided Collector and returns their number.
-//
-// This can be used to assert the number of metrics collected by a given collector after certain operations.
-//
-// This function is only for testing purposes, and even for testing, other approaches
-// are often more appropriate (see this package's documentation).
-func CollectAndCount(c prometheus.Collector) int {
-	var (
-		mCount int
-		mChan  = make(chan prometheus.Metric)
-		done   = make(chan struct{})
-	)
+// CollectAndCount registers the provided Collector with a newly created
+// pedantic Registry. It then calls GatherAndCount with that Registry and with
+// the provided metricNames. In the unlikely case that the registration or the
+// gathering fails, this function panics. (This is inconsistent with the other
+// CollectAnd… functions in this package and has historical reasons. Changing
+// the function signature would be a breaking change and will therefore only
+// happen with the next major version bump.)
+func CollectAndCount(c prometheus.Collector, metricNames ...string) int {
+	reg := prometheus.NewPedanticRegistry()
+	if err := reg.Register(c); err != nil {
+		panic(fmt.Errorf("registering collector failed: %s", err))
+	}
+	result, err := GatherAndCount(reg, metricNames...)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
 
-	go func() {
-		for range mChan {
-			mCount++
-		}
-		close(done)
-	}()
+// GatherAndCount gathers all metrics from the provided Gatherer and counts
+// them. It returns the number of metric children in all gathered metric
+// families together. If any metricNames are provided, only metrics with those
+// names are counted.
+func GatherAndCount(g prometheus.Gatherer, metricNames ...string) (int, error) {
+	got, err := g.Gather()
+	if err != nil {
+		return 0, fmt.Errorf("gathering metrics failed: %s", err)
+	}
+	if metricNames != nil {
+		got = filterMetrics(got, metricNames)
+	}
 
-	c.Collect(mChan)
-	close(mChan)
-	<-done
-
-	return mCount
+	result := 0
+	for _, mf := range got {
+		result += len(mf.GetMetric())
+	}
+	return result, nil
 }
 
 // CollectAndCompare registers the provided Collector with a newly created

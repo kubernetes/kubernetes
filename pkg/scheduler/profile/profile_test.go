@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/events/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/events"
@@ -101,7 +101,7 @@ func TestNewProfile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
-			b := events.NewBroadcaster(&events.EventSinkImpl{Interface: c.EventsV1beta1().Events("")})
+			b := events.NewBroadcaster(&events.EventSinkImpl{Interface: c.EventsV1()})
 			p, err := NewProfile(tc.cfg, fakeFrameworkFactory, NewRecorderFactory(b))
 			if err := checkErr(err, tc.wantErr); err != nil {
 				t.Fatal(err)
@@ -113,7 +113,7 @@ func TestNewProfile(t *testing.T) {
 			called := make(chan struct{})
 			var ctrl string
 			stopFn := b.StartEventWatcher(func(obj runtime.Object) {
-				e, _ := obj.(*v1beta1.Event)
+				e, _ := obj.(*eventsv1.Event)
 				ctrl = e.ReportingController
 				close(called)
 			})

@@ -66,7 +66,9 @@ func NewCertsPhase() workflow.Phase {
 func localFlags() *pflag.FlagSet {
 	set := pflag.NewFlagSet("csr", pflag.ExitOnError)
 	options.AddCSRFlag(set, &csrOnly)
+	set.MarkDeprecated(options.CSROnly, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
 	options.AddCSRDirFlag(set, &csrDir)
+	set.MarkDeprecated(options.CSRDir, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
 	return set
 }
 

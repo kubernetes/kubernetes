@@ -174,14 +174,6 @@ func TestInstanceID(t *testing.T) {
 			expectedErrMsg:      fmt.Errorf("failure of getting instance metadata"),
 		},
 		{
-			name:                "NodeAddresses should report error if VMSS instanceID is invalid",
-			nodeName:            "vm123456",
-			metadataName:        "vmss_$123",
-			vmType:              vmTypeVMSS,
-			useInstanceMetadata: true,
-			expectedErrMsg:      fmt.Errorf("failed to parse VMSS instanceID %q: strconv.ParseInt: parsing %q: invalid syntax", "$123", "$123"),
-		},
-		{
 			name:                "NodeAddresses should report error if cloud.vmSet is nil",
 			nodeName:            "vm1",
 			vmType:              vmTypeStandard,
@@ -453,14 +445,6 @@ func TestNodeAddresses(t *testing.T) {
 			expectedErrMsg:      fmt.Errorf("getError"),
 		},
 		{
-			name:                "NodeAddresses should report error if VMSS instanceID is invalid",
-			nodeName:            "vm123456",
-			metadataName:        "vmss_$123",
-			vmType:              vmTypeVMSS,
-			useInstanceMetadata: true,
-			expectedErrMsg:      fmt.Errorf("failed to parse VMSS instanceID %q: strconv.ParseInt: parsing %q: invalid syntax", "$123", "$123"),
-		},
-		{
 			name:                "NodeAddresses should report error if cloud.vmSet is nil",
 			nodeName:            "vm1",
 			vmType:              vmTypeStandard,
@@ -691,6 +675,11 @@ func TestInstanceMetadataByProviderID(t *testing.T) {
 			expectedErrMsg: fmt.Errorf("providerID is empty, the node is not initialized yet"),
 		},
 		{
+			name:             "InstanceMetadataByProviderID should return nil if the node is unmanaged",
+			providerID:       "baremental-node",
+			expectedMetadata: nil,
+		},
+		{
 			name:                "InstanceMetadataByProviderID should report error if providerID is invalid",
 			providerID:          "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachine/vm3",
 			vmType:              vmTypeStandard,
@@ -763,14 +752,6 @@ func TestInstanceMetadataByProviderID(t *testing.T) {
 			useInstanceMetadata: true,
 			useCustomImsCache:   true,
 			expectedErrMsg:      fmt.Errorf("getError"),
-		},
-		{
-			name:                "InstanceMetadataByProviderID should report error if VMSS instanceID is invalid",
-			metadataName:        "vmss_$123",
-			providerID:          providerID,
-			vmType:              vmTypeVMSS,
-			useInstanceMetadata: true,
-			expectedErrMsg:      fmt.Errorf("failed to parse VMSS instanceID %q: strconv.ParseInt: parsing %q: invalid syntax", "$123", "$123"),
 		},
 		{
 			name:         "InstanceMetadataByProviderID should get metadata from Azure API if cloud.UseInstanceMetadata is false",
@@ -915,7 +896,7 @@ func TestInstanceMetadataByProviderID(t *testing.T) {
 func TestIsCurrentInstance(t *testing.T) {
 	cloud := &Cloud{
 		Config: Config{
-			VMType: vmTypeVMSS,
+			VMType: vmTypeStandard,
 		},
 	}
 	testcases := []struct {
@@ -933,22 +914,6 @@ func TestIsCurrentInstance(t *testing.T) {
 			nodeName:       "node1",
 			metadataVMName: "node2",
 			expected:       false,
-		},
-		{
-			nodeName:       "vmss000001",
-			metadataVMName: "vmss_1",
-			expected:       true,
-		},
-		{
-			nodeName:       "vmss_2",
-			metadataVMName: "vmss000000",
-			expected:       false,
-		},
-		{
-			nodeName:       "vmss123456",
-			metadataVMName: "vmss_$123",
-			expected:       false,
-			expectedErrMsg: fmt.Errorf("failed to parse VMSS instanceID %q: strconv.ParseInt: parsing %q: invalid syntax", "$123", "$123"),
 		},
 	}
 
@@ -1042,14 +1007,6 @@ func TestInstanceTypeByProviderID(t *testing.T) {
 			vmType:            vmTypeStandard,
 			useCustomImsCache: true,
 			expectedErrMsg:    fmt.Errorf("getError"),
-		},
-		{
-			name:           "NodeAddresses should report error if VMSS instanceID is invalid",
-			nodeName:       "vm123456",
-			metadataName:   "vmss_$123",
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
-			vmType:         vmTypeVMSS,
-			expectedErrMsg: fmt.Errorf("failed to parse VMSS instanceID %q: strconv.ParseInt: parsing %q: invalid syntax", "$123", "$123"),
 		},
 	}
 

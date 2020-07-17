@@ -59,6 +59,7 @@ type Cloud struct {
 	Exists bool
 	Err    error
 
+	EnableInstancesV2       bool
 	ExistsByProviderID      bool
 	ErrByProviderID         error
 	NodeShutdown            bool
@@ -150,6 +151,16 @@ func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 // Actually it just returns f itself.
 func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return f, true
+}
+
+// InstancesV2 returns a fake implementation of InstancesV2.
+//
+// Actually it just returns f itself.
+func (f *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	if f.EnableInstancesV2 {
+		return f, true
+	}
+	return nil, false
 }
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.

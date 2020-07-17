@@ -68,7 +68,7 @@ while IFS='' read -r line; do
   all_packages+=("./$line")
 done < <( hack/make-rules/helpers/cache_go_dirs.sh "${KUBE_ROOT}/_tmp/all_go_dirs" |
             grep "^${FOCUS:-.}" |
-            grep -vE "(third_party|generated|clientset_generated|hack|/_)" |
+            grep -vE "(third_party|generated|clientset_generated|hack|testdata|/_)" |
             grep -vE "$ignore_pattern" )
 
 failing_packages=()

@@ -21,6 +21,10 @@ import (
 
 	"github.com/google/cadvisor/container"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+
+	fs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	fs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	configs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 )
 
@@ -164,4 +168,17 @@ func DiskStatsCopy(blkioStats []cgroups.BlkioStatEntry) (stat []info.PerDiskStat
 		diskp.Stats[op] = blkioStats[i].Value
 	}
 	return DiskStatsCopy1(diskStat)
+}
+
+func NewCgroupManager(name string, paths map[string]string) (cgroups.Manager, error) {
+	if cgroups.IsCgroup2UnifiedMode() {
+		path := paths["cpu"]
+		return fs2.NewManager(nil, path, false)
+	}
+
+	config := configs.Cgroup{
+		Name: name,
+	}
+	return fs.NewManager(&config, paths, false), nil
+
 }

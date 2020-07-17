@@ -682,22 +682,22 @@ func TestRunningPodAndContainerCount(t *testing.T) {
 	}{
 		{
 			name:        "test container count",
-			metricsName: "kubelet_running_container_count",
+			metricsName: "kubelet_running_containers",
 			wants: `
-# HELP kubelet_running_container_count [ALPHA] Number of containers currently running
-# TYPE kubelet_running_container_count gauge
-kubelet_running_container_count{container_state="exited"} 1
-kubelet_running_container_count{container_state="running"} 1
-kubelet_running_container_count{container_state="unknown"} 2
+# HELP kubelet_running_containers [ALPHA] Number of containers currently running
+# TYPE kubelet_running_containers gauge
+kubelet_running_containers{container_state="exited"} 1
+kubelet_running_containers{container_state="running"} 1
+kubelet_running_containers{container_state="unknown"} 2
 `,
 		},
 		{
 			name:        "test pod count",
-			metricsName: "kubelet_running_pod_count",
+			metricsName: "kubelet_running_pods",
 			wants: `
-# HELP kubelet_running_pod_count [ALPHA] Number of pods currently running
-# TYPE kubelet_running_pod_count gauge
-kubelet_running_pod_count 2
+# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pods gauge
+kubelet_running_pods 2
 `,
 		},
 	}

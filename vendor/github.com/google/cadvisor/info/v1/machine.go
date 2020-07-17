@@ -47,9 +47,10 @@ type Node struct {
 }
 
 type Core struct {
-	Id      int     `json:"core_id"`
-	Threads []int   `json:"thread_ids"`
-	Caches  []Cache `json:"caches"`
+	Id       int     `json:"core_id"`
+	Threads  []int   `json:"thread_ids"`
+	Caches   []Cache `json:"caches"`
+	SocketID int     `json:"socket_id"`
 }
 
 type Cache struct {
@@ -65,6 +66,19 @@ func (n *Node) FindCore(id int) (bool, int) {
 	for i, n := range n.Cores {
 		if n.Id == id {
 			return true, i
+		}
+	}
+	return false, -1
+}
+
+// FindCoreByThread returns bool if found Core with same thread as provided and it's index in Node Core array.
+// If it's not found, returns false and -1.
+func (n *Node) FindCoreByThread(thread int) (bool, int) {
+	for i, n := range n.Cores {
+		for _, t := range n.Threads {
+			if t == thread {
+				return true, i
+			}
 		}
 	}
 	return false, -1

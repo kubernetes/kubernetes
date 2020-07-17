@@ -7,6 +7,7 @@ go_library(
         "external.go",
         "golist.go",
         "golist_overlay.go",
+        "loadmode_string.go",
         "packages.go",
         "visit.go",
     ],
@@ -18,6 +19,7 @@ go_library(
         "//vendor/golang.org/x/tools/go/internal/packagesdriver:go_default_library",
         "//vendor/golang.org/x/tools/internal/gopathwalk:go_default_library",
         "//vendor/golang.org/x/tools/internal/semver:go_default_library",
+        "//vendor/golang.org/x/tools/internal/span:go_default_library",
     ],
 )
 

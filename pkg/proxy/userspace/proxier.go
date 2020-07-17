@@ -489,12 +489,11 @@ func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 	if service == nil {
 		return nil
 	}
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if utilproxy.ShouldSkipService(svcName, service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+	if utilproxy.ShouldSkipService(service) {
 		return nil
 	}
 	existingPorts := sets.NewString()
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		serviceName := proxy.ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
@@ -551,12 +550,12 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPorts sets.S
 	if service == nil {
 		return
 	}
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if utilproxy.ShouldSkipService(svcName, service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+
+	if utilproxy.ShouldSkipService(service) {
 		return
 	}
 	staleUDPServices := sets.NewString()
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		if existingPorts.Has(servicePort.Name) {

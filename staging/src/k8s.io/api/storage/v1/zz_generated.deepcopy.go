@@ -103,6 +103,16 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = make([]VolumeLifecycleMode, len(*in))
 		copy(*out, *in)
 	}
+	if in.StorageCapacity != nil {
+		in, out := &in.StorageCapacity, &out.StorageCapacity
+		*out = new(bool)
+		**out = **in
+	}
+	if in.FSGroupPolicy != nil {
+		in, out := &in.FSGroupPolicy, &out.FSGroupPolicy
+		*out = new(FSGroupPolicy)
+		**out = **in
+	}
 	return
 }
 

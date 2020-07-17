@@ -171,3 +171,8 @@ func getPVSourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, err
 	}
 	return pvSrc, nil
 }
+
+// GetCSIMounterPath returns the mounter path given the base path.
+func GetCSIMounterPath(path string) string {
+	return filepath.Join(path, "/mount")
+}

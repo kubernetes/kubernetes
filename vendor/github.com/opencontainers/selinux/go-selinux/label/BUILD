@@ -5,16 +5,19 @@ go_library(
     srcs = [
         "label.go",
         "label_selinux.go",
+        "label_stub.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/selinux/go-selinux/label",
     importpath = "github.com/opencontainers/selinux/go-selinux/label",
     visibility = ["//visibility:public"],
-    deps = select({
+    deps = [
+        "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
+            "//vendor/github.com/pkg/errors:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
+            "//vendor/github.com/pkg/errors:go_default_library",
         ],
         "//conditions:default": [],
     }),

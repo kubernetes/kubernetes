@@ -87,6 +87,7 @@ coordination.k8s.io/v1 \
 discovery.k8s.io/v1alpha1 \
 discovery.k8s.io/v1beta1 \
 extensions/v1beta1 \
+events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \

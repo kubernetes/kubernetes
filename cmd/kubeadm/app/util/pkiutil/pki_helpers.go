@@ -36,6 +36,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
@@ -290,16 +291,14 @@ func TryLoadKeyFromDisk(pkiPath, name string) (crypto.Signer, error) {
 
 // TryLoadCSRAndKeyFromDisk tries to load the CSR and key from the disk
 func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, crypto.Signer, error) {
-	csrPath := pathForCSR(pkiPath, name)
-
-	csr, err := CertificateRequestFromFile(csrPath)
+	csr, err := TryLoadCSRFromDisk(pkiPath, name)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load the certificate request %s", csrPath)
+		return nil, nil, errors.Wrap(err, "could not load CSR file")
 	}
 
 	key, err := TryLoadKeyFromDisk(pkiPath, name)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't load key file")
+		return nil, nil, errors.Wrap(err, "could not load key file")
 	}
 
 	return csr, key, nil
@@ -332,6 +331,18 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	p := pubKeys[0].(*rsa.PublicKey)
 
 	return k, p, nil
+}
+
+// TryLoadCSRFromDisk tries to load the CSR from the disk
+func TryLoadCSRFromDisk(pkiPath, name string) (*x509.CertificateRequest, error) {
+	csrPath := pathForCSR(pkiPath, name)
+
+	csr, err := CertificateRequestFromFile(csrPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not load the CSR %s", csrPath)
+	}
+
+	return csr, nil
 }
 
 // PathsForCertAndKey returns the paths for the certificate and key given the path and basename.
@@ -566,6 +577,8 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		return nil, errors.New("must specify at least one ExtKeyUsage")
 	}
 
+	RemoveDuplicateAltNames(&cfg.AltNames)
+
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -584,4 +597,25 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		return nil, err
 	}
 	return x509.ParseCertificate(certDERBytes)
+}
+
+// RemoveDuplicateAltNames removes duplicate items in altNames.
+func RemoveDuplicateAltNames(altNames *certutil.AltNames) {
+	if altNames == nil {
+		return
+	}
+
+	if altNames.DNSNames != nil {
+		altNames.DNSNames = sets.NewString(altNames.DNSNames...).List()
+	}
+
+	ipsKeys := make(map[string]struct{})
+	var ips []net.IP
+	for _, one := range altNames.IPs {
+		if _, ok := ipsKeys[one.String()]; !ok {
+			ipsKeys[one.String()] = struct{}{}
+			ips = append(ips, one)
+		}
+	}
+	altNames.IPs = ips
 }

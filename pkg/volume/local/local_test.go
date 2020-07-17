@@ -375,7 +375,7 @@ func TestMapUnmap(t *testing.T) {
 	var devPath string
 
 	if customMapper, ok := mapper.(volume.CustomBlockVolumeMapper); ok {
-		err = customMapper.SetUpDevice()
+		_, err = customMapper.SetUpDevice()
 		if err != nil {
 			t.Errorf("Failed to SetUpDevice, err: %v", err)
 		}

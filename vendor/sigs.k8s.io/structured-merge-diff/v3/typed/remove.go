@@ -95,10 +95,9 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 		fieldType := t.ElementType
 		if ft, ok := fieldTypes[k]; ok {
 			fieldType = ft
-		} else {
-			if w.toRemove.Has(path) {
-				return true
-			}
+		}
+		if w.toRemove.Has(path) {
+			return true
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
 			val = removeItemsWithSchema(val, subset, w.schema, fieldType)

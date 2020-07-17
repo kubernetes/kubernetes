@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
@@ -84,8 +84,8 @@ func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
 
 // NewHTTPExtender creates an HTTPExtender object.
 func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) {
-	if config.HTTPTimeout.Nanoseconds() == 0 {
-		config.HTTPTimeout = time.Duration(DefaultExtenderTimeout)
+	if config.HTTPTimeout.Duration.Nanoseconds() == 0 {
+		config.HTTPTimeout.Duration = time.Duration(DefaultExtenderTimeout)
 	}
 
 	transport, err := makeTransport(config)
@@ -94,7 +94,7 @@ func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) 
 	}
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   config.HTTPTimeout,
+		Timeout:   config.HTTPTimeout.Duration,
 	}
 	managedResources := sets.NewString()
 	for _, r := range config.ManagedResources {

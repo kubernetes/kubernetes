@@ -59,7 +59,7 @@ var (
 		&metrics.SummaryOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      DeprecatedSchedulingDurationName,
-			Help:      "Scheduling latency in seconds split by sub-parts of the scheduling operation",
+			Help:      "Scheduling latency in seconds split by sub-parts of the scheduling operation (Deprecated since 1.19.0)",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on some SLI definition (long term).
 			MaxAge:            5 * time.Hour,
@@ -89,7 +89,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:         SchedulerSubsystem,
 			Name:              "scheduling_algorithm_predicate_evaluation_seconds",
-			Help:              "Scheduling algorithm predicate evaluation duration in seconds",
+			Help:              "Scheduling algorithm predicate evaluation duration in seconds (Deprecated since 1.19.0)",
 			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel:    metrics.ALPHA,
 			DeprecatedVersion: "1.19.0",
@@ -99,7 +99,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:         SchedulerSubsystem,
 			Name:              "scheduling_algorithm_priority_evaluation_seconds",
-			Help:              "Scheduling algorithm priority evaluation duration in seconds",
+			Help:              "Scheduling algorithm priority evaluation duration in seconds (Deprecated since 1.19.0)",
 			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel:    metrics.ALPHA,
 			DeprecatedVersion: "1.19.0",
@@ -154,7 +154,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"work"})
 
-	PodSchedulingDuration = metrics.NewHistogram(
+	PodSchedulingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "pod_scheduling_duration_seconds",
@@ -162,7 +162,8 @@ var (
 			// Start with 1ms with the last bucket being [~16s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		})
+		},
+		[]string{"attempts"})
 
 	PodSchedulingAttempts = metrics.NewHistogram(
 		&metrics.HistogramOpts{
@@ -182,7 +183,7 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"extension_point", "status"})
+		[]string{"extension_point", "status", "profile"})
 
 	PluginExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{

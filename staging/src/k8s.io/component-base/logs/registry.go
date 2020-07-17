@@ -18,7 +18,6 @@ package logs
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/go-logr/logr"
 	json "k8s.io/component-base/logs/json"
@@ -33,21 +32,22 @@ var logRegistry = NewLogFormatRegistry()
 // LogFormatRegistry store klog format registry
 type LogFormatRegistry struct {
 	registry map[string]logr.Logger
-	mu       sync.Mutex
+	frozen   bool
 }
 
 // NewLogFormatRegistry return new init LogFormatRegistry struct
 func NewLogFormatRegistry() *LogFormatRegistry {
 	return &LogFormatRegistry{
 		registry: make(map[string]logr.Logger),
-		mu:       sync.Mutex{},
+		frozen:   false,
 	}
 }
 
 // Register new log format registry to global logRegistry
 func (lfr *LogFormatRegistry) Register(name string, logger logr.Logger) error {
-	lfr.mu.Lock()
-	defer lfr.mu.Unlock()
+	if lfr.frozen {
+		return fmt.Errorf("log format is frozen, unable to register log format")
+	}
 	if _, ok := lfr.registry[name]; ok {
 		return fmt.Errorf("log format: %s already exists", name)
 	}
@@ -57,8 +57,6 @@ func (lfr *LogFormatRegistry) Register(name string, logger logr.Logger) error {
 
 // Get specified log format logger
 func (lfr *LogFormatRegistry) Get(name string) (logr.Logger, error) {
-	lfr.mu.Lock()
-	defer lfr.mu.Unlock()
 	re, ok := lfr.registry[name]
 	if !ok {
 		return nil, fmt.Errorf("log format: %s does not exists", name)
@@ -67,23 +65,27 @@ func (lfr *LogFormatRegistry) Get(name string) (logr.Logger, error) {
 }
 
 // Set specified log format logger
-func (lfr *LogFormatRegistry) Set(name string, logger logr.Logger) {
-	lfr.mu.Lock()
-	defer lfr.mu.Unlock()
+func (lfr *LogFormatRegistry) Set(name string, logger logr.Logger) error {
+	if lfr.frozen {
+		return fmt.Errorf("log format is frozen, unable to set log format")
+	}
+
 	lfr.registry[name] = logger
+	return nil
 }
 
 // Delete specified log format logger
-func (lfr *LogFormatRegistry) Delete(name string) {
-	lfr.mu.Lock()
-	defer lfr.mu.Unlock()
+func (lfr *LogFormatRegistry) Delete(name string) error {
+	if lfr.frozen {
+		return fmt.Errorf("log format is frozen, unable to delete log format")
+	}
+
 	delete(lfr.registry, name)
+	return nil
 }
 
 // List names of registered log formats
 func (lfr *LogFormatRegistry) List() []string {
-	lfr.mu.Lock()
-	defer lfr.mu.Unlock()
 	formats := make([]string, 0, len(lfr.registry))
 	for f := range lfr.registry {
 		formats = append(formats, f)
@@ -91,6 +93,10 @@ func (lfr *LogFormatRegistry) List() []string {
 	return formats
 }
 
+// Freeze freezes the log format registry
+func (lfr *LogFormatRegistry) Freeze() {
+	lfr.frozen = true
+}
 func init() {
 	// Text format is default klog format
 	logRegistry.Register(defaultLogFormat, nil)

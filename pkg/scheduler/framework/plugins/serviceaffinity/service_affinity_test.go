@@ -500,6 +500,9 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				p := &ServiceAffinity{
 					sharedLister:  snapshot,
 					serviceLister: fakeframework.ServiceLister(test.services),
+					args: config.ServiceAffinityArgs{
+						AffinityLabels: []string{"region", "zone"},
+					},
 				}
 				cycleState := framework.NewCycleState()
 				preFilterStatus := p.PreFilter(context.Background(), cycleState, test.pendingPod)

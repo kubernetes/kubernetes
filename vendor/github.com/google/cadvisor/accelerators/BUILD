@@ -7,6 +7,7 @@ go_library(
     importpath = "github.com/google/cadvisor/accelerators",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/stats:go_default_library",
         "//vendor/github.com/mindprince/gonvml:go_default_library",

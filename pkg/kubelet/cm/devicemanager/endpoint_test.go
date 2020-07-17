@@ -159,8 +159,42 @@ func TestAllocate(t *testing.T) {
 	require.Equal(t, resp, respOut)
 }
 
+func TestGetPreferredAllocation(t *testing.T) {
+	socket := path.Join("/tmp", esocketName)
+	callbackCount := 0
+	callbackChan := make(chan int)
+	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
+		callbackCount++
+		callbackChan <- callbackCount
+	})
+	defer ecleanup(t, p, e)
+
+	resp := &pluginapi.PreferredAllocationResponse{
+		ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+			{DeviceIDs: []string{"device0", "device1", "device2"}},
+		},
+	}
+
+	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+		return resp, nil
+	})
+
+	go e.run()
+	// Wait for the callback to be issued.
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
+
+	respOut, err := e.getPreferredAllocation([]string{}, []string{}, -1)
+	require.NoError(t, err)
+	require.Equal(t, resp, respOut)
+}
+
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
-	p := NewDevicePluginStub(devs, socket, resourceName, false)
+	p := NewDevicePluginStub(devs, socket, resourceName, false, false)
 
 	err := p.Start()
 	require.NoError(t, err)

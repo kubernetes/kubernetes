@@ -667,9 +667,10 @@ type LinuxSeccompArg struct {
 
 // LinuxSyscall is used to match a syscall in Seccomp
 type LinuxSyscall struct {
-	Names  []string           `json:"names"`
-	Action LinuxSeccompAction `json:"action"`
-	Args   []LinuxSeccompArg  `json:"args,omitempty"`
+	Names    []string           `json:"names"`
+	Action   LinuxSeccompAction `json:"action"`
+	ErrnoRet *uint              `json:"errnoRet,omitempty"`
+	Args     []LinuxSeccompArg  `json:"args,omitempty"`
 }
 
 // LinuxIntelRdt has container runtime resource constraints for Intel RDT

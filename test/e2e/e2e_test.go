@@ -110,7 +110,11 @@ func TestMain(m *testing.M) {
 			File        string `yaml:"file"`
 		}
 
-		data := testfiles.ReadOrDie("test/conformance/testdata/conformance.yaml")
+		data, err := testfiles.Read("test/conformance/testdata/conformance.yaml")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		if err := yaml.Unmarshal(data, &tests); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)

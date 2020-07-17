@@ -1412,6 +1412,34 @@ func TestDontAllowForceApplyWithServerDryRun(t *testing.T) {
 	t.Fatalf(`expected error "%s"`, expectedError)
 }
 
+func TestDontAllowForceApplyWithServerSide(t *testing.T) {
+	expectedError := "error: --force cannot be used with --server-side"
+
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		panic(str)
+	})
+	defer func() {
+		actualError := recover()
+		if expectedError != actualError {
+			t.Fatalf(`expected error "%s", but got "%s"`, expectedError, actualError)
+		}
+	}()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("server-side", "true")
+	cmd.Flags().Set("force", "true")
+	cmd.Run(cmd, []string{})
+
+	t.Fatalf(`expected error "%s"`, expectedError)
+}
+
 func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 	expectedError := "error: from testing-: cannot use generate name with apply"
 	cmdutil.BehaviorOnFatal(func(str string, code int) {

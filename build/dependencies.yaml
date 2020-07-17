@@ -12,7 +12,7 @@ dependencies:
       match: cniVersion[\t\n\f\r ]*=
 
   - name: "coredns-kube-up"
-    version: 1.6.7
+    version: 1.7.0
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
@@ -22,7 +22,7 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.6.7
+    version: 1.7.0
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
@@ -65,11 +65,10 @@ dependencies:
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
-    - path: cluster/images/etcd/migrate-if-needed.sh
-      match: BUNDLED_VERSIONS=
+    - path: cluster/images/etcd/migrate/options.go
 
   - name: "golang"
-    version: 1.14.4
+    version: 1.14.5
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -134,7 +133,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.14.4-2
+    version: v1.14.5-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
@@ -199,7 +198,7 @@ dependencies:
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
 
   - name: "repo-infra"
-    version: 0.0.6
+    version: 0.0.7
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"

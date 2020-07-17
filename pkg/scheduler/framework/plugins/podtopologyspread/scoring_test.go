@@ -735,8 +735,8 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 }
 
 // The following test allows to compare PodTopologySpread.Score with
-// DefaultPodTopologySpread.Score by using a similar rule.
-// See pkg/scheduler/framework/plugins/defaultpodtopologyspread/default_pod_topology_spread_perf_test.go
+// SelectorSpread.Score by using a similar rule.
+// See pkg/scheduler/framework/plugins/selectorspread/selector_spread_perf_test.go
 // for the equivalent test.
 
 var (

@@ -19,7 +19,8 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -237,6 +238,18 @@ func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	return p
 }
 
+// StartTime sets `t` as .status.startTime for the inner pod.
+func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
+	p.Status.StartTime = &t
+	return p
+}
+
+// NominatedNodeName sets `n` as the .Status.NominatedNodeName of the inner pod.
+func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
+	p.Status.NominatedNodeName = n
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
@@ -357,12 +370,37 @@ func (p *PodWrapper) Label(k, v string) *PodWrapper {
 	return p
 }
 
+// Req adds a new container to the inner pod with given resource map.
+func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
+	if len(resMap) == 0 {
+		return p
+	}
+
+	res := v1.ResourceList{}
+	for k, v := range resMap {
+		res[k] = resource.MustParse(v)
+	}
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Resources: v1.ResourceRequirements{
+			Requests: res,
+		},
+	})
+	return p
+}
+
+// PreemptionPolicy sets the give preemption policy to the inner pod.
+func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
+	p.Spec.PreemptionPolicy = &policy
+	return p
+}
+
 // NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 
 // MakeNode creates a Node wrapper.
 func MakeNode() *NodeWrapper {
-	return &NodeWrapper{v1.Node{}}
+	w := &NodeWrapper{v1.Node{}}
+	return w.Capacity(nil)
 }
 
 // Obj returns the inner Node.
@@ -388,5 +426,30 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 		n.Labels = make(map[string]string)
 	}
 	n.Labels[k] = v
+	return n
+}
+
+// Capacity sets the capacity and the allocatable resources of the inner node.
+// Each entry in `resources` corresponds to a resource name and its quantity.
+// By default, the capacity and allocatable number of pods are set to 32.
+func (n *NodeWrapper) Capacity(resources map[v1.ResourceName]string) *NodeWrapper {
+	res := v1.ResourceList{
+		v1.ResourcePods: resource.MustParse("32"),
+	}
+	for name, value := range resources {
+		res[name] = resource.MustParse(value)
+	}
+	n.Status.Capacity, n.Status.Allocatable = res, res
+	return n
+}
+
+// Images sets the images of the inner node. Each entry in `images` corresponds
+// to an image name and its size in bytes.
+func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
+	var containerImages []v1.ContainerImage
+	for name, size := range images {
+		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
+	}
+	n.Status.Images = containerImages
 	return n
 }

@@ -19,6 +19,7 @@ package config
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -321,6 +322,9 @@ type KubeletConfiguration struct {
 	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
 	// +optional
 	AllowedUnsafeSysctls []string
+	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
+	// notification to determine if memory eviction thresholds are crossed rather than polling.
+	KernelMemcgNotification bool
 
 	/* the following fields are meant for Node Allocatable */
 
@@ -354,6 +358,11 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
+	// Logging specifies the options of logging.
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	Logging componentbaseconfig.LoggingConfiguration
+	// EnableSystemLogHandler enables /logs handler.
+	EnableSystemLogHandler bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

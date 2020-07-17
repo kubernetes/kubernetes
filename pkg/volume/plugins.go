@@ -115,6 +115,9 @@ type NodeResizeOptions struct {
 	// it would be location where volume was mounted for the pod
 	DeviceMountPath string
 
+	// DeviceStagingPath stores location where the volume is staged
+	DeviceStagePath string
+
 	NewSize resource.Quantity
 	OldSize resource.Quantity
 

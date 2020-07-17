@@ -103,11 +103,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		}
 	}
 
-	if obj.DisablePreemption == nil {
-		disablePreemption := false
-		obj.DisablePreemption = &disablePreemption
-	}
-
 	if obj.PercentageOfNodesToScore == nil {
 		percentageOfNodesToScore := int32(config.DefaultPercentageOfNodesToScore)
 		obj.PercentageOfNodesToScore = &percentageOfNodesToScore
@@ -199,7 +194,7 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
 	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		// When feature is disabled, the default spreading is done by legacy
-		// DefaultPodTopologySpread plugin.
+		// SelectorSpread plugin.
 		return
 	}
 	if obj.DefaultConstraints == nil {

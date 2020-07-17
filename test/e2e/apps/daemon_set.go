@@ -606,7 +606,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 	if err != nil {
 		return nil, err
 	} else if len(newLabels) != len(labels) {
-		return nil, fmt.Errorf("Could not set daemon set test labels as expected")
+		return nil, fmt.Errorf("could not set daemon set test labels as expected")
 	}
 
 	return newNode, nil
@@ -698,11 +698,11 @@ func checkRunningOnNoNodes(f *framework.Framework, ds *appsv1.DaemonSet) func() 
 func checkDaemonStatus(f *framework.Framework, dsName string) error {
 	ds, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(context.TODO(), dsName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Could not get daemon set from v1")
+		return fmt.Errorf("could not get daemon set from v1")
 	}
 	desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
 	if desired != scheduled && desired != ready {
-		return fmt.Errorf("Error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
+		return fmt.Errorf("error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
 	}
 	return nil
 }

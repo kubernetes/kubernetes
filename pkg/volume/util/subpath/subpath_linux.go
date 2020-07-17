@@ -29,6 +29,7 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/utils/mount"
 )
 
@@ -108,9 +109,21 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		notMount = true
 	}
 	if !notMount {
-		// It's already mounted
-		klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
-		return true, bindPathTarget, nil
+		linuxHostUtil := hostutil.NewHostUtil()
+		mntInfo, err := linuxHostUtil.FindMountInfo(bindPathTarget)
+		if err != nil {
+			return false, "", fmt.Errorf("error calling findMountInfo for %s: %s", bindPathTarget, err)
+		}
+		if mntInfo.Root != subpath.Path {
+			// It's already mounted but not what we want, unmount it
+			if err = mounter.Unmount(bindPathTarget); err != nil {
+				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
+			}
+		} else {
+			// It's already mounted
+			klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+			return true, bindPathTarget, nil
+		}
 	}
 
 	// bindPathTarget is in /var/lib/kubelet and thus reachable without any

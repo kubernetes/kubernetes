@@ -85,7 +85,7 @@ func setupScheduler(
 	informerFactory informers.SharedInformerFactory,
 ) {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: cs.EventsV1beta1().Events(""),
+		Interface: cs.EventsV1(),
 	})
 
 	sched, err := scheduler.New(

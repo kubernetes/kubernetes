@@ -134,7 +134,7 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 				// And Go client will follow redirects automatically so the 301 check is probably unnecessary.
 				if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
 					retryAfter := resp.Header.Get("Retry-After")
-					if seconds, err := strconv.Atoi(retryAfter); err != nil {
+					if seconds, err := strconv.Atoi(retryAfter); err == nil {
 						backoff = seconds + 10
 					}
 					fmt.Fprintf(os.Stderr, "Got %d visiting %s, retry after %d seconds.\n", resp.StatusCode, string(URL), backoff)

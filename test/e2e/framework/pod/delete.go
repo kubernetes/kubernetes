@@ -48,7 +48,7 @@ func DeletePodOrFail(c clientset.Interface, ns, name string) {
 }
 
 // DeletePodWithWait deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
-// not existing.
+// not existing. Also waits for all owned resources to be deleted.
 func DeletePodWithWait(c clientset.Interface, pod *v1.Pod) error {
 	if pod == nil {
 		return nil
@@ -57,10 +57,17 @@ func DeletePodWithWait(c clientset.Interface, pod *v1.Pod) error {
 }
 
 // DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
-// not existing.
+// not existing. Also waits for all owned resources to be deleted.
 func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string) error {
 	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
-	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, metav1.DeleteOptions{})
+	deletionPolicy := metav1.DeletePropagationForeground
+	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName,
+		metav1.DeleteOptions{
+			// If the pod is the owner of some resources (like ephemeral inline volumes),
+			// then we want to be sure that those are also gone before we return.
+			// Blocking pod deletion via metav1.DeletePropagationForeground achieves that.
+			PropagationPolicy: &deletionPolicy,
+		})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil // assume pod was already deleted

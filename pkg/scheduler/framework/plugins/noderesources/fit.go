@@ -19,10 +19,13 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -44,7 +47,8 @@ const (
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources sets.String
+	ignoredResources      sets.String
+	ignoredResourceGroups sets.String
 }
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -62,16 +66,48 @@ func (f *Fit) Name() string {
 	return FitName
 }
 
+func validateFitArgs(args config.NodeResourcesFitArgs) error {
+	var allErrs field.ErrorList
+	resPath := field.NewPath("ignoredResources")
+	for i, res := range args.IgnoredResources {
+		path := resPath.Index(i)
+		if errs := metav1validation.ValidateLabelName(res, path); len(errs) != 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+
+	groupPath := field.NewPath("ignoredResourceGroups")
+	for i, group := range args.IgnoredResourceGroups {
+		path := groupPath.Index(i)
+		if strings.Contains(group, "/") {
+			allErrs = append(allErrs, field.Invalid(path, group, "resource group name can't contain '/'"))
+		}
+		if errs := metav1validation.ValidateLabelName(group, path); len(errs) != 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return allErrs.ToAggregate()
+}
+
 // NewFit initializes a new plugin and returns it.
 func NewFit(plArgs runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	args, err := getFitArgs(plArgs)
 	if err != nil {
 		return nil, err
 	}
-	fit := &Fit{
-		ignoredResources: sets.NewString(args.IgnoredResources...),
+
+	if err := validateFitArgs(args); err != nil {
+		return nil, err
 	}
-	return fit, nil
+
+	return &Fit{
+		ignoredResources:      sets.NewString(args.IgnoredResources...),
+		ignoredResourceGroups: sets.NewString(args.IgnoredResourceGroups...),
+	}, nil
 }
 
 func getFitArgs(obj runtime.Object) (config.NodeResourcesFitArgs, error) {
@@ -162,7 +198,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources)
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -187,11 +223,11 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod), nodeInfo, ignoredExtendedResources)
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
+	return fitsRequest(computePodResourceRequest(pod), nodeInfo, nil, nil)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
@@ -203,10 +239,6 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			int64(len(nodeInfo.Pods)),
 			int64(allowedPodNumber),
 		})
-	}
-
-	if ignoredExtendedResources == nil {
-		ignoredExtendedResources = sets.NewString()
 	}
 
 	if podRequest.MilliCPU == 0 &&
@@ -246,9 +278,13 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 
 	for rName, rQuant := range podRequest.ScalarResources {
 		if v1helper.IsExtendedResourceName(rName) {
-			// If this resource is one of the extended resources that should be
-			// ignored, we will skip checking it.
-			if ignoredExtendedResources.Has(string(rName)) {
+			// If this resource is one of the extended resources that should be ignored, we will skip checking it.
+			// rName is guaranteed to have a slash due to API validation.
+			var rNamePrefix string
+			if ignoredResourceGroups.Len() > 0 {
+				rNamePrefix = strings.Split(string(rName), "/")[0]
+			}
+			if ignoredExtendedResources.Has(string(rName)) || ignoredResourceGroups.Has(rNamePrefix) {
 				continue
 			}
 		}

@@ -59,8 +59,8 @@ var (
 		string(api.AzureDataDiskCachingReadWrite))
 
 	supportedDiskKinds = sets.NewString(
-		string(api.AzureSharedBlobDisk),
-		string(api.AzureDedicatedBlobDisk),
+		string(api.AzureSharedBlobDisk),    // deprecated
+		string(api.AzureDedicatedBlobDisk), // deprecated
 		string(api.AzureManagedDisk))
 
 	// only for Windows node

@@ -1371,6 +1371,53 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c.EnsureLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
 
+func TestCheckProtocol(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		port        v1.ServicePort
+		wantErr     error
+	}{
+		{
+			name:        "TCP with ELB",
+			annotations: make(map[string]string),
+			port:        v1.ServicePort{Protocol: v1.ProtocolTCP, Port: int32(8080)},
+			wantErr:     nil,
+		},
+		{
+			name:        "TCP with NLB",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			port:        v1.ServicePort{Protocol: v1.ProtocolTCP, Port: int32(8080)},
+			wantErr:     nil,
+		},
+		{
+			name:        "UDP with ELB",
+			annotations: make(map[string]string),
+			port:        v1.ServicePort{Protocol: v1.ProtocolUDP, Port: int32(8080)},
+			wantErr:     fmt.Errorf("Protocol UDP not supported by load balancer"),
+		},
+		{
+			name:        "UDP with NLB",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			port:        v1.ServicePort{Protocol: v1.ProtocolUDP, Port: int32(8080)},
+			wantErr:     nil,
+		},
+	}
+	for _, test := range tests {
+		tt := test
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkProtocol(tt.port, tt.annotations)
+			if tt.wantErr != nil && err == nil {
+				t.Errorf("Expected error: want=%s got =%s", tt.wantErr, err)
+			}
+			if tt.wantErr == nil && err != nil {
+				t.Errorf("Unexpected error: want=%s got =%s", tt.wantErr, err)
+			}
+		})
+	}
+}
+
 func TestBuildListener(t *testing.T) {
 	tests := []struct {
 		name string

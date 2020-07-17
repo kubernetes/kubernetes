@@ -60,7 +60,7 @@ var CurrentSuite Suite
 // PrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
 // before tests starts, so that the tests won't fail due image pulling flakes.
 // Currently, this is only used by node e2e test.
-// See also updateImageWhiteList() in ../../e2e_node/image_list.go
+// See also updateImageAllowList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),

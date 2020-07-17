@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -38,6 +39,7 @@ import (
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
+	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -110,6 +112,8 @@ var args = []string{
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
 	"--min-resync-period=8h",
+	"--mirroring-concurrent-service-endpoint-syncs=2",
+	"--mirroring-max-endpoints-per-subset=1000",
 	"--namespace-sync-period=10m",
 	"--node-cidr-mask-size=48",
 	"--node-cidr-mask-size-ipv4=48",
@@ -250,6 +254,12 @@ func TestAddFlags(t *testing.T) {
 				MaxEndpointsPerSlice:           200,
 			},
 		},
+		EndpointSliceMirroringController: &EndpointSliceMirroringControllerOptions{
+			&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+				MirroringConcurrentServiceEndpointSyncs: 2,
+				MirroringMaxEndpointsPerSubset:          1000,
+			},
+		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
@@ -383,6 +393,7 @@ func TestAddFlags(t *testing.T) {
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
 		Metrics:    &metrics.Options{},
+		Logs:       logs.NewOptions(),
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -480,6 +491,10 @@ func TestApplyTo(t *testing.T) {
 			EndpointSliceController: endpointsliceconfig.EndpointSliceControllerConfiguration{
 				ConcurrentServiceEndpointSyncs: 10,
 				MaxEndpointsPerSlice:           200,
+			},
+			EndpointSliceMirroringController: endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+				MirroringConcurrentServiceEndpointSyncs: 2,
+				MirroringMaxEndpointsPerSubset:          1000,
 			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,

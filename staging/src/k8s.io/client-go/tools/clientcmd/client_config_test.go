@@ -624,6 +624,26 @@ func TestCreateMissingContext(t *testing.T) {
 	}
 }
 
+func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		AuthInfo: clientcmdapi.AuthInfo{
+			Exec: &clientcmdapi.ExecConfig{
+				APIVersion:  "client.authentication.k8s.io/v1alpha1",
+				Command:     "some-command",
+				InstallHint: "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+			},
+		},
+	}, nil)
+	cleanedInstallHint := "some install hint with U+001B[1mcontrol charsU+001B[0m\nand a newline"
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	matchStringArg(cleanedInstallHint, clientConfig.ExecProvider.InstallHint, t)
+}
+
 func TestInClusterClientConfigPrecedence(t *testing.T) {
 	tt := []struct {
 		overrides *ConfigOverrides
@@ -849,4 +869,71 @@ users:
 		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
 	}
 
+}
+
+func TestCleanANSIEscapeCodes(t *testing.T) {
+	tests := []struct {
+		name    string
+		in, out string
+	}{
+		{
+			name: "DenyBoldCharacters",
+			in:   "\x1b[1mbold tuna\x1b[0m, fish, \x1b[1mbold marlin\x1b[0m",
+			out:  "U+001B[1mbold tunaU+001B[0m, fish, U+001B[1mbold marlinU+001B[0m",
+		},
+		{
+			name: "DenyCursorNavigation",
+			in:   "\x1b[2Aup up, \x1b[2Cright right",
+			out:  "U+001B[2Aup up, U+001B[2Cright right",
+		},
+		{
+			name: "DenyClearScreen",
+			in:   "clear: \x1b[2J",
+			out:  "clear: U+001B[2J",
+		},
+		{
+			name: "AllowSpaceCharactersUnchanged",
+			in:   "tuna\nfish\r\nmarlin\t\r\ntuna\vfish\fmarlin",
+		},
+		{
+			name: "AllowLetters",
+			in:   "alpha: \u03b1, beta: \u03b2, gamma: \u03b3",
+		},
+		{
+			name: "AllowMarks",
+			in: "tu\u0301na with a mark over the u, fi\u0302sh with a mark over the i," +
+				" ma\u030Arlin with a mark over the a",
+		},
+		{
+			name: "AllowNumbers",
+			in:   "t1na, f2sh, m3rlin, t12a, f34h, m56lin, t123, f456, m567n",
+		},
+		{
+			name: "AllowPunctuation",
+			in:   "\"here's a sentence; with! some...punctuation ;)\"",
+		},
+		{
+			name: "AllowSymbols",
+			in: "the integral of f(x) from 0 to n approximately equals the sum of f(x)" +
+				" from a = 0 to n, where a and n are natural numbers:" +
+				"\u222b\u2081\u207F f(x) dx \u2248 \u2211\u2090\u208C\u2081\u207F f(x)," +
+				" a \u2208 \u2115, n \u2208 \u2115",
+		},
+		{
+			name: "AllowSepatators",
+			in: "here is a paragraph separator\u2029and here\u2003are\u2003some" +
+				"\u2003em\u2003spaces",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if len(test.out) == 0 {
+				test.out = test.in
+			}
+
+			if actualOut := cleanANSIEscapeCodes(test.in); test.out != actualOut {
+				t.Errorf("expected %q, actual %q", test.out, actualOut)
+			}
+		})
+	}
 }

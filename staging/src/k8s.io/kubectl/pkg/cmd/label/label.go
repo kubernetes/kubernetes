@@ -362,7 +362,7 @@ func (o *LabelOptions) RunLabel() error {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(o.ErrOut, "Listing labels for %s.%s/%s:\n", gvks[0].Kind, gvks[0].Group, info.Name)
+				fmt.Fprintf(o.Out, "Listing labels for %s.%s/%s:\n", gvks[0].Kind, gvks[0].Group, info.Name)
 			}
 			for k, v := range accessor.GetLabels() {
 				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)

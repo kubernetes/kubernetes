@@ -91,7 +91,10 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
 	sshAndLog(cmd, host, true /*failOnError*/)
 
-	data := e2etestfiles.ReadOrDie(filePath)
+	data, err := e2etestfiles.Read(filePath)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
 	cmd = fmt.Sprintf("sudo tee <<'EOF' %s\n%s\nEOF", flexFile, string(data))
 	sshAndLog(cmd, host, true /*failOnError*/)
 

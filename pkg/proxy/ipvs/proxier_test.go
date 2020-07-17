@@ -57,11 +57,16 @@ import (
 const testHostname = "test-hostname"
 
 type fakeIPGetter struct {
-	nodeIPs []net.IP
+	nodeIPs   []net.IP
+	bindedIPs sets.String
 }
 
 func (f *fakeIPGetter) NodeIPs() ([]net.IP, error) {
 	return f.nodeIPs, nil
+}
+
+func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
+	return f.bindedIPs, nil
 }
 
 // fakePortOpener implements portOpener.
@@ -122,9 +127,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 	p := &Proxier{
 		exec:                  fexec,
 		serviceMap:            make(proxy.ServiceMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil, endpointSlicesEnabled),
+		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil, endpointSlicesEnabled, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
@@ -3056,6 +3061,7 @@ func Test_syncService(t *testing.T) {
 		svcName          string
 		newVirtualServer *utilipvs.VirtualServer
 		bindAddr         bool
+		bindedAddrs      sets.String
 	}{
 		{
 			// case 0, old virtual server is same as new virtual server
@@ -3074,7 +3080,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 1, old virtual server is different from new virtual server
@@ -3093,7 +3100,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 2, old virtual server is different from new virtual server
@@ -3112,7 +3120,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 3, old virtual server is nil, and create new virtual server
@@ -3125,7 +3134,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: true,
+			bindAddr:    true,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 4, SCTP, old virtual server is same as new virtual server
@@ -3144,7 +3154,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 5, old virtual server is different from new virtual server
@@ -3163,7 +3174,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 6, old virtual server is different from new virtual server
@@ -3182,7 +3194,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 7, old virtual server is nil, and create new virtual server
@@ -3195,7 +3208,28 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: true,
+			bindAddr:    true,
+			bindedAddrs: sets.NewString(),
+		},
+		{
+			// case 8, virtual server address already binded, skip sync
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(v1.ProtocolSCTP),
+				Port:      53,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "baz",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(v1.ProtocolSCTP),
+				Port:      53,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr:    true,
+			bindedAddrs: sets.NewString("1.2.3.4"),
 		},
 	}
 
@@ -3211,7 +3245,7 @@ func Test_syncService(t *testing.T) {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
 			}
 		}
-		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr); err != nil {
+		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, testCases[i].bindedAddrs); err != nil {
 			t.Errorf("Case [%d], unexpected sync IPVS virtual server error: %v", i, err)
 		}
 		// check

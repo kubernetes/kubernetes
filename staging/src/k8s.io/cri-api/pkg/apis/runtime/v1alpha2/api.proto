@@ -785,8 +785,8 @@ message ContainerConfig {
 
     // Configuration specific to Linux containers.
     LinuxContainerConfig linux = 15;
-   // Configuration specific to Windows containers.
-   WindowsContainerConfig windows = 16;
+    // Configuration specific to Windows containers.
+    WindowsContainerConfig windows = 16;
 }
 
 message CreateContainerRequest {

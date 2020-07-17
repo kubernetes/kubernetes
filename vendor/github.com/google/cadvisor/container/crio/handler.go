@@ -26,9 +26,7 @@ import (
 	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 type crioContainerHandler struct {
@@ -70,7 +68,7 @@ type crioContainerHandler struct {
 	reference info.ContainerReference
 
 	libcontainerHandler *containerlibcontainer.Handler
-	cgroupManager       *cgroupfs.Manager
+	cgroupManager       cgroups.Manager
 	rootFs              string
 	pidKnown            bool
 }
@@ -94,11 +92,9 @@ func newCrioContainerHandler(
 	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
-	cgroupManager := &cgroupfs.Manager{
-		Cgroups: &libcontainerconfigs.Cgroup{
-			Name: name,
-		},
-		Paths: cgroupPaths,
+	cgroupManager, err := containerlibcontainer.NewCgroupManager(name, cgroupPaths)
+	if err != nil {
+		return nil, err
 	}
 
 	rootFs := "/"

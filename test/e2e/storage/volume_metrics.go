@@ -100,7 +100,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func() {
 		var err error
 
-		if !metricsGrabber.HasRegisteredMaster() {
+		if !metricsGrabber.HasControlPlanePods() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
@@ -146,7 +146,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func() {
 		var err error
 
-		if !metricsGrabber.HasRegisteredMaster() {
+		if !metricsGrabber.HasControlPlanePods() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
@@ -446,7 +446,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		ginkgo.BeforeEach(func() {
-			if !metricsGrabber.HasRegisteredMaster() {
+			if !metricsGrabber.HasControlPlanePods() {
 				e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 			}
 

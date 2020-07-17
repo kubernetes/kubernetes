@@ -44,6 +44,7 @@ type nodeOptions struct {
 	renewCerts            bool
 	dryRun                bool
 	kustomizeDir          string
+	patchesDir            string
 	ignorePreflightErrors []string
 }
 
@@ -61,6 +62,7 @@ type nodeData struct {
 	isControlPlaneNode    bool
 	client                clientset.Interface
 	kustomizeDir          string
+	patchesDir            string
 	ignorePreflightErrors sets.String
 }
 
@@ -82,6 +84,7 @@ func NewCmdNode() *cobra.Command {
 	// flags could be eventually inherited by the sub-commands automatically generated for phases
 	addUpgradeNodeFlags(cmd.Flags(), nodeOptions)
 	options.AddKustomizePodsFlag(cmd.Flags(), &nodeOptions.kustomizeDir)
+	options.AddPatchesFlag(cmd.Flags(), &nodeOptions.patchesDir)
 
 	// initialize the workflow runner with the list of phases
 	nodeRunner.AppendPhase(phases.NewPreflightPhase())
@@ -141,7 +144,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", !isControlPlaneNode)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", !isControlPlaneNode, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
@@ -162,6 +165,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		client:                client,
 		isControlPlaneNode:    isControlPlaneNode,
 		kustomizeDir:          options.kustomizeDir,
+		patchesDir:            options.patchesDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 	}, nil
 }
@@ -204,6 +208,11 @@ func (d *nodeData) Client() clientset.Interface {
 // KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
 func (d *nodeData) KustomizeDir() string {
 	return d.kustomizeDir
+}
+
+// PatchesDir returns the folder where patches for components are stored
+func (d *nodeData) PatchesDir() string {
+	return d.patchesDir
 }
 
 // IgnorePreflightErrors returns the list of preflight errors to ignore.

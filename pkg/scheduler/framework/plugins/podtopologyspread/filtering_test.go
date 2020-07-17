@@ -1145,11 +1145,11 @@ func mustConvertLabelSelectorAsSelector(t *testing.T, ls *metav1.LabelSelector) 
 
 func TestSingleConstraint(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		nodes        []*v1.Node
-		existingPods []*v1.Pod
-		fits         map[string]bool
+		name           string
+		pod            *v1.Pod
+		nodes          []*v1.Node
+		existingPods   []*v1.Pod
+		wantStatusCode map[string]framework.Code
 	}{
 		{
 			name: "no existing pods",
@@ -1162,11 +1162,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": true,
-				"node-x": true,
-				"node-y": true,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success,
+				"node-x": framework.Success,
+				"node-y": framework.Success,
 			},
 		},
 		{
@@ -1180,11 +1180,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": true,
-				"node-x": true,
-				"node-y": true,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success,
+				"node-x": framework.Success,
+				"node-y": framework.Success,
 			},
 		},
 		{
@@ -1204,11 +1204,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": true,
-				"node-x": false,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success,
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1230,11 +1230,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": true,
-				"node-x": true,
-				"node-y": true,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success,
+				"node-x": framework.Success,
+				"node-y": framework.Success,
 			},
 		},
 		{
@@ -1256,11 +1256,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": false,
-				"node-x": false,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.UnschedulableAndUnresolvable,
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1282,11 +1282,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": false,
-				"node-x": true,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Unschedulable,
+				"node-x": framework.Success,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1308,11 +1308,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": true,
-				"node-x": true,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Success,
+				"node-x": framework.Success,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1338,17 +1338,17 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": true,
-				"node-x": true,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Success,
+				"node-x": framework.Success,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
 			// only node-a and node-y are considered, so pods spread as 2/~1~/~0~/3
 			// ps: '~num~' is a markdown symbol to denote a crossline through 'num'
-			// but in this unit test, we don't run NodeAffinityPredicate, so node-b and node-x are
+			// but in this unit test, we don't run NodeAffinity Predicate, so node-b and node-x are
 			// still expected to be fits;
 			// the fact that node-a fits can prove the underlying logic works
 			name: "incoming pod has nodeAffinity, pods spread as 2/~1~/~0~/3, hence node-a fits",
@@ -1370,11 +1370,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": true, // in real case, it's false
-				"node-x": true, // in real case, it's false
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success, // in real case, it's false
+				"node-x": framework.Success, // in real case, it's false
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1390,9 +1390,9 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Terminating().Obj(),
 				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Unschedulable,
 			},
 		},
 	}
@@ -1409,8 +1409,8 @@ func TestSingleConstraint(t *testing.T) {
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
 				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
-				if status.IsSuccess() != tt.fits[node.Name] {
-					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
+					t.Errorf("[%s]: expected status code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
 				}
 			}
 		})
@@ -1419,11 +1419,11 @@ func TestSingleConstraint(t *testing.T) {
 
 func TestMultipleConstraints(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		nodes        []*v1.Node
-		existingPods []*v1.Pod
-		fits         map[string]bool
+		name           string
+		pod            *v1.Pod
+		nodes          []*v1.Node
+		existingPods   []*v1.Pod
+		wantStatusCode map[string]framework.Code
 	}{
 		{
 			// 1. to fulfil "zone" constraint, incoming pod can be placed on any zone (hence any node)
@@ -1448,11 +1448,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": false,
-				"node-x": true,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Unschedulable,
+				"node-x": framework.Success,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1479,16 +1479,16 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": false,
-				"node-x": false,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Unschedulable,
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
 			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone2 (node-x or node-y)
-			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b or node-x
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-a, node-b or node-x
 			// intersection of (1) and (2) returns node-x
 			name: "Constraints hold different labelSelectors, spreads = [1/0, 1/0/0/1]",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
@@ -1505,11 +1505,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": false,
-				"node-x": true,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Unschedulable,
+				"node-x": framework.Success,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1532,11 +1532,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": false,
-				"node-x": false,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Unschedulable,
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1561,11 +1561,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": false,
-				"node-b": true,
-				"node-x": false,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Success,
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
 			},
 		},
 		{
@@ -1588,11 +1588,37 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
 			},
-			fits: map[string]bool{
-				"node-a": true,
-				"node-b": true,
-				"node-x": false,
-				"node-y": false,
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success,
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on any zone (hence any node)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b (node-x doesn't have the required label)
+			// intersection of (1) and (2) returns node-b
+			name: "two Constraints on zone and node, absence of label 'node' on node-x, spreads = [1/1, 1/0/0/1]",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Unschedulable,
+				"node-b": framework.Success,
+				"node-x": framework.UnschedulableAndUnresolvable,
+				"node-y": framework.Unschedulable,
 			},
 		},
 	}
@@ -1609,8 +1635,8 @@ func TestMultipleConstraints(t *testing.T) {
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
 				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
-				if status.IsSuccess() != tt.fits[node.Name] {
-					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
+					t.Errorf("[%s]: expected error code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
 				}
 			}
 		})

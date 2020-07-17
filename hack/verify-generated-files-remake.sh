@@ -338,7 +338,7 @@ assert_clean
 touch "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go"
 echo > api/api-rules/violation_exceptions.list
 echo > api/api-rules/codegen_violation_exceptions.list
-if make generated_files >/dev/null; then
+if make generated_files >/dev/null 2>&1; then
     echo "Expected make generated_files to fail with API violations."
     echo ""
     exit 1

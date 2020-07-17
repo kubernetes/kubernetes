@@ -690,7 +690,7 @@ func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.Reso
 }
 
 // disksAreAttached takes map of node and it's volumes and returns map of node, its volumes and attachment state
-func disksAreAttached(nodeVolumes map[string][]string) (nodeVolumesAttachMap map[string]map[string]bool, err error) {
+func disksAreAttached(nodeVolumes map[string][]string) (map[string]map[string]bool, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -713,7 +713,7 @@ func disksAreAttached(nodeVolumes map[string][]string) (nodeVolumesAttachMap map
 			}
 			volumeAttachedMap[volume] = attached
 		}
-		nodeVolumesAttachMap[vm] = volumeAttachedMap
+		disksAttached[vm] = volumeAttachedMap
 	}
 	return disksAttached, nil
 }
