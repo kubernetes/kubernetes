@@ -308,6 +308,10 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 
 	rwc, _ := proxyClientConn.Hijack()
 
+	if req.URL.Scheme != "https" {
+		return rwc, nil
+	}
+
 	host, _, err := net.SplitHostPort(targetHost)
 
 	if err != nil {
