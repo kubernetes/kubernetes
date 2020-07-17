@@ -1021,17 +1021,17 @@ items:
   - apiGroups:
     - ""
     resources:
+    - serviceaccounts/token
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
     - persistentvolumeclaims/status
     verbs:
     - get
     - patch
     - update
-  - apiGroups:
-    - ""
-    resources:
-    - serviceaccounts/token
-    verbs:
-    - create
   - apiGroups:
     - storage.k8s.io
     resources:

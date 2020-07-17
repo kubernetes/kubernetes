@@ -197,7 +197,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "testing defaults",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				CertificatesDir: testCertsDir,
 			},
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
@@ -207,6 +207,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -234,7 +236,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "ipv6 advertise address",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				CertificatesDir: testCertsDir,
 			},
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
@@ -244,6 +246,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -271,7 +275,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "an external etcd with custom ca, certs and keys",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking: kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				Etcd: kubeadmapi.Etcd{
 					External: &kubeadmapi.ExternalEtcd{
 						Endpoints: []string{"https://[2001:abcd:bcda::1]:2379", "https://[2001:abcd:bcda::2]:2379"},
@@ -289,6 +293,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -316,7 +322,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "an insecure etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking: kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				Etcd: kubeadmapi.Etcd{
 					External: &kubeadmapi.ExternalEtcd{
 						Endpoints: []string{"http://[::1]:2379", "http://[::1]:2380"},
@@ -331,6 +337,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -355,7 +363,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "test APIServer.ExtraArgs works as expected",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
@@ -375,6 +383,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=baz",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -404,7 +414,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "authorization-mode extra-args ABAC",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
@@ -421,6 +431,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -448,7 +460,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "insecure-port extra-args",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
@@ -465,6 +477,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -492,7 +506,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "authorization-mode extra-args Webhook",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar", DNSDomain: "cluster.local"},
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
@@ -513,6 +527,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--service-account-signing-key-file=" + testCertsDir + "/sa.key",
+				"--service-account-issuer=https://kubernetes.default.svc.cluster.local",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
@@ -628,7 +644,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			name: "custom cluster-cidr for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16", DNSDomain: "cluster.local"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
 			},
@@ -657,7 +673,9 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{
 					PodSubnet:     "10.0.1.15/16",
-					ServiceSubnet: "172.20.0.0/24"},
+					ServiceSubnet: "172.20.0.0/24",
+					DNSDomain:     "cluster.local",
+				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
 			},
@@ -685,7 +703,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			name: "custom extra-args for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16", DNSDomain: "cluster.local"},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
 				},
@@ -719,7 +737,9 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				Networking: kubeadmapi.Networking{
 					PodSubnet:     "2001:db8::/64",
 					ServiceSubnet: "fd03::/112",
+					DNSDomain:     "cluster.local",
 				},
+
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
 			},
@@ -750,6 +770,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				Networking: kubeadmapi.Networking{
 					PodSubnet:     "2001:db8::/64,10.1.0.0/16",
 					ServiceSubnet: "fd03::/112,192.168.0.0/16",
+					DNSDomain:     "cluster.local",
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
@@ -780,7 +801,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			name: "dual-stack networking custom extra-args for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16,2001:db8::/64"},
+				Networking: kubeadmapi.Networking{
+					PodSubnet: "10.0.1.15/16,2001:db8::/64",
+					DNSDomain: "cluster.local",
+				},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "20", "node-cidr-mask-size-ipv6": "80"},
 				},

@@ -42,19 +42,11 @@ import (
 )
 
 var (
-	trEnabledFeature           = featuregate.NewFeatureGate()
-	trDisabledFeature          = featuregate.NewFeatureGate()
 	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
 	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
-		panic(err)
-	}
 	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
 		panic(err)
 	}
@@ -189,34 +181,24 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed svcacct token create - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
-			features: trEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed svcacct token create",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "disallowed svcacct token create - serviceaccount not attached to node",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node1", Namespace: "ns0"},
-			features: trEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed svcacct token create - serviceaccount not attached to node",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node1", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed svcacct token create - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
-			features: trDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed svcacct token create - no subresource",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed svcacct token create - no subresource",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			features: trEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "disallowed svcacct token create - non create",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
-			features: trEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed svcacct token create - non create",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed get lease in namespace other than kube-node-lease - feature enabled",

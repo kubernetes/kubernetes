@@ -34,6 +34,15 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/test/cmd/legacy-script.sh"
 
+# setup envs for TokenRequest required flags
+SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+# Generate ServiceAccount key if needed
+if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
+  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+fi
+
 # Runs kube-apiserver
 #
 # Exports:
@@ -64,6 +73,10 @@ function run_kube_apiserver() {
     --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --runtime-config=api/v1 \
+    --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
+    --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
+    --service-account-issuer="https://kubernetes.default.svc" \
+    --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \

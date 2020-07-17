@@ -192,10 +192,6 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 	if o.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-			allErrors = append(allErrors, errors.New("if the BoundServiceAccountTokenVolume feature is enabled,"+
-				" the TokenRequest and TokenRequestProjection features must also be enabled"))
-		}
 		if len(o.ServiceAccounts.Issuer) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag when BoundServiceAccountTokenVolume is enabled"))
 		}
@@ -313,7 +309,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"that this value comply with the OpenID spec: https://openid.net/specs/openid-connect-discovery-1_0.html. "+
 			"In practice, this means that service-account-issuer must be an https URL. It is also highly "+
 			"recommended that this URL be capable of serving OpenID discovery documents at "+
-			"`{service-account-issuer}/.well-known/openid-configuration`.")
+			"{service-account-issuer}/.well-known/openid-configuration.")
 
 		fs.StringVar(&o.ServiceAccounts.JWKSURI, "service-account-jwks-uri", o.ServiceAccounts.JWKSURI, ""+
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
@@ -464,14 +460,13 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
 	}
 
-	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
-			extclient,
-			versionedInformer.Core().V1().Secrets().Lister(),
-			versionedInformer.Core().V1().ServiceAccounts().Lister(),
-			versionedInformer.Core().V1().Pods().Lister(),
-		)
-	}
+	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+		extclient,
+		versionedInformer.Core().V1().Secrets().Lister(),
+		versionedInformer.Core().V1().ServiceAccounts().Lister(),
+		versionedInformer.Core().V1().Pods().Lister(),
+	)
+
 	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
 		versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
 	)

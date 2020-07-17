@@ -10,7 +10,6 @@ go_library(
     srcs = ["config.go"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/authenticator",
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
@@ -26,7 +25,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
