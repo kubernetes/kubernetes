@@ -967,6 +967,10 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
 		glogBody("Response Body", result.body)
 		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
+			if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+				// DEBUG
+				fmt.Printf("DEBUG: original url: %s\nredirect location: %s\n", req.URL.String(), resp.Header.Get("location"))
+			}
 			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
 		}
 	})
@@ -1041,6 +1045,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	switch {
 	case resp.StatusCode == http.StatusSwitchingProtocols:
 		// no-op, we've been upgraded
+
+	case resp.StatusCode >= 300 && resp.StatusCode < 400:
+		// DEBUG
+		fmt.Printf("DEBUG: original url: %s\nredirect location: %s\n", req.URL.String(), resp.Header.Get("location"))
+
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		// calculate an unstructured error from the response which the Result object may use if the caller
 		// did not return a structured error.
