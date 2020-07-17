@@ -53,8 +53,8 @@ func WithTrace(handler http.Handler, longRunningCheck genericapirequest.LongRunn
 			utiltrace.Field{Key: "namespace", Value: ri.Namespace},
 			utiltrace.Field{Key: "api-group", Value: ri.APIGroup},
 			utiltrace.Field{Key: "api-version", Value: ri.APIVersion},
-			utiltrace.Field{Key: "user-agent", Value: &internal.LazyTruncatedUserAgent{req}},
-			utiltrace.Field{Key: "client", Value: &internal.LazyClientIP{req}})
+			utiltrace.Field{Key: "user-agent", Value: &internal.LazyTruncatedUserAgent{Req: req}},
+			utiltrace.Field{Key: "client", Value: &internal.LazyClientIP{Req: req}})
 		req = req.Clone(ctx)
 		// Set trace as root trace in context for nested tracing
 		defer trace.LogIfLong(30 * time.Second)
