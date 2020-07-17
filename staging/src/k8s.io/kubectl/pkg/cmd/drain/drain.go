@@ -195,6 +195,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
+	cmd.Flags().BoolVar(&o.drainer.ParallelizeNodes, "parallelize-nodes", o.drainer.ParallelizeNodes, "Execute drains on multiple nodes in parallel")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -286,6 +287,28 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	})
 }
 
+func (o *DrainCmdOptions) drainNode(
+	nodeInfo *resource.Info,
+	drainResultMutex *sync.Mutex,
+	drainWG *sync.WaitGroup,
+	drainedNodes *sets.String,
+	drainErrors []error,
+	printObj printers.ResourcePrinterFunc,
+) {
+	err := o.deleteOrEvictPodsSimple(nodeInfo)
+	drainResultMutex.Lock()
+	defer drainResultMutex.Unlock()
+	defer drainWG.Done()
+
+	if err == nil {
+		drainedNodes.Insert(nodeInfo.Name)
+		printObj(nodeInfo.Object, o.Out)
+	} else {
+		fmt.Fprintf(o.ErrOut, "error: unable to drain node %q\n\n", nodeInfo.Name)
+		drainErrors = append(drainErrors, err)
+	}
+}
+
 // RunDrain runs the 'drain' command
 func (o *DrainCmdOptions) RunDrain() error {
 	if err := o.RunCordonOrUncordon(true); err != nil {
@@ -304,20 +327,11 @@ func (o *DrainCmdOptions) RunDrain() error {
 	drainWG.Add(len(o.nodeInfos))
 
 	for _, info := range o.nodeInfos {
-		go func(info *resource.Info) {
-			err := o.deleteOrEvictPodsSimple(info)
-			drainResultMutex.Lock()
-			defer drainResultMutex.Unlock()
-			defer drainWG.Done()
-
-			if err == nil {
-				drainedNodes.Insert(info.Name)
-				printObj(info.Object, o.Out)
-			} else {
-				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q\n\n", info.Name)
-				drainErrors = append(drainErrors, err)
-			}
-		}(info)
+		if o.drainer.ParallelizeNodes {
+			go o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, drainErrors, printObj)
+		} else {
+			o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, drainErrors, printObj)
+		}
 	}
 
 	drainWG.Wait()

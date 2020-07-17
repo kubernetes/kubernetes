@@ -59,6 +59,9 @@ type Helper struct {
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool
 
+	// Drain pods from multiple nodes in parallel
+	ParallelizeNodes bool
+
 	// SkipWaitForDeleteTimeoutSeconds ignores pods that have a
 	// DeletionTimeStamp > N seconds. It's up to the user to decide when this
 	// option is appropriate; examples include the Node is unready and the pods
