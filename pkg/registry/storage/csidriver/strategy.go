@@ -45,13 +45,15 @@ func (csiDriverStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the fields for which the corresponding feature is disabled.
 func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	csiDriver := obj.(*storage.CSIDriver)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		csiDriver := obj.(*storage.CSIDriver)
 		csiDriver.Spec.StorageCapacity = nil
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		csiDriver := obj.(*storage.CSIDriver)
 		csiDriver.Spec.VolumeLifecycleModes = nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
+		csiDriver.Spec.FSGroupPolicy = nil
 	}
 }
 
@@ -85,6 +87,11 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
+	}
+	if old.(*storage.CSIDriver).Spec.FSGroupPolicy == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
+		newCSIDriver := obj.(*storage.CSIDriver)
+		newCSIDriver.Spec.FSGroupPolicy = nil
 	}
 }
 

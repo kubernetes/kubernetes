@@ -421,6 +421,7 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
 	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
 	allErrs = append(allErrs, validateStorageCapacity(spec.StorageCapacity, fldPath.Child("storageCapacity"))...)
+	allErrs = append(allErrs, validateFSGroupPolicy(spec.FSGroupPolicy, fldPath.Child("fsGroupPolicy"))...)
 	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	return allErrs
 }
@@ -450,6 +451,23 @@ func validateStorageCapacity(storageCapacity *bool, fldPath *field.Path) field.E
 	allErrs := field.ErrorList{}
 	if storageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+var supportedFSGroupPolicy = sets.NewString(string(storage.ReadWriteOnceWithFSTypeFSGroupPolicy), string(storage.FileFSGroupPolicy), string(storage.NoneFSGroupPolicy))
+
+// validateFSGroupPolicy tests if FSGroupPolicy contains an appropriate value.
+func validateFSGroupPolicy(fsGroupPolicy *storage.FSGroupPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if fsGroupPolicy == nil {
+		// This is not a required field, so if nothing is provided simply return
+		return allErrs
+	}
+
+	if !supportedFSGroupPolicy.Has(string(*fsGroupPolicy)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, fsGroupPolicy, supportedFSGroupPolicy.List()))
 	}
 
 	return allErrs

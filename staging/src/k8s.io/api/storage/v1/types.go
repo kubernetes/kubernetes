@@ -336,7 +336,46 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
+
+	// Defines if the underlying volume supports changing ownership and
+	// permission of the volume before being mounted.
+	// Refer to the specific FSGroupPolicy values for additional details.
+	// This field is alpha-level, and is only honored by servers
+	// that enable the CSIVolumeFSGroupPolicy feature gate.
+	// +optional
+	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 }
+
+// FSGroupPolicy specifies if a CSI Driver supports modifying
+// volume ownership and permissions of the volume to be mounted.
+// More modes may be added in the future.
+type FSGroupPolicy string
+
+const (
+	// ReadWriteOnceWithFSTypeFSGroupPolicy indicates that each volume will be examined
+	// to determine if the volume ownership and permissions
+	// should be modified. If a fstype is defined and the volume's access mode
+	// contains ReadWriteOnce, then the defined fsGroup will be applied.
+	// This mode should be defined if it's expected that the
+	// fsGroup may need to be modified depending on the pod's SecurityPolicy.
+	// This is the default behavior if no other FSGroupPolicy is defined.
+	ReadWriteOnceWithFSTypeFSGroupPolicy FSGroupPolicy = "ReadWriteOnceWithFSType"
+
+	// FileFSGroupPolicy indicates that CSI driver supports volume ownership
+	// and permission change via fsGroup, and Kubernetes may use fsGroup
+	// to change permissions and ownership of the volume to match user requested fsGroup in
+	// the pod's SecurityPolicy regardless of fstype or access mode.
+	// This mode should be defined if the fsGroup is expected to always change on mount
+	FileFSGroupPolicy FSGroupPolicy = "File"
+
+	// NoneFSGroupPolicy indicates that volumes will be mounted without performing
+	// any ownership or permission modifications, as the CSIDriver does not support
+	// these operations.
+	// This mode should be selected if the CSIDriver does not support fsGroup modifications,
+	// for example when Kubernetes cannot change ownership and permissions on a volume due
+	// to root-squash settings on a NFS volume.
+	NoneFSGroupPolicy FSGroupPolicy = "None"
+)
 
 // VolumeLifecycleMode is an enumeration of possible usage modes for a volume
 // provided by a CSI driver. More modes may be added in the future.

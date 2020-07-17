@@ -32,6 +32,7 @@ type Integrator interface {
 	Set(float64) // set the value of X
 	Add(float64) // add the given quantity to X
 	GetResults() IntegratorResults
+	Reset() IntegratorResults // restart the integration from now
 }
 
 // IntegratorResults holds statistical abstracts of the integration
@@ -83,6 +84,10 @@ func (igr *integrator) updateLocked() {
 func (igr *integrator) GetResults() (results IntegratorResults) {
 	igr.Lock()
 	defer func() { igr.Unlock() }()
+	return igr.getResultsLocked()
+}
+
+func (igr *integrator) getResultsLocked() (results IntegratorResults) {
 	igr.updateLocked()
 	results.Duration = igr.integrals[0]
 	if results.Duration <= 0 {
@@ -99,5 +104,13 @@ func (igr *integrator) GetResults() (results IntegratorResults) {
 	if variance > 0 {
 		results.Deviation = math.Sqrt(variance)
 	}
+	return
+}
+
+func (igr *integrator) Reset() (results IntegratorResults) {
+	igr.Lock()
+	defer func() { igr.Unlock() }()
+	results = igr.getResultsLocked()
+	igr.integrals = [3]float64{0, 0, 0}
 	return
 }

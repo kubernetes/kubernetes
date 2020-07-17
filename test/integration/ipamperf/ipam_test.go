@@ -108,7 +108,8 @@ func logResults(allResults []*Results) {
 }
 
 func TestPerformance(t *testing.T) {
-	if testing.Short() {
+	// TODO (#93112) skip test until appropriate timeout established
+	if testing.Short() || true {
 		// TODO (#61854) find why flakiness is caused by etcd connectivity before enabling always
 		t.Skip("Skipping because we want to run short tests")
 	}

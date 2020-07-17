@@ -123,7 +123,13 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
 	})
 
-	ginkgo.It("should delete a collection of events", func() {
+	/*
+	   Release : v1.19
+	   Testname: Event, delete a collection
+	   Description: A set of events is created with a label selector which MUST be found when listed.
+	   The set of events is deleted and MUST NOT show up when listed by its label selector.
+	*/
+	framework.ConformanceIt("should delete a collection of events", func() {
 		eventTestNames := []string{"test-event-1", "test-event-2", "test-event-3"}
 
 		ginkgo.By("Create set of events")
