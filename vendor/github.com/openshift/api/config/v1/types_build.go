@@ -97,6 +97,13 @@ type BuildOverrides struct {
 	// tolerations set on a build pod.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// ForcePull overrides, if set, the equivalent value in the builds,
+	// i.e. false disables force pull for all builds,
+	// true enables force pull for all builds,
+	// independently of what each build specifies itself
+	// +optional
+	ForcePull *bool `json:"forcePull,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

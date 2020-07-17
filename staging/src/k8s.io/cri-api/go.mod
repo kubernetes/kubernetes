@@ -10,18 +10,20 @@ require (
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20200421231249-e086a090c8fd // indirect
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9 // indirect
 	golang.org/x/sys v0.0.0-20191022100944-742c48ecaeb7 // indirect
-	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/text v0.3.3 // indirect
 	google.golang.org/grpc v1.26.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
 
 replace (
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/text => golang.org/x/text v0.3.2
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/cri-api => ../cri-api
 )

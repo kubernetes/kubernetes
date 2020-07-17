@@ -46,11 +46,22 @@ type OAuthStatus struct {
 // TokenConfig holds the necessary configuration options for authorization and access tokens
 type TokenConfig struct {
 	// accessTokenMaxAgeSeconds defines the maximum age of access tokens
-	AccessTokenMaxAgeSeconds int32 `json:"accessTokenMaxAgeSeconds"`
+	AccessTokenMaxAgeSeconds int32 `json:"accessTokenMaxAgeSeconds,omitempty"`
 
 	// accessTokenInactivityTimeoutSeconds - DEPRECATED: setting this field has no effect.
 	// +optional
 	AccessTokenInactivityTimeoutSeconds int32 `json:"accessTokenInactivityTimeoutSeconds,omitempty"`
+
+	// accessTokenInactivityTimeout defines the token inactivity timeout
+	// for tokens granted by any client.
+	// The value represents the maximum amount of time that can occur between
+	// consecutive uses of the token. Tokens become invalid if they are not
+	// used within this temporal window. The user will need to acquire a new
+	// token to regain access once a token times out.
+	// If this value is not set, then tokens are valid until their expiry.
+	// Takes valid time duration string such as "5m", "1.5h" or "2h45m".
+	// +optional
+	AccessTokenInactivityTimeout *metav1.Duration `json:"accessTokenInactivityTimeout,omitempty"`
 }
 
 const (

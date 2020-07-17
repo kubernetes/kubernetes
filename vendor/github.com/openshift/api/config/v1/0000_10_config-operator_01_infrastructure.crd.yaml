@@ -227,6 +227,17 @@ spec:
                     provider.
                   type: object
                   properties:
+                    cloudName:
+                      description: cloudName is the name of the Azure cloud environment
+                        which can be used to configure the Azure SDK with the appropriate
+                        Azure API endpoints. If empty, the value is equal to `AzurePublicCloud`.
+                      type: string
+                      enum:
+                      - ""
+                      - AzurePublicCloud
+                      - AzureUSGovernmentCloud
+                      - AzureChinaCloud
+                      - AzureGermanCloud
                     networkResourceGroupName:
                       description: networkResourceGroupName is the Resource Group
                         for network resources like the Virtual Network and Subnets

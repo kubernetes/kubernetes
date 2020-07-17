@@ -26,16 +26,17 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
+	go.uber.org/atomic v1.3.3-0.20181018215023-8dc6146f7569
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/net v0.0.0-20200421231249-e086a090c8fd
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	gopkg.in/yaml.v2 v2.2.8
-	k8s.io/api v0.18.3
-	k8s.io/apimachinery v0.18.3
+	gopkg.in/yaml.v2 v2.3.0
+	k8s.io/api v0.18.4
+	k8s.io/apimachinery v0.18.4
 	k8s.io/client-go v0.18.3
 	k8s.io/component-base v0.18.3
 	k8s.io/klog v1.0.0
@@ -47,8 +48,8 @@ require (
 )
 
 replace (
-	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
+	github.com/google/cadvisor => github.com/openshift/cadvisor v0.33.2-0.20200609152315-52275b81dc5b // Fix incorrect diskstats on mapper devices
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.1.0
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
@@ -59,7 +60,9 @@ replace (
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/text => golang.org/x/text v0.3.2
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery

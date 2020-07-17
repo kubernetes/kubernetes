@@ -304,7 +304,8 @@ func (Authentication) SwaggerDoc() map[string]string {
 var map_AuthenticationSpec = map[string]string{
 	"type":                       "type identifies the cluster managed, user facing authentication mode in use. Specifically, it manages the component that responds to login attempts. The default is IntegratedOAuth.",
 	"oauthMetadata":              "oauthMetadata contains the discovery endpoint data for OAuth 2.0 Authorization Server Metadata for an external OAuth server. This discovery document can be viewed from its served location: oc get --raw '/.well-known/oauth-authorization-server' For further details, see the IETF Draft: https://tools.ietf.org/html/draft-ietf-oauth-discovery-04#section-2 If oauthMetadata.name is non-empty, this value has precedence over any metadata reference stored in status. The key \"oauthMetadata\" is used to locate the data. If specified and the config map or expected key is not found, no metadata is served. If the specified metadata is not valid, no metadata is served. The namespace for this config map is openshift-config.",
-	"webhookTokenAuthenticators": "webhookTokenAuthenticators configures remote token reviewers. These remote authentication webhooks can be used to verify bearer tokens via the tokenreviews.authentication.k8s.io REST API.  This is required to honor bearer tokens that are provisioned by an external authentication service. The namespace for these secrets is openshift-config.",
+	"webhookTokenAuthenticators": "webhookTokenAuthenticators is DEPRECATED, setting it has no effect.",
+	"webhookTokenAuthenticator":  "webhookTokenAuthenticator configures a remote token reviewer. These remote authentication webhooks can be used to verify bearer tokens via the tokenreviews.authentication.k8s.io REST API. This is required to honor bearer tokens that are provisioned by an external authentication service.",
 	"serviceAccountIssuer":       "serviceAccountIssuer is the identifier of the bound service account token issuer. The default is https://kubernetes.default.svc",
 }
 
@@ -320,9 +321,18 @@ func (AuthenticationStatus) SwaggerDoc() map[string]string {
 	return map_AuthenticationStatus
 }
 
+var map_DeprecatedWebhookTokenAuthenticator = map[string]string{
+	"":           "deprecatedWebhookTokenAuthenticator holds the necessary configuration options for a remote token authenticator. It's the same as WebhookTokenAuthenticator but it's missing the 'required' validation on KubeConfig field.",
+	"kubeConfig": "kubeConfig contains kube config file data which describes how to access the remote webhook service. For further details, see: https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication The key \"kubeConfig\" is used to locate the data. If the secret or expected key is not found, the webhook is not honored. If the specified kube config data is not valid, the webhook is not honored. The namespace for this secret is determined by the point of use.",
+}
+
+func (DeprecatedWebhookTokenAuthenticator) SwaggerDoc() map[string]string {
+	return map_DeprecatedWebhookTokenAuthenticator
+}
+
 var map_WebhookTokenAuthenticator = map[string]string{
 	"":           "webhookTokenAuthenticator holds the necessary configuration options for a remote token authenticator",
-	"kubeConfig": "kubeConfig contains kube config file data which describes how to access the remote webhook service. For further details, see: https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication The key \"kubeConfig\" is used to locate the data. If the secret or expected key is not found, the webhook is not honored. If the specified kube config data is not valid, the webhook is not honored. The namespace for this secret is determined by the point of use.",
+	"kubeConfig": "kubeConfig references a secret that contains kube config file data which describes how to access the remote webhook service. The namespace for the referenced secret is openshift-config.\n\nFor further details, see:\n\nhttps://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication\n\nThe key \"kubeConfig\" is used to locate the data. If the secret or expected key is not found, the webhook is not honored. If the specified kube config data is not valid, the webhook is not honored.",
 }
 
 func (WebhookTokenAuthenticator) SwaggerDoc() map[string]string {
@@ -354,6 +364,7 @@ var map_BuildOverrides = map[string]string{
 	"imageLabels":  "ImageLabels is a list of docker labels that are applied to the resulting image. If user provided a label in their Build/BuildConfig with the same name as one in this list, the user's label will be overwritten.",
 	"nodeSelector": "NodeSelector is a selector which must be true for the build pod to fit on a node",
 	"tolerations":  "Tolerations is a list of Tolerations that will override any existing tolerations set on a build pod.",
+	"forcePull":    "ForcePull overrides, if set, the equivalent value in the builds, i.e. false disables force pull for all builds, true enables force pull for all builds, independently of what each build specifies itself",
 }
 
 func (BuildOverrides) SwaggerDoc() map[string]string {
@@ -720,6 +731,7 @@ var map_AzurePlatformStatus = map[string]string{
 	"":                         "AzurePlatformStatus holds the current status of the Azure infrastructure provider.",
 	"resourceGroupName":        "resourceGroupName is the Resource Group for new Azure resources created for the cluster.",
 	"networkResourceGroupName": "networkResourceGroupName is the Resource Group for network resources like the Virtual Network and Subnets used by the cluster. If empty, the value is same as ResourceGroupName.",
+	"cloudName":                "cloudName is the name of the Azure cloud environment which can be used to configure the Azure SDK with the appropriate Azure API endpoints. If empty, the value is equal to `AzurePublicCloud`.",
 }
 
 func (AzurePlatformStatus) SwaggerDoc() map[string]string {
@@ -975,11 +987,12 @@ func (Network) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkSpec = map[string]string{
-	"":               "NetworkSpec is the desired network configuration. As a general rule, this SHOULD NOT be read directly. Instead, you should consume the NetworkStatus, as it indicates the currently deployed configuration. Currently, most spec fields are immutable after installation. Please view the individual ones for further details on each.",
-	"clusterNetwork": "IP address pool to use for pod IPs. This field is immutable after installation.",
-	"serviceNetwork": "IP address pool for services. Currently, we only support a single entry here. This field is immutable after installation.",
-	"networkType":    "NetworkType is the plugin that is to be deployed (e.g. OpenShiftSDN). This should match a value that the cluster-network-operator understands, or else no networking will be installed. Currently supported values are: - OpenShiftSDN This field is immutable after installation.",
-	"externalIP":     "externalIP defines configuration for controllers that affect Service.ExternalIP. If nil, then ExternalIP is not allowed to be set.",
+	"":                     "NetworkSpec is the desired network configuration. As a general rule, this SHOULD NOT be read directly. Instead, you should consume the NetworkStatus, as it indicates the currently deployed configuration. Currently, most spec fields are immutable after installation. Please view the individual ones for further details on each.",
+	"clusterNetwork":       "IP address pool to use for pod IPs. This field is immutable after installation.",
+	"serviceNetwork":       "IP address pool for services. Currently, we only support a single entry here. This field is immutable after installation.",
+	"networkType":          "NetworkType is the plugin that is to be deployed (e.g. OpenShiftSDN). This should match a value that the cluster-network-operator understands, or else no networking will be installed. Currently supported values are: - OpenShiftSDN This field is immutable after installation.",
+	"externalIP":           "externalIP defines configuration for controllers that affect Service.ExternalIP. If nil, then ExternalIP is not allowed to be set.",
+	"serviceNodePortRange": "The port range allowed for Services of type NodePort. If not specified, the default of 30000-32767 will be used. Such Services without a NodePort specified will have one automatically allocated from this range. This parameter can be updated after the cluster is installed.",
 }
 
 func (NetworkSpec) SwaggerDoc() map[string]string {
@@ -1213,6 +1226,7 @@ var map_TokenConfig = map[string]string{
 	"":                                    "TokenConfig holds the necessary configuration options for authorization and access tokens",
 	"accessTokenMaxAgeSeconds":            "accessTokenMaxAgeSeconds defines the maximum age of access tokens",
 	"accessTokenInactivityTimeoutSeconds": "accessTokenInactivityTimeoutSeconds - DEPRECATED: setting this field has no effect.",
+	"accessTokenInactivityTimeout":        "accessTokenInactivityTimeout defines the token inactivity timeout for tokens granted by any client. The value represents the maximum amount of time that can occur between consecutive uses of the token. Tokens become invalid if they are not used within this temporal window. The user will need to acquire a new token to regain access once a token times out. If this value is not set, then tokens are valid until their expiry. Takes valid time duration string such as \"5m\", \"1.5h\" or \"2h45m\".",
 }
 
 func (TokenConfig) SwaggerDoc() map[string]string {
@@ -1349,7 +1363,7 @@ func (Scheduler) SwaggerDoc() map[string]string {
 
 var map_SchedulerSpec = map[string]string{
 	"policy":              "policy is a reference to a ConfigMap containing scheduler policy which has user specified predicates and priorities. If this ConfigMap is not available scheduler will default to use DefaultAlgorithmProvider. The namespace for this configmap is openshift-config.",
-	"defaultNodeSelector": "defaultNodeSelector helps set the cluster-wide default node selector to restrict pod placement to specific nodes. This is applied to the pods created in all namespaces without a specified nodeSelector value. For example, defaultNodeSelector: \"type=user-node,region=east\" would set nodeSelector field in pod spec to \"type=user-node,region=east\" to all pods created in all namespaces. Namespaces having project-wide node selectors won't be impacted even if this field is set. This adds an annotation section to the namespace. For example, if a new namespace is created with node-selector='type=user-node,region=east', the annotation openshift.io/node-selector: type=user-node,region=east gets added to the project. When the openshift.io/node-selector annotation is set on the project the value is used in preference to the value we are setting for defaultNodeSelector field. For instance, openshift.io/node-selector: \"type=user-node,region=west\" means that the default of \"type=user-node,region=east\" set in defaultNodeSelector would not be applied.",
+	"defaultNodeSelector": "defaultNodeSelector helps set the cluster-wide default node selector to restrict pod placement to specific nodes. This is applied to the pods created in all namespaces and creates an intersection with any existing nodeSelectors already set on a pod, additionally constraining that pod's selector. For example, defaultNodeSelector: \"type=user-node,region=east\" would set nodeSelector field in pod spec to \"type=user-node,region=east\" to all pods created in all namespaces. Namespaces having project-wide node selectors won't be impacted even if this field is set. This adds an annotation section to the namespace. For example, if a new namespace is created with node-selector='type=user-node,region=east', the annotation openshift.io/node-selector: type=user-node,region=east gets added to the project. When the openshift.io/node-selector annotation is set on the project the value is used in preference to the value we are setting for defaultNodeSelector field. For instance, openshift.io/node-selector: \"type=user-node,region=west\" means that the default of \"type=user-node,region=east\" set in defaultNodeSelector would not be applied.",
 	"mastersSchedulable":  "MastersSchedulable allows masters nodes to be schedulable. When this flag is turned on, all the master nodes in the cluster will be made schedulable, so that workload pods can run on them. The default value for this field is false, meaning none of the master nodes are schedulable. Important Note: Once the workload pods start running on the master nodes, extreme care must be taken to ensure that cluster-critical control plane components are not impacted. Please turn on this field after doing due diligence.",
 }
 

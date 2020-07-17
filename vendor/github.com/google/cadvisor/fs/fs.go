@@ -416,7 +416,17 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 					Major:  uint(partition.major),
 					Minor:  uint(partition.minor),
 				}
-				fs.DiskStats = diskStatsMap[device]
+
+				if val, ok := diskStatsMap[device]; ok {
+					fs.DiskStats = val
+				} else {
+					for k, v := range diskStatsMap {
+						if v.MajorNum == uint64(partition.major) && v.MinorNum == uint64(partition.minor) {
+							fs.DiskStats = diskStatsMap[k]
+							break
+						}
+					}
+				}
 				filesystems = append(filesystems, fs)
 			}
 		}
@@ -448,13 +458,22 @@ func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 		}
 		// 8      50 sdd2 40 0 280 223 7 0 22 108 0 330 330
 		deviceName := path.Join("/dev", words[2])
+
+		var error error
+		devInfo := make([]uint64, 2)
+		for i := 0; i < len(devInfo); i++ {
+			devInfo[i], error = strconv.ParseUint(words[i], 10, 64)
+			if error != nil {
+				return nil, error
+			}
+		}
+
 		wordLength := len(words)
 		offset := 3
 		var stats = make([]uint64, wordLength-offset)
 		if len(stats) < 11 {
 			return nil, fmt.Errorf("could not parse all 11 columns of /proc/diskstats")
 		}
-		var error error
 		for i := offset; i < wordLength; i++ {
 			stats[i-offset], error = strconv.ParseUint(words[i], 10, 64)
 			if error != nil {
@@ -462,6 +481,8 @@ func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 			}
 		}
 		diskStats := DiskStats{
+			MajorNum:        devInfo[0],
+			MinorNum:        devInfo[1],
 			ReadsCompleted:  stats[0],
 			ReadsMerged:     stats[1],
 			SectorsRead:     stats[2],

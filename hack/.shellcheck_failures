@@ -7,3 +7,6 @@
 ./cluster/gce/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
+./openshift-hack/lib/build/binaries.sh
+./openshift-hack/lib/constants.sh
+./openshift-hack/lib/init.sh

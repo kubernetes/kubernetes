@@ -30,7 +30,8 @@ type SchedulerSpec struct {
 	Policy ConfigMapNameReference `json:"policy"`
 	// defaultNodeSelector helps set the cluster-wide default node selector to
 	// restrict pod placement to specific nodes. This is applied to the pods
-	// created in all namespaces without a specified nodeSelector value.
+	// created in all namespaces and creates an intersection with any existing
+	// nodeSelectors already set on a pod, additionally constraining that pod's selector.
 	// For example,
 	// defaultNodeSelector: "type=user-node,region=east" would set nodeSelector
 	// field in pod spec to "type=user-node,region=east" to all pods created

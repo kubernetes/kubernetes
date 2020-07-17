@@ -334,17 +334,20 @@ kube::log::status "vendor: updating BUILD files"
 # Prune out any Bazel build files, since these can break the build due to
 # missing dependencies that aren't included by go mod vendor.
 find vendor/ -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) -exec rm -f {} \;
-hack/update-bazel.sh >>"${LOG_FILE}" 2>&1
+## Bazel is not used to build downstream
+#hack/update-bazel.sh >>"${LOG_FILE}" 2>&1
 
-kube::log::status "vendor: updating LICENSES file"
-hack/update-vendor-licenses.sh >>"${LOG_FILE}" 2>&1
+## License files are not currently maintained downstream
+#kube::log::status "vendor: updating LICENSES file"
+#hack/update-vendor-licenses.sh >>"${LOG_FILE}" 2>&1
 
-kube::log::status "vendor: creating OWNERS file"
-rm -f "Godeps/OWNERS" "vendor/OWNERS"
-cat <<__EOF__ > "Godeps/OWNERS"
+## Only the root OWNERS file is used downstream
+#kube::log::status "vendor: creating OWNERS file"
+#rm -f "Godeps/OWNERS" "vendor/OWNERS"
+#cat <<__EOF__ > "Godeps/OWNERS"
 # See the OWNERS docs at https://go.k8s.io/owners
-
-approvers:
-- dep-approvers
-__EOF__
-cp "Godeps/OWNERS" "vendor/OWNERS"
+#
+#approvers:
+#- dep-approvers
+#__EOF__
+#cp "Godeps/OWNERS" "vendor/OWNERS"

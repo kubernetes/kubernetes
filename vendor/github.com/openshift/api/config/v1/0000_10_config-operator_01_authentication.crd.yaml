@@ -71,16 +71,40 @@ spec:
                 mode in use. Specifically, it manages the component that responds
                 to login attempts. The default is IntegratedOAuth.
               type: string
-            webhookTokenAuthenticators:
-              description: webhookTokenAuthenticators configures remote token reviewers.
+            webhookTokenAuthenticator:
+              description: webhookTokenAuthenticator configures a remote token reviewer.
                 These remote authentication webhooks can be used to verify bearer
-                tokens via the tokenreviews.authentication.k8s.io REST API.  This
-                is required to honor bearer tokens that are provisioned by an external
-                authentication service. The namespace for these secrets is openshift-config.
+                tokens via the tokenreviews.authentication.k8s.io REST API. This is
+                required to honor bearer tokens that are provisioned by an external
+                authentication service.
+              type: object
+              required:
+              - kubeConfig
+              properties:
+                kubeConfig:
+                  description: "kubeConfig references a secret that contains kube
+                    config file data which describes how to access the remote webhook
+                    service. The namespace for the referenced secret is openshift-config.
+                    \n For further details, see: \n https://kubernetes.io/docs/reference/access-authn-authz/authentication/#webhook-token-authentication
+                    \n The key \"kubeConfig\" is used to locate the data. If the secret
+                    or expected key is not found, the webhook is not honored. If the
+                    specified kube config data is not valid, the webhook is not honored."
+                  type: object
+                  required:
+                  - name
+                  properties:
+                    name:
+                      description: name is the metadata.name of the referenced secret
+                      type: string
+            webhookTokenAuthenticators:
+              description: webhookTokenAuthenticators is DEPRECATED, setting it has
+                no effect.
               type: array
               items:
-                description: webhookTokenAuthenticator holds the necessary configuration
-                  options for a remote token authenticator
+                description: deprecatedWebhookTokenAuthenticator holds the necessary
+                  configuration options for a remote token authenticator. It's the
+                  same as WebhookTokenAuthenticator but it's missing the 'required'
+                  validation on KubeConfig field.
                 type: object
                 properties:
                   kubeConfig:

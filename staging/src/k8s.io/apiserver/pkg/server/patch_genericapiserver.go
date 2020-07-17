@@ -46,7 +46,7 @@ type eventfFunc func(eventType, reason, messageFmt string, args ...interface{})
 var (
 	lateConnectionRemoteAddrsLock sync.RWMutex
 	lateConnectionRemoteAddrs     = map[string]bool{}
-	lateConnectionEventf          atomic.Value    // of type eventfFunc
+	lateConnectionEventf          atomic.Value // of type eventfFunc
 )
 
 func (l *terminationLoggingListener) Accept() (net.Conn, error) {

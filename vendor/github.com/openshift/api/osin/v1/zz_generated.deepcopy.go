@@ -5,6 +5,7 @@
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -617,6 +618,11 @@ func (in *TokenConfig) DeepCopyInto(out *TokenConfig) {
 	if in.AccessTokenInactivityTimeoutSeconds != nil {
 		in, out := &in.AccessTokenInactivityTimeoutSeconds, &out.AccessTokenInactivityTimeoutSeconds
 		*out = new(int32)
+		**out = **in
+	}
+	if in.AccessTokenInactivityTimeout != nil {
+		in, out := &in.AccessTokenInactivityTimeout, &out.AccessTokenInactivityTimeout
+		*out = new(metav1.Duration)
 		**out = **in
 	}
 	return

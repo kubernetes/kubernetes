@@ -36,14 +36,29 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
-# Excluded checks for openshift/kubernetes fork
+# Excluded checks for openshift/kubernetes fork that are always skipped.
 EXCLUDED_PATTERNS+=(
   "verify-boilerplate.sh"            # Carries do not require boilerplate
-  "verify-golint.sh"                 # TODO(marun) Cleanup carried code
-  "verify-generated-files-remake.sh" # TODO(marun) Should this be passing?
+  "verify-bazel.sh"                  # Bazel is not used downstream
   "verify-no-vendor-cycles.sh"       # Incompatible with the way many carries are specified
-  "verify-vendor.sh"                 # Wants to update pins to newer versions than used upstream
   "verify-publishing-bot.py"         # Verifies the upstream rules, which are not maintained in o/k
+  "verify-staging-meta-files.sh"     # Staging meta files are not maintained downstream
+)
+
+# Skipped checks for openshift/kubernetes fork that need to be fixed.
+#
+# Where a check is excluded due to 'inconsistent behavior between
+# local and ci execution', the fix will require finding a way to
+# compare current and generated results without 'cp -a' since this
+# command does not execute without error in downstream ci.
+EXCLUDED_PATTERNS+=(
+  "verify-codegen.sh"                # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-generated-files-remake.sh" # TODO(marun) Is it worth fixing this check?
+  "verify-generated-protobuf.sh"     # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-golint.sh"                 # TODO(marun) Cleanup carried code
+  "verify-openapi-spec.sh"           # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-staticcheck.sh"            # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-vendor-licenses.sh"        # TODO(marun) Fix inconsistent behavior between local and ci execution
   )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
