@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -342,8 +343,20 @@ type componentStatusStorage struct {
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
 	// this is fragile, which assumes that the default port is being used
 	serversToValidate := map[string]*componentstatus.Server{
-		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultInsecureSchedulerPort, Path: "/healthz"},
+		"controller-manager": {
+			Addr:        "127.0.0.1",
+			EnableHTTPS: true,
+			TLSConfig:   &tls.Config{InsecureSkipVerify: true},
+			Port:        ports.KubeControllerManagerPort,
+			Path:        "/healthz",
+		},
+		"scheduler": {
+			Addr:        "127.0.0.1",
+			EnableHTTPS: true,
+			TLSConfig:   &tls.Config{InsecureSkipVerify: true},
+			Port:        kubeschedulerconfig.DefaultKubeSchedulerPort,
+			Path:        "/healthz",
+		},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
