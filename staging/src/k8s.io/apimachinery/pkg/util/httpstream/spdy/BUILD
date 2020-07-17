@@ -17,6 +17,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
         "//vendor/github.com/docker/spdystream:go_default_library",
+        "//vendor/github.com/armon/go-socks5:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
     ],
 )
@@ -40,6 +41,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/third_party/forked/golang/netutil:go_default_library",
         "//vendor/github.com/docker/spdystream:go_default_library",
+        "//vendor/golang.org/x/net/proxy:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
