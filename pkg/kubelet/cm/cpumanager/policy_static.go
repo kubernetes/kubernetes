@@ -343,7 +343,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	}
 
 	// Get a list of available CPUs.
-	available := p.assignableCPUs(s)
+	available := p.assignableCPUs(s).Union(p.cpusToReuse[string(pod.UID)])
 
 	// Generate hints.
 	cpuHints := p.generateCPUTopologyHints(available, requested)
