@@ -226,7 +226,8 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
 		})
 
-		ginkgo.It("should create a CronJob", func() {
+		// [Deprecated] because kubectl run --generator=cronjob/v2alpha1 and --schedule are deprecated
+		ginkgo.It("should create a CronJob [Deprecated]", func() {
 			framework.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceAlpha, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
@@ -1536,7 +1537,8 @@ metadata:
 			Testname: Kubectl, run rc
 			Description: Command ‘kubectl run’ MUST create a running rc with default one replicas given a image using the option --image=’httpd’. The running replication controller SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command. Also there MUST be 1 pod controlled by this replica set running 1 container with the image specified. A ‘kubetctl logs’ command MUST return the logs from the container in the replication controller.
 		*/
-		framework.ConformanceIt("should create an rc from an image ", func() {
+		// [Deprecated] because kubectl run --generator=run/v1 is deprecated
+		framework.ConformanceIt("should create an rc from an image [Deprecated]", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
 			ginkgo.By("verifying the rc " + rcName + " was created")
@@ -1597,7 +1599,8 @@ metadata:
 			Testname: Kubectl, rolling update
 			Description: Command ‘kubectl rolling-update’ MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
 		*/
-		framework.ConformanceIt("should support rolling-update to same image ", func() {
+		// [Deprecated] because kubectl run --generator=run/v1 is deprecated
+		framework.ConformanceIt("should support rolling-update to same image [Deprecated]", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
 			ginkgo.By("verifying the rc " + rcName + " was created")
@@ -1647,7 +1650,8 @@ metadata:
 			Testname: Kubectl, run deployment
 			Description: Command ‘kubectl run’ MUST create a deployment, with --generator=deployment, when a image name is specified in the run command. After the run command there SHOULD be a deployment that should exist with one container running the specified image. Also there SHOULD be a Pod that is controlled by this deployment, with a container running the specified image.
 		*/
-		framework.ConformanceIt("should create a deployment from an image ", func() {
+		// [Deprecated] because --generator=deployment/apps.v1 is deprecated
+		framework.ConformanceIt("should create a deployment from an image [Deprecated]", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie("run", dName, "--image="+httpdImage, "--generator=deployment/apps.v1", nsFlag)
 			ginkgo.By("verifying the deployment " + dName + " was created")
@@ -1692,7 +1696,8 @@ metadata:
 			Testname: Kubectl, run job
 			Description: Command ‘kubectl run’ MUST create a job, with --generator=job, when a image name is specified in the run command. After the run command there SHOULD be a job that should exist with one container running the specified image. Also there SHOULD be a restart policy on the job spec that SHOULD match the command line.
 		*/
-		framework.ConformanceIt("should create a job from an image when restart is OnFailure ", func() {
+		// [Deprecated] because kubectl run --generator=job/v1 is deprecated
+		framework.ConformanceIt("should create a job from an image when restart is OnFailure [Deprecated]", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the job " + jobName + " was created")
@@ -1723,7 +1728,8 @@ metadata:
 			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
 		})
 
-		ginkgo.It("should create a CronJob", func() {
+		// [Deprecated] because kubectl run --generator=cronjob/v1beta1 and --schedule are deprecated
+		ginkgo.It("should create a CronJob [Deprecated]", func() {
 			framework.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceBeta, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
@@ -1842,7 +1848,8 @@ metadata:
 			Testname: Kubectl, run job with --rm
 			Description: Start a job with a Pod using ‘kubectl run’ but specify --rm=true. Wait for the Pod to start running by verifying that there is output as expected. Now verify that the job has exited and cannot be found. With --rm=true option the job MUST start by running the image specified and then get deleted itself.
 		*/
-		framework.ConformanceIt("should create a job from an image, then delete the job ", func() {
+		// [Deprecated] because kubectl run --generator=job/v1 is deprecated
+		framework.ConformanceIt("should create a job from an image, then delete the job [Deprecated]", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("executing a command with run --rm and attach with stdin")
