@@ -30,6 +30,7 @@ filegroup(
         "//vendor/github.com/PuerkitoBio/purell:all-srcs",
         "//vendor/github.com/PuerkitoBio/urlesc:all-srcs",
         "//vendor/github.com/armon/circbuf:all-srcs",
+        "//vendor/github.com/armon/go-socks5:all-srcs",
         "//vendor/github.com/asaskevich/govalidator:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/context:all-srcs",
