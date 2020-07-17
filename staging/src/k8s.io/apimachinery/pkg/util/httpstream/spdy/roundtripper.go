@@ -207,7 +207,6 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 		Host:   targetHost,
 =======
 		URL: &url.URL{},
-		Header: http.Header{},
 		Host: targetHost,
 >>>>>>> fix formatting
 	}
@@ -215,6 +214,7 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 	proxyReq = *proxyReq.WithContext(req.Context())
 
 	if pa := s.proxyAuth(proxyURL); pa != "" {
+		proxyReq.Header = http.Header{}
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
@@ -234,7 +234,42 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	return s.tlsConn(req.URL, rwc, targetHost), nil
+	if req.URL.Scheme != "https" {
+		return rwc, nil
+	}
+
+	host, _, err := net.SplitHostPort(targetHost)
+
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig := s.tlsConfig
+	switch {
+	case tlsConfig == nil:
+		tlsConfig = &tls.Config{ServerName: host}
+	case len(tlsConfig.ServerName) == 0:
+		tlsConfig = tlsConfig.Clone()
+		tlsConfig.ServerName = host
+	}
+
+	tlsConn := tls.Client(rwc, tlsConfig)
+
+	// need to manually call Handshake() so we can call VerifyHostname() below
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if tlsConfig.InsecureSkipVerify {
+		return tlsConn, nil
+	}
+
+	if err := tlsConn.VerifyHostname(tlsConfig.ServerName); err != nil {
+		return nil, err
+	}
+
+	return tlsConn, nil
 }
 
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
