@@ -30,7 +30,10 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+<<<<<<< HEAD
 	"time"
+=======
+>>>>>>> fix formatting
 
 	"golang.org/x/net/proxy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,9 +75,12 @@ type SpdyRoundTripper struct {
 	// requireSameHostRedirects restricts redirect following to only follow redirects to the same host
 	// as the original request.
 	requireSameHostRedirects bool
+<<<<<<< HEAD
 	// pingPeriod is a period for sending Ping frames over established
 	// connections.
 	pingPeriod time.Duration
+=======
+>>>>>>> fix formatting
 }
 
 var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
@@ -84,16 +90,21 @@ var _ utilnet.Dialer = &SpdyRoundTripper{}
 // NewRoundTripper creates a new SpdyRoundTripper that will use the specified
 // tlsConfig.
 func NewRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) *SpdyRoundTripper {
+<<<<<<< HEAD
 	return NewRoundTripperWithConfig(RoundTripperConfig{
 		TLS:                      tlsConfig,
 		FollowRedirects:          followRedirects,
 		RequireSameHostRedirects: requireSameHostRedirects,
 	})
+=======
+	return NewRoundTripperWithProxy(tlsConfig, followRedirects, requireSameHostRedirects, utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment))
+>>>>>>> fix formatting
 }
 
 // NewRoundTripperWithProxy creates a new SpdyRoundTripper that will use the
 // specified tlsConfig and proxy func.
 func NewRoundTripperWithProxy(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool, proxier func(*http.Request) (*url.URL, error)) *SpdyRoundTripper {
+<<<<<<< HEAD
 	return NewRoundTripperWithConfig(RoundTripperConfig{
 		TLS:                      tlsConfig,
 		FollowRedirects:          followRedirects,
@@ -129,6 +140,14 @@ type RoundTripperConfig struct {
 
 	FollowRedirects          bool
 	RequireSameHostRedirects bool
+=======
+	return &SpdyRoundTripper{
+		tlsConfig:                tlsConfig,
+		followRedirects:          followRedirects,
+		requireSameHostRedirects: requireSameHostRedirects,
+		proxier:                  proxier,
+	}
+>>>>>>> fix formatting
 }
 
 // TLSClientConfig implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during
@@ -182,9 +201,15 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
 	proxyReq := http.Request{
 		Method: "CONNECT",
+<<<<<<< HEAD
 		URL:    &url.URL{},
 		Header: http.Header{},
 		Host:   targetHost,
+=======
+		URL: &url.URL{},
+		Header: http.Header{},
+		Host: targetHost,
+>>>>>>> fix formatting
 	}
 
 	proxyReq = *proxyReq.WithContext(req.Context())
