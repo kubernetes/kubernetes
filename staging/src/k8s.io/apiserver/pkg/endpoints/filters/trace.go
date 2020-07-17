@@ -43,6 +43,7 @@ func WithTrace(handler http.Handler, longRunningCheck genericapirequest.LongRunn
 			handler.ServeHTTP(w, req)
 			return
 		}
+		// Set trace as root trace in context for nested tracing
 		ctx, trace := genericapirequest.WithTrace(req.Context(), "HTTP Request",
 			utiltrace.Field{Key: "method", Value: req.Method},
 			utiltrace.Field{Key: "url", Value: req.URL.Path},
@@ -56,8 +57,16 @@ func WithTrace(handler http.Handler, longRunningCheck genericapirequest.LongRunn
 			utiltrace.Field{Key: "user-agent", Value: &internal.LazyTruncatedUserAgent{req}},
 			utiltrace.Field{Key: "client", Value: &internal.LazyClientIP{req}})
 		req = req.Clone(ctx)
-		// Set trace as root trace in context for nested tracing
-		defer trace.LogIfLong(30 * time.Second)
+		defer func(start time.Time) {
+			if time.Since(start) >= 30*time.Second {
+				// To mitigate https://github.com/kubernetes/kubernetes/issues/93042
+				// don't call LogIfLong here unless threshold is exceeded. This avoid printing
+				// this trace unconditionally when verbosity is set above 4, which is the case for
+				// e2e tests. LogIfLong called here instead of Log so that individual steps are
+				// only logged if step threshold is exceeded.
+				trace.LogIfLong(30 * time.Second)
+			}
+		}(time.Now())
 		handler.ServeHTTP(w, req)
 	})
 }
