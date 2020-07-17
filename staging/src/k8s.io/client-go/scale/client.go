@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 )
@@ -235,4 +236,81 @@ func (c *namespacedScaleClient) Patch(ctx context.Context, gvr schema.GroupVersi
 	}
 
 	return convertToScale(&result)
+}
+
+func (c *namespacedScaleClient) List(ctx context.Context, resource schema.GroupResource, opts metav1.ListOptions) (*autoscaling.ScaleList, error) {
+	// Currently, a /scale endpoint can return different scale types.
+	// Until we have support for the alternative API representations proposal,
+	// we need to deal with accepting different API versions.
+	// In practice, this is autoscaling/v1.Scale and extensions/v1beta1.Scale
+
+	path, gvr, err := c.client.pathAndVersionFor(resource)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get client for %s: %v", resource.String(), err)
+	}
+
+	result := c.client.clientBase.Get().
+		AbsPath(path).
+		NamespaceIfScoped(c.namespace, c.namespace != "").
+		Resource(gvr.Resource).
+		//Name("*").
+		SubResource("scale").
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+
+	return convertToScales(&result)
+}
+
+func (c *namespacedScaleClient) Watch(ctx context.Context, resource schema.GroupResource, name string, opts metav1.ListOptions) (watch.Interface, error) {
+	// Currently, a /scale endpoint can return different scale types.
+	// Until we have support for the alternative API representations proposal,
+	// we need to deal with accepting different API versions.
+	// In practice, this is autoscaling/v1.Scale and extensions/v1beta1.Scale
+
+	path, gvr, err := c.client.pathAndVersionFor(resource)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get client for %s: %v", resource.String(), err)
+	}
+	opts.Watch = true
+	req := c.client.clientBase.Get().
+		AbsPath(path).
+		NamespaceIfScoped(c.namespace, c.namespace != "").
+		Resource(gvr.Resource)
+	if name != "" {
+		req.Name(name)
+	}
+	return req.SubResource("scale").
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Watch(ctx)
+}
+
+// convertToScales converts the response body to autoscaling/v1.ScaleList
+func convertToScales(result *restclient.Result) (*autoscaling.ScaleList, error) {
+	scaleBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	decoder := scaleConverter.codecs.UniversalDecoder(scaleConverter.ScaleVersions()...)
+	rawScaleObj, err := runtime.Decode(decoder, scaleBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	sl, ok := rawScaleObj.(*autoscaling.ScaleList)
+	if !ok {
+		return nil, fmt.Errorf("received an object from a /scale endpoint which was not convertible to autoscaling ScaleList: %v", rawScaleObj)
+	}
+	convertedList := &autoscaling.ScaleList{TypeMeta: sl.TypeMeta, ListMeta: sl.ListMeta, Items: make([]autoscaling.Scale, len(sl.Items))}
+	for i := range sl.Items {
+		// convert whatever this is to autoscaling/v1.Scale
+		scaleObj, err := scaleConverter.ConvertToVersion(&sl.Items[i], autoscaling.SchemeGroupVersion)
+		if err != nil {
+			return nil, fmt.Errorf("received an object from a /scale endpoint which was not convertible to autoscaling Scale: %v", err)
+		}
+		convertedList.Items[i] = *scaleObj.(*autoscaling.Scale)
+	}
+	return convertedList, nil
 }

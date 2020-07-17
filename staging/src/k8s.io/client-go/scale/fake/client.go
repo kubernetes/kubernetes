@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/testing"
 )
@@ -78,4 +79,14 @@ func (f *fakeNamespacedScaleClient) Patch(ctx context.Context, gvr schema.GroupV
 	}
 
 	return obj.(*autoscalingapi.Scale), err
+}
+
+func (f *fakeNamespacedScaleClient) List(ctx context.Context, resource schema.GroupResource, opts metav1.ListOptions) (*autoscalingapi.ScaleList, error) {
+	// TODO
+	panic("implement me")
+}
+
+func (f *fakeNamespacedScaleClient) Watch(ctx context.Context, resource schema.GroupResource, name string, opts metav1.ListOptions) (watch.Interface, error) {
+	// TODO
+	panic("implement me")
 }

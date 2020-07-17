@@ -475,9 +475,12 @@ func (r *Request) URL() *url.URL {
 	}
 	// Join trims trailing slashes, so preserve r.pathPrefix's trailing slash for backwards compatibility if nothing was changed
 	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
-		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
+		if len(r.subresource) != 0 {
+			p = strings.Join([]string{p, r.resourceName, r.subresource, r.subpath}, "/")
+		} else {
+			p = path.Join(p, r.resourceName, r.subresource, r.subpath)
+		}
 	}
-
 	finalURL := &url.URL{}
 	if r.c.base != nil {
 		*finalURL = *r.c.base
