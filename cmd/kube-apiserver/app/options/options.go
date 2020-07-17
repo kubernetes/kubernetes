@@ -270,7 +270,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
-		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
+		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
 
 	return fss
 }

@@ -58,6 +58,15 @@ kube::etcd::start
 
 echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
 
+# setup envs for TokenRequest required flags
+SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+# Generate ServiceAccount key if needed
+if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
+  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+fi
+
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
@@ -69,8 +78,10 @@ kube::log::status "Starting kube-apiserver"
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \
-  --service-account-issuer="https://kubernetes.default.svc/" \
-  --service-account-signing-key-file="${KUBE_ROOT}/staging/src/k8s.io/client-go/util/cert/testdata/dontUseThisKey.pem" \
+  --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
+  --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
+  --service-account-issuer="https://kubernetes.default.svc" \
+  --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
   --logtostderr \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
