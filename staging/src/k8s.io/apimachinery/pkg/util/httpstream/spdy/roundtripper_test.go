@@ -93,6 +93,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 			testCases := map[string]struct {
 				serverFunc             func(http.Handler) *httptest.Server
+				socks5ProxyServerFunc  func(*socks5.StaticCredentials) *socks5.Server
 				proxyServerFunc        func(http.Handler) *httptest.Server
 				proxyAuth              *url.Userinfo
 				clientTLS              *tls.Config
