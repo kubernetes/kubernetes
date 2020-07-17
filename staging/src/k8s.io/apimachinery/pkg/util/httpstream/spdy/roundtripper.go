@@ -234,7 +234,7 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	return s.tlsConn(req.URL, rwc, targetHost)
+	return s.tlsConn(req.URL, rwc, targetHost), nil
 }
 
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
@@ -273,7 +273,7 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	return s.tlsConn(req.URL, rwc, targetHost)
+	return s.tlsConn(req.URL, rwc, targetHost), nil
 }
 
 // tlsConn returns a TLS client side connection using rwc as the underlying transport.
