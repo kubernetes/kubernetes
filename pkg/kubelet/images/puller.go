@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/util/env"
 	"sort"
 	"strings"
@@ -49,7 +50,6 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 
 func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, pod *v1.Pod) {
 	go func() {
-		// remote服务区pull image，通过参数设置endpoint，向endpoint请求。
 		imageRef, err := pip.imageService.PullImage(spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
 			imageRef: imageRef,
@@ -92,14 +92,17 @@ func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecret
 
 func (sip *serialImagePuller) processImagePullRequests() {
 	// Set environment variables to identify the namespace that needs to be pulled first
-	priorityNamespace := env.GetEnvAsStringOrFallback("PRIORITY_NAMESPACE_LIST", "kube-system")
+	priorityNamespace := env.GetEnvAsStringOrFallback("PRIORITY_NAMESPACES", "kube-system")
+	for request := range sip.pullRequests {
 
-	for r := range sip.pullRequests {
-
-		// Sleep some time and wait for the imagePullRequest to enter the channel
+		// Wait for a while for as many requests as possible to enter the channel, Avoid first-come request
+		// not being sorted and processed directly
 		time.Sleep(1 * time.Second)
 		pullRequestQ := make([]*imagePullRequest, 0)
-		pullRequestQ = append(pullRequestQ, r)
+		pullRequestQ = append(pullRequestQ, request)
+
+		// Use a loop to fetch the requests in the channel at the current time and
+		// store them in a slice to wait for sorting
 	Loop:
 		for {
 			select {
@@ -110,20 +113,20 @@ func (sip *serialImagePuller) processImagePullRequests() {
 			}
 		}
 
-		// Prioritize requests in the slice
+		// Prioritize requests in the slice by PriorityClassName and Namespace
 		sort.SliceStable(pullRequestQ, func(i, j int) bool {
-			if pullRequestQ[i].pod.Spec.PriorityClassName == "system-node-critical" &&
-				pullRequestQ[j].pod.Spec.PriorityClassName != "system-node-critical" {
+			if pullRequestQ[i].pod.Spec.PriorityClassName == scheduling.SystemNodeCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName != scheduling.SystemNodeCritical {
 				return true
-			} else if pullRequestQ[i].pod.Spec.PriorityClassName != "system-node-critical" &&
-				pullRequestQ[j].pod.Spec.PriorityClassName == "system-node-critical" {
+			} else if pullRequestQ[i].pod.Spec.PriorityClassName != scheduling.SystemNodeCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName == scheduling.SystemNodeCritical {
 				return false
 			}
-			if pullRequestQ[i].pod.Spec.PriorityClassName == "system-cluster-critical" &&
-				pullRequestQ[j].pod.Spec.PriorityClassName != "system-cluster-critical" {
+			if pullRequestQ[i].pod.Spec.PriorityClassName == scheduling.SystemClusterCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName != scheduling.SystemClusterCritical {
 				return true
-			} else if pullRequestQ[i].pod.Spec.PriorityClassName != "system-cluster-critical" &&
-				pullRequestQ[j].pod.Spec.PriorityClassName == "system-cluster-critical" {
+			} else if pullRequestQ[i].pod.Spec.PriorityClassName != scheduling.SystemClusterCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName == scheduling.SystemClusterCritical {
 				return false
 			}
 			if strings.Contains(priorityNamespace, pullRequestQ[i].pod.Namespace) &&
@@ -136,7 +139,7 @@ func (sip *serialImagePuller) processImagePullRequests() {
 			return false
 		})
 
-		// Handle the requests
+		// Handle the requests one by one
 		for _, pr := range pullRequestQ {
 			imageRef, err := sip.imageService.PullImage(pr.spec, pr.pullSecrets, pr.podSandboxConfig)
 			pr.pullChan <- pullResult{
