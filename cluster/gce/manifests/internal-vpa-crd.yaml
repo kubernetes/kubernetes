@@ -5,6 +5,8 @@ metadata:
   name: verticalpodautoscalers.autoscaling.k8s.io
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+  annotations:
+    "api-approved.kubernetes.io": "https://github.com/kubernetes/kubernetes/pull/63797"
 spec:
   group: autoscaling.k8s.io
   scope: Namespaced
@@ -53,6 +55,8 @@ metadata:
   name: verticalpodautoscalercheckpoints.autoscaling.k8s.io
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+  annotations:
+    "api-approved.kubernetes.io": "https://github.com/kubernetes/kubernetes/pull/63797"
 spec:
   group: autoscaling.k8s.io
   scope: Namespaced
