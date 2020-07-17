@@ -298,29 +298,29 @@ func (o *DrainCmdOptions) RunDrain() error {
 	}
 
 	drainedNodes := sets.NewString()
-	var deleteOrEvictErrors []error
-	var deleteOrEvictResultMutex sync.Mutex
-	var deleteOrEvictWaitGroup sync.WaitGroup
-	deleteOrEvictWaitGroup.Add(len(o.nodeInfos))
+	var drainErrors []error
+	var drainResultMutex sync.Mutex
+	var drainWG sync.WaitGroup
+	drainWG.Add(len(o.nodeInfos))
 
 	for _, info := range o.nodeInfos {
 		go func(info *resource.Info) {
 			err := o.deleteOrEvictPodsSimple(info)
-			deleteOrEvictResultMutex.Lock()
-			defer deleteOrEvictResultMutex.Unlock()
-			defer deleteOrEvictWaitGroup.Done()
+			drainResultMutex.Lock()
+			defer drainResultMutex.Unlock()
+			defer drainWG.Done()
 
 			if err == nil {
 				drainedNodes.Insert(info.Name)
 				printObj(info.Object, o.Out)
 			} else {
 				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q\n\n", info.Name)
-				deleteOrEvictErrors = append(deleteOrEvictErrors, err)
+				drainErrors = append(drainErrors, err)
 			}
 		}(info)
 	}
 
-	deleteOrEvictWaitGroup.Wait()
+	drainWG.Wait()
 	remainingNodes := []string{}
 	for _, remainingInfo := range o.nodeInfos {
 		if drainedNodes.Has(remainingInfo.Name) {
@@ -336,7 +336,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 		}
 	}
 
-	return utilerrors.NewAggregate(deleteOrEvictErrors)
+	return utilerrors.NewAggregate(drainErrors)
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
