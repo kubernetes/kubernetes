@@ -21,6 +21,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -169,6 +170,15 @@ func TestRepairWithExisting(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
 			Spec:       corev1.ServiceSpec{ClusterIP: "None"},
 		},
+		&corev1.Service{ // being deleted with finalizer, skipped
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:         "seven",
+				Name:              "seven",
+				DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				Finalizers:        []string{"test-finalizer"},
+			},
+			Spec: corev1.ServiceSpec{ClusterIP: "192.168.2.1"},
+		},
 	)
 
 	ipregistry := &mockRangeRegistry{
@@ -188,7 +198,9 @@ func TestRepairWithExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !after.Has(net.ParseIP("192.168.1.1")) || !after.Has(net.ParseIP("192.168.1.100")) {
+	if !after.Has(net.ParseIP("192.168.1.1")) ||
+		!after.Has(net.ParseIP("192.168.1.100")) ||
+		after.Has(net.ParseIP("192.168.2.1")) {
 		t.Errorf("unexpected ipallocator state: %#v", after)
 	}
 	if free := after.Free(); free != 252 {

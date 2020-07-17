@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -179,6 +180,17 @@ func TestRepairWithExisting(t *testing.T) {
 				HealthCheckNodePort: 144,
 			},
 		},
+		&corev1.Service{ // being deleted with finalizer, skipped
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:         "seven",
+				Name:              "seven",
+				DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				Finalizers:        []string{"test-finalizer"},
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{NodePort: 222}},
+			},
+		},
 	)
 
 	registry := &mockRangeRegistry{
@@ -198,7 +210,7 @@ func TestRepairWithExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !after.Has(111) || !after.Has(122) || !after.Has(133) || !after.Has(144) {
+	if !after.Has(111) || !after.Has(122) || !after.Has(133) || !after.Has(144) || after.Has(222) {
 		t.Errorf("unexpected portallocator state: %#v", after)
 	}
 	if free := after.Free(); free != 97 {

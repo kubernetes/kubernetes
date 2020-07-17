@@ -130,6 +130,10 @@ func (c *Repair) runOnce() error {
 	// Check every Service's ports, and rebuild the state as we think it should be.
 	for i := range list.Items {
 		svc := &list.Items[i]
+		if svc.ObjectMeta.DeletionTimestamp != nil {
+			// Skip repairing if service is being deleted.
+			continue
+		}
 		ports := collectServiceNodePorts(svc)
 		if len(ports) == 0 {
 			continue

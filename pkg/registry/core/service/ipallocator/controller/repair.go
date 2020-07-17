@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -212,8 +212,10 @@ func (c *Repair) runOnce() error {
 
 	// Check every Service's ClusterIP, and rebuild the state as we think it should be.
 	for _, svc := range list.Items {
-		if !helper.IsServiceIPSet(&svc) {
-			// didn't need a cluster IP
+		if svc.ObjectMeta.DeletionTimestamp != nil ||
+			!helper.IsServiceIPSet(&svc) {
+			// Skip repairing if service is being deleted
+			// or didn't need a cluster IP.
 			continue
 		}
 		ip := net.ParseIP(svc.Spec.ClusterIP)
