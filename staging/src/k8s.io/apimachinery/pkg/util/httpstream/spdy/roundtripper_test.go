@@ -471,9 +471,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 						t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
 					}
 				}
-				if l != nil {
-					l.Close()
-				}
 			}
 		})
 	}
