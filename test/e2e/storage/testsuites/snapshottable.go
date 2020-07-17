@@ -207,23 +207,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 				vscontent = sr.Vscontent
 				vsc = sr.Vsclass
 			})
-
-			ginkgo.It("should delete the VolumeSnapshotContent according to its deletion policy", func() {
-				err = DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
-				framework.ExpectNoError(err)
-
-				switch pattern.SnapshotDeletionPolicy {
-				case testpatterns.DeleteSnapshot:
-					ginkgo.By("checking the SnapshotContent has been deleted")
-					err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, vscontent.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
-					framework.ExpectNoError(err)
-				case testpatterns.RetainSnapshot:
-					ginkgo.By("checking the SnapshotContent has not been deleted")
-					err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, vscontent.GetName(), 1*time.Second /* poll */, 30*time.Second /* timeout */)
-					framework.ExpectError(err)
-				}
-			})
-			ginkgo.It("should create snapshot objects correctly", func() {
+			ginkgo.It("should create snapshot objects correctly and delete according to its deletion policy", func() {
 				ginkgo.By("checking the snapshot")
 				// Get new copy of the snapshot
 				vs, err = dc.Resource(SnapshotGVR).Namespace(vs.GetNamespace()).Get(context.TODO(), vs.GetName(), metav1.GetOptions{})
@@ -243,6 +227,21 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 				framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
 				framework.ExpectEqual(volumeSnapshotRef["name"], vs.GetName())
 				framework.ExpectEqual(volumeSnapshotRef["namespace"], vs.GetNamespace())
+
+				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
+				err = DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
+				framework.ExpectNoError(err)
+
+				switch pattern.SnapshotDeletionPolicy {
+				case testpatterns.DeleteSnapshot:
+					ginkgo.By("checking the SnapshotContent has been deleted")
+					err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, vscontent.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
+					framework.ExpectNoError(err)
+				case testpatterns.RetainSnapshot:
+					ginkgo.By("checking the SnapshotContent has not been deleted")
+					err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, vscontent.GetName(), 1*time.Second /* poll */, 30*time.Second /* timeout */)
+					framework.ExpectError(err)
+				}
 			})
 			ginkgo.It("should restore from snapshot with saved data after modifying source data", func() {
 				var restoredPVC *v1.PersistentVolumeClaim
