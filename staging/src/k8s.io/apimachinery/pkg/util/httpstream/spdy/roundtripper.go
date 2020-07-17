@@ -32,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/proxy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -163,6 +164,18 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return s.dialWithoutProxy(req.Context(), req.URL)
 	}
 
+	switch proxyURL.Scheme {
+	case "socks5":
+		return s.dialWithSocks5Proxy(req, proxyURL)
+	case "https", "http", "":
+		return s.dialWithHttpProxy(req, proxyURL)
+	}
+
+	return nil, fmt.Errorf("proxy URL scheme not supported: %s", proxyURL.Scheme)
+}
+
+// dialWithHttpProxy dials the host specified by url through an http or an https proxy.
+func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
 	targetHost := netutil.CanonicalAddr(req.URL)
 
@@ -170,15 +183,17 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	proxyReq := http.Request{
 		Method: "CONNECT",
 		URL:    &url.URL{},
+		Header: http.Header{},
 		Host:   targetHost,
 	}
 
+	proxyReq = *proxyReq.WithContext(req.Context())
+
 	if pa := s.proxyAuth(proxyURL); pa != "" {
-		proxyReq.Header = http.Header{}
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
-	proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
+	proxyDialConn, err := s.dialWithoutProxy(proxyReq.Context(), proxyURL)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +209,52 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	if req.URL.Scheme != "https" {
+	return s.tlsConn(req.URL, rwc, targetHost)
+}
+
+// dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
+func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(req.URL)
+	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
+
+	var auth *proxy.Auth
+	if proxyURL.User != nil {
+		pass, _ := proxyURL.User.Password()
+		auth = &proxy.Auth{
+			User:     proxyURL.User.Username(),
+			Password: pass,
+		}
+	}
+
+	dialer := s.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{}
+	}
+
+	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, dialer)
+
+	if err != nil {
+		return nil, err
+	}
+
+	proxyDialConn, err := proxyDialer.(proxy.ContextDialer).DialContext(req.Context(), "tcp", targetHost)
+
+	if err != nil {
+		return nil, err
+	}
+
+	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+
+	rwc, _ := proxyClientConn.Hijack()
+
+	return s.tlsConn(req.URL, rwc, targetHost)
+}
+
+// tlsConn returns a TLS client side connection using rwc as the underlying transport.
+func (s *SpdyRoundTripper) tlsConn(requestUrl *url.URL, rwc net.Conn, targetHost string) (net.Conn, error) {
+
+	if requestUrl.Scheme != "https" {
 		return rwc, nil
 	}
 
