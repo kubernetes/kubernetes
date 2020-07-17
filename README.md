@@ -72,7 +72,7 @@ That said, if you have questions, reach out to us
 
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
 [Borg]: https://research.google.com/pubs/pub43438.html
-[CNCF]: https://www.cncf.io/about
+[CNCF]: https://www.cncf.io/
 [communication]: https://git.k8s.io/community/communication
 [community repository]: https://git.k8s.io/community
 [containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
