@@ -131,7 +131,7 @@ dependencies:
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/kube-cross:v\d+\.\d+\.\d+-\d+
 
   - name: "repo-infra"
-    version: 0.0.5
+    version: 0.0.8
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
