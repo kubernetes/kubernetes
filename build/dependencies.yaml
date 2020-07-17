@@ -71,7 +71,7 @@ dependencies:
       match: const etcdImage
 
   - name: "golang"
-    version: 1.13.14
+    version: 1.14.6
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -110,7 +110,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.13.14-1
+    version: v1.14.6-1
     refPaths:
     - path: build/build-image/cross/VERSION
 
