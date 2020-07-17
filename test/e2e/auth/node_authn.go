@@ -27,6 +27,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
@@ -60,7 +61,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		pod := createNodeAuthTestPod(f)
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
-			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s:%v/metrics", "%{http_code}", nodeIP, ports.KubeletPort))
+			result := e2ekubectl.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s:%v/metrics", "%{http_code}", nodeIP, ports.KubeletPort))
 			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
 		}
 	})
@@ -81,7 +82,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		pod := createNodeAuthTestPod(f)
 
 		for _, nodeIP := range nodeIPs {
-			result := framework.RunHostCmdOrDie(ns,
+			result := e2ekubectl.RunHostCmdOrDie(ns,
 				pod.Name,
 				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s:%v/metrics",
 					"%{http_code}",

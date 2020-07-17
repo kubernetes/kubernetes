@@ -44,6 +44,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -894,7 +895,7 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 	}
 
 	err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
-		if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+		if _, err := e2ekubectl.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
 			return false, nil
 		}
@@ -975,7 +976,7 @@ func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod)
 	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svcName)
-	_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
+	_, stderr, err := e2ekubectl.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
 	// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
 	// we can check stderr for the error.
 	if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {

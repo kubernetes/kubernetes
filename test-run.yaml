@@ -1,0 +1,18 @@
+# config for 1 control plane node and 2 workers.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  ipFamily: ipv4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+featureGates:
+kubeadmConfigPatches:
+- |
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  apiServer:
+    extraArgs:
+      runtime-config: ""

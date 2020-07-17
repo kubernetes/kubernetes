@@ -41,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -236,7 +237,7 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 			continue
 		}
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
-		desc, _ := framework.RunKubectl(
+		desc, _ := e2ekubectl.RunKubectl(
 			e.Namespace, "describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
 		framework.Logf(desc)
 	}
@@ -506,7 +507,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 	podName := config.HostTestContainerPod.Name
 	var msg string
 	if pollErr := wait.PollImmediate(retryInterval, retryTimeout, func() (bool, error) {
-		stdout, err := framework.RunHostCmd(config.Namespace, podName, cmd)
+		stdout, err := e2ekubectl.RunHostCmd(config.Namespace, podName, cmd)
 		if err != nil {
 			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
 			framework.Logf(msg)
@@ -520,7 +521,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 		return true, nil
 	}); pollErr != nil {
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
-		desc, _ := framework.RunKubectl(
+		desc, _ := e2ekubectl.RunKubectl(
 			config.Namespace, "describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
 		framework.Logf("%s", desc)
 		framework.Failf("Timed out in %v: %v", retryTimeout, msg)

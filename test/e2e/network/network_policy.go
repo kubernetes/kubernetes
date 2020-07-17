@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -1936,6 +1937,11 @@ func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.P
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
 		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
+<<<<<<< HEAD
+=======
+		// Dump debug information for the test namespace.
+		e2ekubectl.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+>>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 	}
 }
 
@@ -1952,6 +1958,11 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
 		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
+<<<<<<< HEAD
+=======
+		// Dump debug information for the test namespace.
+		e2ekubectl.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+>>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 	}
 }
 
@@ -1973,7 +1984,7 @@ func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, pod
 		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2ekubectl.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 	}
 }
 

@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -376,7 +377,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+				e2ekubectl.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all stateful set in ns %v", ns)
 			e2estatefulset.DeleteAllStatefulSets(c, ns)

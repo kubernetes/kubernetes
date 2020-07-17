@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -745,7 +746,7 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 			return err
 		}
 
-		framework.WaitForSSHTunnels(namespace)
+		e2ekubectl.WaitForSSHTunnels(namespace)
 	}
 	return nil
 }

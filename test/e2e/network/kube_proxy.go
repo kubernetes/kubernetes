@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -215,7 +216,7 @@ var _ = SIGDescribe("KubeProxy", func() {
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
 		if err := wait.PollImmediate(1*time.Second, postFinTimeoutSeconds, func() (bool, error) {
-			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
+			result, err := e2ekubectl.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
 				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)

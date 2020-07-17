@@ -2,7 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["kubectl_utils.go"],
+    srcs = ["kubectl_utils.go","kubectl_builder.go"],
     importpath = "k8s.io/kubernetes/test/e2e/framework/kubectl",
     visibility = ["//visibility:public"],
     deps = [

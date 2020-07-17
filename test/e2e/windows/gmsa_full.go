@@ -53,6 +53,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -235,9 +236,9 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
 	cleanUpFunc = func() {
-		framework.RunKubectl(f.Namespace.Name, "delete", "--filename", manifestsFile)
-		framework.RunKubectl(f.Namespace.Name, "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
-		framework.RunKubectl(f.Namespace.Name, "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
+		e2ekubectl.RunKubectl(f.Namespace.Name, "delete", "--filename", manifestsFile)
+		e2ekubectl.RunKubectl(f.Namespace.Name, "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
+		e2ekubectl.RunKubectl(f.Namespace.Name, "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
 		os.RemoveAll(tempDir)
 	}
 
@@ -272,7 +273,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 	defer tempFile.Close()
 
 	cleanUpFunc = func() {
-		framework.RunKubectl(ns, "delete", "--filename", tempFile.Name())
+		e2ekubectl.RunKubectl(ns, "delete", "--filename", tempFile.Name())
 		os.Remove(tempFile.Name())
 	}
 
@@ -282,7 +283,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 		return cleanUpFunc, err
 	}
 
-	output, err := framework.RunKubectl(ns, "apply", "--filename", tempFile.Name())
+	output, err := e2ekubectl.RunKubectl(ns, "apply", "--filename", tempFile.Name())
 	if err != nil {
 		err = errors.Wrapf(err, "unable to create custom resource, output:\n%s", output)
 	}
@@ -392,5 +393,5 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
-	return framework.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
+	return e2ekubectl.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
 }

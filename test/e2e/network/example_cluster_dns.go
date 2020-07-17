@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -95,11 +96,11 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
+			e2ekubectl.RunKubectlOrDie(ns.Name, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+			e2ekubectl.RunKubectlOrDie(ns.Name, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
 		}
 
 		// wait for objects
@@ -140,14 +141,14 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		podName := pods.Items[0].Name
 
 		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
-		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
+		_, err = e2ekubectl.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		framework.ExpectNoError(err, "waiting for output from pod exec")
 
 		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			framework.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
+			e2ekubectl.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
@@ -159,7 +160,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for pods to print their result
 		for _, ns := range namespaces {
-			_, err := framework.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
+			_, err := e2ekubectl.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
 			framework.ExpectNoError(err, "pod %s failed to print result in logs", frontendPodName)
 		}
 	})

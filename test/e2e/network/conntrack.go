@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -297,7 +298,7 @@ func dumpConntrack(cs clientset.Interface) {
 	cmd := "conntrack -L"
 	for _, pod := range pods.Items {
 		if strings.Contains(pod.Name, "kube-proxy") {
-			stdout, err := framework.RunHostCmd(namespace, pod.Name, cmd)
+			stdout, err := e2ekubectl.RunHostCmd(namespace, pod.Name, cmd)
 			if err != nil {
 				framework.Logf("Failed to dump conntrack table of node %s: %v", pod.Spec.NodeName, err)
 				continue

@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -57,6 +58,29 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 	return err
 }
 
+<<<<<<< HEAD
+=======
+// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
+func MasterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
+	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
+	// TODO: Remove these variables when they're no longer needed for downgrades.
+	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+		env = append(env,
+			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE="+etcdImage)
+	} else {
+		// In e2e tests, we skip the confirmation prompt about
+		// implicit etcd upgrades to simulate the user entering "y".
+		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
+	}
+
+	v := "v" + rawV
+	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-M", v)
+	return err
+}
+
+>>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 // LocationParamGKE returns parameter related to location for gcloud command.
 func LocationParamGKE() string {
 	if TestContext.CloudConfig.MultiMaster {
@@ -75,53 +99,12 @@ func AppendContainerCommandGroupIfNeeded(args []string) []string {
 	return args
 }
 
-// MasterUpgradeGKE upgrades master node to the specified version on GKE.
-func MasterUpgradeGKE(namespace string, v string) error {
-	Logf("Upgrading master to %q", v)
-	args := []string{
-		"container",
-		"clusters",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		LocationParamGKE(),
-		"upgrade",
-		TestContext.CloudConfig.Cluster,
-		"--master",
-		fmt.Sprintf("--cluster-version=%s", v),
-		"--quiet",
-	}
-	_, _, err := RunCmd("gcloud", AppendContainerCommandGroupIfNeeded(args)...)
-	if err != nil {
-		return err
-	}
-
-	WaitForSSHTunnels(namespace)
-
-	return nil
-}
-
 // GCEUpgradeScript returns path of script for upgrading on GCE.
 func GCEUpgradeScript() string {
 	if len(TestContext.GCEUpgradeScript) == 0 {
 		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
 	return TestContext.GCEUpgradeScript
-}
-
-// WaitForSSHTunnels waits for establishing SSH tunnel to busybox pod.
-func WaitForSSHTunnels(namespace string) {
-	Logf("Waiting for SSH tunnels to establish")
-	RunKubectl(namespace, "run", "ssh-tunnel-test",
-		"--image=busybox",
-		"--restart=Never",
-		"--command", "--",
-		"echo", "Hello")
-	defer RunKubectl(namespace, "delete", "pod", "ssh-tunnel-test")
-
-	// allow up to a minute for new ssh tunnels to establish
-	wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
-		_, err := RunKubectl(namespace, "logs", "ssh-tunnel-test")
-		return err == nil, nil
-	})
 }
 
 // NodeKiller is a utility to simulate node failures.

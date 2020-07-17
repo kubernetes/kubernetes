@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -72,7 +73,7 @@ func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, ho
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := framework.RunKubectl(
+	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
 }

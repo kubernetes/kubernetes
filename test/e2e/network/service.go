@@ -52,6 +52,7 @@ import (
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubesystem "k8s.io/kubernetes/test/e2e/framework/kubesystem"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -125,7 +126,7 @@ func affinityCheckFromPod(execPod *v1.Pod, serviceIP string, servicePort int) (t
 	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
 	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	getHosts := func() []string {
-		stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		stdout, err := e2ekubectl.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
 			return nil
@@ -326,6 +327,7 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods
 	cmdFunc := func(podName string) string {
 		wgetCmd := "wget -q -T 1 -O -"
 		serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+<<<<<<< HEAD
 		cmd := fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
 			50*len(expectedPods), wgetCmd, serviceIPPort)
 		framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, podName)
@@ -335,6 +337,34 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, podName, err, output)
 		}
 		return output
+=======
+		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
+			50*len(expectedPods), wget, serviceIPPort)
+	}
+	commands := []func() string{
+		// verify service from node
+		func() string {
+			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
+			framework.Logf("Executing cmd %q on host %v", cmd, host)
+			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+			if err != nil || result.Code != 0 {
+				e2essh.LogResult(result)
+				framework.Logf("error while SSH-ing to node: %v", err)
+			}
+			return result.Stdout
+		},
+		// verify service from pod
+		func() string {
+			cmd := buildCommand("wget -q -T 1 -O -")
+			framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPod.Name)
+			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
+			output, err := e2ekubectl.RunHostCmd(ns, execPod.Name, cmd)
+			if err != nil {
+				framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPod.Name, err, output)
+			}
+			return output
+		},
+>>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 	}
 
 	expectedEndpoints := sets.NewString(expectedPods...)
@@ -1953,7 +1983,7 @@ var _ = SIGDescribe("Services", func() {
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			stdout, err = e2ekubectl.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
 				framework.Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 				return false, nil
@@ -2046,7 +2076,7 @@ var _ = SIGDescribe("Services", func() {
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2ekubectl.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -2069,7 +2099,7 @@ var _ = SIGDescribe("Services", func() {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/; test \"$?\" -ne \"0\"", svcName, port)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2ekubectl.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -2089,7 +2119,7 @@ var _ = SIGDescribe("Services", func() {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2ekubectl.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -2248,7 +2278,7 @@ var _ = SIGDescribe("Services", func() {
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
 		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
-			stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			stdout, err := e2ekubectl.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
 				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
 				return false, nil
@@ -2663,7 +2693,7 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			_, err := e2ekubectl.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
 				if strings.Contains(err.Error(), expectedErr) {
@@ -3151,7 +3181,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
 		ginkgo.By(fmt.Sprintf("Hitting external lb %v from pod %v on node %v", ingressIP, pausePod.Name, pausePod.Spec.NodeName))
 		if pollErr := wait.PollImmediate(framework.Poll, loadBalancerPropagationTimeout, func() (bool, error) {
-			stdout, err := framework.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
+			stdout, err := e2ekubectl.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
 			if err != nil {
 				framework.Logf("got err: %v, retry until timeout", err)
 				return false, nil
@@ -3308,6 +3338,41 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 	})
 })
 
+<<<<<<< HEAD
+=======
+func execSourceipTest(pausePod v1.Pod, serviceAddress string) (string, string) {
+	var err error
+	var stdout string
+	timeout := 2 * time.Minute
+
+	framework.Logf("Waiting up to %v to get response from %s", timeout, serviceAddress)
+	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, serviceAddress)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
+		stdout, err = e2ekubectl.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
+		if err != nil {
+			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		// Need to check output because it might omit in case of error.
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
+			continue
+		}
+		break
+	}
+
+	framework.ExpectNoError(err)
+
+	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
+	host, _, err := net.SplitHostPort(stdout)
+	if err != nil {
+		// ginkgo.Fail the test if output format is unexpected.
+		framework.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
+	}
+	return pausePod.Status.PodIP, host
+}
+
+>>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
 // affinity test for non-load-balancer services. Session afinity will be
 // enabled when the service is created and a short timeout will be configured so
@@ -3371,7 +3436,7 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 	hosts := sets.NewString()
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, net.JoinHostPort(svcIP, strconv.Itoa(servicePort)))
 	for i := 0; i < 10; i++ {
-		hostname, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		hostname, err := e2ekubectl.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err == nil {
 			hosts.Insert(hostname)
 			if hosts.Len() > 1 {
@@ -3567,7 +3632,7 @@ func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		_, err := e2ekubectl.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
 			return false, nil
@@ -3590,7 +3655,7 @@ func proxyMode(f *framework.Framework) (string, error) {
 	defer f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
+	stdout, err := e2ekubectl.RunHostCmd(pod.Namespace, pod.Name, cmd)
 	if err != nil {
 		return "", err
 	}
@@ -3710,6 +3775,11 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 		}
 		return framework.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 	}
+<<<<<<< HEAD
+=======
+	return e2ekubectl.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+}
+>>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 
 	return restartComponent(cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
 }

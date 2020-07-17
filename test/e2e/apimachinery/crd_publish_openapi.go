@@ -43,6 +43,7 @@ import (
 	k8sclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"k8s.io/kubernetes/test/utils/crd"
 )
 
@@ -74,34 +75,34 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
 		validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, validCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, validCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, validCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, validCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
 
 		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
 		unknownCR := fmt.Sprintf(`{%s,"spec":{"foo":true}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
 			framework.Failf("unexpected no error when creating CR with unknown field: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
 			framework.Failf("unexpected no error when applying CR with unknown field: %v", err)
 		}
 
 		ginkgo.By("client-side validation (kubectl create and apply) rejects request without required properties")
 		noRequireCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"age":"10"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
 			framework.Failf("unexpected no error when creating CR without required field: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
 			framework.Failf("unexpected no error when applying CR without required field: %v", err)
 		}
 
@@ -122,7 +123,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		ginkgo.By("kubectl explain works to return error when explain is called on property that doesn't exist")
-		if _, err := framework.RunKubectl(f.Namespace.Name, "explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, "explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
@@ -149,16 +150,16 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
@@ -190,16 +191,16 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD that allows unknown properties at the root: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
@@ -231,17 +232,17 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
-		randomCR := fmt.Sprintf(`{%s,"spec":{"a":null,"b":[{"c":"d"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
+		randomCR := fmt.Sprintf(`{%s,"spec":{"b":[{"c":"d"}]}}`, meta)
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD that allows unknown properties in a nested object: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
@@ -704,7 +705,7 @@ func dropDefaults(s *spec.Schema) {
 }
 
 func verifyKubectlExplain(ns, name, pattern string) error {
-	result, err := framework.RunKubectl(ns, "explain", name)
+	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
 	if err != nil {
 		return fmt.Errorf("failed to explain %s: %v", name, err)
 	}

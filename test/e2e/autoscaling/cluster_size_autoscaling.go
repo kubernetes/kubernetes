@@ -45,6 +45,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -590,7 +591,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		if len(newNodesSet) > 1 {
 			ginkgo.By(fmt.Sprintf("Spotted following new nodes in %s: %v", minMig, newNodesSet))
 			klog.Infof("Usually only 1 new node is expected, investigating")
-			klog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie(f.Namespace.Name, "get", "nodes", "-o", "json"))
+			klog.Infof("Kubectl:%s\n", e2ekubectl.RunKubectlOrDie(f.Namespace.Name, "get", "nodes", "-o", "json"))
 			if output, err := exec.Command("gcloud", "compute", "instances", "list",
 				"--project="+framework.TestContext.CloudConfig.ProjectID,
 				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
@@ -1404,8 +1405,8 @@ func waitForCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interface
 		klog.Infof("Too many pods are not ready yet: %v", notready)
 	}
 	klog.Info("Timeout on waiting for pods being ready")
-	klog.Info(framework.RunKubectlOrDie(f.Namespace.Name, "get", "pods", "-o", "json", "--all-namespaces"))
-	klog.Info(framework.RunKubectlOrDie(f.Namespace.Name, "get", "nodes", "-o", "json"))
+	klog.Info(e2ekubectl.RunKubectlOrDie(f.Namespace.Name, "get", "pods", "-o", "json", "--all-namespaces"))
+	klog.Info(e2ekubectl.RunKubectlOrDie(f.Namespace.Name, "get", "nodes", "-o", "json"))
 
 	// Some pods are still not running.
 	return fmt.Errorf("Too many pods are still not running: %v", notready)

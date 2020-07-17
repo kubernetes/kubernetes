@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -318,10 +319,10 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 
 			// Create empty files on the mounted volumes on the pod to verify volume is writable
 			ginkgo.By("Creating empty file on volume mounted on pod-A")
-			framework.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
+			e2ekubectl.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
 
 			ginkgo.By("Creating empty file volume mounted on pod-B")
-			framework.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
+			e2ekubectl.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
 
 			// Verify newly and previously created files present on the volume mounted on the pod
 			ginkgo.By("Verify newly Created file and previously created files present on volume mounted on pod-A")

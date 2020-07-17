@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -113,7 +114,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+				e2ekubectl.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2estatefulset.DeleteAllStatefulSets(c, ns)
@@ -880,7 +881,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+				e2ekubectl.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2estatefulset.DeleteAllStatefulSets(c, ns)
@@ -919,7 +920,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
 	var err error
 	for i := 0; i < 3; i++ {
-		if out, err = framework.RunKubectl(ns, args...); err == nil {
+		if out, err = e2ekubectl.RunKubectl(ns, args...); err == nil {
 			return
 		}
 		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
@@ -983,14 +984,14 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
 func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(framework.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
+	return lastLine(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
 }
 
 type mysqlGaleraTester struct {
@@ -1047,7 +1048,7 @@ func (m *redisTester) name() string {
 
 func (m *redisTester) redisExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return framework.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectlOrDie(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1078,7 +1079,7 @@ func (c *cockroachDBTester) name() string {
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return framework.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectlOrDie(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1279,7 +1280,7 @@ func breakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
-	stdout, err := framework.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	stdout, err := e2ekubectl.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -1303,7 +1304,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
-	stdout, err := framework.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	stdout, err := e2ekubectl.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
