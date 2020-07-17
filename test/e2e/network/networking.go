@@ -133,7 +133,7 @@ var _ = SIGDescribe("Networking", func() {
 			// TODO: test proxy links here
 		}
 		if !framework.ProviderIs("gke", "skeleton") {
-			tests = append(tests, struct{ path string }{path: "/logs"})
+			tests = append(tests, struct{ path string }{path: "/logs/"})
 		}
 		for _, test := range tests {
 			ginkgo.By(fmt.Sprintf("testing: %s", test.path))
