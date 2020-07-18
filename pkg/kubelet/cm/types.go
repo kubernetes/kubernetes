@@ -26,11 +26,11 @@ type ResourceConfig struct {
 	// Memory limit (in bytes).
 	Memory *int64
 	// CPU shares (relative weight vs. other containers).
-	CpuShares *uint64
+	CPUShares *uint64
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
-	CpuQuota *int64
+	CPUQuota *int64
 	// CPU quota period.
-	CpuPeriod *uint64
+	CPUPeriod *uint64
 	// HugePageLimit map from page size (in bytes) to limit (in bytes)
 	HugePageLimit map[int64]int64
 	// Maximum number of pids

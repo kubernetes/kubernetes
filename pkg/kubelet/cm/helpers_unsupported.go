@@ -27,7 +27,6 @@ const (
 	MinShares     = 0
 	SharesPerCPU  = 0
 	MilliCPUToCPU = 0
-
 	MinQuotaPeriod = 0
 )
 

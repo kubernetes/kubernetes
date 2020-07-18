@@ -16131,9 +16131,9 @@ func (this *LinuxContainerResources) String() string {
 	}
 	repeatedStringForHugepageLimits += "}"
 	s := strings.Join([]string{`&LinuxContainerResources{`,
-		`CpuPeriod:` + fmt.Sprintf("%v", this.CpuPeriod) + `,`,
-		`CpuQuota:` + fmt.Sprintf("%v", this.CpuQuota) + `,`,
-		`CpuShares:` + fmt.Sprintf("%v", this.CpuShares) + `,`,
+		`CPUPeriod:` + fmt.Sprintf("%v", this.CpuPeriod) + `,`,
+		`CPUQuota:` + fmt.Sprintf("%v", this.CpuQuota) + `,`,
+		`CPUShares:` + fmt.Sprintf("%v", this.CpuShares) + `,`,
 		`MemoryLimitInBytes:` + fmt.Sprintf("%v", this.MemoryLimitInBytes) + `,`,
 		`OomScoreAdj:` + fmt.Sprintf("%v", this.OomScoreAdj) + `,`,
 		`CpusetCpus:` + fmt.Sprintf("%v", this.CpusetCpus) + `,`,
@@ -16239,7 +16239,7 @@ func (this *WindowsContainerResources) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&WindowsContainerResources{`,
-		`CpuShares:` + fmt.Sprintf("%v", this.CpuShares) + `,`,
+		`CPUShares:` + fmt.Sprintf("%v", this.CpuShares) + `,`,
 		`CpuCount:` + fmt.Sprintf("%v", this.CpuCount) + `,`,
 		`CpuMaximum:` + fmt.Sprintf("%v", this.CpuMaximum) + `,`,
 		`MemoryLimitInBytes:` + fmt.Sprintf("%v", this.MemoryLimitInBytes) + `,`,
@@ -22381,7 +22381,7 @@ func (m *LinuxContainerResources) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CpuPeriod", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CPUPeriod", wireType)
 			}
 			m.CpuPeriod = 0
 			for shift := uint(0); ; shift += 7 {
@@ -22400,7 +22400,7 @@ func (m *LinuxContainerResources) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CpuQuota", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CPUQuota", wireType)
 			}
 			m.CpuQuota = 0
 			for shift := uint(0); ; shift += 7 {
@@ -22419,7 +22419,7 @@ func (m *LinuxContainerResources) Unmarshal(dAtA []byte) error {
 			}
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CpuShares", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CPUShares", wireType)
 			}
 			m.CpuShares = 0
 			for shift := uint(0); ; shift += 7 {
@@ -23925,7 +23925,7 @@ func (m *WindowsContainerResources) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CpuShares", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CPUShares", wireType)
 			}
 			m.CpuShares = 0
 			for shift := uint(0); ; shift += 7 {
