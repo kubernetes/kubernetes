@@ -143,17 +143,17 @@ func (o *Options) RunConvert() error {
 	// not be removed from convert. Another way to convert a resource is to
 	// "kubectl apply" it to the cluster, then "kubectl get" at the desired version.
 	// Another possible solution is to make convert a plugin.
-	fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
+	_, _ = fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
 
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
 	if !o.local {
-		schema, err := o.validator()
+		getSchema, err := o.validator()
 		if err != nil {
 			return err
 		}
-		b.Schema(schema)
+		b.Schema(getSchema)
 	}
 
 	r := b.NamespaceParam(o.Namespace).
