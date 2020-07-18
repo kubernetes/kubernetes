@@ -104,10 +104,10 @@ type kubenetNetworkPlugin struct {
 	// kubenet can use either hostportSyncer and hostportManager to implement hostports
 	// Currently, if network host supports legacy features, hostportSyncer will be used,
 	// otherwise, hostportManager will be used.
-	hostportSyncer    hostport.HostportSyncer
-	hostportSyncerv6  hostport.HostportSyncer
-	hostportManager   hostport.HostPortManager
-	hostportManagerv6 hostport.HostPortManager
+	hostportSyncer    hostport.Syncer
+	hostportSyncerv6  hostport.Syncer
+	hostportManager   hostport.Manager
+	hostportManagerv6 hostport.Manager
 	iptables          utiliptables.Interface
 	iptablesv6        utiliptables.Interface
 	sysctl            utilsysctl.Interface
