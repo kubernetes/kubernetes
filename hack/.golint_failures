@@ -97,7 +97,6 @@ pkg/kubeapiserver/options
 pkg/kubelet/cm
 pkg/kubelet/container
 pkg/kubelet/container/testing
-pkg/kubelet/cri/remote
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
