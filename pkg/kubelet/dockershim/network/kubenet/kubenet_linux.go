@@ -120,7 +120,7 @@ type kubenetNetworkPlugin struct {
 	podCIDRs          []*net.IPNet
 }
 
-func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
+func NewPlugin(networkPluginDirs []string, cacheDir string) network.Plugin {
 	execer := utilexec.New()
 	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIPv4)
 	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIPv6)
