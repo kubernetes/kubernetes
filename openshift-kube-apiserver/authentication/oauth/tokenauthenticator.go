@@ -2,8 +2,11 @@ package oauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
@@ -34,7 +37,17 @@ func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users u
 	}
 }
 
+const sha256Prefix = "sha256:"
+
 func (a *tokenAuthenticator) AuthenticateToken(ctx context.Context, name string) (*kauthenticator.Response, bool, error) {
+	// hash token for new-style sha256: prefixed token
+	// TODO: reject non-sha256 prefix tokens in 4.7+
+	if strings.HasPrefix(name, sha256Prefix) {
+		withoutPrefix := strings.TrimPrefix(name, sha256Prefix)
+		h := sha256.Sum256([]byte(withoutPrefix))
+		name = sha256Prefix + base64.RawURLEncoding.EncodeToString(h[0:])
+	}
+
 	token, err := a.tokens.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errLookup // mask the error so we do not leak token data in logs
