@@ -725,7 +725,7 @@ github.com/vmware/govmomi/vim25/xml
 github.com/xiang90/probing
 # go.etcd.io/bbolt v1.3.5 => go.etcd.io/bbolt v1.3.5
 go.etcd.io/bbolt
-# go.etcd.io/etcd v0.5.0-alpha.5.0.20200520232829-54ba9589114f => go.etcd.io/etcd v0.5.0-alpha.5.0.20200520232829-54ba9589114f
+# go.etcd.io/etcd v0.5.0-alpha.5.0.20200716221620-18dfb9cca345 => go.etcd.io/etcd v0.5.0-alpha.5.0.20200716221620-18dfb9cca345
 go.etcd.io/etcd/auth
 go.etcd.io/etcd/auth/authpb
 go.etcd.io/etcd/client
