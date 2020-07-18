@@ -53,7 +53,7 @@ func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error
 		Options:  f.DNSOptions}, f.Err
 }
 
-// This is not used by docker runtime.
+// GeneratePodHostNameAndDomain is not used by docker runtime.
 func (f *FakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	return f.HostName, f.HostDomain, f.Err
 }
