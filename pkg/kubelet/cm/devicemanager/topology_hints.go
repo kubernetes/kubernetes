@@ -20,6 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
@@ -103,14 +104,8 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 		// First, update minAffinitySize for the current request size.
 		devicesInMask := 0
 		for _, device := range m.allDevices[resource] {
-			if device.Topology == nil {
-				continue
-			}
-			for _, node := range device.Topology.Nodes {
-				if mask.IsSet(int(node.ID)) {
-					devicesInMask++
-					break
-				}
+			if mask.AnySet(m.getNUMANodeIds(device.Topology)) {
+				devicesInMask++
 			}
 		}
 		if devicesInMask >= request && mask.Count() < minAffinitySize {
@@ -121,14 +116,8 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 		// NUMA Node combination to satisfy the device request.
 		numMatching := 0
 		for d := range devices {
-			if m.allDevices[resource][d].Topology == nil {
-				continue
-			}
-			for _, node := range m.allDevices[resource][d].Topology.Nodes {
-				if mask.IsSet(int(node.ID)) {
-					numMatching++
-					break
-				}
+			if mask.AnySet(m.getNUMANodeIds(m.allDevices[resource][d].Topology)) {
+				numMatching++
 			}
 		}
 
@@ -157,4 +146,15 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 	}
 
 	return hints
+}
+
+func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {
+	if topology == nil {
+		return nil
+	}
+	var ids []int
+	for _, n := range topology.Nodes {
+		ids = append(ids, int(n.ID))
+	}
+	return ids
 }
