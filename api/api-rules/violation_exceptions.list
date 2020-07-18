@@ -472,9 +472,15 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,AttachDetachControllerConfiguration,DisableAttachDetachReconcilerSync
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,AttachDetachControllerConfiguration,ReconcilerSyncLoopPeriod
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningConfiguration,CertFile
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningConfiguration,KeyFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,ClusterSigningCertFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,ClusterSigningDuration
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,ClusterSigningKeyFile
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,KubeAPIServerClientSignerConfiguration
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,KubeletClientSignerConfiguration
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,KubeletServingSignerConfiguration
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,LegacyUnknownSignerConfiguration
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CloudProviderConfiguration,CloudConfigFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CloudProviderConfiguration,Name
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DaemonSetControllerConfiguration,ConcurrentDaemonSetSyncs

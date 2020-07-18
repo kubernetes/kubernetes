@@ -160,9 +160,13 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["core_test.go"],
+    srcs = [
+        "certificates_test.go",
+        "core_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/controller/certificates/signer/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
