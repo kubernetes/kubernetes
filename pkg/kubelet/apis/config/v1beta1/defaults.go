@@ -30,16 +30,16 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
+// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 const (
-	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 	DefaultIPTablesMasqueradeBit = 14
 	DefaultIPTablesDropBit       = 15
 	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 )
 
+// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 var (
 	zeroDuration = metav1.Duration{}
-	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	DefaultNodeAllocatableEnforcement = []string{"pods"}
 )
@@ -48,7 +48,8 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
+// SetDefaultsKubeletConfiguration sets default config for Kubelet
+func SetDefaultsKubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
 	if obj.EnableServer == nil {
 		obj.EnableServer = utilpointer.BoolPtr(true)
 	}

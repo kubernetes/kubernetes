@@ -34,5 +34,5 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_KubeletConfiguration(in *v1beta1.KubeletConfiguration) {
-	SetDefaults_KubeletConfiguration(in)
+	SetDefaultsKubeletConfiguration(in)
 }
