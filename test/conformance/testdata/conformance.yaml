@@ -1108,6 +1108,12 @@
     events match. Events are produced from writes on a background goroutine.
   release: v1.15
   file: test/e2e/apimachinery/watch.go
+- testname: Confirm a server version
+  codename: '[sig-api-machinery] server version should find the server version [Conformance]'
+  description: Ensure that an API server version can be retrieved. Both the major
+    and minor versions MUST only be an integer.
+  release: v1.19
+  file: test/e2e/apimachinery/server_version.go
 - testname: DaemonSet-FailedPodCreation
   codename: '[sig-apps] Daemon set [Serial] should retry creating failed daemon pods
     [Conformance]'
