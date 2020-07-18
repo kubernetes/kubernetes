@@ -202,8 +202,8 @@ func (f *FakeDockerClient) getCalledNames() []string {
 	return names
 }
 
-// Because the new data type returned by engine-api is too complex to manually initialize, we need a
-// fake container which is easier to initialize.
+// FakeContainer for easier initialization, because the new data
+// type returned by engine-api is too complex to manually initialize.
 type FakeContainer struct {
 	ID         string
 	Name       string
@@ -636,10 +636,10 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 			return ImageNotFoundError{ID: image}
 		}
 
-		authJson, _ := json.Marshal(auth)
+		authJSON, _ := json.Marshal(auth)
 		inspect := createImageInspectFromRef(image)
 		f.ImageInspects[image] = inspect
-		f.appendPulled(fmt.Sprintf("%s using %s", image, string(authJson)))
+		f.appendPulled(fmt.Sprintf("%s using %s", image, string(authJSON)))
 		f.Images = append(f.Images, *createImageFromImageInspect(*inspect))
 		f.ImagesPulled = append(f.ImagesPulled, image)
 	}
