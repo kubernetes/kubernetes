@@ -17,15 +17,20 @@ limitations under the License.
 package scheduling
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
@@ -33,6 +38,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -47,7 +53,6 @@ const (
 
 var (
 	gpuResourceName v1.ResourceName
-	dsYamlURL       string
 )
 
 func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
@@ -125,18 +130,23 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
 	logOSImages(f)
 
+	var err error
+	var ds *appsv1.DaemonSet
 	dsYamlURLFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
 	if dsYamlURLFromEnv != "" {
-		dsYamlURL = dsYamlURLFromEnv
+		// Using DaemonSet from remote URL
+		framework.Logf("Using remote nvidia-driver-installer daemonset manifest from %v", dsYamlURLFromEnv)
+		ds, err = framework.DsFromManifest(dsYamlURLFromEnv)
+		framework.ExpectNoError(err, "failed get remote")
 	} else {
-		dsYamlURL = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		// Using default local DaemonSet
+		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
+		data, err := e2etestfiles.Read("test/e2e/testing-manifests/scheduling/nvidia-driver-installer.yaml")
+		framework.ExpectNoError(err, "failed to read local manifest for nvidia-driver-installer daemonset")
+		ds, err = daemonSetFromData(data)
+		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
 	}
 	gpuResourceName = gpu.NVIDIAGPUResourceName
-
-	e2elog.Logf("Using %v", dsYamlURL)
-	// Creates the DaemonSet that installs Nvidia Drivers.
-	ds, err := framework.DsFromManifest(dsYamlURL)
-	framework.ExpectNoError(err)
 	ds.Namespace = f.Namespace.Name
 	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ds)
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
@@ -166,6 +176,21 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	}, driverInstallTimeout, time.Second).Should(gomega.BeTrue())
 
 	return rsgather
+}
+
+// daemonSetFromData reads a byte slice and returns the daemonset in it.
+func daemonSetFromData(data []byte) (*appsv1.DaemonSet, error) {
+	var ds appsv1.DaemonSet
+	dataJSON, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
+	}
+
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
+	}
+	return &ds, nil
 }
 
 func getGPUsPerPod() int64 {
