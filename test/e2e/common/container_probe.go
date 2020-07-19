@@ -266,6 +266,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 })
 
+// GetContainerStartedTime is a function that get the started time of the container.
 func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
 	for _, status := range p.Status.ContainerStatuses {
 		if status.Name != containerName {
@@ -279,6 +280,7 @@ func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error)
 	return time.Time{}, fmt.Errorf("cannot find container named %q", containerName)
 }
 
+// GetTransitionTimeForReadyCondition is a function that get the transition time for pod's ready condition.
 func GetTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
 	for _, cond := range p.Status.Conditions {
 		if cond.Type == v1.PodReady {
@@ -407,6 +409,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 	return probe
 }
 
+// RunLivenessTest is a function that run test of a pod's liveness.
 func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
