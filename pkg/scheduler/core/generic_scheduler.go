@@ -278,6 +278,14 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profil
 
 	}
 
+	if len(pod.Spec.NodeName) > 0 {
+		nodeInfo, err := g.nodeInfoSnapshot.NodeInfos().Get(pod.Spec.NodeName)
+		if err != nil {
+			return nil, filteredNodesStatuses, err
+		}
+		return []*v1.Node{nodeInfo.Node()}, filteredNodesStatuses, nil
+	}
+
 	feasibleNodes, err := g.findNodesThatPassFilters(ctx, prof, state, pod, filteredNodesStatuses)
 	if err != nil {
 		return nil, nil, err

@@ -333,10 +333,6 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 		// ResourceVersion must be excluded because each object update will
 		// have a new resource version.
 		p.ResourceVersion = ""
-		// Spec.NodeName must be excluded because the pod assumed in the cache
-		// is expected to have a node assigned while the pod update may nor may
-		// not have this field set.
-		p.Spec.NodeName = ""
 		// Annotations must be excluded for the reasons described in
 		// https://github.com/kubernetes/kubernetes/issues/52914.
 		p.Annotations = nil
