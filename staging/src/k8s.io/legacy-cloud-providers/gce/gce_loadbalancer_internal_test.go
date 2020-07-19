@@ -682,11 +682,11 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 	}
 
 	existingFirewall, err := gce.GetFirewall(fwName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingFirewall)
 	// Existing firewall will not be deleted yet since this was the first sync with the new rule created.
 	existingLegacyFirewall, err := gce.GetFirewall(lbName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingLegacyFirewall)
 
 	// Now ensure the firewall again to simulate a second sync where the old rule will be deleted.
@@ -704,10 +704,10 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 	}
 
 	existingFirewall, err = gce.GetFirewall(fwName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingFirewall)
 	existingLegacyFirewall, err = gce.GetFirewall(lbName)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, existingLegacyFirewall)
 
 }
@@ -761,9 +761,9 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		v1.ProtocolTCP,
 		nodes,
 		lbName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	existingFirewall, err := gce.GetFirewall(fwName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingFirewall)
 
 	gce.onXPN = true

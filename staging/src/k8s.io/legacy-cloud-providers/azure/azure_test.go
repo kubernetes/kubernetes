@@ -1257,7 +1257,7 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 
 	newSG, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	assert.Nil(t, newSG)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	assert.Equal(t, expectedError.Error(), err)
 }

@@ -102,7 +102,7 @@ func TestVMSSVMCache(t *testing.T) {
 		vm := expectedVMs[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
 		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "vmss", ssName)
 		assert.Equal(t, to.String(vm.InstanceID), instanceID)
 		assert.Equal(t, &vm, realVM)

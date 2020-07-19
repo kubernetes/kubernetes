@@ -1772,7 +1772,7 @@ func TestEnsureHostInPool(t *testing.T) {
 func TestGetVmssAndResourceGroupNameByVMProviderID(t *testing.T) {
 	providerID := "azure:///subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0"
 	rgName, vmssName, err := getVmssAndResourceGroupNameByVMProviderID(providerID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "rg", rgName)
 	assert.Equal(t, "vmss", vmssName)
 

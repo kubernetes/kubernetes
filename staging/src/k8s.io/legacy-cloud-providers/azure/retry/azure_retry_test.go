@@ -102,7 +102,7 @@ func TestDoExponentialBackoffRetry(t *testing.T) {
 
 	result, err := sender.Do(req)
 	assert.Nil(t, result)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestStep(t *testing.T) {
@@ -196,7 +196,7 @@ func TestDoBackoffRetry(t *testing.T) {
 	}
 
 	resp, err = doBackoffRetry(client, fakeRequest, bo)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 3, client.Attempts())
 	assert.Equal(t, expectedResp, resp)
 
@@ -205,7 +205,7 @@ func TestDoBackoffRetry(t *testing.T) {
 	client = mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 1)
 	resp, err = doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 3})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, client.Attempts())
 	assert.NotNil(t, resp)
 	assert.Equal(t, 200, resp.StatusCode)

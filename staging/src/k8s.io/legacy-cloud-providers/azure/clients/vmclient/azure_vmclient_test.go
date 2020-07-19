@@ -193,7 +193,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	vmList := []compute.VirtualMachine{getTestVM("vm1"), getTestVM("vm1"), getTestVM("vm1")}
 	responseBody, err := json.Marshal(compute.VirtualMachineListResult{Value: &vmList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -282,7 +282,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	vmList := []compute.VirtualMachine{getTestVM("vm1"), getTestVM("vm2"), getTestVM("vm3")}
 	responseBody, err := json.Marshal(compute.VirtualMachineListResult{Value: &vmList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,
@@ -380,7 +380,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		if err != nil {
 			assert.Equal(t, err.(autorest.DetailedError).Message, test.expectedErrMsg)
 		} else {
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 
 		if test.prepareErr != nil {
@@ -437,7 +437,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 		expected.Response = autorest.Response{Response: response}
 		vmssClient := getTestVMClient(armClient)
 		result, err := vmssClient.listNextResults(context.TODO(), lastResult)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 		if test.sendErr != nil {
 			assert.NotEqual(t, expected, result)
 		} else {
