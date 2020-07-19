@@ -18,6 +18,7 @@ package create
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 )
 
 func TestCreateDeployment(t *testing.T) {
@@ -122,6 +124,85 @@ func TestCreateDeploymentWithReplicas(t *testing.T) {
 	cmd.Run(cmd, []string{depName})
 	if buf.String() != replicas {
 		t.Errorf("expected output: %s, but got: %s", replicas, buf.String())
+	}
+}
+
+func TestCreateDeploymentWithEnvironmentVariables(t *testing.T) {
+	depName := "jonny-dep"
+
+	testCases := []struct {
+		Name string
+		Envs []string
+	}{
+		{
+			"SingleEnvVar",
+			[]string{
+				"FOO=bar",
+				"FIZZ=buzz",
+			},
+		},
+		{
+			"MultipleEnvVars",
+			[]string{
+				"FOO=bar",
+				"FIZZ=buzz",
+			},
+		},
+		{
+			"DuplicateEnvVar",
+			[]string{
+				"FOO=bar",
+				"FIZZ=buzz",
+				"FOO=quux",
+			},
+		},
+		{
+			"NoEnvVars",
+			nil,
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdCreateDeployment(tf, ioStreams)
+			cmd.Flags().Set("dry-run", "client")
+			cmd.Flags().Set("output", "jsonpath={.spec.template.spec.containers[0].env}")
+			cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+
+			for _, e := range tc.Envs {
+				cmd.Flags().Set("env", e)
+			}
+
+			cmd.Run(cmd, []string{depName})
+
+			// iterate through the env vars and validate their presence
+			for _, e := range tc.Envs {
+				name, value, err := util.ParseLiteralSource(e)
+				assert.NoError(t, err)
+
+				expected := fmt.Sprintf(`{"name":"%s","value":"%s"}`, name, value)
+				if !strings.Contains(buf.String(), expected) {
+					t.Errorf("unexpected output: %s\nexpected to contain: %s", buf.String(), expected)
+				}
+			}
+		})
 	}
 }
 

@@ -227,6 +227,23 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment nginx-with-command "${kube_flags[@]:?}"
 
+  ### Test kubectl create deployment with environment variables
+  # Pre-Condition: No deployment exists.
+  kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Dry-run command
+  kubectl create deployment nginx-with-env-vars --dry-run=client --image=k8s.gcr.io/nginx:test-cmd --env=FOO=bar
+  kubectl create deployment nginx-with-env-vars --dry-run=server --image=k8s.gcr.io/nginx:test-cmd --env=FOO=bar
+  kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Command
+  kubectl create deployment nginx-with-env-vars --image=k8s.gcr.io/nginx:test-cmd --env=FOO=bar
+  # Post-Condition: Deployment "nginx" is created.
+  kube::test::get_object_assert 'deploy nginx-with-env-vars' "{{${container_name_field:?}}}" 'nginx'
+  # Post-Condition: Deployment environment variable is present with expected name and value
+  kube::test::get_object_assert 'deploy nginx-with-env-vars' "{{${container_env_var_name:?}}}" 'FOO'
+  kube::test::get_object_assert 'deploy nginx-with-env-vars' "{{${container_env_var_value:?}}}" 'bar'
+  # Clean up
+  kubectl delete deployment nginx-with-command "${kube_flags[@]:?}"
+
   ### Test kubectl create deployment should not fail validation
   # Pre-Condition: No deployment exists.
   kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" ''

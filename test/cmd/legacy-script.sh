@@ -375,6 +375,9 @@ runTests() {
   export image_field="(index .spec.containers 0).image"
   export pod_container_name_field="(index .spec.containers 0).name"
   export container_name_field="(index .spec.template.spec.containers 0).name"
+  export container_env_var_name="(index (index .spec.template.spec.containers 0).env 0).name"
+  export container_env_var_value="(index (index .spec.template.spec.containers 0).env 0).value"
+  export container_len="(len .spec.template.spec.containers)"
   export hpa_min_field=".spec.minReplicas"
   export hpa_max_field=".spec.maxReplicas"
   export hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
@@ -389,7 +392,6 @@ runTests() {
   export pdb_min_available=".spec.minAvailable"
   export pdb_max_unavailable=".spec.maxUnavailable"
   export generation_field=".metadata.generation"
-  export container_len="(len .spec.template.spec.containers)"
   export image_field0="(index .spec.template.spec.containers 0).image"
   export image_field1="(index .spec.template.spec.containers 1).image"
 

@@ -49,6 +49,9 @@ var (
 	# Create a deployment with command
 	kubectl create deployment my-dep --image=busybox -- date
 
+	# Create a deployment with environment variables
+	kubectl create deployment my-dep --image=busybox --env=FOO=bar --env=FIZZ=buzz
+
 	# Create a deployment named my-dep that runs the nginx image with 3 replicas.
 	kubectl create deployment my-dep --image=nginx --replicas=3
 
@@ -71,6 +74,7 @@ type CreateDeploymentOptions struct {
 	EnforceNamespace bool
 	FieldManager     string
 	CreateAnnotation bool
+	Env              []string
 
 	Client         appsv1client.AppsV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -85,6 +89,7 @@ func NewCreateCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *Cr
 		Replicas:   1,
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
+		Env:        nil,
 	}
 }
 
@@ -116,7 +121,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
 	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
-
+	cmd.Flags().StringSliceVar(&o.Env, "env", o.Env, "environment variables to set in the container, eg. --env=\"key=value\"")
 	return cmd
 }
 
@@ -147,6 +152,8 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
+	o.Env = cmdutil.GetFlagStringSlice(cmd, "env")
+
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return err
@@ -173,9 +180,19 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return nil
 }
 
+// Validate will parse the deployment options and return an error for any misconfiguration
 func (o *CreateDeploymentOptions) Validate() error {
 	if len(o.Images) > 1 && len(o.Command) > 0 {
 		return fmt.Errorf("cannot specify multiple --image options and command")
+	}
+
+	if o.Env != nil {
+		for _, e := range o.Env {
+			_, _, err := util.ParseLiteralSource(e)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -236,9 +253,26 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 		},
 	}
 
-	if o.Port >= 0 && len(deploy.Spec.Template.Spec.Containers) > 0 {
-		deploy.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{ContainerPort: o.Port}}
+	if len(deploy.Spec.Template.Spec.Containers) > 0 {
+		if o.Port >= 0 {
+			deploy.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{ContainerPort: o.Port}}
+		}
+
+		if o.Env != nil {
+			var envs []corev1.EnvVar
+			for _, e := range o.Env {
+				// error checking was previously conducted by the Validate method
+				name, value, _ := util.ParseLiteralSource(e)
+
+				envs = append(envs, corev1.EnvVar{
+					Name:  name,
+					Value: value,
+				})
+			}
+			deploy.Spec.Template.Spec.Containers[0].Env = envs
+		}
 	}
+
 	return deploy
 }
 
