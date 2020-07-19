@@ -31,6 +31,7 @@ go_test(
     srcs = ["queueset_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/counter:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing:go_default_library",

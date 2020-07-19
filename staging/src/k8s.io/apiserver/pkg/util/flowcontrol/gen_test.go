@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 var noRestraintQSF = fqtesting.NewNoRestraintFactory()
@@ -55,7 +56,7 @@ func genPL(rng *rand.Rand, name string) *fcv1a1.PriorityLevelConfiguration {
 			HandSize:         hs,
 			QueueLengthLimit: 5}
 	}
-	_, err := qscOfPL(noRestraintQSF, nil, plc, time.Minute)
+	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, time.Minute, metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, []string{"test"}))
 	if err != nil {
 		panic(err)
 	}
