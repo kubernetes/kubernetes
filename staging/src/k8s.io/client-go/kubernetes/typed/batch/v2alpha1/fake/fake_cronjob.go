@@ -115,7 +115,7 @@ func (c *FakeCronJobs) UpdateStatus(ctx context.Context, cronJob *v2alpha1.CronJ
 }
 
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
-func (c *FakeCronJobs) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeCronJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
 
@@ -123,8 +123,8 @@ func (c *FakeCronJobs) Delete(ctx context.Context, name string, options *v1.Dele
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCronJobs) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
+func (c *FakeCronJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(cronjobsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2alpha1.CronJobList{})
 	return err

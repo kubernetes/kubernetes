@@ -254,6 +254,32 @@ func TestGeneratePod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test10: privileged mode",
+			params: map[string]interface{}{
+				"name":       "foo",
+				"image":      "someimage",
+				"replicas":   "1",
+				"privileged": "true",
+			},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							SecurityContext: securityContextWithPrivilege(true),
+						},
+					},
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			},
+		},
 	}
 	generator := BasicPod{}
 	for _, tt := range tests {
@@ -356,5 +382,11 @@ func TestParseEnv(t *testing.T) {
 				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", tt.expected, envs, tt.test)
 			}
 		})
+	}
+}
+
+func securityContextWithPrivilege(privileged bool) *v1.SecurityContext {
+	return &v1.SecurityContext{
+		Privileged: &privileged,
 	}
 }

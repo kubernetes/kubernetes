@@ -97,15 +97,15 @@ func (c *FakePodSecurityPolicies) Update(ctx context.Context, podSecurityPolicy 
 }
 
 // Delete takes name of the podSecurityPolicy and deletes it. Returns an error if one occurs.
-func (c *FakePodSecurityPolicies) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakePodSecurityPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(podsecuritypoliciesResource, name), &v1beta1.PodSecurityPolicy{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePodSecurityPolicies) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOptions)
+func (c *FakePodSecurityPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.PodSecurityPolicyList{})
 	return err

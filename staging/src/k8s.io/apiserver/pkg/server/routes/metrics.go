@@ -23,6 +23,7 @@ import (
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
 	etcd3metrics "k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	flowcontrolmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
@@ -47,6 +48,8 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 		if req.Method == "DELETE" {
 			apimetrics.Reset()
 			etcd3metrics.Reset()
+			flowcontrolmetrics.Reset()
+
 			io.WriteString(w, "metrics reset\n")
 			return
 		}
@@ -58,4 +61,5 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 func register() {
 	apimetrics.Register()
 	etcd3metrics.Register()
+	flowcontrolmetrics.Register()
 }

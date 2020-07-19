@@ -18,57 +18,63 @@ package testing
 
 import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // NewFramework creates a Framework from the register functions and options.
-func NewFramework(fns []RegisterPluginFunc, opts ...framework.Option) (framework.Framework, error) {
-	registry := framework.Registry{}
+func NewFramework(fns []RegisterPluginFunc, opts ...runtime.Option) (framework.Framework, error) {
+	registry := runtime.Registry{}
 	plugins := &schedulerapi.Plugins{}
 	var pluginConfigs []schedulerapi.PluginConfig
 	for _, f := range fns {
 		f(&registry, plugins, pluginConfigs)
 	}
-	return framework.NewFramework(registry, plugins, pluginConfigs, opts...)
+	return runtime.NewFramework(registry, plugins, pluginConfigs, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()
 // to register a Filter Plugin to a given registry.
-type RegisterPluginFunc func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig)
+type RegisterPluginFunc func(reg *runtime.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig)
 
 // RegisterQueueSortPlugin returns a function to register a QueueSort Plugin to a given registry.
-func RegisterQueueSortPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+func RegisterQueueSortPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "QueueSort")
 }
 
+// RegisterPreFilterPlugin returns a function to register a PreFilter Plugin to a given registry.
+func RegisterPreFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreFilter")
+}
+
 // RegisterFilterPlugin returns a function to register a Filter Plugin to a given registry.
-func RegisterFilterPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
 }
 
 // RegisterScorePlugin returns a function to register a Score Plugin to a given registry.
-func RegisterScorePlugin(pluginName string, pluginNewFunc framework.PluginFactory, weight int32) RegisterPluginFunc {
+func RegisterScorePlugin(pluginName string, pluginNewFunc runtime.PluginFactory, weight int32) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, weight, pluginNewFunc, "Score")
 }
 
 // RegisterPreScorePlugin returns a function to register a Score Plugin to a given registry.
-func RegisterPreScorePlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+func RegisterPreScorePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreScore")
 }
 
 // RegisterBindPlugin returns a function to register a Bind Plugin to a given registry.
-func RegisterBindPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+func RegisterBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Bind")
 }
 
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
-func RegisterPluginAsExtensions(pluginName string, pluginNewFunc framework.PluginFactory, extensions ...string) RegisterPluginFunc {
+func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, 1, pluginNewFunc, extensions...)
 }
 
 // RegisterPluginAsExtensionsWithWeight returns a function to register a Plugin as given extensionPoints with weight to a given registry.
-func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, pluginNewFunc framework.PluginFactory, extensions ...string) RegisterPluginFunc {
-	return func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {
+func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
+	return func(reg *runtime.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {
 		reg.Register(pluginName, pluginNewFunc)
 		for _, extension := range extensions {
 			ps := getPluginSetByExtension(plugins, extension)
@@ -101,6 +107,10 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return initializeIfNeeded(&plugins.Reserve)
 	case "Permit":
 		return initializeIfNeeded(&plugins.Permit)
+	case "PreBind":
+		return initializeIfNeeded(&plugins.PreBind)
+	case "PostBind":
+		return initializeIfNeeded(&plugins.PostBind)
 	default:
 		return nil
 	}

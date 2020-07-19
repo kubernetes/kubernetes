@@ -37,9 +37,10 @@ import (
 
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
+// Attention: blob disk feature is deprecated
 const (
 	vhdContainerName         = "vhds"
 	useHTTPSForBlobBasedDisk = true
@@ -84,7 +85,15 @@ func (c *BlobDiskController) initStorageAccounts() {
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
 func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, location string, requestGB int) (string, string, int, error) {
-	account, key, err := c.common.cloud.EnsureStorageAccount(accountName, accountType, string(defaultStorageAccountKind), c.common.resourceGroup, location, dedicatedDiskAccountNamePrefix)
+	accountOptions := &AccountOptions{
+		Name:                   accountName,
+		Type:                   accountType,
+		Kind:                   string(defaultStorageAccountKind),
+		ResourceGroup:          c.common.resourceGroup,
+		Location:               location,
+		EnableHTTPSTrafficOnly: true,
+	}
+	account, key, err := c.common.cloud.EnsureStorageAccount(accountOptions, dedicatedDiskAccountNamePrefix)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
@@ -344,7 +353,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 	}
 
 	// account exists but not ready yet
-	if provisionState != storage.ProvisioningStateSucceeded {
+	if provisionState != storage.Succeeded {
 		// we don't want many attempts to validate the account readiness
 		// here hence we are locking
 		counter := 1
@@ -375,7 +384,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 				return false, nil // error performing the query - retryable
 			}
 
-			if provisionState == storage.ProvisioningStateSucceeded {
+			if provisionState == storage.Succeeded {
 				return true, nil
 			}
 

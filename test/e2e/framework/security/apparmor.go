@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -64,7 +63,7 @@ elif [[ $(< /proc/self/attr/current) != "%[3]s" ]]; then
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+nsName)
 
 	if unconfined {
-		profile = apparmor.ProfileNameUnconfined
+		profile = v1.AppArmorBetaProfileNameUnconfined
 		testCmd = `
 if cat /proc/sysrq-trigger 2>&1 | grep 'Permission denied'; then
   echo 'FAILURE: reading /proc/sysrq-trigger should be allowed'
@@ -98,7 +97,7 @@ done`, testCmd)
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-apparmor-",
 			Annotations: map[string]string{
-				apparmor.ContainerAnnotationKeyPrefix + "test": profile,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 			},
 			Labels: map[string]string{
 				"test": "apparmor",

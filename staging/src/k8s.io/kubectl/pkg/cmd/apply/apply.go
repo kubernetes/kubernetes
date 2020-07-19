@@ -28,12 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -190,10 +191,9 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmd.Flags().Bool("server-dry-run", false, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted.")
-	cmd.Flags().MarkDeprecated("server-dry-run", "--server-dry-run is deprecated and can be replaced with --dry-run=server.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
 
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
@@ -221,7 +221,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
-	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
+	o.FieldManager = GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
@@ -229,15 +229,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApply {
 		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
-	}
-
-	var deprecatedServerDryRunFlag = cmdutil.GetFlagBool(cmd, "server-dry-run")
-	if o.DryRunStrategy == cmdutil.DryRunClient && deprecatedServerDryRunFlag {
-		return fmt.Errorf("--dry-run=client and --server-dry-run can't be used together (did you mean --dry-run=server instead?)")
-	}
-
-	if o.DryRunStrategy == cmdutil.DryRunNone && deprecatedServerDryRunFlag {
-		o.DryRunStrategy = cmdutil.DryRunServer
 	}
 
 	// allow for a success message operation to be specified at print time
@@ -257,6 +248,14 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
 	if err != nil {
 		return err
+	}
+
+	if o.ServerSideApply && o.DeleteOptions.ForceDeletion {
+		return fmt.Errorf("--force cannot be used with --server-side")
+	}
+
+	if o.DryRunStrategy == cmdutil.DryRunServer && o.DeleteOptions.ForceDeletion {
+		return fmt.Errorf("--dry-run=server cannot be used with --force")
 	}
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
@@ -314,13 +313,14 @@ func isIncompatibleServerError(err error) bool {
 	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
 
-// GetObjects returns a (possibly cached) version of all the objects to apply
-// as a slice of pointer to resource.Info. The resource.Info contains the object
-// and some other denormalized data. This function should not be called until
-// AFTER the "complete" and "validate" methods have been called to ensure that
-// the ApplyOptions is filled in and valid. Returns an error if the resource
-// builder returns an error retrieving the objects.
+// GetObjects returns a (possibly cached) version of all the valid objects to apply
+// as a slice of pointer to resource.Info and an error if one or more occurred.
+// IMPORTANT: This function can return both valid objects AND an error, since
+// "ContinueOnError" is set on the builder. This function should not be called
+// until AFTER the "complete" and "validate" methods have been called to ensure that
+// the ApplyOptions is filled in and valid.
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
+	var err error = nil
 	if !o.objectsCached {
 		// include the uninitialized objects by default if --prune is true
 		// unless explicitly set --include-uninitialized=false
@@ -333,17 +333,10 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 			LabelSelectorParam(o.Selector).
 			Flatten().
 			Do()
-		if err := r.Err(); err != nil {
-			return nil, err
-		}
-		infos, err := r.Infos()
-		if err != nil {
-			return nil, err
-		}
-		o.objects = infos
+		o.objects, err = r.Infos()
 		o.objectsCached = true
 	}
-	return o.objects, nil
+	return o.objects, err
 }
 
 // SetObjects stores the set of objects (as resource.Info) to be
@@ -370,53 +363,91 @@ func (o *ApplyOptions) Run() error {
 
 	// Generates the objects using the resource builder if they have not
 	// already been stored by calling "SetObjects()" in the pre-processor.
+	errs := []error{}
 	infos, err := o.GetObjects()
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
-	if len(infos) == 0 {
+	if len(infos) == 0 && len(errs) == 0 {
 		return fmt.Errorf("no objects passed to apply")
 	}
+	// Iterate through all objects, applying each one.
 	for _, info := range infos {
+		if err := o.applyOneObject(info); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	// If any errors occurred during apply, then return error (or
+	// aggregate of errors).
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	if len(errs) > 1 {
+		return utilerrors.NewAggregate(errs)
+	}
 
-		o.MarkNamespaceVisited(info)
+	if o.PostProcessorFn != nil {
+		klog.V(4).Infof("Running apply post-processor function")
+		if err := o.PostProcessorFn(); err != nil {
+			return err
+		}
+	}
 
-		if err := o.Recorder.Record(info.Object); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+	return nil
+}
+
+func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
+	o.MarkNamespaceVisited(info)
+
+	if err := o.Recorder.Record(info.Object); err != nil {
+		klog.V(4).Infof("error recording current command: %v", err)
+	}
+
+	if len(info.Name) == 0 {
+		metadata, _ := meta.Accessor(info.Object)
+		generatedName := metadata.GetGenerateName()
+		if len(generatedName) > 0 {
+			return fmt.Errorf("from %s: cannot use generate name with apply", generatedName)
+		}
+	}
+
+	helper := resource.NewHelper(info.Client, info.Mapping).
+		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+		WithFieldManager(o.FieldManager)
+
+	if o.DryRunStrategy == cmdutil.DryRunServer {
+		// Ensure the APIServer supports server-side dry-run for the resource,
+		// otherwise fail early.
+		// For APIServers that don't support server-side dry-run will persist
+		// changes.
+		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+			return err
+		}
+	}
+
+	if o.ServerSideApply {
+		// Send the full object to be applied on the server side.
+		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
+		if err != nil {
+			return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 		}
 
-		if o.ServerSideApply {
-			// Send the full object to be applied on the server side.
-			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
-			if err != nil {
-				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
+		options := metav1.PatchOptions{
+			Force: &o.ForceConflicts,
+		}
+		obj, err := helper.Patch(
+			info.Namespace,
+			info.Name,
+			types.ApplyPatchType,
+			data,
+			&options,
+		)
+		if err != nil {
+			if isIncompatibleServerError(err) {
+				err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
 			}
-
-			options := metav1.PatchOptions{
-				Force:        &o.ForceConflicts,
-				FieldManager: o.FieldManager,
-			}
-
-			helper := resource.NewHelper(info.Client, info.Mapping)
-			if o.DryRunStrategy == cmdutil.DryRunServer {
-				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return err
-				}
-				helper.DryRun(true)
-			}
-			obj, err := helper.Patch(
-				info.Namespace,
-				info.Name,
-				types.ApplyPatchType,
-				data,
-				&options,
-			)
-			if err != nil {
-				if isIncompatibleServerError(err) {
-					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
-				}
-				if errors.IsConflict(err) {
-					err = fmt.Errorf(`%v
+			if errors.IsConflict(err) {
+				err = fmt.Errorf(`%v
 Please review the fields above--they currently have other managers. Here
 are the ways you can resolve this warning:
 * If you intend to manage all of these fields, please re-run the apply
@@ -428,136 +459,121 @@ are the ways you can resolve this warning:
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
 See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
-				}
-				return err
 			}
-
-			info.Refresh(obj, true)
-
-			if err := o.MarkObjectVisited(info); err != nil {
-				return err
-			}
-
-			if o.shouldPrintObject() {
-				continue
-			}
-
-			printer, err := o.ToPrinter("serverside-applied")
-			if err != nil {
-				return err
-			}
-
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			continue
+			return err
 		}
 
-		// Get the modified configuration of the object. Embed the result
-		// as an annotation in the modified configuration, so that it will appear
-		// in the patch sent to the server.
-		modified, err := util.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
+		info.Refresh(obj, true)
+
+		if err := o.MarkObjectVisited(info); err != nil {
+			return err
+		}
+
+		if o.shouldPrintObject() {
+			return nil
+		}
+
+		printer, err := o.ToPrinter("serverside-applied")
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
+			return err
 		}
 
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
-			}
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
+			return err
+		}
+		return nil
+	}
 
-			// Create the resource if it doesn't exist
-			// First, update the annotation used by kubectl apply
-			if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+	// Get the modified configuration of the object. Embed the result
+	// as an annotation in the modified configuration, so that it will appear
+	// in the patch sent to the server.
+	modified, err := util.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
+	if err != nil {
+		return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
+	}
+
+	if err := info.Get(); err != nil {
+		if !errors.IsNotFound(err) {
+			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
+		}
+
+		// Create the resource if it doesn't exist
+		// First, update the annotation used by kubectl apply
+		if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
+		}
+
+		if o.DryRunStrategy != cmdutil.DryRunClient {
+			// Then create the resource and skip the three-way merge
+			obj, err := helper.Create(info.Namespace, true, info.Object)
+			if err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
-
-			if o.DryRunStrategy != cmdutil.DryRunClient {
-				// Then create the resource and skip the three-way merge
-				helper := resource.NewHelper(info.Client, info.Mapping)
-				if o.DryRunStrategy == cmdutil.DryRunServer {
-					if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-						return cmdutil.AddSourceToErr("creating", info.Source, err)
-					}
-					helper.DryRun(true)
-				}
-				obj, err := helper.Create(info.Namespace, true, info.Object)
-				if err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
-				info.Refresh(obj, true)
-			}
-
-			if err := o.MarkObjectVisited(info); err != nil {
-				return err
-			}
-
-			if o.shouldPrintObject() {
-				continue
-			}
-
-			printer, err := o.ToPrinter("created")
-			if err != nil {
-				return err
-			}
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			continue
+			info.Refresh(obj, true)
 		}
 
 		if err := o.MarkObjectVisited(info); err != nil {
 			return err
 		}
 
-		if o.DryRunStrategy != cmdutil.DryRunClient {
-			metadata, _ := meta.Accessor(info.Object)
-			annotationMap := metadata.GetAnnotations()
-			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
-				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
-			}
-
-			patcher, err := newPatcher(o, info)
-			if err != nil {
-				return err
-			}
-			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
-			if err != nil {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
-			}
-
-			info.Refresh(patchedObject, true)
-
-			if string(patchBytes) == "{}" && !o.shouldPrintObject() {
-				printer, err := o.ToPrinter("unchanged")
-				if err != nil {
-					return err
-				}
-				if err = printer.PrintObj(info.Object, o.Out); err != nil {
-					return err
-				}
-				continue
-			}
-		}
-
 		if o.shouldPrintObject() {
-			continue
+			return nil
 		}
 
-		printer, err := o.ToPrinter("configured")
+		printer, err := o.ToPrinter("created")
 		if err != nil {
 			return err
 		}
 		if err = printer.PrintObj(info.Object, o.Out); err != nil {
 			return err
 		}
+		return nil
 	}
 
-	if o.PostProcessorFn != nil {
-		klog.V(4).Infof("Running apply post-processor function")
-		if err := o.PostProcessorFn(); err != nil {
+	if err := o.MarkObjectVisited(info); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		metadata, _ := meta.Accessor(info.Object)
+		annotationMap := metadata.GetAnnotations()
+		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
+			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
+		}
+
+		patcher, err := newPatcher(o, info, helper)
+		if err != nil {
 			return err
 		}
+		patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
+		if err != nil {
+			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+		}
+
+		info.Refresh(patchedObject, true)
+
+		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
+			printer, err := o.ToPrinter("unchanged")
+			if err != nil {
+				return err
+			}
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
+	if o.shouldPrintObject() {
+		return nil
+	}
+
+	printer, err := o.ToPrinter("configured")
+	if err != nil {
+		return err
+	}
+	if err = printer.PrintObj(info.Object, o.Out); err != nil {
+		return err
 	}
 
 	return nil
@@ -656,4 +672,35 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 
 		return nil
 	}
+}
+
+const (
+	// FieldManagerClientSideApply is the default client-side apply field manager.
+	//
+	// The default field manager is not `kubectl-apply` to distinguish from
+	// server-side apply.
+	FieldManagerClientSideApply = "kubectl-client-side-apply"
+	// The default server-side apply field manager is `kubectl`
+	// instead of a field manager like `kubectl-server-side-apply`
+	// for backward compatibility to not conflict with old versions
+	// of kubectl server-side apply where `kubectl` has already been the field manager.
+	fieldManagerServerSideApply = "kubectl"
+)
+
+// GetApplyFieldManagerFlag gets the field manager for kubectl apply
+// if it is not set.
+//
+// The default field manager is not `kubectl-apply` to distinguish between
+// client-side and server-side apply.
+func GetApplyFieldManagerFlag(cmd *cobra.Command, serverSide bool) string {
+	// The field manager flag was set
+	if cmd.Flag("field-manager").Changed {
+		return cmdutil.GetFlagString(cmd, "field-manager")
+	}
+
+	if serverSide {
+		return fieldManagerServerSideApply
+	}
+
+	return FieldManagerClientSideApply
 }

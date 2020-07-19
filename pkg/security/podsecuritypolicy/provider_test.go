@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/utils/pointer"
 )
 
@@ -345,6 +346,18 @@ func TestValidatePodFailures(t *testing.T) {
 		},
 	}
 
+	failGenericEphemeralPod := defaultPod()
+	failGenericEphemeralPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "generic ephemeral volume",
+			VolumeSource: api.VolumeSource{
+				Ephemeral: &api.EphemeralVolumeSource{
+					VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{},
+				},
+			},
+		},
+	}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *policy.PodSecurityPolicy
@@ -484,6 +497,11 @@ func TestValidatePodFailures(t *testing.T) {
 			psp:           defaultPSP(),
 			expectedError: "csi volumes are not allowed to be used",
 		},
+		"generic ephemeral volumes without proper policy set": {
+			pod:           failGenericEphemeralPod,
+			psp:           defaultPSP(),
+			expectedError: "ephemeral volumes are not allowed to be used",
+		},
 	}
 	for name, test := range errorCases {
 		t.Run(name, func(t *testing.T) {
@@ -546,13 +564,13 @@ func TestValidateContainerFailures(t *testing.T) {
 
 	failNilAppArmorPod := defaultPod()
 	v1FailInvalidAppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, v1.AppArmorBetaProfileNamePrefix+"foo")
 	failInvalidAppArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
 
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 
 	failPrivPod := defaultPod()
@@ -887,6 +905,18 @@ func TestValidatePodSuccess(t *testing.T) {
 		},
 	}
 
+	genericEphemeralPod := defaultPod()
+	genericEphemeralPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "generic ephemeral volume",
+			VolumeSource: api.VolumeSource{
+				Ephemeral: &api.EphemeralVolumeSource{
+					VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{},
+				},
+			},
+		},
+	}
+
 	successCases := map[string]struct {
 		pod *api.Pod
 		psp *policy.PodSecurityPolicy
@@ -994,6 +1024,22 @@ func TestValidatePodSuccess(t *testing.T) {
 				return psp
 			}(),
 		},
+		"generic ephemeral volume policy with generic ephemeral volume used": {
+			pod: genericEphemeralPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.Ephemeral}
+				return psp
+			}(),
+		},
+		"policy.All with generic ephemeral volume used": {
+			pod: genericEphemeralPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.All}
+				return psp
+			}(),
+		},
 	}
 
 	for name, test := range successCases {
@@ -1033,10 +1079,10 @@ func TestValidateContainerSuccess(t *testing.T) {
 
 	appArmorPSP := defaultPSP()
 	appArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	v1AppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
+	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, v1.AppArmorBetaProfileRuntimeDefault)
 	appArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1AppArmorPod, appArmorPod, nil)
 
@@ -1327,6 +1373,7 @@ func defaultV1Pod() *v1.Pod {
 // the FSTypeAll wildcard.
 func TestValidateAllowedVolumes(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
 
 	val := reflect.ValueOf(api.VolumeSource{})
 
@@ -1369,6 +1416,66 @@ func TestValidateAllowedVolumes(t *testing.T) {
 			psp.Spec.Volumes = []policy.FSType{policy.All}
 			errs = provider.ValidatePod(pod)
 			assert.Empty(t, errs, "wildcard volume expected no errors")
+		})
+	}
+}
+
+func TestValidateProjectedVolume(t *testing.T) {
+	pod := defaultPod()
+	psp := defaultPSP()
+	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+	require.NoError(t, err, "error creating provider")
+
+	tests := []struct {
+		desc                  string
+		allowedFSTypes        []policy.FSType
+		projectedVolumeSource *api.ProjectedVolumeSource
+		wantAllow             bool
+	}{
+		{
+			desc:                  "deny if secret is not allowed",
+			allowedFSTypes:        []policy.FSType{policy.EmptyDir},
+			projectedVolumeSource: serviceaccount.TokenVolumeSource(),
+			wantAllow:             false,
+		},
+		{
+			desc:           "deny if the projected volume has volume source other than the ones in projected volume injected by service account token admission plugin",
+			allowedFSTypes: []policy.FSType{policy.Secret},
+			projectedVolumeSource: &api.ProjectedVolumeSource{
+				Sources: []api.VolumeProjection{
+					{
+						ConfigMap: &api.ConfigMapProjection{
+							LocalObjectReference: api.LocalObjectReference{
+								Name: "foo-ca.crt",
+							},
+							Items: []api.KeyToPath{
+								{
+									Key:  "ca.crt",
+									Path: "ca.crt",
+								},
+							},
+						},
+					},
+				}},
+			wantAllow: false,
+		},
+		{
+			desc:                  "allow if secret is allowed and the projected volume sources equals to the ones injected by service account admission plugin",
+			allowedFSTypes:        []policy.FSType{policy.Secret},
+			projectedVolumeSource: serviceaccount.TokenVolumeSource(),
+			wantAllow:             true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			pod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{Projected: test.projectedVolumeSource}}}
+			psp.Spec.Volumes = test.allowedFSTypes
+			errs := provider.ValidatePod(pod)
+			if test.wantAllow {
+				assert.Empty(t, errs, "projected volumes are allowed if secret volumes is allowed and BoundServiceAccountTokenVolume is enabled")
+			} else {
+				assert.Contains(t, errs.ToAggregate().Error(), fmt.Sprintf("projected volumes are not allowed to be used"), "did not find the expected error")
+			}
 		})
 	}
 }

@@ -375,7 +375,7 @@ func (c *Fake$.type|publicPlural$) Get(ctx context.Context, $.type|private$Name 
 
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
-func (c *Fake$.type|publicPlural$) Delete(ctx context.Context, name string, options *$.DeleteOptions|raw$) error {
+func (c *Fake$.type|publicPlural$) Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error {
 	_, err := c.Fake.
 		$if .namespaced$Invokes($.NewDeleteAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
 		$else$Invokes($.NewRootDeleteAction|raw$($.type|allLowercasePlural$Resource, name), &$.type|raw${})$end$
@@ -385,9 +385,9 @@ func (c *Fake$.type|publicPlural$) Delete(ctx context.Context, name string, opti
 
 var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
-func (c *Fake$.type|publicPlural$) DeleteCollection(ctx context.Context, options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
-	$if .namespaced$action := $.NewDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, c.ns, listOptions)
-	$else$action := $.NewRootDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, listOptions)
+func (c *Fake$.type|publicPlural$) DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error {
+	$if .namespaced$action := $.NewDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, c.ns, listOpts)
+	$else$action := $.NewRootDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, listOpts)
 	$end$
 	_, err := c.Fake.Invokes(action, &$.type|raw$List{})
 	return err

@@ -24,6 +24,19 @@ import (
 	"net"
 	"net/http"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
+
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+)
+
+const (
+	testAvailabilitySetNodeProviderID = "azure:///subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm-0"
 )
 
 func TestIsAvailabilityZone(t *testing.T) {
@@ -88,24 +101,49 @@ func TestGetZone(t *testing.T) {
 	testcases := []struct {
 		name        string
 		zone        string
+		location    string
 		faultDomain string
 		expected    string
+		isNilResp   bool
+		expectedErr error
 	}{
 		{
 			name:     "GetZone should get real zone if only node's zone is set",
 			zone:     "1",
+			location: "eastus",
 			expected: "eastus-1",
 		},
 		{
 			name:        "GetZone should get real zone if both node's zone and FD are set",
 			zone:        "1",
+			location:    "eastus",
 			faultDomain: "99",
 			expected:    "eastus-1",
 		},
 		{
 			name:        "GetZone should get faultDomain if node's zone isn't set",
+			location:    "eastus",
 			faultDomain: "99",
 			expected:    "99",
+		},
+		{
+			name:     "GetZone should get availability zone in lower cases",
+			location: "EastUS",
+			zone:     "1",
+			expected: "eastus-1",
+		},
+		{
+			name:        "GetZone should report an error if there is no `Compute` in the response",
+			isNilResp:   true,
+			expectedErr: fmt.Errorf("failure of getting compute information from instance metadata"),
+		},
+		{
+			name:        "GetZone should report an error if the zone is invalid",
+			zone:        "a",
+			location:    "eastus",
+			faultDomain: "99",
+			expected:    "",
+			expectedErr: fmt.Errorf("failed to parse zone ID \"a\": strconv.Atoi: parsing \"a\": invalid syntax"),
 		},
 	}
 
@@ -115,9 +153,13 @@ func TestGetZone(t *testing.T) {
 			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
 		}
 
+		respString := fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s", "location":"%s"}}`, test.zone, test.faultDomain, test.location)
+		if test.isNilResp {
+			respString = "{}"
+		}
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s", "location":"eastus"}}`, test.zone, test.faultDomain))
+			fmt.Fprint(w, respString)
 		}))
 		go func() {
 			http.Serve(listener, mux)
@@ -131,13 +173,72 @@ func TestGetZone(t *testing.T) {
 
 		zone, err := cloud.GetZone(context.Background())
 		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+			if test.expectedErr == nil {
+				t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+			} else {
+				assert.Equal(t, test.expectedErr, err)
+			}
 		}
 		if zone.FailureDomain != test.expected {
 			t.Errorf("Test [%s] unexpected zone: %s, expected %q", test.name, zone.FailureDomain, test.expected)
 		}
-		if zone.Region != cloud.Location {
+		if err == nil && zone.Region != cloud.Location {
 			t.Errorf("Test [%s] unexpected region: %s, expected: %s", test.name, zone.Region, cloud.Location)
 		}
 	}
+}
+
+func TestMakeZone(t *testing.T) {
+	az := &Cloud{}
+	zone := az.makeZone("EASTUS", 2)
+	assert.Equal(t, "eastus-2", zone)
+}
+
+func TestGetZoneByProviderID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+
+	zone, err := az.GetZoneByProviderID(context.Background(), "")
+	assert.Equal(t, errNodeNotInitialized, err)
+	assert.Equal(t, cloudprovider.Zone{}, zone)
+
+	zone, err = az.GetZoneByProviderID(context.Background(), "invalid/id")
+	assert.NoError(t, err)
+	assert.Equal(t, cloudprovider.Zone{}, zone)
+
+	mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
+	mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm-0", gomock.Any()).Return(compute.VirtualMachine{
+		Zones:    &[]string{"1"},
+		Location: to.StringPtr("eastus"),
+	}, nil)
+	zone, err = az.GetZoneByProviderID(context.Background(), testAvailabilitySetNodeProviderID)
+	assert.NoError(t, err)
+	assert.Equal(t, cloudprovider.Zone{
+		FailureDomain: "eastus-1",
+		Region:        "eastus",
+	}, zone)
+}
+
+func TestAvailabilitySetGetZoneByNodeName(t *testing.T) {
+	az := &Cloud{
+		unmanagedNodes: sets.String{"vm-0": sets.Empty{}},
+		nodeInformerSynced: func() bool {
+			return true
+		},
+	}
+	zone, err := az.GetZoneByNodeName(context.Background(), "vm-0")
+	assert.NoError(t, err)
+	assert.Equal(t, cloudprovider.Zone{}, zone)
+
+	az = &Cloud{
+		unmanagedNodes: sets.String{"vm-0": sets.Empty{}},
+		nodeInformerSynced: func() bool {
+			return false
+		},
+	}
+	zone, err = az.GetZoneByNodeName(context.Background(), "vm-0")
+	assert.Equal(t, fmt.Errorf("node informer is not synced when trying to GetUnmanagedNodes"), err)
+	assert.Equal(t, cloudprovider.Zone{}, zone)
 }

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -32,8 +32,8 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(sj batchv1beta1.CronJob, uid types.UID) bool {
-	for _, j := range sj.Status.Active {
+func inActiveList(cj batchv1beta1.CronJob, uid types.UID) bool {
+	for _, j := range cj.Status.Active {
 		if j.UID == uid {
 			return true
 		}
@@ -41,17 +41,17 @@ func inActiveList(sj batchv1beta1.CronJob, uid types.UID) bool {
 	return false
 }
 
-func deleteFromActiveList(sj *batchv1beta1.CronJob, uid types.UID) {
-	if sj == nil {
+func deleteFromActiveList(cj *batchv1beta1.CronJob, uid types.UID) {
+	if cj == nil {
 		return
 	}
 	newActive := []v1.ObjectReference{}
-	for _, j := range sj.Status.Active {
+	for _, j := range cj.Status.Active {
 		if j.UID != uid {
 			newActive = append(newActive, j)
 		}
 	}
-	sj.Status.Active = newActive
+	cj.Status.Active = newActive
 }
 
 // getParentUIDFromJob extracts UID of job's parent and whether it was found
@@ -70,47 +70,47 @@ func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 	return controllerRef.UID, true
 }
 
-// groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
+// groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. cronJob).
 // It has no receiver, to facilitate testing.
 func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
-	jobsBySj := make(map[types.UID][]batchv1.Job)
+	jobsByCj := make(map[types.UID][]batchv1.Job)
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
 			klog.V(4).Infof("Unable to get parent uid from job %s in namespace %s", job.Name, job.Namespace)
 			continue
 		}
-		jobsBySj[parentUID] = append(jobsBySj[parentUID], job)
+		jobsByCj[parentUID] = append(jobsByCj[parentUID], job)
 	}
-	return jobsBySj
+	return jobsByCj
 }
 
 // getRecentUnmetScheduleTimes gets a slice of times (from oldest to latest) that have passed when a Job should have started but did not.
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
+func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
-	sched, err := cron.ParseStandard(sj.Spec.Schedule)
+	sched, err := cron.ParseStandard(cj.Spec.Schedule)
 	if err != nil {
-		return starts, fmt.Errorf("unparseable schedule: %s : %s", sj.Spec.Schedule, err)
+		return starts, fmt.Errorf("unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 	}
 
 	var earliestTime time.Time
-	if sj.Status.LastScheduleTime != nil {
-		earliestTime = sj.Status.LastScheduleTime.Time
+	if cj.Status.LastScheduleTime != nil {
+		earliestTime = cj.Status.LastScheduleTime.Time
 	} else {
-		// If none found, then this is either a recently created scheduledJob,
+		// If none found, then this is either a recently created cronJob,
 		// or the active/completed info was somehow lost (contract for status
 		// in kubernetes says it may need to be recreated), or that we have
 		// started a job, but have not noticed it yet (distributed systems can
 		// have arbitrary delays).  In any case, use the creation time of the
 		// CronJob as last known start time.
-		earliestTime = sj.ObjectMeta.CreationTimestamp.Time
+		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
 	}
-	if sj.Spec.StartingDeadlineSeconds != nil {
+	if cj.Spec.StartingDeadlineSeconds != nil {
 		// Controller is not going to schedule anything below this point
-		schedulingDeadline := now.Add(-time.Second * time.Duration(*sj.Spec.StartingDeadlineSeconds))
+		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
 
 		if schedulingDeadline.After(earliestTime) {
 			earliestTime = schedulingDeadline
@@ -126,8 +126,8 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 		// controller gets wedged on friday at 5:01pm when everyone has
 		// gone home, and someone comes in on tuesday AM and discovers
 		// the problem and restarts the controller, then all the hourly
-		// jobs, more than 80 of them for one hourly scheduledJob, should
-		// all start running with no further intervention (if the scheduledJob
+		// jobs, more than 80 of them for one hourly cronJob, should
+		// all start running with no further intervention (if the cronJob
 		// allows concurrency and late starts).
 		//
 		// However, if there is a bug somewhere, or incorrect clock
@@ -148,21 +148,21 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 }
 
 // getJobFromTemplate makes a Job from a CronJob
-func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
-	labels := copyLabels(&sj.Spec.JobTemplate)
-	annotations := copyAnnotations(&sj.Spec.JobTemplate)
+func getJobFromTemplate(cj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+	labels := copyLabels(&cj.Spec.JobTemplate)
+	annotations := copyAnnotations(&cj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
-	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))
+	name := fmt.Sprintf("%s-%d", cj.Name, getTimeHash(scheduledTime))
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labels,
 			Annotations:     annotations,
 			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(sj, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
 		},
 	}
-	sj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
+	cj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
 	return job, nil
 }
 

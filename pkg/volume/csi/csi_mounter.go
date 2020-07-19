@@ -25,10 +25,10 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	api "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -64,6 +65,7 @@ type csiMountMgr struct {
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
+	fsGroupPolicy       storage.FSGroupPolicy
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
@@ -71,7 +73,6 @@ type csiMountMgr struct {
 	spec                *volume.Spec
 	pod                 *api.Pod
 	podUID              types.UID
-	options             volume.VolumeOptions
 	publishContext      map[string]string
 	kubeVolHost         volume.KubeletVolumeHost
 	volume.MetricsProvider
@@ -81,7 +82,7 @@ type csiMountMgr struct {
 var _ volume.Volume = &csiMountMgr{}
 
 func (c *csiMountMgr) GetPath() string {
-	dir := filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
+	dir := GetCSIMounterPath(filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host)))
 	klog.V(4).Info(log("mounter.GetPath generated [%s]", dir))
 	return dir
 }
@@ -105,12 +106,18 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
+	corruptedDir := false
 	mounted, err := isDirMounted(c.plugin, dir)
 	if err != nil {
-		return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
+		if isCorruptedDir(dir) {
+			corruptedDir = true // leave to CSI driver to handle corrupted mount
+			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
+		} else {
+			return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
+		}
 	}
 
-	if mounted {
+	if mounted && !corruptedDir {
 		klog.V(4).Info(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
 		return nil
 	}
@@ -211,7 +218,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil && !corruptedDir {
 		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", dir))
@@ -270,17 +277,16 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 	}
 
-	// apply volume ownership
-	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
-	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
-	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
-	err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
-	if err != nil {
-		// At this point mount operation is successful:
-		//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
-		//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
-		//      cleaned up.
-		return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
+	if c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
+		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		if err != nil {
+			// At this point mount operation is successful:
+			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
+			//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
+			//      cleaned up.
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
+		}
+		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *mounterArgs.FsGroup, c.volumeID))
 	}
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
@@ -288,10 +294,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 }
 
 func (c *csiMountMgr) podAttributes() (map[string]string, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		return nil, nil
-	}
-
 	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
 	if ok {
 		kletHost.WaitForCacheSync()
@@ -369,41 +371,30 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	return nil
 }
 
-// applyFSGroup applies the volume ownership it derives its logic
-// from https://github.com/kubernetes/kubernetes/issues/66323
-// 1) if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
-// 2) if fstype is provided and pv.AccessMode == ReadWriteOnly and !c.spec.ReadOnly then apply fsgroup
-func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
-	if fsGroup != nil {
-		if fsType == "" {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
-			return nil
-		}
-
-		accessModes := c.spec.PersistentVolume.Spec.AccessModes
-		if c.spec.PersistentVolume.Spec.AccessModes == nil {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-			return nil
-		}
-		if !hasReadWriteOnce(accessModes) {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-			return nil
-		}
-
-		if c.readOnly {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
-			return nil
-		}
-
-		err := volume.SetVolumeOwnership(c, fsGroup)
-		if err != nil {
-			return err
-		}
-
-		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolicy storage.FSGroupPolicy) bool {
+	if fsGroup == nil || driverPolicy == storage.NoneFSGroupPolicy || c.readOnly {
+		return false
 	}
 
-	return nil
+	if driverPolicy == storage.FileFSGroupPolicy {
+		return true
+	}
+
+	if fsType == "" {
+		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
+		return false
+	}
+
+	accessModes := c.spec.PersistentVolume.Spec.AccessModes
+	if c.spec.PersistentVolume.Spec.AccessModes == nil {
+		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+		return false
+	}
+	if !hasReadWriteOnce(accessModes) {
+		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+		return false
+	}
+	return true
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
@@ -415,6 +406,11 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 		return false, err
 	}
 	return !notMnt, nil
+}
+
+func isCorruptedDir(dir string) bool {
+	_, pathErr := mount.PathExists(dir)
+	return pathErr != nil && mount.IsCorruptedMnt(pathErr)
 }
 
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir

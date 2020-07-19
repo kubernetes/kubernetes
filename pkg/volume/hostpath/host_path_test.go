@@ -447,7 +447,7 @@ func TestOSFileTypeChecker(t *testing.T) {
 			if oftc.IsDir() {
 				t.Errorf("[%d: %q] expected socket file, got unexpected folder: %s", i, tc.name, path)
 			}
-			if !oftc.IsFile() {
+			if oftc.IsFile() {
 				t.Errorf("[%d: %q] expected socket file, got unexpected file: %s", i, tc.name, path)
 			}
 			if oftc.IsBlock() {
@@ -465,7 +465,7 @@ func TestOSFileTypeChecker(t *testing.T) {
 			if oftc.IsDir() {
 				t.Errorf("[%d: %q] expected character device, got unexpected folder: %s", i, tc.name, path)
 			}
-			if !oftc.IsFile() {
+			if oftc.IsFile() {
 				t.Errorf("[%d: %q] expected character device, got unexpected file: %s", i, tc.name, path)
 			}
 			if oftc.IsSocket() {
@@ -483,7 +483,7 @@ func TestOSFileTypeChecker(t *testing.T) {
 			if oftc.IsDir() {
 				t.Errorf("[%d: %q] expected block device, got unexpected folder: %s", i, tc.name, path)
 			}
-			if !oftc.IsFile() {
+			if oftc.IsFile() {
 				t.Errorf("[%d: %q] expected block device, got unexpected file: %s", i, tc.name, path)
 			}
 			if oftc.IsSocket() {

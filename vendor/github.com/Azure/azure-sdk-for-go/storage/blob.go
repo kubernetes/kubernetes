@@ -566,7 +566,7 @@ type DeleteBlobOptions struct {
 }
 
 // Delete deletes the given blob from the specified container.
-// If the blob does not exists at the time of the Delete Blob operation, it
+// If the blob does not exist at the time of the Delete Blob operation, it
 // returns error.
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Delete-Blob
 func (b *Blob) Delete(options *DeleteBlobOptions) error {

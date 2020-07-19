@@ -1,6 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
+  - build-image-reviewers
   - BenTheElder
   - bowei
   - freehan
@@ -9,6 +10,7 @@ reviewers:
   - mrhohn
   - tallclair
 approvers:
+  - build-image-approvers
   - BenTheElder
   - bowei
   - freehan

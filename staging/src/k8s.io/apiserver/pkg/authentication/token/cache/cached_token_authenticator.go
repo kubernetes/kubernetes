@@ -34,8 +34,11 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/klog"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
 )
 
 var errAuthnCrash = apierrors.NewInternalError(errors.New("authentication failed unexpectedly"))
@@ -47,6 +50,16 @@ type cacheRecord struct {
 	resp *authenticator.Response
 	ok   bool
 	err  error
+
+	// this cache assumes token authn has no side-effects or temporal dependence.
+	// neither of these are true for audit annotations set via AddAuditAnnotation.
+	//
+	// for audit annotations, the assumption is that for some period of time (cache TTL),
+	// all requests with the same API audiences and the same bearer token result in the
+	// same annotations.  This may not be true if the authenticator sets an annotation
+	// based on the current time, but that may be okay since cache TTLs are generally
+	// small (seconds).
+	annotations map[string]string
 }
 
 type cachedTokenAuthenticator struct {
@@ -109,6 +122,17 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	record := a.doAuthenticateToken(ctx, token)
+	if !record.ok || record.err != nil {
+		return nil, false, record.err
+	}
+	for key, value := range record.annotations {
+		audit.AddAuditAnnotation(ctx, key, value)
+	}
+	return record.resp, true, nil
+}
+
+func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, token string) *cacheRecord {
 	doneAuthenticating := stats.authenticating()
 
 	auds, audsOk := authenticator.AudiencesFrom(ctx)
@@ -117,7 +141,7 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	if record, ok := a.cache.get(key); ok {
 		// Record cache hit
 		doneAuthenticating(true)
-		return record.resp, record.ok, record.err
+		return record
 	}
 
 	// Record cache miss
@@ -125,18 +149,19 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	defer doneBlocking()
 	defer doneAuthenticating(false)
 
-	type lookup struct {
-		resp *authenticator.Response
-		ok   bool
-	}
+	c := a.group.DoChan(key, func() (val interface{}, _ error) {
+		// always use one place to read and write the output of AuthenticateToken
+		record := &cacheRecord{}
 
-	c := a.group.DoChan(key, func() (val interface{}, err error) {
 		doneFetching := stats.fetching()
 		// We're leaving the request handling stack so we need to handle crashes
 		// ourselves. Log a stack trace and return a 500 if something panics.
 		defer func() {
 			if r := recover(); r != nil {
-				err = errAuthnCrash
+				// make sure to always return a record
+				record.err = errAuthnCrash
+				val = record
+
 				// Same as stdlib http server code. Manually allocate stack
 				// trace buffer size to prevent excessively large logs
 				const size = 64 << 10
@@ -144,12 +169,12 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 				buf = buf[:runtime.Stack(buf, false)]
 				klog.Errorf("%v\n%s", r, buf)
 			}
-			doneFetching(err == nil)
+			doneFetching(record.err == nil)
 		}()
 
 		// Check again for a cached record. We may have raced with a fetch.
 		if record, ok := a.cache.get(key); ok {
-			return lookup{record.resp, record.ok}, record.err
+			return record, nil
 		}
 
 		// Detach the context because the lookup may be shared by multiple callers,
@@ -161,29 +186,35 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 			ctx = authenticator.WithAudiences(ctx, auds)
 		}
 
-		resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
-		if !a.cacheErrs && err != nil {
-			return nil, err
+		// since this is shared work between multiple requests, we have no way of knowing if any
+		// particular request supports audit annotations.  thus we always attempt to record them.
+		ev := &auditinternal.Event{Level: auditinternal.LevelMetadata}
+		ctx = request.WithAuditEvent(ctx, ev)
+
+		record.resp, record.ok, record.err = a.authenticator.AuthenticateToken(ctx, token)
+		record.annotations = ev.Annotations
+
+		if !a.cacheErrs && record.err != nil {
+			return record, nil
 		}
 
 		switch {
-		case ok && a.successTTL > 0:
-			a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
-		case !ok && a.failureTTL > 0:
-			a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
+		case record.ok && a.successTTL > 0:
+			a.cache.set(key, record, a.successTTL)
+		case !record.ok && a.failureTTL > 0:
+			a.cache.set(key, record, a.failureTTL)
 		}
-		return lookup{resp, ok}, err
+
+		return record, nil
 	})
 
 	select {
 	case result := <-c:
-		if result.Err != nil {
-			return nil, false, result.Err
-		}
-		lookup := result.Val.(lookup)
-		return lookup.resp, lookup.ok, nil
+		// we always set Val and never set Err
+		return result.Val.(*cacheRecord)
 	case <-ctx.Done():
-		return nil, false, ctx.Err()
+		// fake a record on context cancel
+		return &cacheRecord{err: ctx.Err()}
 	}
 }
 

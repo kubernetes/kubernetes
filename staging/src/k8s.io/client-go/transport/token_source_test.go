@@ -177,17 +177,6 @@ func TestCancellation(t *testing.T) {
 			expectCancel: true,
 		},
 		{
-			name:         "cancel req without bearer token hits both rts",
-			expectCancel: true,
-		},
-		{
-			name: "cancel req without bearer token hits both wrapped rts",
-			wrapTransport: func(rt http.RoundTripper) http.RoundTripper {
-				return NewUserAgentRoundTripper("testing testing", rt)
-			},
-			expectCancel: true,
-		},
-		{
 			name: "can't cancel request with rts that doesn't implent unwrap or cancel",
 			wrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 				return &uncancellableRT{rt: rt}

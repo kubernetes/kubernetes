@@ -51,9 +51,10 @@ export IFS='|'; ignore_pattern="^(${IGNORE[*]})\$"; unset IFS
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install staticcheck from vendor
-echo 'installing staticcheck from vendor'
-go install k8s.io/kubernetes/vendor/honnef.co/go/tools/cmd/staticcheck
+# Install staticcheck
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install honnef.co/go/tools/cmd/staticcheck
+popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
@@ -67,7 +68,7 @@ while IFS='' read -r line; do
   all_packages+=("./$line")
 done < <( hack/make-rules/helpers/cache_go_dirs.sh "${KUBE_ROOT}/_tmp/all_go_dirs" |
             grep "^${FOCUS:-.}" |
-            grep -vE "(third_party|generated|clientset_generated|/_)" |
+            grep -vE "(third_party|generated|clientset_generated|hack|testdata|/_)" |
             grep -vE "$ignore_pattern" )
 
 failing_packages=()

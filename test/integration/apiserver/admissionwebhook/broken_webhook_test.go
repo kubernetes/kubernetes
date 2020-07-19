@@ -96,7 +96,7 @@ func TestBrokenWebhook(t *testing.T) {
 	}
 
 	t.Logf("Deleting the broken webhook to fix the cluster")
-	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(context.TODO(), brokenWebhookName, nil)
+	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(context.TODO(), brokenWebhookName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete broken webhook: %v", err)
 	}

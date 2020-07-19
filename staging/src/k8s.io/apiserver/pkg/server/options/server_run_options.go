@@ -38,6 +38,7 @@ type ServerRunOptions struct {
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
+	GoawayChance                float64
 	LivezGracePeriod            time.Duration
 	MinRequestTimeout           int
 	ShutdownDelayDuration       time.Duration
@@ -49,7 +50,6 @@ type ServerRunOptions struct {
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
 	MaxRequestBodyBytes       int64
-	TargetRAMMB               int
 	EnablePriorityAndFairness bool
 }
 
@@ -68,7 +68,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 }
 
-// ApplyOptions applies the run options to the method receiver and returns self
+// ApplyTo applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.ExternalAddress = s.ExternalHost
@@ -76,6 +76,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
 	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
+	c.GoawayChance = s.GoawayChance
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
@@ -106,9 +107,6 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 // Validate checks validation of ServerRunOptions
 func (s *ServerRunOptions) Validate() []error {
 	errors := []error{}
-	if s.TargetRAMMB < 0 {
-		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
-	}
 
 	if s.LivezGracePeriod < 0 {
 		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
@@ -123,6 +121,10 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if s.RequestTimeout.Nanoseconds() < 0 {
 		errors = append(errors, fmt.Errorf("--request-timeout can not be negative value"))
+	}
+
+	if s.GoawayChance < 0 || s.GoawayChance > 0.02 {
+		errors = append(errors, fmt.Errorf("--goaway-chance can not be less than 0 or greater than 0.02"))
 	}
 
 	if s.MinRequestTimeout < 0 {
@@ -159,8 +161,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
 
-	fs.IntVar(&s.TargetRAMMB, "target-ram-mb", s.TargetRAMMB,
-		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
+	deprecatedTargetRAMMB := 0
+	fs.IntVar(&deprecatedTargetRAMMB, "target-ram-mb", deprecatedTargetRAMMB,
+		"DEPRECATED: Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
+	fs.MarkDeprecated("target-ram-mb", "This flag will be removed in v1.23")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).")
@@ -182,6 +186,12 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"it out. This is the default request timeout for requests but may be overridden by flags such as "+
 		"--min-request-timeout for specific types of requests.")
 
+	fs.Float64Var(&s.GoawayChance, "goaway-chance", s.GoawayChance, ""+
+		"To prevent HTTP/2 clients from getting stuck on a single apiserver, randomly close a connection (GOAWAY). "+
+		"The client's other in-flight requests won't be affected, and the client will reconnect, likely landing on a different apiserver after going through the load balancer again. "+
+		"This argument sets the fraction of requests that will be sent a GOAWAY. Clusters with single apiservers, or which don't use a load balancer, should NOT enable this. "+
+		"Min is 0 (off), Max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point.")
+
 	fs.DurationVar(&s.LivezGracePeriod, "livez-grace-period", s.LivezGracePeriod, ""+
 		"This option represents the maximum amount of time it should take for apiserver to complete its startup sequence "+
 		"and become live. From apiserver's start time to when this amount of time has elapsed, /livez will assume "+
@@ -197,8 +207,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If true and the APIPriorityAndFairness feature gate is enabled, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
-		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
-		"returns success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
+		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+
+		"will return success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)

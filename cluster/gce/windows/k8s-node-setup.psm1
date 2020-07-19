@@ -51,15 +51,14 @@
 #  - Document functions using proper syntax:
 #    https://technet.microsoft.com/en-us/library/hh847834(v=wps.620).aspx
 
-$INFRA_CONTAINER = 'gcr.io/gke-release/pause-win:1.1.0'
 $GCE_METADATA_SERVER = "169.254.169.254"
 # The "management" interface is used by the kubelet and by Windows pods to talk
 # to the rest of the Kubernetes cluster *without NAT*. This interface does not
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.17.0'
-$CRICTL_SHA256 = '781fd3bd15146a924c6fc2428b11d8a0f20fa04a0c8e00a9a5808f2cc37e0569'
+$CRICTL_VERSION = 'v1.18.0'
+$CRICTL_SHA256 = '5045bcc6d8b0e6004be123ab99ea06e5b1b2ae1e586c968fcdf85fccd4d67ae1'
 
 Import-Module -Force C:\common.psm1
 
@@ -136,11 +135,24 @@ function Add_GceMetadataServerRoute {
   }
 }
 
+# Returns a PowerShell object representing the Windows version.
+function Get_WindowsVersion {
+  # Unlike checking `[System.Environment]::OSVersion.Version`, this long-winded
+  # approach gets the OS revision/patch number correctly
+  # (https://superuser.com/a/1160428/652018).
+  $win_ver = New-Object -TypeName PSObject
+  $win_ver | Add-Member -MemberType NoteProperty -Name Major -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' CurrentMajorVersionNumber).CurrentMajorVersionNumber
+  $win_ver | Add-Member -MemberType NoteProperty -Name Minor -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' CurrentMinorVersionNumber).CurrentMinorVersionNumber
+  $win_ver | Add-Member -MemberType NoteProperty -Name Build -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' CurrentBuild).CurrentBuild
+  $win_ver | Add-Member -MemberType NoteProperty -Name Revision -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' UBR).UBR
+  return $win_ver
+}
+
 # Writes debugging information, such as Windows version and patch info, to the
 # console.
 function Dump-DebugInfoToConsole {
   Try {
-    $version = "$([System.Environment]::OSVersion.Version | Out-String)"
+    $version = Get_WindowsVersion | Out-String
     $hotfixes = "$(Get-Hotfix | Out-String)"
     $image = "$(Get-InstanceMetadata 'image' | Out-String)"
     Log-Output "Windows version:`n$version"
@@ -229,6 +241,14 @@ function Set_CurrentShellEnvironmentVar {
 # Sets environment variables used by Kubernetes binaries and by other functions
 # in this module. Depends on numerous ${kube_env} keys.
 function Set-EnvironmentVars {
+  if ($kube_env.ContainsKey('WINDOWS_CONTAINER_RUNTIME')) {
+      $container_runtime = ${kube_env}['WINDOWS_CONTAINER_RUNTIME']
+      $container_runtime_endpoint = ${kube_env}['WINDOWS_CONTAINER_RUNTIME_ENDPOINT']
+  } else {
+      Log-Output "ERROR: WINDOWS_CONTAINER_RUNTIME not set in kube-env, falling back in CONTAINER_RUNTIME"
+      $container_runtime = ${kube_env}['CONTAINER_RUNTIME']
+      $container_runtime_endpoint = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
+  }
   # Turning the kube-env values into environment variables is not required but
   # it makes debugging this script easier, and it also makes the syntax a lot
   # easier (${env:K8S_DIR} can be expanded within a string but
@@ -241,6 +261,8 @@ function Set-EnvironmentVars {
     "CNI_CONFIG_DIR" = ${kube_env}['CNI_CONFIG_DIR']
     "WINDOWS_CNI_STORAGE_PATH" = ${kube_env}['WINDOWS_CNI_STORAGE_PATH']
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
+    "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
+    "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
@@ -249,14 +271,15 @@ function Set-EnvironmentVars {
     "KUBEPROXY_KUBECONFIG" = ${kube_env}['KUBEPROXY_KUBECONFIG_FILE']
     "LOGS_DIR" = ${kube_env}['LOGS_DIR']
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
+    "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
     "KUBELET_CERT_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.crt'
     "KUBELET_KEY_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.key'
 
-    "CONTAINER_RUNTIME" = ${kube_env}['CONTAINER_RUNTIME']
-    "CONTAINER_RUNTIME_ENDPOINT" = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
+    "CONTAINER_RUNTIME" = $container_runtime
+    "CONTAINER_RUNTIME_ENDPOINT" = $container_runtime_endpoint
 
     'LICENSE_DIR' = 'C:\Program Files\Google\Compute Engine\THIRD_PARTY_NOTICES'
   }
@@ -373,6 +396,33 @@ function DownloadAndInstall-KubernetesBinaries {
   Remove-Item -Force -Recurse $tmp_dir
 }
 
+# Downloads the csi-proxy binaries from kube-env's CSI_PROXY_STORAGE_PATH and
+# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR. 
+# Note: for now the installation is skipped for non-test clusters. Will be
+# installed for all cluster after tests pass.
+# Required ${kube_env} keys:
+#   CSI_PROXY_STORAGE_PATH and CSI_PROXY_VERSION
+function DownloadAndInstall-CSIProxyBinaries {
+  if (Test-IsTestCluster $kube_env) {
+    if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
+      $tmp_dir = 'C:\k8s_tmp'
+      New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+      $filename = 'csi-proxy.exe'
+      $urls = "${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/$filename"
+      MustDownload-File -OutFile $tmp_dir\$filename -URLs $urls
+      Move-Item -Force $tmp_dir\$filename ${env:NODE_DIR}\$filename
+      # Clean up the temporary directory
+      Remove-Item -Force -Recurse $tmp_dir
+    }
+  }
+}
+
+# TODO(jingxu97): Make csi-proxy.exe as a service similar to kubelet.exe
+function Start-CSIProxy {
+  Log-Output 'Starting CSI Proxy'
+  Start-Process "${env:NODE_DIR}\csi-proxy.exe"
+}
+
 # TODO(pjh): this is copied from
 # https://github.com/Microsoft/SDN/blob/master/Kubernetes/windows/start-kubelet.ps1#L98.
 # See if there's a way to fetch or construct the "management subnet" so that
@@ -425,39 +475,6 @@ function ConvertTo_MaskLength
     [Convert]::ToString($_, 2)
   } )" -replace "[\s0]"
   return $bits.Length
-}
-
-# Returns the "management" subnet on which the Windows pods+kubelet will
-# communicate with the rest of the Kubernetes cluster without NAT. In GCE this
-# is the subnet that VM internal IPs are allocated from.
-#
-# This function will fail if Add_InitialHnsNetwork() has not been called first.
-function Get_MgmtSubnet {
-  $net_adapter = Get_MgmtNetAdapter
-
-  # TODO(pjh): applying the primary interface's subnet mask to its IP address
-  # *should* give us the GCE network subnet that VM IP addresses are being
-  # allocated from... however it might be more accurate or straightforward to
-  # just fetch the IP address range for the VPC subnet that the kube-up script
-  # creates (kubernetes-subnet-default).
-  $addr = (Get-NetIPAddress `
-      -InterfaceAlias ${net_adapter}.ifAlias `
-      -AddressFamily IPv4).IPAddress
-  # Get the adapter's mask from the registry rather than WMI or some other
-  # approach: this is compatible with Windows' forthcoming LWVNICs (lightweight
-  # VNICs).
-  # https://github.com/kubernetes-sigs/sig-windows-tools/pull/16/commits/c5b5c67d5da6c23ad870cb16146eaa58131caf29
-  $adapter_registry = Get-Item `
-      -Path ("HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\" +
-             "Parameters\Interfaces\$($net_adapter.InterfaceGuid)")
-  # In this command the value name is 'DhcpSubnetMask' for current network
-  # interfaces but could be different for "LWVNIC" interfaces.
-  $mask = ($adapter_registry.GetValueNames() -like "*SubnetMask" |
-           % { $adapter_registry.GetValue($_) })
-  $mgmt_subnet = `
-    (ConvertTo_DecimalIP ${addr}) -band (ConvertTo_DecimalIP ${mask})
-  $mgmt_subnet = ConvertTo_DottedDecimalIP ${mgmt_subnet}
-  return "${mgmt_subnet}/$(ConvertTo_MaskLength $mask)"
 }
 
 # Returns a network adapter object for the "management" interface via which the
@@ -912,6 +929,15 @@ function Configure-GcePdTools {
 '$modulePath = "K8S_DIR\GetGcePdName.dll"
 Unblock-File $modulePath
 Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
+
+  if (Test-IsTestCluster $kube_env) {
+    if (ShouldWrite-File ${env:K8S_DIR}\diskutil.exe) {
+      # The source code of this executable file is https://github.com/kubernetes-sigs/sig-windows-tools/blob/master/cmd/diskutil/diskutil.c
+      MustDownload-File -OutFile ${env:K8S_DIR}\diskutil.exe `
+        -URLs "https://ddebroywin1.s3-us-west-2.amazonaws.com/diskutil.exe"
+    }
+    Copy-Item ${env:K8S_DIR}\diskutil.exe -Destination "C:\Windows\system32"
+  }
 }
 
 # Setup cni network. This function supports both Docker and containerd.
@@ -971,7 +997,6 @@ function Install_Cni_Binaries {
 # Required ${kube_env} keys:
 #   DNS_SERVER_IP
 #   DNS_DOMAIN
-#   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function Configure_Dockerd_CniNetworking {
   $l2bridge_conf = "${env:CNI_CONFIG_DIR}\l2bridge.conf"
@@ -981,24 +1006,20 @@ function Configure_Dockerd_CniNetworking {
 
   $mgmt_ip = (Get_MgmtNetAdapter |
               Get-NetIPAddress -AddressFamily IPv4).IPAddress
-  $mgmt_subnet = Get_MgmtSubnet
-  Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
-              "CNI config")
 
   $cidr_range_start = Get_PodIP_Range_Start(${env:POD_CIDR})
 
   # Explanation of the CNI config values:
-  #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.
   #   POD_CIDR: the pod CIDR assigned to this node.
   #   CIDR_RANGE_START: start of the pod CIDR range.
-  #   MGMT_SUBNET: the subnet on which the Windows pods + kubelet will
-  #     communicate with the rest of the cluster without NAT (i.e. the subnet
-  #     that VM internal IPs are allocated from).
   #   MGMT_IP: the IP address assigned to the node's primary network interface
   #     (i.e. the internal IP of the GCE VM).
   #   SERVICE_CIDR: the CIDR used for kubernetes services.
   #   DNS_SERVER_IP: the cluster's DNS server IP address.
   #   DNS_DOMAIN: the cluster's DNS domain, e.g. "cluster.local".
+  #
+  # OutBoundNAT ExceptionList: No SNAT for CIDRs in the list, the same as default GKE non-masquerade destination ranges listed at https://cloud.google.com/kubernetes-engine/docs/how-to/ip-masquerade-agent#default-non-masq-dests
+
   New-Item -Force -ItemType file ${l2bridge_conf} | Out-Null
   Set-Content ${l2bridge_conf} `
 '{
@@ -1028,9 +1049,18 @@ function Configure_Dockerd_CniNetworking {
       "Value":  {
         "Type":  "OutBoundNAT",
         "ExceptionList":  [
-          "CLUSTER_CIDR",
-          "SERVICE_CIDR",
-          "MGMT_SUBNET"
+          "169.254.0.0/16",
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16",
+          "100.64.0.0/10",
+          "192.0.0.0/24",
+          "192.0.2.0/24",
+          "192.88.99.0/24",
+          "198.18.0.0/15",
+          "198.51.100.0/24",
+          "203.0.113.0/24",
+          "240.0.0.0/4"
         ]
       }
     },
@@ -1056,9 +1086,7 @@ function Configure_Dockerd_CniNetworking {
   replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
-  replace('CLUSTER_CIDR', ${kube_env}['CLUSTER_IP_RANGE']).`
-  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
-  replace('MGMT_SUBNET', ${mgmt_subnet})
+  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE'])
 
   Log-Output "CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
 }
@@ -1115,7 +1143,7 @@ function Start-WorkerServices {
   $kubelet_args = $kubelet_args_str.Split(" ")
   Log-Output "kubelet_args from metadata: ${kubelet_args}"
   $default_kubelet_args = @(`
-      "--pod-infra-container-image=${INFRA_CONTAINER}"
+      "--pod-infra-container-image=${env:INFRA_CONTAINER}"
   )
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
@@ -1224,18 +1252,22 @@ function Verify-WorkerServices {
   Log_Todo "run more verification commands."
 }
 
-# Downloads crictl.exe and installs it in $env:NODE_DIR.
+# Downloads the Windows crictl package and installs its contents (e.g.
+# crictl.exe) in $env:NODE_DIR.
 function DownloadAndInstall-Crictl {
   if (-not (ShouldWrite-File ${env:NODE_DIR}\crictl.exe)) {
     return
   }
-  $url = ('https://storage.googleapis.com/kubernetes-release/crictl/' +
-      'crictl-' + $CRICTL_VERSION + '-windows-amd64.exe')
+  $CRI_TOOLS_GCS_BUCKET = 'k8s-artifacts-cri-tools'
+  $url = ('https://storage.googleapis.com/' + $CRI_TOOLS_GCS_BUCKET +
+          '/release/' + $CRICTL_VERSION + '/crictl-' + $CRICTL_VERSION +
+          '-windows-amd64.tar.gz')
   MustDownload-File `
       -URLs $url `
-      -OutFile ${env:NODE_DIR}\crictl.exe `
+      -OutFile ${env:NODE_DIR}\crictl.tar.gz `
       -Hash $CRICTL_SHA256 `
       -Algorithm SHA256
+  tar xzvf ${env:NODE_DIR}\crictl.tar.gz -C ${env:NODE_DIR}
 }
 
 # Sets crictl configuration values.
@@ -1253,14 +1285,14 @@ function Configure-Crictl {
 # node startup steps!
 # Pull-InfraContainer must be called AFTER Verify-WorkerServices.
 function Pull-InfraContainer {
-  $name, $label = $INFRA_CONTAINER -split ':',2
+  $name, $label = ${env:INFRA_CONTAINER} -split ':',2
   if (-not ("$(& crictl images)" -match "$name.*$label")) {
-    & crictl pull $INFRA_CONTAINER
+    & crictl pull ${env:INFRA_CONTAINER}
     if (!$?) {
-      throw "Error running 'crictl pull $INFRA_CONTAINER'"
+      throw "Error running 'crictl pull ${env:INFRA_CONTAINER}'"
     }
   }
-  $inspect = "$(& crictl inspecti $INFRA_CONTAINER | Out-String)"
+  $inspect = "$(& crictl inspecti ${env:INFRA_CONTAINER} | Out-String)"
   Log-Output "Infra/pause container:`n$inspect"
 }
 
@@ -1325,7 +1357,6 @@ function Configure_Dockerd {
 # Required ${kube_env} keys:
 #   DNS_SERVER_IP
 #   DNS_DOMAIN
-#   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function Configure_Containerd_CniNetworking {
   $l2bridge_conf = "${env:CNI_CONFIG_DIR}\l2bridge.conf"
@@ -1335,24 +1366,20 @@ function Configure_Containerd_CniNetworking {
 
   $mgmt_ip = (Get_MgmtNetAdapter |
               Get-NetIPAddress -AddressFamily IPv4).IPAddress
-  $mgmt_subnet = Get_MgmtSubnet
-  Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
-              "CNI config")
 
   $pod_gateway = Get_Endpoint_Gateway_From_CIDR(${env:POD_CIDR})
 
   # Explanation of the CNI config values:
-  #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.
   #   POD_CIDR: the pod CIDR assigned to this node.
   #   POD_GATEWAY: the gateway IP.
-  #   MGMT_SUBNET: the subnet on which the Windows pods + kubelet will
-  #     communicate with the rest of the cluster without NAT (i.e. the subnet
-  #     that VM internal IPs are allocated from).
   #   MGMT_IP: the IP address assigned to the node's primary network interface
   #     (i.e. the internal IP of the GCE VM).
   #   SERVICE_CIDR: the CIDR used for kubernetes services.
   #   DNS_SERVER_IP: the cluster's DNS server IP address.
   #   DNS_DOMAIN: the cluster's DNS domain, e.g. "cluster.local".
+  #
+  # OutBoundNAT ExceptionList: No SNAT for CIDRs in the list, the same as default GKE non-masquerade destination ranges listed at https://cloud.google.com/kubernetes-engine/docs/how-to/ip-masquerade-agent#default-non-masq-dests
+
   New-Item -Force -ItemType file ${l2bridge_conf} | Out-Null
   Set-Content ${l2bridge_conf} `
 '{
@@ -1387,9 +1414,18 @@ function Configure_Containerd_CniNetworking {
         "Type":  "OutBoundNAT",
         "Settings": {
           "Exceptions":  [
-            "CLUSTER_CIDR",
-            "SERVICE_CIDR",
-            "MGMT_SUBNET"
+            "169.254.0.0/16",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "100.64.0.0/10",
+            "192.0.0.0/24",
+            "192.0.2.0/24",
+            "192.88.99.0/24",
+            "198.18.0.0/15",
+            "198.51.100.0/24",
+            "203.0.113.0/24",
+            "240.0.0.0/4"
           ]
         }
       }
@@ -1420,9 +1456,7 @@ function Configure_Containerd_CniNetworking {
   replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
-  replace('CLUSTER_CIDR', ${kube_env}['CLUSTER_IP_RANGE']).`
-  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
-  replace('MGMT_SUBNET', ${mgmt_subnet})
+  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE'])
 
   Log-Output "containerd CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
 }
@@ -1473,7 +1507,7 @@ function Configure_Containerd {
 [plugins.cri.cni]
   bin_dir = 'CNI_BIN_DIR'
   conf_dir = 'CNI_CONF_DIR'
-"@.replace('INFRA_CONTAINER_IMAGE', $INFRA_CONTAINER).`
+"@.replace('INFRA_CONTAINER_IMAGE', ${env:INFRA_CONTAINER}).`
     replace('CNI_BIN_DIR', ${env:CNI_DIR}).`
     replace('CNI_CONF_DIR', ${env:CNI_CONFIG_DIR})
 }
@@ -1489,7 +1523,7 @@ function Start_Containerd {
 # TODO(pjh): move the Stackdriver logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$STACKDRIVER_VERSION = 'v1-9'
+$STACKDRIVER_VERSION = 'v1-11'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 # Restarts the Stackdriver logging agent, or starts it if it is not currently
@@ -1534,6 +1568,38 @@ function Restart-LoggingAgent {
   Start-Service StackdriverLogging
 }
 
+# Check whether the logging agent is installed by whether it's registered as service
+function IsLoggingAgentInstalled {
+  $stackdriver_status = (Get-Service StackdriverLogging -ErrorAction Ignore).Status
+  return -not [string]::IsNullOrEmpty($stackdriver_status)
+}
+
+# Clean up the logging agent's registry key and root folder if they exist from a prior installation.
+# Try to uninstall it first, if it failed, remove the registry key at least, 
+# as the registry key will block the silent installation later on.
+function Cleanup-LoggingAgent {
+  # For 64 bits app, the registry path is 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+  # for 32 bits app, it's 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+  # StackdriverLogging is installed as 32 bits app
+  $x32_app_reg = 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+  $uninstall_string = (Get-ChildItem $x32_app_reg | Get-ItemProperty | Where-Object {$_.DisplayName -match "Stackdriver"}).UninstallString
+  if (-not [string]::IsNullOrEmpty($uninstall_string)) {
+    try {
+      Start-Process -FilePath "$uninstall_string" -ArgumentList "/S" -Wait
+    } catch {
+      Log-Output "Exception happens during uninstall logging agent, so remove the registry key at least"
+      Remove-Item -Path "$x32_app_reg\GoogleStackdriverLoggingAgent\"
+    }
+  }
+
+  #  If we chose reboot after uninstallation, the root folder would be clean.
+  #  But since we couldn't reboot, so some files & folders would be left there, 
+  #  which could block the re-installation later on, so clean it up
+  if(Test-Path $STACKDRIVER_ROOT){
+    Remove-Item -Force -Recurse $STACKDRIVER_ROOT
+  }
+}
+
 # Installs the Stackdriver logging agent according to
 # https://cloud.google.com/logging/docs/agent/installation.
 # TODO(yujuhong): Update to a newer Stackdriver agent once it is released to
@@ -1550,17 +1616,18 @@ function Install-LoggingAgent {
       ("$STACKDRIVER_ROOT\LoggingAgent\Main\pos\winevtlog.pos\worker0\" +
        "storage.json")
 
-  if (Test-Path $STACKDRIVER_ROOT) {
+  if (IsLoggingAgentInstalled) {
     # Note: we should reinstall the Stackdriver agent if $REDO_STEPS is true
     # here, but we don't know how to run the installer without it prompting
     # when Stackdriver is already installed. We dumped the strings in the
     # installer binary and searched for flags to do this but found nothing. Oh
     # well.
-    Log-Output ("Skip: $STACKDRIVER_ROOT is already present, assuming that " +
-                "Stackdriver logging agent is already installed")
-    Restart-LoggingAgent
+    Log-Output ("Skip: Stackdriver logging agent is already installed")
     return
   }
+  
+  # After a crash, the StackdriverLogging service could be missing, but its files will still be present
+  Cleanup-LoggingAgent
 
   $url = ("https://storage.googleapis.com/gke-release/winnode/stackdriver/" +
           "StackdriverLogging-${STACKDRIVER_VERSION}.exe")

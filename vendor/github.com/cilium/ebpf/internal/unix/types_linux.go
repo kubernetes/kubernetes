@@ -10,10 +10,17 @@ import (
 
 const (
 	ENOENT                   = linux.ENOENT
+	EEXIST                   = linux.EEXIST
 	EAGAIN                   = linux.EAGAIN
 	ENOSPC                   = linux.ENOSPC
 	EINVAL                   = linux.EINVAL
 	EPOLLIN                  = linux.EPOLLIN
+	EINTR                    = linux.EINTR
+	EPERM                    = linux.EPERM
+	ESRCH                    = linux.ESRCH
+	ENODEV                   = linux.ENODEV
+	BPF_F_RDONLY_PROG        = linux.BPF_F_RDONLY_PROG
+	BPF_F_WRONLY_PROG        = linux.BPF_F_WRONLY_PROG
 	BPF_OBJ_NAME_LEN         = linux.BPF_OBJ_NAME_LEN
 	BPF_TAG_SIZE             = linux.BPF_TAG_SIZE
 	SYS_BPF                  = linux.SYS_BPF
@@ -30,6 +37,8 @@ const (
 	PerfBitWatermark         = linux.PerfBitWatermark
 	PERF_SAMPLE_RAW          = linux.PERF_SAMPLE_RAW
 	PERF_FLAG_FD_CLOEXEC     = linux.PERF_FLAG_FD_CLOEXEC
+	RLIM_INFINITY            = linux.RLIM_INFINITY
+	RLIMIT_MEMLOCK           = linux.RLIMIT_MEMLOCK
 )
 
 // Statfs_t is a wrapper
@@ -115,4 +124,27 @@ type PerfEventAttr = linux.PerfEventAttr
 // PerfEventOpen is a wrapper
 func PerfEventOpen(attr *PerfEventAttr, pid int, cpu int, groupFd int, flags int) (fd int, err error) {
 	return linux.PerfEventOpen(attr, pid, cpu, groupFd, flags)
+}
+
+// Utsname is a wrapper
+type Utsname = linux.Utsname
+
+// Uname is a wrapper
+func Uname(buf *Utsname) (err error) {
+	return linux.Uname(buf)
+}
+
+// Getpid is a wrapper
+func Getpid() int {
+	return linux.Getpid()
+}
+
+// Gettid is a wrapper
+func Gettid() int {
+	return linux.Gettid()
+}
+
+// Tgkill is a wrapper
+func Tgkill(tgid int, tid int, sig syscall.Signal) (err error) {
+	return linux.Tgkill(tgid, tid, sig)
 }

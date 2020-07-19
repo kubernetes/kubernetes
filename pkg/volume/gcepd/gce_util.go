@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
@@ -101,7 +101,10 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 	name := volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// GCE PDs are allocated in chunks of GiBs
-	requestGB := volumehelpers.RoundUpToGiB(capacity)
+	requestGB, err := volumehelpers.RoundUpToGiB(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
 
 	// Apply Parameters.
 	// Values for parameter "replication-type" are canonicalized to lower case.
@@ -159,7 +162,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			name,
 			diskType,
 			selectedZones,
-			int64(requestGB),
+			requestGB,
 			*c.options.CloudTags)
 		if err != nil {
 			klog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
@@ -176,7 +179,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			name,
 			diskType,
 			selectedZone,
-			int64(requestGB),
+			requestGB,
 			*c.options.CloudTags)
 		if err != nil {
 			klog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)

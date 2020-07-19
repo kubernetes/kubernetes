@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // FakeMounter implements mount.Interface for tests.
@@ -82,6 +82,15 @@ func (f *FakeMounter) GetLog() []FakeAction {
 
 // Mount records the mount event and updates the in-memory mount points for FakeMounter
 func (f *FakeMounter) Mount(source string, target string, fstype string, options []string) error {
+	return f.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
+// Mount records the mount event and updates the in-memory mount points for FakeMounter
+// sensitiveOptions to be passed in a separate parameter from the normal
+// mount options and ensures the sensitiveOptions are never logged. This
+// method should be used by callers that pass sensitive material (like
+// passwords) as mount options.
+func (f *FakeMounter) MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -117,7 +126,7 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 	if err != nil {
 		absTarget = target
 	}
-	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: opts})
+	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: append(opts, sensitiveOptions...)})
 	klog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
 	f.log = append(f.log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
 	return nil

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // CleanupMountPoint unmounts the given path and deletes the remaining directory
@@ -48,9 +48,9 @@ func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 // if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, and the mount point check
 // will be skipped
 func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
+	var notMnt bool
+	var err error
 	if !corruptedMnt {
-		var notMnt bool
-		var err error
 		if extensiveMountPointCheck {
 			notMnt, err = IsNotMountPoint(mounter, mountPath)
 		} else {
@@ -73,9 +73,13 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 		return err
 	}
 
-	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
-	if mntErr != nil {
-		return mntErr
+	if extensiveMountPointCheck {
+		notMnt, err = IsNotMountPoint(mounter, mountPath)
+	} else {
+		notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
+	}
+	if err != nil {
+		return err
 	}
 	if notMnt {
 		klog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)

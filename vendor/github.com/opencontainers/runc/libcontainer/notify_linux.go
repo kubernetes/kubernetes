@@ -3,6 +3,7 @@
 package libcontainer
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,8 +11,6 @@ import (
 
 	"golang.org/x/sys/unix"
 )
-
-const oomCgroupName = "memory"
 
 type PressureLevel uint
 
@@ -66,19 +65,17 @@ func registerMemoryEvent(cgDir string, evName string, arg string) (<-chan struct
 
 // notifyOnOOM returns channel on which you can expect event about OOM,
 // if process died without OOM this channel will be closed.
-func notifyOnOOM(paths map[string]string) (<-chan struct{}, error) {
-	dir := paths[oomCgroupName]
+func notifyOnOOM(dir string) (<-chan struct{}, error) {
 	if dir == "" {
-		return nil, fmt.Errorf("path %q missing", oomCgroupName)
+		return nil, errors.New("memory controller missing")
 	}
 
 	return registerMemoryEvent(dir, "memory.oom_control", "")
 }
 
-func notifyMemoryPressure(paths map[string]string, level PressureLevel) (<-chan struct{}, error) {
-	dir := paths[oomCgroupName]
+func notifyMemoryPressure(dir string, level PressureLevel) (<-chan struct{}, error) {
 	if dir == "" {
-		return nil, fmt.Errorf("path %q missing", oomCgroupName)
+		return nil, errors.New("memory controller missing")
 	}
 
 	if level > CriticalPressure {

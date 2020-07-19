@@ -145,4 +145,7 @@ const (
 
 	// Kustomize flag sets the folder where kustomize patches for static pod manifest are stored
 	Kustomize = "experimental-kustomize"
+
+	// Patches flag sets the folder where kubeadm component patches are stored
+	Patches = "experimental-patches"
 )

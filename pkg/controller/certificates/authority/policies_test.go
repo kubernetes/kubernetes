@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
 )
 
 func TestKeyUsagesFromStrings(t *testing.T) {

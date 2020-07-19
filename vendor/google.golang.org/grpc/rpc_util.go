@@ -871,7 +871,7 @@ type channelzData struct {
 
 // The SupportPackageIsVersion variables are referenced from generated protocol
 // buffer files to ensure compatibility with the gRPC version used.  The latest
-// support package version is 5.
+// support package version is 6.
 //
 // Older versions are kept for compatibility. They may be removed if
 // compatibility cannot be maintained.
@@ -881,6 +881,7 @@ const (
 	SupportPackageIsVersion3 = true
 	SupportPackageIsVersion4 = true
 	SupportPackageIsVersion5 = true
+	SupportPackageIsVersion6 = true
 )
 
 const grpcUA = "grpc-go/" + Version

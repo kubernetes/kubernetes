@@ -23,7 +23,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -66,6 +66,7 @@ type PatchOptions struct {
 	args                         []string
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	fieldManager                 string
 
 	genericclioptions.IOStreams
 }
@@ -127,6 +128,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-patch")
 
 	return cmd
 }
@@ -238,7 +240,8 @@ func (o *PatchOptions) RunPatch() error {
 
 			helper := resource.
 				NewHelper(client, mapping).
-				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
+				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+				WithFieldManager(o.fieldManager)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				return err

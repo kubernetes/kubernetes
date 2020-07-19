@@ -24,7 +24,7 @@ import (
 	"time"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	autoscaling "k8s.io/api/autoscaling/v2beta2"

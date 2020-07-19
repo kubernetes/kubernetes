@@ -26,6 +26,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -51,7 +52,7 @@ var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 
 	ginkgo.It("should check that the kubernetes-dashboard instance is alive", func() {
 		ginkgo.By("Checking whether the kubernetes-dashboard service exists.")
-		err := framework.WaitForService(f.ClientSet, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
+		err := e2enetwork.WaitForService(f.ClientSet, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking to make sure the kubernetes-dashboard pods are running")

@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/utils/exec"
 )
@@ -146,7 +146,7 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 	}{
 		{
 			storageAccountType:  "",
-			expectedAccountType: compute.StandardLRS,
+			expectedAccountType: compute.StandardSSDLRS,
 			expectError:         false,
 		},
 		{

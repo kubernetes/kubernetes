@@ -31,7 +31,7 @@ import (
 
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -670,8 +670,9 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	err = cli.VolumeDelete(volumeID)
 	if err != nil {
 		if dstrings.TrimSpace(err.Error()) != errIDNotFound {
-			klog.Errorf("failed to delete volume %s: %v", volumeName, err)
-			return fmt.Errorf("failed to delete volume %s: %v", volumeName, err)
+			// don't log error details from client calls in events
+			klog.V(4).Infof("failed to delete volume %s: %v", volumeName, err)
+			return fmt.Errorf("failed to delete volume: see kube-controller-manager.log for details")
 		}
 		klog.V(2).Infof("volume %s not present in heketi, ignoring", volumeName)
 	}
@@ -816,7 +817,9 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions, Snapshot: snaps}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to create volume: %v", err)
+		// don't log error details from client calls in events
+		klog.V(4).Infof("failed to create volume: %v", err)
+		return nil, 0, "", fmt.Errorf("failed to create volume: see kube-controller-manager.log for details")
 	}
 	klog.V(1).Infof("volume with size %d and name %s created", volume.Size, volume.Name)
 	volID = volume.Id
@@ -837,10 +840,11 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	if err != nil {
 		deleteErr := cli.VolumeDelete(volume.Id)
 		if deleteErr != nil {
-			klog.Errorf("failed to delete volume: %v, manual deletion of the volume required", deleteErr)
+			// don't log error details from client calls in events
+			klog.V(4).Infof("failed to delete volume: %v, manual deletion of the volume required", deleteErr)
 		}
 		klog.V(3).Infof("failed to update endpoint, deleting %s", endpoint)
-		err = kubeClient.CoreV1().Services(epNamespace).Delete(context.TODO(), epServiceName, nil)
+		err = kubeClient.CoreV1().Services(epNamespace).Delete(context.TODO(), epServiceName, metav1.DeleteOptions{})
 		if err != nil && errors.IsNotFound(err) {
 			klog.V(1).Infof("service %s does not exist in namespace %s", epServiceName, epNamespace)
 			err = nil
@@ -921,7 +925,7 @@ func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServi
 	if kubeClient == nil {
 		return fmt.Errorf("failed to get kube client when deleting endpoint service")
 	}
-	err = kubeClient.CoreV1().Services(namespace).Delete(context.TODO(), epServiceName, nil)
+	err = kubeClient.CoreV1().Services(namespace).Delete(context.TODO(), epServiceName, metav1.DeleteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete service %s/%s: %v", namespace, epServiceName, err)
 	}
@@ -955,7 +959,9 @@ func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (
 func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string, err error) {
 	clusterinfo, err := cli.ClusterInfo(cluster)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster details: %v", err)
+		// don't log error details from client calls in events
+		klog.V(4).Infof("failed to get cluster details: %v", err)
+		return nil, fmt.Errorf("failed to get cluster details: see kube-controller-manager.log for details")
 	}
 
 	// For the dynamically provisioned volume, we gather the list of node IPs
@@ -964,7 +970,9 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 	for _, node := range clusterinfo.Nodes {
 		nodeInfo, err := cli.NodeInfo(string(node))
 		if err != nil {
-			return nil, fmt.Errorf("failed to get host ipaddress: %v", err)
+			// don't log error details from client calls in events
+			klog.V(4).Infof("failed to get host ipaddress: %v", err)
+			return nil, fmt.Errorf("failed to get host ipaddress: see kube-controller-manager.log for details")
 		}
 		ipaddr := dstrings.Join(nodeInfo.NodeAddRequest.Hostnames.Storage, "")
 		// IP validates if a string is a valid IP address.
@@ -1204,17 +1212,25 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	}
 
 	// Find out delta size
-	expansionSize := resource.NewScaledQuantity((newSize.Value() - oldSize.Value()), 0)
-	expansionSizeGiB := int(volumehelpers.RoundUpToGiB(*expansionSize))
+	expansionSize := newSize
+	expansionSize.Sub(oldSize)
+	expansionSizeGiB, err := volumehelpers.RoundUpToGiBInt(expansionSize)
+	if err != nil {
+		return oldSize, err
+	}
 
 	// Find out requested Size
-	requestGiB := volumehelpers.RoundUpToGiB(newSize)
+	requestGiB, err := volumehelpers.RoundUpToGiB(newSize)
+	if err != nil {
+		return oldSize, err
+	}
 
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
 	if err != nil {
-		klog.Errorf("error when fetching details of volume %s: %v", volumeName, err)
-		return oldSize, err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("error when fetching details of volume %s: %v", volumeName, err)
+		return oldSize, fmt.Errorf("failed to get volume info %s: see kube-controller-manager.log for details", volumeName)
 	}
 	if int64(currentVolumeInfo.Size) >= requestGiB {
 		return newSize, nil
@@ -1226,8 +1242,9 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	// Expand the volume
 	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
 	if err != nil {
-		klog.Errorf("failed to expand volume %s: %v", volumeName, err)
-		return oldSize, err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("failed to expand volume %s: %v", volumeName, err)
+		return oldSize, fmt.Errorf("failed to expand volume: see kube-controller-manager.log for details")
 	}
 	klog.V(2).Infof("volume %s expanded to new size %d successfully", volumeName, volumeInfoRes.Size)
 	newVolumeSize := resource.MustParse(fmt.Sprintf("%dGi", volumeInfoRes.Size))

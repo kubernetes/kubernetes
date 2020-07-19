@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
@@ -257,12 +256,12 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference a service account", nodeName))
 	}
 	hasSecrets := false
-	podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false })
+	podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, podutil.AllContainers)
 	if hasSecrets {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference secrets", nodeName))
 	}
 	hasConfigMaps := false
-	podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false })
+	podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, podutil.AllContainers)
 	if hasConfigMaps {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
 	}
@@ -406,13 +405,8 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		// Don't allow a node to register with labels outside the allowed set.
 		// This would allow a node to add or modify its labels in a way that would let it steer privileged workloads to itself.
 		modifiedLabels := getModifiedLabels(node.Labels, nil)
-		if forbiddenLabels := p.getForbiddenCreateLabels(modifiedLabels); len(forbiddenLabels) > 0 {
+		if forbiddenLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
-		}
-		// check and warn if nodes set labels on create that would have been forbidden on update
-		// TODO(liggitt): in 1.19, expand getForbiddenCreateLabels to match getForbiddenUpdateLabels and drop this
-		if forbiddenUpdateLabels := p.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
-			klog.Warningf("node %q added disallowed labels on node creation: %s", nodeName, strings.Join(forbiddenUpdateLabels.List(), ", "))
 		}
 	}
 	if requestedName != nodeName {
@@ -445,7 +439,7 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		// Don't allow a node to update labels outside the allowed set.
 		// This would allow a node to add or modify its labels in a way that would let it steer privileged workloads to itself.
 		modifiedLabels := getModifiedLabels(node.Labels, oldNode.Labels)
-		if forbiddenUpdateLabels := p.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
+		if forbiddenUpdateLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("is not allowed to modify labels: %s", strings.Join(forbiddenUpdateLabels.List(), ", ")))
 		}
 	}
@@ -487,26 +481,8 @@ func getLabelNamespace(key string) string {
 	return ""
 }
 
-// getForbiddenCreateLabels returns the set of labels that may not be set by the node.
-// TODO(liggitt): in 1.19, expand to match getForbiddenUpdateLabels()
-func (p *Plugin) getForbiddenCreateLabels(modifiedLabels sets.String) sets.String {
-	if len(modifiedLabels) == 0 {
-		return nil
-	}
-
-	forbiddenLabels := sets.NewString()
-	for label := range modifiedLabels {
-		namespace := getLabelNamespace(label)
-		// forbid kubelets from setting node-restriction labels
-		if namespace == v1.LabelNamespaceNodeRestriction || strings.HasSuffix(namespace, "."+v1.LabelNamespaceNodeRestriction) {
-			forbiddenLabels.Insert(label)
-		}
-	}
-	return forbiddenLabels
-}
-
-// getForbiddenLabels returns the set of labels that may not be set by the node on update.
-func (p *Plugin) getForbiddenUpdateLabels(modifiedLabels sets.String) sets.String {
+// getForbiddenLabels returns the set of labels that may not be added, removed, or modified by the node on create or update.
+func (p *Plugin) getForbiddenLabels(modifiedLabels sets.String) sets.String {
 	if len(modifiedLabels) == 0 {
 		return nil
 	}

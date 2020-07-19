@@ -1,38 +1,35 @@
 package wclayer
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
+	"github.com/Microsoft/hcsshim/internal/oc"
 	"github.com/Microsoft/hcsshim/internal/safefile"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 )
 
 // ImportLayer will take the contents of the folder at importFolderPath and import
 // that into a layer with the id layerId.  Note that in order to correctly populate
 // the layer and interperet the transport format, all parent layers must already
 // be present on the system at the paths provided in parentLayerPaths.
-func ImportLayer(path string, importFolderPath string, parentLayerPaths []string) (err error) {
+func ImportLayer(ctx context.Context, path string, importFolderPath string, parentLayerPaths []string) (err error) {
 	title := "hcsshim::ImportLayer"
-	fields := logrus.Fields{
-		"path":             path,
-		"importFolderPath": importFolderPath,
-	}
-	logrus.WithFields(fields).Debug(title)
-	defer func() {
-		if err != nil {
-			fields[logrus.ErrorKey] = err
-			logrus.WithFields(fields).Error(err)
-		} else {
-			logrus.WithFields(fields).Debug(title + " - succeeded")
-		}
-	}()
+	ctx, span := trace.StartSpan(ctx, title)
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("path", path),
+		trace.StringAttribute("importFolderPath", importFolderPath),
+		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
 
 	// Generate layer descriptors
-	layers, err := layerPathsToDescriptors(parentLayerPaths)
+	layers, err := layerPathsToDescriptors(ctx, parentLayerPaths)
 	if err != nil {
 		return err
 	}
@@ -60,20 +57,26 @@ type LayerWriter interface {
 }
 
 type legacyLayerWriterWrapper struct {
+	ctx context.Context
+	s   *trace.Span
+
 	*legacyLayerWriter
 	path             string
 	parentLayerPaths []string
 }
 
-func (r *legacyLayerWriterWrapper) Close() error {
+func (r *legacyLayerWriterWrapper) Close() (err error) {
+	defer r.s.End()
+	defer func() { oc.SetSpanStatus(r.s, err) }()
 	defer os.RemoveAll(r.root.Name())
 	defer r.legacyLayerWriter.CloseRoots()
-	err := r.legacyLayerWriter.Close()
+
+	err = r.legacyLayerWriter.Close()
 	if err != nil {
 		return err
 	}
 
-	if err = ImportLayer(r.destRoot.Name(), r.path, r.parentLayerPaths); err != nil {
+	if err = ImportLayer(r.ctx, r.destRoot.Name(), r.path, r.parentLayerPaths); err != nil {
 		return err
 	}
 	for _, name := range r.Tombstones {
@@ -96,7 +99,7 @@ func (r *legacyLayerWriterWrapper) Close() error {
 		if err != nil {
 			return err
 		}
-		err = ProcessUtilityVMImage(filepath.Join(r.destRoot.Name(), "UtilityVM"))
+		err = ProcessUtilityVMImage(r.ctx, filepath.Join(r.destRoot.Name(), "UtilityVM"))
 		if err != nil {
 			return err
 		}
@@ -107,7 +110,18 @@ func (r *legacyLayerWriterWrapper) Close() error {
 // NewLayerWriter returns a new layer writer for creating a layer on disk.
 // The caller must have taken the SeBackupPrivilege and SeRestorePrivilege privileges
 // to call this and any methods on the resulting LayerWriter.
-func NewLayerWriter(path string, parentLayerPaths []string) (LayerWriter, error) {
+func NewLayerWriter(ctx context.Context, path string, parentLayerPaths []string) (_ LayerWriter, err error) {
+	ctx, span := trace.StartSpan(ctx, "hcsshim::NewLayerWriter")
+	defer func() {
+		if err != nil {
+			oc.SetSpanStatus(span, err)
+			span.End()
+		}
+	}()
+	span.AddAttributes(
+		trace.StringAttribute("path", path),
+		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
+
 	if len(parentLayerPaths) == 0 {
 		// This is a base layer. It gets imported differently.
 		f, err := safefile.OpenRoot(path)
@@ -115,6 +129,8 @@ func NewLayerWriter(path string, parentLayerPaths []string) (LayerWriter, error)
 			return nil, err
 		}
 		return &baseLayerWriter{
+			ctx:  ctx,
+			s:    span,
 			root: f,
 		}, nil
 	}
@@ -128,6 +144,8 @@ func NewLayerWriter(path string, parentLayerPaths []string) (LayerWriter, error)
 		return nil, err
 	}
 	return &legacyLayerWriterWrapper{
+		ctx:               ctx,
+		s:                 span,
 		legacyLayerWriter: w,
 		path:              importPath,
 		parentLayerPaths:  parentLayerPaths,

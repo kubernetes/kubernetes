@@ -34,7 +34,7 @@ var (
 		Enable or update dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
 		where X is the minor version of the desired kubelet version.
 
-		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
+		WARNING: This kubeadm feature is deprecated. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
 
 		` + cmdutil.AlphaDisclaimer)
@@ -43,7 +43,7 @@ var (
 		# Enable dynamic kubelet configuration for a Node.
 		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version %s
 
-		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
+		WARNING: This kubeadm feature is deprecated. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
 		`, constants.CurrentKubernetesVersion))
 )
@@ -80,9 +80,11 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "enable-dynamic",
-		Short:   "EXPERIMENTAL: Enable or update dynamic kubelet configuration for a Node",
+		Short:   "DEPRECATED: Enable or update dynamic kubelet configuration for a Node",
 		Long:    kubeletConfigEnableDynamicLongDesc,
 		Example: kubeletConfigEnableDynamicExample,
+		Deprecated: "This command is deprecated and will be removed in a future release. Please defer to the official \"Dynamic Kubelet Configuration\" " +
+			"guide at k8s.io if you wish to use this feature",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(nodeName) == 0 {
 				return errors.New("the --node-name argument is required")
@@ -104,6 +106,7 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 
 			return kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)

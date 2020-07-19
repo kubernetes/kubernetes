@@ -25,7 +25,11 @@ import (
 	"net/http"
 	"net/url"
 	goruntime "runtime"
+	"strings"
 	"time"
+
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,7 +46,8 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -415,4 +420,36 @@ func parseTimeout(str string) time.Duration {
 
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
+}
+
+type etcdError interface {
+	Code() grpccodes.Code
+	Error() string
+}
+
+type grpcError interface {
+	GRPCStatus() *grpcstatus.Status
+}
+
+func isTooLargeError(err error) bool {
+	if err != nil {
+		if etcdErr, ok := err.(etcdError); ok {
+			if etcdErr.Code() == grpccodes.InvalidArgument && etcdErr.Error() == "etcdserver: request is too large" {
+				return true
+			}
+		}
+		if grpcErr, ok := err.(grpcError); ok {
+			if grpcErr.GRPCStatus().Code() == grpccodes.ResourceExhausted && strings.Contains(grpcErr.GRPCStatus().Message(), "trying to send message larger than max") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// requestWithTrace returns a new trace using the provided msg and fields, nested within any trace already in the
+//context of the provided req. Also returns a request with the new trace in the context.
+func requestWithTrace(req *http.Request, msg string, fields ...utiltrace.Field) (*http.Request, *utiltrace.Trace) {
+	ctx, trace := request.WithTrace(req.Context(), msg, fields...)
+	return req.Clone(ctx), trace
 }

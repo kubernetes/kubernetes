@@ -26,7 +26,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/mocks"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Ensure package autorest/mocks is imported and vendored.

@@ -21,9 +21,8 @@ package gce
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
@@ -80,15 +79,6 @@ func (g *Cloud) ReserveRegionAddress(addr *compute.Address, region string) error
 	return mc.Observe(g.c.Addresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
 }
 
-// ReserveAlphaRegionAddress creates an Alpha, regional address.
-func (g *Cloud) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newAddressMetricContext("reserve", region)
-	return mc.Observe(g.c.AlphaAddresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
-}
-
 // ReserveBetaRegionAddress creates a beta region address
 func (g *Cloud) ReserveBetaRegionAddress(addr *computebeta.Address, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -114,16 +104,6 @@ func (g *Cloud) GetRegionAddress(name, region string) (*compute.Address, error) 
 
 	mc := newAddressMetricContext("get", region)
 	v, err := g.c.Addresses().Get(ctx, meta.RegionalKey(name, region))
-	return v, mc.Observe(err)
-}
-
-// GetAlphaRegionAddress returns the Alpha, regional address by name.
-func (g *Cloud) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newAddressMetricContext("get", region)
-	v, err := g.c.AlphaAddresses().Get(ctx, meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
@@ -185,14 +165,12 @@ func (g *Cloud) GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta
 	return nil, makeGoogleAPINotFoundError(fmt.Sprintf("Address with IP %q was not found in region %q", ipAddress, region))
 }
 
-// TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
 func (g *Cloud) getNetworkTierFromAddress(name, region string) (string, error) {
-	if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return cloud.NetworkTierDefault.ToGCEValue(), nil
-	}
-	addr, err := g.GetAlphaRegionAddress(name, region)
+
+	addr, err := g.GetRegionAddress(name, region)
 	if err != nil {
-		return handleAlphaNetworkTierGetError(err)
+		// Can't get the network tier, just return an error.
+		return "", err
 	}
 	return addr.NetworkTier, nil
 }

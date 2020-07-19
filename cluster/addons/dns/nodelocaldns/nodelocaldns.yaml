@@ -121,8 +121,11 @@ spec:
       k8s-app: node-local-dns
   template:
     metadata:
-       labels:
-          k8s-app: node-local-dns
+      labels:
+        k8s-app: node-local-dns
+      annotations:
+        prometheus.io/port: "9253"
+        prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: node-local-dns
@@ -131,9 +134,13 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      - effect: "NoExecute"
+        operator: "Exists"
+      - effect: "NoSchedule"
+        operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/k8s-dns-node-cache:1.15.7
+        image: k8s.gcr.io/k8s-dns-node-cache:1.15.13
         resources:
           requests:
             cpu: 25m

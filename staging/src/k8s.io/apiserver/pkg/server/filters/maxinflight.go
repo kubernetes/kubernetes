@@ -27,8 +27,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -50,13 +51,17 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	klog.Errorf(err.Error())
 }
 
-// requestWatermark is used to trak maximal usage of inflight requests.
+// requestWatermark is used to track maximal numbers of requests in a particular phase of handling
 type requestWatermark struct {
+	phase                                string
+	readOnlyObserver, mutatingObserver   fcmetrics.TimedObserver
 	lock                                 sync.Mutex
 	readOnlyWatermark, mutatingWatermark int
 }
 
 func (w *requestWatermark) recordMutating(mutatingVal int) {
+	w.mutatingObserver.Set(float64(mutatingVal))
+
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -66,6 +71,8 @@ func (w *requestWatermark) recordMutating(mutatingVal int) {
 }
 
 func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
+	w.readOnlyObserver.Set(float64(readOnlyVal))
+
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -74,9 +81,14 @@ func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
 	}
 }
 
-var watermark = &requestWatermark{}
+// watermark tracks requests being executed (not waiting in a queue)
+var watermark = &requestWatermark{
+	phase:            metrics.ExecutingPhase,
+	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.ReadOnlyKind}).RequestsExecuting,
+	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.MutatingKind}).RequestsExecuting,
+}
 
-func startRecordingUsage() {
+func startRecordingUsage(watermark *requestWatermark) {
 	go func() {
 		wait.Forever(func() {
 			watermark.lock.Lock()
@@ -86,7 +98,7 @@ func startRecordingUsage() {
 			watermark.mutatingWatermark = 0
 			watermark.lock.Unlock()
 
-			metrics.UpdateInflightRequestMetrics(readOnlyWatermark, mutatingWatermark)
+			metrics.UpdateInflightRequestMetrics(watermark.phase, readOnlyWatermark, mutatingWatermark)
 		}, inflightUsageMetricUpdatePeriod)
 	}()
 }
@@ -100,7 +112,7 @@ func WithMaxInFlightLimit(
 	mutatingLimit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
-	startOnce.Do(startRecordingUsage)
+	startOnce.Do(func() { startRecordingUsage(watermark) })
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
@@ -108,9 +120,11 @@ func WithMaxInFlightLimit(
 	var mutatingChan chan bool
 	if nonMutatingLimit != 0 {
 		nonMutatingChan = make(chan bool, nonMutatingLimit)
+		watermark.readOnlyObserver.SetX1(float64(nonMutatingLimit))
 	}
 	if mutatingLimit != 0 {
 		mutatingChan = make(chan bool, mutatingLimit)
+		watermark.mutatingObserver.SetX1(float64(mutatingLimit))
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,21 +155,22 @@ func WithMaxInFlightLimit(
 
 			select {
 			case c <- true:
-				var mutatingLen, readOnlyLen int
+				// We note the concurrency level both while the
+				// request is being served and after it is done being
+				// served, because both states contribute to the
+				// sampled stats on concurrency.
 				if isMutatingRequest {
-					mutatingLen = len(mutatingChan)
+					watermark.recordMutating(len(c))
 				} else {
-					readOnlyLen = len(nonMutatingChan)
+					watermark.recordReadOnly(len(c))
 				}
-
 				defer func() {
 					<-c
 					if isMutatingRequest {
-						watermark.recordMutating(mutatingLen)
+						watermark.recordMutating(len(c))
 					} else {
-						watermark.recordReadOnly(readOnlyLen)
+						watermark.recordReadOnly(len(c))
 					}
-
 				}()
 				handler.ServeHTTP(w, r)
 

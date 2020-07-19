@@ -273,9 +273,9 @@ func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMod
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--file_mode=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -299,9 +299,9 @@ func downwardAPIVolumePodForSimpleTest(name string, filePath string) *v1.Pod {
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--file_content=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_content=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -330,9 +330,9 @@ func downwardAPIVolumeForDefaultContainerResources(name string, filePath string)
 func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 	return []v1.Container{
 		{
-			Name:    name,
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--file_content=" + filePath},
+			Name:  name,
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_content=" + filePath},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("250m"),
@@ -358,9 +358,9 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container {
 	return []v1.Container{
 		{
-			Name:    name,
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--file_content=" + filePath},
+			Name:  name,
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_content=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -377,9 +377,9 @@ func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[stri
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",

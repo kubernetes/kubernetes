@@ -103,7 +103,7 @@ func (c *FakeExamples) Update(ctx context.Context, example *crv1.Example, opts v
 }
 
 // Delete takes name of the example and deletes it. Returns an error if one occurs.
-func (c *FakeExamples) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeExamples) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(examplesResource, c.ns, name), &crv1.Example{})
 
@@ -111,8 +111,8 @@ func (c *FakeExamples) Delete(ctx context.Context, name string, options *v1.Dele
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeExamples) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(examplesResource, c.ns, listOptions)
+func (c *FakeExamples) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(examplesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &crv1.ExampleList{})
 	return err

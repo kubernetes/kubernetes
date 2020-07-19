@@ -45,11 +45,6 @@ type kubeAPIServerEnv struct {
 
 func TestEncryptionProviderFlag(t *testing.T) {
 	var (
-		//	command": [
-		//   "/bin/sh", - Index 0
-		//   "-c",      - Index 1
-		//   "exec /usr/local/bin/kube-apiserver " - Index 2
-		execArgsIndex        = 2
 		encryptionConfigFlag = "--encryption-provider-config"
 	)
 
@@ -83,13 +78,13 @@ func TestEncryptionProviderFlag(t *testing.T) {
 
 			c.mustInvokeFunc(
 				e,
-				kubeAPIServerConfigScriptName,
+				[]string{"configure-helper.sh", kubeAPIServerConfigScriptName},
 				"kms.template",
 				"testdata/kube-apiserver/base.template",
 				"testdata/kube-apiserver/kms.template")
 			c.mustLoadPodFromManifest()
 
-			execArgs := c.pod.Spec.Containers[0].Command[execArgsIndex]
+			execArgs := strings.Join(c.pod.Spec.Containers[0].Command, " ")
 			flagIsInArg := strings.Contains(execArgs, encryptionConfigFlag)
 			flag := fmt.Sprintf("%s=%s", encryptionConfigFlag, e.EncryptionProviderConfigPath)
 
@@ -118,7 +113,7 @@ func TestEncryptionProviderConfig(t *testing.T) {
 
 	c.mustInvokeFunc(
 		e,
-		kubeAPIServerConfigScriptName,
+		[]string{"configure-helper.sh", kubeAPIServerConfigScriptName},
 		"kms.template",
 
 		"testdata/kube-apiserver/base.template",
@@ -189,7 +184,7 @@ func TestKMSIntegration(t *testing.T) {
 
 			c.mustInvokeFunc(
 				e,
-				kubeAPIServerConfigScriptName,
+				[]string{"configure-helper.sh", kubeAPIServerConfigScriptName},
 				"kms.template",
 
 				"testdata/kube-apiserver/base.template",

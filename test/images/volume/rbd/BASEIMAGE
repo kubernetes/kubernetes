@@ -1,3 +1,3 @@
-amd64=fedora:26
-arm64=arm64v8/fedora:26
-ppc64le=ppc64le/fedora:26
+linux/amd64=fedora:26
+linux/arm64=arm64v8/fedora:26
+linux/ppc64le=ppc64le/fedora:26

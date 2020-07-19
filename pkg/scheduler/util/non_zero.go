@@ -18,7 +18,9 @@ package util
 
 import (
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // For each of these resources, a pod that doesn't request the resource explicitly
@@ -60,6 +62,11 @@ func GetNonzeroRequestForResource(resource v1.ResourceName, requests *v1.Resourc
 		}
 		return requests.Memory().Value()
 	case v1.ResourceEphemeralStorage:
+		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk.
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			return 0
+		}
+
 		quantity, found := (*requests)[v1.ResourceEphemeralStorage]
 		if !found {
 			return 0

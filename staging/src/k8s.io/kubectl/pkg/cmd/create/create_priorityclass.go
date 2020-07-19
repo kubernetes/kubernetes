@@ -76,7 +76,8 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd.Flags().Int32("value", 0, i18n.T("the value of this priority class."))
 	cmd.Flags().Bool("global-default", false, i18n.T("global-default specifies whether this PriorityClass should be considered as the default priority."))
 	cmd.Flags().String("description", "", i18n.T("description is an arbitrary string that usually provides guidelines on when this priority class should be used."))
-	cmd.Flags().String("preemption-policy", "", i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
+	cmd.Flags().String("preemption-policy", "PreemptLowerPriority", i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 	return cmd
 }
 

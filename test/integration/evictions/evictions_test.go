@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +73,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	var gracePeriodSeconds int64 = 30
-	deleteOption := &metav1.DeleteOptions{
+	deleteOption := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 
@@ -113,7 +113,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			eviction := newEviction(ns.Name, podName, deleteOption)
 
 			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(eviction)
+				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 				switch {
 				case apierrors.IsTooManyRequests(e):
 					return false, nil
@@ -192,7 +192,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	}
 
 	var gracePeriodSeconds int64 = 30
-	deleteOption := &metav1.DeleteOptions{
+	deleteOption := metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 	pod := newPod("test-terminal-pod1")
@@ -221,7 +221,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	oldPdb := pdbList.Items[0]
 	eviction := newEviction(ns.Name, pod.Name, deleteOption)
 	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(eviction)
+		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 		switch {
 		case apierrors.IsTooManyRequests(e):
 			return false, nil
@@ -309,7 +309,7 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 	}
 }
 
-func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v1beta1.Eviction {
+func newEviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *v1beta1.Eviction {
 	return &v1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "Policy/v1beta1",
@@ -319,7 +319,7 @@ func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v
 			Name:      evictionName,
 			Namespace: ns,
 		},
-		DeleteOptions: deleteOption,
+		DeleteOptions: &deleteOption,
 	}
 }
 

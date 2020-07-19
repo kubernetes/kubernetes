@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 ADD sampledeviceplugin /sampledeviceplugin
 ENTRYPOINT ["/sampledeviceplugin", "-alsologtostderr"]

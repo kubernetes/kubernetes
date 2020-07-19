@@ -27,6 +27,16 @@ type DebuggingOptions struct {
 	*componentbaseconfig.DebuggingConfiguration
 }
 
+// RecommendedDebuggingOptions returns the currently recommended debugging options.  These are subject to change
+// between releases as we add options and decide which features should be exposed or not by default.
+func RecommendedDebuggingOptions() *DebuggingOptions {
+	return &DebuggingOptions{
+		DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
+			EnableProfiling: true, // profile debugging is cheap to have exposed and standard on kube binaries
+		},
+	}
+}
+
 // AddFlags adds flags related to debugging for controller manager to the specified FlagSet.
 func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {

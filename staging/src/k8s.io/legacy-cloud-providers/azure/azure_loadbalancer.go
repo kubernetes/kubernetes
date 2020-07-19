@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
@@ -102,6 +102,8 @@ const (
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
 	clusterNameKey = "kubernetes-cluster-name"
+
+	defaultLoadBalancerSourceRanges = "0.0.0.0/0"
 )
 
 // GetLoadBalancer returns whether the specified load balancer and its components exist, and
@@ -265,26 +267,24 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	}
 
 	// check if the service already has a load balancer
-	if existingLBs != nil {
-		for i := range existingLBs {
-			existingLB := existingLBs[i]
-			if strings.EqualFold(*existingLB.Name, defaultLBName) {
-				defaultLB = &existingLB
-			}
-			if isInternalLoadBalancer(&existingLB) != isInternal {
-				continue
-			}
-			status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
-			if err != nil {
-				return nil, nil, false, err
-			}
-			if status == nil {
-				// service is not on this load balancer
-				continue
-			}
-
-			return &existingLB, status, true, nil
+	for i := range existingLBs {
+		existingLB := existingLBs[i]
+		if strings.EqualFold(*existingLB.Name, defaultLBName) {
+			defaultLB = &existingLB
 		}
+		if isInternalLoadBalancer(&existingLB) != isInternal {
+			continue
+		}
+		status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if status == nil {
+			// service is not on this load balancer
+			continue
+		}
+
+		return &existingLB, status, true, nil
 	}
 
 	hasMode, _, _ := getServiceLoadBalancerMode(service)
@@ -407,7 +407,7 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 				if pipID == nil {
 					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress ID is Nil", serviceName, *lb.Name)
 				}
-				pipName, err := getLastSegment(*pipID)
+				pipName, err := getLastSegment(*pipID, "/")
 				if err != nil {
 					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress Name from ID(%s)", serviceName, *lb.Name, *pipID)
 				}
@@ -550,23 +550,21 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 
-	if az.ipv6DualStackEnabled {
-		// TODO: (khenidak) if we ever enable IPv6 single stack, then we should
-		// not wrap the following in a feature gate
-		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
-		if ipv6 {
-			pip.PublicIPAddressVersion = network.IPv6
-			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv6 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+	// use the same family as the clusterIP as we support IPv6 single stack as well
+	// as dual-stack clusters
+	ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if ipv6 {
+		pip.PublicIPAddressVersion = network.IPv6
+		klog.V(2).Infof("service(%s): pip(%s) - creating as ipv6 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
 
-			pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Dynamic
-			if az.useStandardLoadBalancer() {
-				// standard sku must have static allocation method for ipv6
-				pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Static
-			}
-		} else {
-			pip.PublicIPAddressVersion = network.IPv4
-			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+		pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Dynamic
+		if az.useStandardLoadBalancer() {
+			// standard sku must have static allocation method for ipv6
+			pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Static
 		}
+	} else {
+		pip.PublicIPAddressVersion = network.IPv4
+		klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
 	}
 
 	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
@@ -686,7 +684,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s/%s) wantLb(%t) resolved load balancer name", serviceName, lbResourceGroup, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbResourceGroup, lbFrontendIPConfigName)
-	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
+	lbBackendPoolName := getBackendPoolName(clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbResourceGroup, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
@@ -1084,14 +1082,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 					EnableTCPReset:      enableTCPReset,
+					EnableFloatingIP:    to.BoolPtr(true),
 				},
-			}
-			// LB does not support floating IPs for IPV6 rules
-			if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-				expectedRule.BackendPort = to.Int32Ptr(port.NodePort)
-				expectedRule.EnableFloatingIP = to.BoolPtr(false)
-			} else {
-				expectedRule.EnableFloatingIP = to.BoolPtr(true)
 			}
 
 			if protocol == v1.ProtocolTCP {
@@ -1140,6 +1132,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if lbIP != nil {
 		destinationIPAddress = *lbIP
 	}
+
 	if destinationIPAddress == "" {
 		destinationIPAddress = "*"
 	}
@@ -1149,6 +1142,12 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	serviceTags := getServiceTags(service)
+	if len(serviceTags) != 0 {
+		if _, ok := sourceRanges[defaultLoadBalancerSourceRanges]; ok {
+			delete(sourceRanges, defaultLoadBalancerSourceRanges)
+		}
+	}
+
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
@@ -1735,7 +1734,7 @@ func subnet(service *v1.Service) *string {
 
 // getServiceLoadBalancerMode parses the mode value.
 // if the value is __auto__ it returns isAuto = TRUE.
-// if anything else it returns the unique VM set names after triming spaces.
+// if anything else it returns the unique VM set names after trimming spaces.
 func getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, vmSetNames []string) {
 	mode, hasMode := service.Annotations[ServiceAnnotationLoadBalancerMode]
 	mode = strings.TrimSpace(mode)

@@ -73,7 +73,7 @@ func TestHTTPProbeProxy(t *testing.T) {
 
 	go func() {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, res)
+			fmt.Fprint(w, res)
 		})
 		err := http.ListenAndServe(":9098", nil)
 		if err != nil {

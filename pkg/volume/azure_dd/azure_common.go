@@ -26,7 +26,7 @@ import (
 	"regexp"
 	libstrings "strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	defaultStorageAccountType       = compute.StandardLRS
+	defaultStorageAccountType       = compute.StandardSSDLRS
 	defaultAzureDiskKind            = v1.AzureManagedDisk
 	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingReadOnly
 )
@@ -59,13 +59,12 @@ var (
 		string(api.AzureDataDiskCachingReadWrite))
 
 	supportedDiskKinds = sets.NewString(
-		string(api.AzureSharedBlobDisk),
-		string(api.AzureDedicatedBlobDisk),
+		string(api.AzureSharedBlobDisk),    // deprecated
+		string(api.AzureDedicatedBlobDisk), // deprecated
 		string(api.AzureManagedDisk))
 
 	// only for Windows node
-	winDiskNumRE     = regexp.MustCompile(`/dev/disk(.+)`)
-	winDiskNumFormat = "/dev/disk%d"
+	winDiskNumRE = regexp.MustCompile(`/dev/disk(.+)`)
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -73,16 +72,16 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 // creates a unique path for disks (even if they share the same *.vhd name)
-func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (string, error) {
-	diskUri = libstrings.ToLower(diskUri) // always lower uri because users may enter it in caps.
+func makeGlobalPDPath(host volume.VolumeHost, diskURI string, isManaged bool) (string, error) {
+	diskURI = libstrings.ToLower(diskURI) // always lower uri because users may enter it in caps.
 	uniqueDiskNameTemplate := "%s%s"
-	hashedDiskUri := azure.MakeCRC32(diskUri)
+	hashedDiskURI := azure.MakeCRC32(diskURI)
 	prefix := "b"
 	if isManaged {
 		prefix = "m"
 	}
-	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
-	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
+	// "{m for managed b for blob}{hashed diskURI or DiskId depending on disk kind }"
+	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskURI)
 	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil

@@ -70,12 +70,12 @@ func TestNewDetectLocalByCIDR(t *testing.T) {
 		},
 		{
 			cidr:        "2002::1234:abcd:ffff:c0a8:101/64",
-			ipt:         iptablestest.NewIpv6Fake(),
+			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: false,
 		},
 		{
 			cidr:        "10.0.0.0/14",
-			ipt:         iptablestest.NewIpv6Fake(),
+			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: true,
 		},
 		{
@@ -90,7 +90,7 @@ func TestNewDetectLocalByCIDR(t *testing.T) {
 		},
 		{
 			cidr:        "2002::1234:abcd:ffff:c0a8:101",
-			ipt:         iptablestest.NewIpv6Fake(),
+			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: true,
 		},
 		{
@@ -100,7 +100,7 @@ func TestNewDetectLocalByCIDR(t *testing.T) {
 		},
 		{
 			cidr:        "",
-			ipt:         iptablestest.NewIpv6Fake(),
+			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: true,
 		},
 	}
@@ -137,7 +137,7 @@ func TestDetectLocalByCIDR(t *testing.T) {
 		},
 		{
 			cidr:                    "2002::1234:abcd:ffff:c0a8:101/64",
-			ipt:                     iptablestest.NewIpv6Fake(),
+			ipt:                     iptablestest.NewIPv6Fake(),
 			chain:                   "TEST",
 			args:                    []string{"arg1", "arg2"},
 			expectedJumpIfOutput:    []string{"arg1", "arg2", "-s", "2002::1234:abcd:ffff:c0a8:101/64", "-j", "TEST"},

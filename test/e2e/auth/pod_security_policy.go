@@ -29,11 +29,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -44,7 +43,7 @@ import (
 
 const nobodyUser = int64(65534)
 
-var _ = SIGDescribe("PodSecurityPolicy", func() {
+var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
 	f.SkipPrivilegedPSPBinding = true
 
@@ -54,9 +53,10 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
 		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
-			e2eskipper.Skipf("PodSecurityPolicy not enabled")
+			framework.Failf("PodSecurityPolicy not enabled")
+			return
 		}
-		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+		if !e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			e2eskipper.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
@@ -72,7 +72,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Binding the edit role to the default SA")
-		err = auth.BindClusterRole(f.ClientSet.RbacV1(), "edit", ns,
+		err = e2eauth.BindClusterRole(f.ClientSet.RbacV1(), "edit", ns,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns, Name: "default"})
 		framework.ExpectNoError(err)
 	})
@@ -172,7 +172,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
-			aa.Annotations[apparmor.ContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
+			aa.Annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
 			tester(aa)
 		})
 	}
@@ -233,20 +233,20 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
-	err = auth.BindRoleInNamespace(f.ClientSet.RbacV1(), name, ns, rbacv1.Subject{
+	err = e2eauth.BindRoleInNamespace(f.ClientSet.RbacV1(), name, ns, rbacv1.Subject{
 		Kind:      rbacv1.ServiceAccountKind,
 		Namespace: ns,
 		Name:      "default",
 	})
 	framework.ExpectNoError(err)
 
-	framework.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
+	framework.ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
 		schema.GroupResource{Group: "policy", Resource: "podsecuritypolicies"}, true))
 
 	return psp, func() {
 		// Cleanup non-namespaced PSP object.
-		f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Delete(context.TODO(), name, &metav1.DeleteOptions{})
+		f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Delete(context.TODO(), name, metav1.DeleteOptions{})
 	}
 }
 
@@ -255,8 +255,8 @@ func restrictedPod(name string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
-				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
+				v1.SeccompPodAnnotationKey:                            v1.SeccompProfileRuntimeDefault,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "pause": v1.AppArmorBetaProfileRuntimeDefault,
 			},
 		},
 		Spec: v1.PodSpec{
@@ -315,10 +315,10 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
-				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
-				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
-				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+				seccomp.AllowedProfilesAnnotationKey:        v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:         v1.SeccompProfileRuntimeDefault,
+				v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
+				v1.AppArmorBetaDefaultProfileAnnotationKey:  v1.AppArmorBetaProfileRuntimeDefault,
 			},
 		},
 		Spec: policyv1beta1.PodSecurityPolicySpec{

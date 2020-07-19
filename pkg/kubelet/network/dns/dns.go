@@ -33,7 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 )
 

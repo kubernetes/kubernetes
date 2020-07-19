@@ -200,6 +200,8 @@ func (o *ClusterInfoDumpOptions) Run() error {
 				metav1.NamespaceSystem,
 				o.Namespace,
 			}
+		} else {
+			namespaces = o.Namespaces
 		}
 	}
 	for _, namespace := range namespaces {
@@ -300,10 +302,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 	}
 
 	dest := o.OutputDir
-	if len(dest) == 0 {
-		dest = "standard output"
-	}
-	if dest != "-" {
+	if len(dest) > 0 && dest != "-" {
 		fmt.Fprintf(o.Out, "Cluster info dumped to %s\n", dest)
 	}
 	return nil

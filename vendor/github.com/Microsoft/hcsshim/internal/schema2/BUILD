@@ -55,6 +55,7 @@ go_library(
         "processor_stats.go",
         "properties.go",
         "property_query.go",
+        "property_type.go",
         "rdp_connection_options.go",
         "registry_changes.go",
         "registry_key.go",
@@ -79,6 +80,8 @@ go_library(
         "virtual_node_info.go",
         "virtual_p_mem_controller.go",
         "virtual_p_mem_device.go",
+        "virtual_pci_device.go",
+        "virtual_pci_function.go",
         "virtual_smb.go",
         "virtual_smb_share.go",
         "virtual_smb_share_options.go",
@@ -88,6 +91,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim/internal/schema2",
     importpath = "github.com/Microsoft/hcsshim/internal/schema2",
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
+    deps = ["//vendor/github.com/containerd/cgroups/stats/v1:go_default_library"],
 )
 
 filegroup(

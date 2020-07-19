@@ -16,22 +16,30 @@ limitations under the License.
 
 package framework
 
-import "sync"
+import (
+	"sync"
+)
 
 // CleanupActionHandle is an integer pointer type for handling cleanup action
 type CleanupActionHandle *int
+type cleanupFuncHandle struct {
+	actionHandle CleanupActionHandle
+	actionHook   func()
+}
 
 var cleanupActionsLock sync.Mutex
-var cleanupActions = map[CleanupActionHandle]func(){}
+var cleanupHookList = []cleanupFuncHandle{}
 
 // AddCleanupAction installs a function that will be called in the event of the
 // whole test being terminated.  This allows arbitrary pieces of the overall
 // test to hook into SynchronizedAfterSuite().
+// The hooks are called in last-in-first-out order.
 func AddCleanupAction(fn func()) CleanupActionHandle {
 	p := CleanupActionHandle(new(int))
 	cleanupActionsLock.Lock()
 	defer cleanupActionsLock.Unlock()
-	cleanupActions[p] = fn
+	c := cleanupFuncHandle{actionHandle: p, actionHook: fn}
+	cleanupHookList = append([]cleanupFuncHandle{c}, cleanupHookList...)
 	return p
 }
 
@@ -40,7 +48,12 @@ func AddCleanupAction(fn func()) CleanupActionHandle {
 func RemoveCleanupAction(p CleanupActionHandle) {
 	cleanupActionsLock.Lock()
 	defer cleanupActionsLock.Unlock()
-	delete(cleanupActions, p)
+	for i, item := range cleanupHookList {
+		if item.actionHandle == p {
+			cleanupHookList = append(cleanupHookList[:i], cleanupHookList[i+1:]...)
+			break
+		}
+	}
 }
 
 // RunCleanupActions runs all functions installed by AddCleanupAction.  It does
@@ -51,8 +64,8 @@ func RunCleanupActions() {
 	func() {
 		cleanupActionsLock.Lock()
 		defer cleanupActionsLock.Unlock()
-		for _, fn := range cleanupActions {
-			list = append(list, fn)
+		for _, p := range cleanupHookList {
+			list = append(list, p.actionHook)
 		}
 	}()
 	// Run unlocked.

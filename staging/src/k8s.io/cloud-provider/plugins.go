@@ -22,7 +22,7 @@ import (
 	"os"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Factory is a function that returns a cloudprovider.Interface.
@@ -91,31 +91,34 @@ func IsExternal(name string) bool {
 	return name == externalCloudProvider
 }
 
+func DeprecationWarningForProvider(providerName string) {
+	for _, provider := range deprecatedCloudProviders {
+		if provider.name != providerName {
+			continue
+		}
+
+		detail := provider.detail
+		if provider.external {
+			detail = fmt.Sprintf("Please use 'external' cloud provider for %s: %s", providerName, provider.detail)
+		}
+
+		klog.Warningf("WARNING: %s built-in cloud provider is now deprecated. %s", providerName, detail)
+		break
+	}
+}
+
 // InitCloudProvider creates an instance of the named cloud provider.
 func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	var cloud Interface
 	var err error
 
 	if name == "" {
-		klog.Info("No cloud provider specified.")
 		return nil, nil
 	}
 
 	if IsExternal(name) {
 		klog.Info("External cloud provider specified")
 		return nil, nil
-	}
-
-	for _, provider := range deprecatedCloudProviders {
-		if provider.name == name {
-			detail := provider.detail
-			if provider.external {
-				detail = fmt.Sprintf("Please use 'external' cloud provider for %s: %s", name, provider.detail)
-			}
-			klog.Warningf("WARNING: %s built-in cloud provider is now deprecated. %s", name, detail)
-
-			break
-		}
 	}
 
 	if configFilePath != "" {

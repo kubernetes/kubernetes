@@ -22,6 +22,7 @@ go_library(
         "//vendor/go.etcd.io/etcd/pkg/pbutil:go_default_library",
         "//vendor/go.etcd.io/etcd/raft:go_default_library",
         "//vendor/go.etcd.io/etcd/raft/raftpb:go_default_library",
+        "//vendor/go.etcd.io/etcd/wal/walpb:go_default_library",
         "//vendor/go.uber.org/zap:go_default_library",
     ],
 )

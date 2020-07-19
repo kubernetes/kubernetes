@@ -87,7 +87,9 @@ type WantExternalKubeClientSet struct {
 	cs kubernetes.Interface
 }
 
-func (self *WantExternalKubeClientSet) SetExternalKubeClientSet(cs kubernetes.Interface) { self.cs = cs }
+func (self *WantExternalKubeClientSet) SetExternalKubeClientSet(cs kubernetes.Interface) {
+	self.cs = cs
+}
 func (self *WantExternalKubeClientSet) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }

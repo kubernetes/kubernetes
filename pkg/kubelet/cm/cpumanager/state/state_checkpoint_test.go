@@ -18,11 +18,12 @@ package state
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -395,5 +396,19 @@ func TestCheckpointStateClear(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func AssertStateEqual(t *testing.T, sf State, sm State) {
+	cpusetSf := sf.GetDefaultCPUSet()
+	cpusetSm := sm.GetDefaultCPUSet()
+	if !cpusetSf.Equals(cpusetSm) {
+		t.Errorf("State CPUSet mismatch. Have %v, want %v", cpusetSf, cpusetSm)
+	}
+
+	cpuassignmentSf := sf.GetCPUAssignments()
+	cpuassignmentSm := sm.GetCPUAssignments()
+	if !reflect.DeepEqual(cpuassignmentSf, cpuassignmentSm) {
+		t.Errorf("State CPU assignments mismatch. Have %s, want %s", cpuassignmentSf, cpuassignmentSm)
 	}
 }

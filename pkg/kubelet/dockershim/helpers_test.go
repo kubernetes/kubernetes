@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -28,9 +30,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
@@ -66,7 +68,7 @@ func TestGetApparmorSecurityOpts(t *testing.T) {
 		expectedOpts: []string{},
 	}, {
 		msg:          "AppArmor local profile",
-		config:       makeConfig(apparmor.ProfileNamePrefix + "foo"),
+		config:       makeConfig(v1.AppArmorBetaProfileNamePrefix + "foo"),
 		expectedOpts: []string{"apparmor=foo"},
 	}}
 

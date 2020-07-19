@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,63 +30,8 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 )
-
-func Test_generatorFromName(t *testing.T) {
-	const (
-		nonsenseName         = "not-a-real-generator-name"
-		basicName            = generateversioned.DeploymentBasicV1Beta1GeneratorName
-		basicAppsV1Beta1Name = generateversioned.DeploymentBasicAppsV1Beta1GeneratorName
-		basicAppsV1Name      = generateversioned.DeploymentBasicAppsV1GeneratorName
-		deploymentName       = "deployment-name"
-	)
-	imageNames := []string{"image-1", "image-2"}
-
-	generator, ok := generatorFromName(nonsenseName, imageNames, deploymentName)
-	assert.Nil(t, generator)
-	assert.False(t, ok)
-
-	generator, ok = generatorFromName(basicName, imageNames, deploymentName)
-	assert.True(t, ok)
-
-	{
-		expectedGenerator := &generateversioned.DeploymentBasicGeneratorV1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		assert.Equal(t, expectedGenerator, generator)
-	}
-
-	generator, ok = generatorFromName(basicAppsV1Beta1Name, imageNames, deploymentName)
-	assert.True(t, ok)
-
-	{
-		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1Beta1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		assert.Equal(t, expectedGenerator, generator)
-	}
-
-	generator, ok = generatorFromName(basicAppsV1Name, imageNames, deploymentName)
-	assert.True(t, ok)
-
-	{
-		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		assert.Equal(t, expectedGenerator, generator)
-	}
-}
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
@@ -107,13 +53,75 @@ func TestCreateDeployment(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateDeployment(tf, ioStreams)
-	cmd.Flags().Set("dry-run", "true")
+	cmd.Flags().Set("dry-run", "client")
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
 	cmd.Run(cmd, []string{depName})
 	expectedOutput := "deployment.apps/" + depName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
+	}
+}
+
+func TestCreateDeploymentWithPort(t *testing.T) {
+	depName := "jonny-dep"
+	port := "5701"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("port", port)
+	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+	cmd.Run(cmd, []string{depName})
+	if !strings.Contains(buf.String(), port) {
+		t.Errorf("unexpected output: %s\nexpected to contain: %s", buf.String(), port)
+	}
+}
+
+func TestCreateDeploymentWithReplicas(t *testing.T) {
+	depName := "jonny-dep"
+	replicas := "3"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "jsonpath={.spec.replicas}")
+	cmd.Flags().Set("replicas", replicas)
+	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+	cmd.Run(cmd, []string{depName})
+	if buf.String() != replicas {
+		t.Errorf("expected output: %s, but got: %s", replicas, buf.String())
 	}
 }
 
@@ -138,12 +146,10 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	ioStreams := genericclioptions.NewTestIOStreamsDiscard()
 	cmd := NewCmdCreateDeployment(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
-	options := &DeploymentOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-			DryRunStrategy: cmdutil.DryRunClient,
-			IOStreams:      ioStreams,
-		},
+	options := &CreateDeploymentOptions{
+		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		DryRunStrategy: cmdutil.DryRunClient,
+		IOStreams:      ioStreams,
 	}
 
 	err := options.Complete(tf, cmd, []string{depName})

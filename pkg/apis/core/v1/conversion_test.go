@@ -398,16 +398,60 @@ func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {
 	}
 }
 func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
-	// fail
-	v1FailTestInputs := []v1.PodStatus{
+	asymmetricInputs := []struct {
+		name string
+		in   v1.PodStatus
+		out  core.PodStatus
+	}{
 		{
-			PodIP: "1.1.2.1", // fail becaue PodIP != PodIPs[0]
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "2.2.2.2"},
+			name: "mismatched podIP",
+			in: v1.PodStatus{
+				PodIP: "1.1.2.1", // Older field takes precedence for compatibility with patch by older clients
+				PodIPs: []v1.PodIP{
+					{IP: "1.1.1.1"},
+					{IP: "2.2.2.2"},
+				},
+			},
+			out: core.PodStatus{
+				PodIPs: []core.PodIP{
+					{IP: "1.1.2.1"},
+				},
+			},
+		},
+		{
+			name: "matching podIP",
+			in: v1.PodStatus{
+				PodIP: "1.1.1.1",
+				PodIPs: []v1.PodIP{
+					{IP: "1.1.1.1"},
+					{IP: "2.2.2.2"},
+				},
+			},
+			out: core.PodStatus{
+				PodIPs: []core.PodIP{
+					{IP: "1.1.1.1"},
+					{IP: "2.2.2.2"},
+				},
+			},
+		},
+		{
+			name: "empty podIP",
+			in: v1.PodStatus{
+				PodIP: "",
+				PodIPs: []v1.PodIP{
+					{IP: "1.1.1.1"},
+					{IP: "2.2.2.2"},
+				},
+			},
+			out: core.PodStatus{
+				PodIPs: []core.PodIP{
+					{IP: "1.1.1.1"},
+					{IP: "2.2.2.2"},
+				},
 			},
 		},
 	}
+
 	// success
 	v1TestInputs := []v1.PodStatus{
 		// only Primary IP Provided
@@ -451,12 +495,18 @@ func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
 			},
 		},
 	}
-	// run failed cases
-	for i, failedTest := range v1FailTestInputs {
+
+	// run asymmetric cases
+	for _, tc := range asymmetricInputs {
+		testInput := tc.in
+
 		corePodStatus := core.PodStatus{}
 		// convert..
-		if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&failedTest, &corePodStatus, nil); err == nil {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus should have failed for input %+v", i, failedTest)
+		if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&testInput, &corePodStatus, nil); err != nil {
+			t.Errorf("%s: Convert v1.PodStatus to core.PodStatus failed with error:%v for input %+v", tc.name, err.Error(), testInput)
+		}
+		if !reflect.DeepEqual(corePodStatus, tc.out) {
+			t.Errorf("%s: expected %#v, got %#v", tc.name, tc.out.PodIPs, corePodStatus.PodIPs)
 		}
 	}
 
@@ -541,10 +591,40 @@ func Test_core_NodeSpec_to_v1_NodeSpec(t *testing.T) {
 }
 
 func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
-	failInputs := []v1.NodeSpec{
-		{ // fail PodCIDRs[0] != PodCIDR
-			PodCIDR:  "10.0.0.0/24",
-			PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+	asymmetricInputs := []struct {
+		name string
+		in   v1.NodeSpec
+		out  core.NodeSpec
+	}{
+		{
+			name: "mismatched podCIDR",
+			in: v1.NodeSpec{
+				PodCIDR:  "10.0.0.0/24",
+				PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			},
+			out: core.NodeSpec{
+				PodCIDRs: []string{"10.0.0.0/24"},
+			},
+		},
+		{
+			name: "unset podCIDR",
+			in: v1.NodeSpec{
+				PodCIDR:  "",
+				PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			},
+			out: core.NodeSpec{
+				PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			},
+		},
+		{
+			name: "matching podCIDR",
+			in: v1.NodeSpec{
+				PodCIDR:  "10.0.1.0/24",
+				PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			},
+			out: core.NodeSpec{
+				PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			},
 		},
 	}
 
@@ -591,11 +671,17 @@ func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
 		},
 	}
 
-	// fail cases
-	for i, failInput := range failInputs {
+	// run asymmetric cases
+	for _, tc := range asymmetricInputs {
+		testInput := tc.in
+
 		coreNodeSpec := core.NodeSpec{}
-		if err := corev1.Convert_v1_NodeSpec_To_core_NodeSpec(&failInput, &coreNodeSpec, nil); err == nil {
-			t.Errorf("%v: Convert v1.NodeSpec to core.NodeSpec failed. Expected an error when coreNodeSpec.PodCIDR != coreNodeSpec.PodCIDRs[0]", i)
+		// convert..
+		if err := corev1.Convert_v1_NodeSpec_To_core_NodeSpec(&testInput, &coreNodeSpec, nil); err != nil {
+			t.Errorf("%s: Convert v1.NodeSpec to core.NodeSpec failed with error:%v for input %+v", tc.name, err.Error(), testInput)
+		}
+		if !reflect.DeepEqual(coreNodeSpec, tc.out) {
+			t.Errorf("%s: expected %#v, got %#v", tc.name, tc.out.PodCIDRs, coreNodeSpec.PodCIDRs)
 		}
 	}
 

@@ -18,11 +18,12 @@ package serviceaccount
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -62,7 +63,7 @@ type legacyValidator struct {
 
 var _ = Validator(&legacyValidator{})
 
-func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
 	private, ok := privateObj.(*legacyPrivateClaims)
 	if !ok {
 		klog.Errorf("jwt validator expected private claim of type *legacyPrivateClaims but got: %T", privateObj)

@@ -40,3 +40,42 @@ type Images struct {
 
 	Images []string `json:"images"`
 }
+
+// ComponentUpgradePlan represents information about upgrade plan for one component
+type ComponentUpgradePlan struct {
+	Name           string `json:"name"`
+	CurrentVersion string `json:"currentVersion"`
+	NewVersion     string `json:"newVersion"`
+}
+
+// ComponentConfigVersionState describes the current and desired version of a component config
+type ComponentConfigVersionState struct {
+	// Group points to the Kubernetes API group that covers the config
+	Group string `json:"group"`
+
+	// CurrentVersion is the currently active component config version
+	// NOTE: This can be empty in case the config was not found on the cluster or it was unsupported
+	// kubeadm generated version
+	CurrentVersion string `json:"currentVersion"`
+
+	// PreferredVersion is the component config version that is currently preferred by kubeadm for use.
+	// NOTE: As of today, this is the only version supported by kubeadm.
+	PreferredVersion string `json:"preferredVersion"`
+
+	// ManualUpgradeRequired indicates if users need to manually upgrade their component config versions. This happens if
+	// the CurrentVersion of the config is user supplied (or modified) and no longer supported. Users should upgrade
+	// their component configs to PreferredVersion or any other supported component config version.
+	ManualUpgradeRequired bool `json:"manualUpgradeRequired"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpgradePlan represents information about upgrade plan for the output
+// produced by 'kubeadm upgrade plan'
+type UpgradePlan struct {
+	metav1.TypeMeta
+
+	Components []ComponentUpgradePlan `json:"components"`
+
+	ConfigVersions []ComponentConfigVersionState `json:"configVersions"`
+}

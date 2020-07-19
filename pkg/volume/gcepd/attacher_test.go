@@ -35,7 +35,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {

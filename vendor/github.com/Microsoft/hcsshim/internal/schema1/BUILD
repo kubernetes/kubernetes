@@ -6,7 +6,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim/internal/schema1",
     importpath = "github.com/Microsoft/hcsshim/internal/schema1",
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
-    deps = ["//vendor/github.com/Microsoft/hcsshim/internal/schema2:go_default_library"],
+    deps = [
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/schema2:go_default_library",
+    ],
 )
 
 filegroup(

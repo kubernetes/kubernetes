@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // TablePrinter decodes table objects into typed objects before delegating to another printer.

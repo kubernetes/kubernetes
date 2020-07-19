@@ -32,7 +32,7 @@ import (
 var (
 	unavailableCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name:           "aggregator_unavailable_apiservice_count",
+			Name:           "aggregator_unavailable_apiservice_total",
 			Help:           "Counter of APIServices which are marked as unavailable broken down by APIService name and reason.",
 			StabilityLevel: metrics.ALPHA,
 		},

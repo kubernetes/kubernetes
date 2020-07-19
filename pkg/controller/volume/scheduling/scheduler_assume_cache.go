@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
 )
@@ -134,7 +134,11 @@ func NewAssumeCache(informer cache.SharedIndexInformer, description, indexName s
 		indexFunc:   indexFunc,
 		indexName:   indexName,
 	}
-	c.store = cache.NewIndexer(objInfoKeyFunc, cache.Indexers{indexName: c.objInfoIndexFunc})
+	indexers := cache.Indexers{}
+	if indexName != "" && indexFunc != nil {
+		indexers[indexName] = c.objInfoIndexFunc
+	}
+	c.store = cache.NewIndexer(objInfoKeyFunc, indexers)
 
 	// Unit tests don't use informers
 	if informer != nil {
@@ -422,7 +426,7 @@ type pvcAssumeCache struct {
 
 // NewPVCAssumeCache creates a PVC assume cache.
 func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
-	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "", nil)}
 }
 
 func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {

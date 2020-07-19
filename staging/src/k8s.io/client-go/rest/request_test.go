@@ -36,7 +36,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1403,7 +1403,8 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 				return nil, &net.OpError{Err: syscall.ECONNRESET}
 			}),
 		},
-		backoff: backoff,
+		backoff:    backoff,
+		maxRetries: 10,
 	}
 	// We expect two retries of "connection reset by peer" and the success.
 	_, err := req.Do(context.Background()).Raw()
@@ -2216,5 +2217,64 @@ func TestThrottledLogger(t *testing.T) {
 
 	if a, e := logMessages, 1000; a != e {
 		t.Fatalf("expected %v log messages, but got %v", e, a)
+	}
+}
+
+func TestRequestMaxRetries(t *testing.T) {
+	successAtNthCalls := 1
+	actualCalls := 0
+	retryOneTimeHandler := func(w http.ResponseWriter, req *http.Request) {
+		defer func() { actualCalls++ }()
+		if actualCalls >= successAtNthCalls {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(http.StatusTooManyRequests)
+		actualCalls++
+	}
+	testServer := httptest.NewServer(http.HandlerFunc(retryOneTimeHandler))
+	defer testServer.Close()
+
+	u, err := url.Parse(testServer.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	testCases := []struct {
+		name        string
+		maxRetries  int
+		expectError bool
+	}{
+		{
+			name:        "no retrying should fail",
+			maxRetries:  0,
+			expectError: true,
+		},
+		{
+			name:        "1 max-retry should exactly work",
+			maxRetries:  1,
+			expectError: false,
+		},
+		{
+			name:        "5 max-retry should work",
+			maxRetries:  5,
+			expectError: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() { actualCalls = 0 }()
+			_, err := NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
+				Verb("get").
+				MaxRetries(testCase.maxRetries).
+				AbsPath("/foo").
+				DoRaw(context.TODO())
+			hasError := err != nil
+			if testCase.expectError != hasError {
+				t.Error(" failed checking error")
+			}
+		})
 	}
 }

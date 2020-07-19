@@ -512,7 +512,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		controller.NoResyncPeriodFunc(),
 		defaultDownscaleStabilisationWindow,
 		defaultTestingTolerance,
-		defaultTestingCpuInitializationPeriod,
+		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
 	)
 	hpaController.hpaListerSynced = alwaysReady

@@ -37,7 +37,7 @@ import (
 	utilexec "k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type HollowProxy struct {

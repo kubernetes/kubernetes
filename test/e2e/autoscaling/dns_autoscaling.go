@@ -274,7 +274,7 @@ func fetchDNSScalingConfigMap(c clientset.Interface) (*v1.ConfigMap, error) {
 }
 
 func deleteDNSScalingConfigMap(c clientset.Interface) error {
-	if err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), DNSAutoscalerLabelName, nil); err != nil {
+	if err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), DNSAutoscalerLabelName, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	framework.Logf("DNS autoscaling ConfigMap deleted.")
@@ -335,7 +335,7 @@ func deleteDNSAutoscalerPod(c clientset.Interface) error {
 	}
 
 	podName := pods.Items[0].Name
-	if err := c.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), podName, nil); err != nil {
+	if err := c.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	framework.Logf("DNS autoscaling pod %v deleted.", podName)

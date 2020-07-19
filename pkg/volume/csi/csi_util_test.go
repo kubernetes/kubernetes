@@ -28,10 +28,10 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // TestMain starting point for all tests.
@@ -84,12 +84,12 @@ func makeTestVol(name string, driverName string) *api.Volume {
 	}
 }
 
-func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, volumeLifecycleModes []storagev1beta1.VolumeLifecycleMode) *storagev1beta1.CSIDriver {
-	return &storagev1beta1.CSIDriver{
+func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, volumeLifecycleModes []storagev1.VolumeLifecycleMode) *storagev1.CSIDriver {
+	return &storagev1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: name,
 		},
-		Spec: storagev1beta1.CSIDriverSpec{
+		Spec: storagev1.CSIDriverSpec{
 			PodInfoOnMount:       podInfoMount,
 			AttachRequired:       attachable,
 			VolumeLifecycleModes: volumeLifecycleModes,

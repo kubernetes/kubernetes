@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
+	ingressclassstore "k8s.io/kubernetes/pkg/registry/networking/ingressclass/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
@@ -64,6 +65,21 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 	storage["networkpolicies"] = networkPolicyStorage
 
+	// ingresses
+	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingresses"] = ingressStorage
+	storage["ingresses/status"] = ingressStatusStorage
+
+	// ingressclasses
+	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingressclasses"] = ingressClassStorage
+
 	return storage, nil
 }
 
@@ -76,6 +92,14 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	}
 	storage["ingresses"] = ingressStorage
 	storage["ingresses/status"] = ingressStatusStorage
+
+	// ingressclasses
+	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingressclasses"] = ingressClassStorage
+
 	return storage, nil
 }
 

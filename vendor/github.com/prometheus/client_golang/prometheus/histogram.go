@@ -20,7 +20,9 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	//lint:ignore SA1019 Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
@@ -138,7 +140,7 @@ type HistogramOpts struct {
 	// better covered by target labels set by the scraping Prometheus
 	// server, or by one specific metric (e.g. a build_info or a
 	// machine_role metric). See also
-	// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels,-not-static-scraped-labels
+	// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 	ConstLabels Labels
 
 	// Buckets defines the buckets into which observations are counted. Each
@@ -151,6 +153,10 @@ type HistogramOpts struct {
 
 // NewHistogram creates a new Histogram based on the provided HistogramOpts. It
 // panics if the buckets in HistogramOpts are not in strictly increasing order.
+//
+// The returned implementation also implements ExemplarObserver. It is safe to
+// perform the corresponding type assertion. Exemplars are tracked separately
+// for each bucket.
 func NewHistogram(opts HistogramOpts) Histogram {
 	return newHistogram(
 		NewDesc(
@@ -187,7 +193,8 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 		desc:        desc,
 		upperBounds: opts.Buckets,
 		labelPairs:  makeLabelPairs(desc, labelValues),
-		counts:      [2]*histogramCounts{&histogramCounts{}, &histogramCounts{}},
+		counts:      [2]*histogramCounts{{}, {}},
+		now:         time.Now,
 	}
 	for i, upperBound := range h.upperBounds {
 		if i < len(h.upperBounds)-1 {
@@ -205,9 +212,10 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 		}
 	}
 	// Finally we know the final length of h.upperBounds and can make buckets
-	// for both counts:
+	// for both counts as well as exemplars:
 	h.counts[0].buckets = make([]uint64, len(h.upperBounds))
 	h.counts[1].buckets = make([]uint64, len(h.upperBounds))
+	h.exemplars = make([]atomic.Value, len(h.upperBounds)+1)
 
 	h.init(h) // Init self-collection.
 	return h
@@ -254,6 +262,9 @@ type histogram struct {
 
 	upperBounds []float64
 	labelPairs  []*dto.LabelPair
+	exemplars   []atomic.Value // One more than buckets (to include +Inf), each a *dto.Exemplar.
+
+	now func() time.Time // To mock out time.Now() for testing.
 }
 
 func (h *histogram) Desc() *Desc {
@@ -261,36 +272,13 @@ func (h *histogram) Desc() *Desc {
 }
 
 func (h *histogram) Observe(v float64) {
-	// TODO(beorn7): For small numbers of buckets (<30), a linear search is
-	// slightly faster than the binary search. If we really care, we could
-	// switch from one search strategy to the other depending on the number
-	// of buckets.
-	//
-	// Microbenchmarks (BenchmarkHistogramNoLabels):
-	// 11 buckets: 38.3 ns/op linear - binary 48.7 ns/op
-	// 100 buckets: 78.1 ns/op linear - binary 54.9 ns/op
-	// 300 buckets: 154 ns/op linear - binary 61.6 ns/op
-	i := sort.SearchFloat64s(h.upperBounds, v)
+	h.observe(v, h.findBucket(v))
+}
 
-	// We increment h.countAndHotIdx so that the counter in the lower
-	// 63 bits gets incremented. At the same time, we get the new value
-	// back, which we can use to find the currently-hot counts.
-	n := atomic.AddUint64(&h.countAndHotIdx, 1)
-	hotCounts := h.counts[n>>63]
-
-	if i < len(h.upperBounds) {
-		atomic.AddUint64(&hotCounts.buckets[i], 1)
-	}
-	for {
-		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
-		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
-		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
-			break
-		}
-	}
-	// Increment count last as we take it as a signal that the observation
-	// is complete.
-	atomic.AddUint64(&hotCounts.count, 1)
+func (h *histogram) ObserveWithExemplar(v float64, e Labels) {
+	i := h.findBucket(v)
+	h.observe(v, i)
+	h.updateExemplar(v, i, e)
 }
 
 func (h *histogram) Write(out *dto.Metric) error {
@@ -329,6 +317,18 @@ func (h *histogram) Write(out *dto.Metric) error {
 			CumulativeCount: proto.Uint64(cumCount),
 			UpperBound:      proto.Float64(upperBound),
 		}
+		if e := h.exemplars[i].Load(); e != nil {
+			his.Bucket[i].Exemplar = e.(*dto.Exemplar)
+		}
+	}
+	// If there is an exemplar for the +Inf bucket, we have to add that bucket explicitly.
+	if e := h.exemplars[len(h.upperBounds)].Load(); e != nil {
+		b := &dto.Bucket{
+			CumulativeCount: proto.Uint64(count),
+			UpperBound:      proto.Float64(math.Inf(1)),
+			Exemplar:        e.(*dto.Exemplar),
+		}
+		his.Bucket = append(his.Bucket, b)
 	}
 
 	out.Histogram = his
@@ -350,6 +350,57 @@ func (h *histogram) Write(out *dto.Metric) error {
 		atomic.StoreUint64(&coldCounts.buckets[i], 0)
 	}
 	return nil
+}
+
+// findBucket returns the index of the bucket for the provided value, or
+// len(h.upperBounds) for the +Inf bucket.
+func (h *histogram) findBucket(v float64) int {
+	// TODO(beorn7): For small numbers of buckets (<30), a linear search is
+	// slightly faster than the binary search. If we really care, we could
+	// switch from one search strategy to the other depending on the number
+	// of buckets.
+	//
+	// Microbenchmarks (BenchmarkHistogramNoLabels):
+	// 11 buckets: 38.3 ns/op linear - binary 48.7 ns/op
+	// 100 buckets: 78.1 ns/op linear - binary 54.9 ns/op
+	// 300 buckets: 154 ns/op linear - binary 61.6 ns/op
+	return sort.SearchFloat64s(h.upperBounds, v)
+}
+
+// observe is the implementation for Observe without the findBucket part.
+func (h *histogram) observe(v float64, bucket int) {
+	// We increment h.countAndHotIdx so that the counter in the lower
+	// 63 bits gets incremented. At the same time, we get the new value
+	// back, which we can use to find the currently-hot counts.
+	n := atomic.AddUint64(&h.countAndHotIdx, 1)
+	hotCounts := h.counts[n>>63]
+
+	if bucket < len(h.upperBounds) {
+		atomic.AddUint64(&hotCounts.buckets[bucket], 1)
+	}
+	for {
+		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
+		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
+		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
+			break
+		}
+	}
+	// Increment count last as we take it as a signal that the observation
+	// is complete.
+	atomic.AddUint64(&hotCounts.count, 1)
+}
+
+// updateExemplar replaces the exemplar for the provided bucket. With empty
+// labels, it's a no-op. It panics if any of the labels is invalid.
+func (h *histogram) updateExemplar(v float64, bucket int, l Labels) {
+	if l == nil {
+		return
+	}
+	e, err := newExemplar(v, h.now(), l)
+	if err != nil {
+		panic(err)
+	}
+	h.exemplars[bucket].Store(e)
 }
 
 // HistogramVec is a Collector that bundles a set of Histograms that all share the
@@ -556,7 +607,7 @@ func NewConstHistogram(
 }
 
 // MustNewConstHistogram is a version of NewConstHistogram that panics where
-// NewConstMetric would have returned an error.
+// NewConstHistogram would have returned an error.
 func MustNewConstHistogram(
 	desc *Desc,
 	count uint64,

@@ -97,7 +97,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		scList := getTestStorageClasses(client, policyName, datastoreName)
 		defer func(scList []*storagev1.StorageClass) {
 			for _, sc := range scList {
-				client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil)
+				client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
 			}
 		}(scList)
 

@@ -52,7 +52,6 @@ var isSpecialElementMap = map[string]bool{
 	"iframe":     true,
 	"img":        true,
 	"input":      true,
-	"isindex":    true, // The 'isindex' element has been removed, but keep it for backwards compatibility.
 	"keygen":     true,
 	"li":         true,
 	"link":       true,

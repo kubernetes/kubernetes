@@ -9,8 +9,7 @@
 
 package hcsschema
 
-//   By default the basic properties will be returned. This query provides a way to  request specific properties. 
+//   By default the basic properties will be returned. This query provides a way to  request specific properties.
 type PropertyQuery struct {
-
-	PropertyTypes []string `json:"PropertyTypes,omitempty"`
+	PropertyTypes []PropertyType `json:"PropertyTypes,omitempty"`
 }

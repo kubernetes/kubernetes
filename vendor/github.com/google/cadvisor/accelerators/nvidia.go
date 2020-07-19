@@ -24,13 +24,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/stats"
 
 	"github.com/mindprince/gonvml"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
-type NvidiaManager struct {
+type nvidiaManager struct {
 	sync.Mutex
 
 	// true if there are NVIDIA devices present on the node
@@ -45,22 +47,37 @@ type NvidiaManager struct {
 
 var sysFsPCIDevicesPath = "/sys/bus/pci/devices/"
 
-const nvidiaVendorId = "0x10de"
+const nvidiaVendorID = "0x10de"
 
-// Setup initializes NVML if nvidia devices are present on the node.
-func (nm *NvidiaManager) Setup() {
-	if !detectDevices(nvidiaVendorId) {
-		klog.V(4).Info("No NVIDIA devices found.")
-		return
+func NewNvidiaManager(includedMetrics container.MetricSet) stats.Manager {
+	if !includedMetrics.Has(container.AcceleratorUsageMetrics) {
+		klog.V(2).Info("NVIDIA GPU metrics disabled")
+		return &stats.NoopManager{}
+	}
+
+	manager := &nvidiaManager{}
+	err := manager.setup()
+	if err != nil {
+		klog.Warningf("NVIDIA GPU metrics will not be available: %s", err)
+		manager.Destroy()
+		return &stats.NoopManager{}
+	}
+	return manager
+}
+
+// setup initializes NVML if NVIDIA devices are present on the node.
+func (nm *nvidiaManager) setup() error {
+	if !detectDevices(nvidiaVendorID) {
+		return fmt.Errorf("no NVIDIA devices found")
 	}
 
 	nm.devicesPresent = true
 
-	initializeNVML(nm)
+	return initializeNVML(nm)
 }
 
 // detectDevices returns true if a device with given pci id is present on the node.
-func detectDevices(vendorId string) bool {
+func detectDevices(vendorID string) bool {
 	devices, err := ioutil.ReadDir(sysFsPCIDevicesPath)
 	if err != nil {
 		klog.Warningf("Error reading %q: %v", sysFsPCIDevicesPath, err)
@@ -74,8 +91,8 @@ func detectDevices(vendorId string) bool {
 			klog.V(4).Infof("Error while reading %q: %v", vendorPath, err)
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(string(content)), vendorId) {
-			klog.V(3).Infof("Found device with vendorId %q", vendorId)
+		if strings.EqualFold(strings.TrimSpace(string(content)), vendorID) {
+			klog.V(3).Infof("Found device with vendorID %q", vendorID)
 			return true
 		}
 	}
@@ -84,72 +101,79 @@ func detectDevices(vendorId string) bool {
 
 // initializeNVML initializes the NVML library and sets up the nvmlDevices map.
 // This is defined as a variable to help in testing.
-var initializeNVML = func(nm *NvidiaManager) {
+var initializeNVML = func(nm *nvidiaManager) error {
 	if err := gonvml.Initialize(); err != nil {
 		// This is under a logging level because otherwise we may cause
 		// log spam if the drivers/nvml is not installed on the system.
-		klog.V(4).Infof("Could not initialize NVML: %v", err)
-		return
+		return fmt.Errorf("Could not initialize NVML: %v", err)
 	}
 	nm.nvmlInitialized = true
 	numDevices, err := gonvml.DeviceCount()
 	if err != nil {
-		klog.Warningf("GPU metrics would not be available. Failed to get the number of nvidia devices: %v", err)
-		return
+		return fmt.Errorf("GPU metrics would not be available. Failed to get the number of NVIDIA devices: %v", err)
 	}
-	klog.V(1).Infof("NVML initialized. Number of nvidia devices: %v", numDevices)
+	if numDevices == 0 {
+		return nil
+	}
+	klog.V(1).Infof("NVML initialized. Number of NVIDIA devices: %v", numDevices)
 	nm.nvidiaDevices = make(map[int]gonvml.Device, numDevices)
 	for i := 0; i < int(numDevices); i++ {
 		device, err := gonvml.DeviceHandleByIndex(uint(i))
 		if err != nil {
-			klog.Warningf("Failed to get nvidia device handle %d: %v", i, err)
-			continue
+			return fmt.Errorf("Failed to get NVIDIA device handle %d: %v", i, err)
 		}
 		minorNumber, err := device.MinorNumber()
 		if err != nil {
-			klog.Warningf("Failed to get nvidia device minor number: %v", err)
-			continue
+			return fmt.Errorf("Failed to get NVIDIA device minor number: %v", err)
 		}
 		nm.nvidiaDevices[int(minorNumber)] = device
 	}
+	return nil
 }
 
 // Destroy shuts down NVML.
-func (nm *NvidiaManager) Destroy() {
+func (nm *nvidiaManager) Destroy() {
 	if nm.nvmlInitialized {
-		gonvml.Shutdown()
+		err := gonvml.Shutdown()
+		if err != nil {
+			klog.Warningf("nvml library shutdown failed: %s", err)
+		}
 	}
 }
 
-// GetCollector returns a collector that can fetch nvidia gpu metrics for nvidia devices
+// GetCollector returns a collector that can fetch NVIDIA gpu metrics for NVIDIA devices
 // present in the devices.list file in the given devicesCgroupPath.
-func (nm *NvidiaManager) GetCollector(devicesCgroupPath string) (AcceleratorCollector, error) {
-	nc := &NvidiaCollector{}
+func (nm *nvidiaManager) GetCollector(devicesCgroupPath string) (stats.Collector, error) {
+	nc := &nvidiaCollector{}
 
 	if !nm.devicesPresent {
-		return nc, nil
+		return &stats.NoopCollector{}, nil
 	}
 	// Makes sure that we don't call initializeNVML() concurrently and
 	// that we only call initializeNVML() when it's not initialized.
 	nm.Lock()
 	if !nm.nvmlInitialized {
-		initializeNVML(nm)
-	}
-	if !nm.nvmlInitialized || len(nm.nvidiaDevices) == 0 {
-		nm.Unlock()
-		return nc, nil
+		err := initializeNVML(nm)
+		if err != nil {
+			nm.Unlock()
+			return &stats.NoopCollector{}, err
+		}
 	}
 	nm.Unlock()
+	if len(nm.nvidiaDevices) == 0 {
+		return &stats.NoopCollector{}, nil
+	}
 	nvidiaMinorNumbers, err := parseDevicesCgroup(devicesCgroupPath)
 	if err != nil {
-		return nc, err
+		return &stats.NoopCollector{}, err
 	}
+
 	for _, minor := range nvidiaMinorNumbers {
 		device, ok := nm.nvidiaDevices[minor]
 		if !ok {
-			return nc, fmt.Errorf("nvidia device minor number %d not found in cached devices", minor)
+			return &stats.NoopCollector{}, fmt.Errorf("NVIDIA device minor number %d not found in cached devices", minor)
 		}
-		nc.Devices = append(nc.Devices, device)
+		nc.devices = append(nc.devices, device)
 	}
 	return nc, nil
 }
@@ -208,14 +232,20 @@ var parseDevicesCgroup = func(devicesCgroupPath string) ([]int, error) {
 	return nvidiaMinorNumbers, nil
 }
 
-type NvidiaCollector struct {
+type nvidiaCollector struct {
 	// Exposed for testing
-	Devices []gonvml.Device
+	devices []gonvml.Device
+
+	stats.NoopDestroy
+}
+
+func NewNvidiaCollector(devices []gonvml.Device) stats.Collector {
+	return &nvidiaCollector{devices: devices}
 }
 
 // UpdateStats updates the stats for NVIDIA GPUs (if any) attached to the container.
-func (nc *NvidiaCollector) UpdateStats(stats *info.ContainerStats) error {
-	for _, device := range nc.Devices {
+func (nc *nvidiaCollector) UpdateStats(stats *info.ContainerStats) error {
+	for _, device := range nc.devices {
 		model, err := device.Name()
 		if err != nil {
 			return fmt.Errorf("error while getting gpu name: %v", err)

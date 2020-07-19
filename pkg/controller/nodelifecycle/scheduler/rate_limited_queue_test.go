@@ -282,6 +282,17 @@ func TestClear(t *testing.T) {
 	}
 }
 
+func TestSetRemove(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	evictor.Add("first", "11111")
+
+	evictor.SetRemove("first")
+
+	if evictor.queue.set.Len() != 0 {
+		t.Fatalf("SetRemove should remove element from the set.")
+	}
+}
+
 func TestSwapLimiter(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
 	fakeAlways := flowcontrol.NewFakeAlwaysRateLimiter()

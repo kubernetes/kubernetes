@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/code-generator/_examples/MixedCase/clientset/versioned/typed/example/v1/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/autoscaling:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

@@ -47,6 +47,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/generate:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/hash:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

@@ -139,9 +139,8 @@ func TestCompileManifests(t *testing.T) {
 		{
 			name:     "CoreDNSConfigMap manifest",
 			manifest: CoreDNSConfigMap,
-			data: struct{ DNSDomain, Federation, UpstreamNameserver, StubDomain string }{
+			data: struct{ DNSDomain, UpstreamNameserver, StubDomain string }{
 				DNSDomain:          "foo",
-				Federation:         "foo",
 				UpstreamNameserver: "foo",
 				StubDomain:         "foo",
 			},
@@ -496,80 +495,6 @@ func TestTranslateUpstreamKubeDNSToCoreDNS(t *testing.T) {
 	}
 }
 
-func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
-	testCases := []struct {
-		name      string
-		configMap *v1.ConfigMap
-		expectOne string
-		expectTwo string
-	}{
-		{
-			name: "valid call",
-			configMap: &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kube-dns",
-					Namespace: "kube-system",
-				},
-				Data: map[string]string{
-					"federations":         `{"foo" : "foo.feddomain.com", "bar" : "bar.feddomain.com"}`,
-					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300","3.3.3.3"], "my.cluster.local" : ["2.3.4.5"]}`,
-					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
-				},
-			},
-
-			expectOne: `
-        federation cluster.local {
-           foo foo.feddomain.com
-           bar bar.feddomain.com
-        }`,
-			expectTwo: `
-        federation cluster.local {
-           bar bar.feddomain.com
-           foo foo.feddomain.com
-        }`,
-		},
-		{
-			name: "empty data",
-			configMap: &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kubedns",
-					Namespace: "kube-system",
-				},
-			},
-
-			expectOne: "",
-			expectTwo: "",
-		},
-		{
-			name: "missing federations data",
-			configMap: &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kube-dns",
-					Namespace: "kube-system",
-				},
-				Data: map[string]string{
-					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300"], "my.cluster.local" : ["2.3.4.5"]}`,
-					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
-				},
-			},
-
-			expectOne: "",
-			expectTwo: "",
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			out, err := translateFederationsofKubeDNSToCoreDNS(kubeDNSFederation, "cluster.local", testCase.configMap)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !strings.EqualFold(out, testCase.expectOne) && !strings.EqualFold(out, testCase.expectTwo) {
-				t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
-			}
-		})
-	}
-}
-
 func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 	replicas := int32(coreDNSReplicas)
 	testCases := []struct {
@@ -660,7 +585,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
         ttl 30
     }
     prometheus :9153
-    forward . /etc/resolv.conf
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
     cache 30
     loop
     reload
@@ -698,7 +625,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
         fallthrough in-addr.arpa ip6.arpa
     }
     prometheus :9153
-    forward . /etc/resolv.conf
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
     k8s_external example.com
     cache 30
     loop

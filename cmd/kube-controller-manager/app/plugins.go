@@ -23,7 +23,7 @@ import (
 
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	// Cloud providers
 	cloudprovider "k8s.io/cloud-provider"

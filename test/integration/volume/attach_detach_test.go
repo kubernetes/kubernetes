@@ -180,6 +180,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	// start controller loop
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
 	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 	defer close(stopCh)
@@ -214,9 +215,7 @@ func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInfo
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		go informers.Storage().V1beta1().CSIDrivers().Informer().Run(stopCh)
-	}
+	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
@@ -258,6 +257,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
 	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
@@ -327,6 +327,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
 	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
@@ -430,7 +431,8 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Core().V1().PersistentVolumes(),
 		informers.Storage().V1().CSINodes(),
-		informers.Storage().V1beta1().CSIDrivers(),
+		informers.Storage().V1().CSIDrivers(),
+		informers.Storage().V1().VolumeAttachments(),
 		cloud,
 		plugins,
 		nil, /* prober */
@@ -506,6 +508,7 @@ func TestPodAddedByDswp(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
 	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 

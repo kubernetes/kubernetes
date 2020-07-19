@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,7 +63,12 @@ var _ Leases = &storageLeases{}
 // ListLeases retrieves a list of the current master IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
 	ipInfoList := &corev1.EndpointsList{}
-	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, "0", storage.Everything, ipInfoList); err != nil {
+	storageOpts := storage.ListOptions{
+		ResourceVersion:      "0",
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+		Predicate:            storage.Everything,
+	}
+	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
 		return nil, err
 	}
 
@@ -191,9 +196,13 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
 	}
 
+	// Don't use the EndpointSliceMirroring controller to mirror this to
+	// EndpointSlices. This may change in the future.
+	skipMirrorChanged := setSkipMirrorTrue(e)
+
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
-	if formatCorrect && ipCorrect && portsCorrect {
+	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
 		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
 

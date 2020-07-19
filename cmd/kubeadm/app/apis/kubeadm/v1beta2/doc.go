@@ -233,12 +233,12 @@ limitations under the License.
 // 	scheduler:
 // 	  extraArgs:
 // 	    address: "10.100.0.1"
-// 	extraVolumes:
-// 	- name: "some-volume"
-// 	  hostPath: "/etc/some-path"
-// 	  mountPath: "/etc/some-pod-path"
-// 	  readOnly: false
-// 	  pathType: File
+// 	  extraVolumes:
+// 	  - name: "some-volume"
+// 	    hostPath: "/etc/some-path"
+// 	    mountPath: "/etc/some-pod-path"
+// 	    readOnly: false
+// 	    pathType: File
 // 	certificatesDir: "/etc/kubernetes/pki"
 // 	imageRepository: "k8s.gcr.io"
 // 	useHyperKubeImage: false

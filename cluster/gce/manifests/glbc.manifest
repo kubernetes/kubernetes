@@ -10,6 +10,8 @@ metadata:
     k8s-app: gcp-lb-controller
     kubernetes.io/name: "GLBC"
 spec:
+  priorityClassName: system-node-critical
+  priority: 2000001000
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:

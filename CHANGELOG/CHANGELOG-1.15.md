@@ -1,79 +1,96 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.15.10](#v11510)
-  - [Downloads for v1.15.10](#downloads-for-v11510)
+- [v1.15.12](#v11512)
+  - [Downloads for v1.15.12](#downloads-for-v11512)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.15.9](#changelog-since-v1159)
+  - [Changelog since v1.15.11](#changelog-since-v11511)
   - [Changes by Kind](#changes-by-kind)
-    - [Other (Bug, Cleanup or Flake)](#other-bug-cleanup-or-flake)
-- [v1.15.9](#v1159)
-  - [Downloads for v1.15.9](#downloads-for-v1159)
+    - [Bug or Regression](#bug-or-regression)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
+- [v1.15.11](#v11511)
+  - [Downloads for v1.15.11](#downloads-for-v11511)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.15.8](#changelog-since-v1158)
-- [v1.15.8](#v1158)
-  - [Downloads for v1.15.8](#downloads-for-v1158)
+  - [Changelog since v1.15.10](#changelog-since-v11510)
+  - [Changes by Kind](#changes-by-kind-1)
+    - [Other (Bug, Cleanup or Flake)](#other-bug-cleanup-or-flake)
+- [v1.15.10](#v11510)
+  - [Downloads for v1.15.10](#downloads-for-v11510)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
+  - [Changelog since v1.15.9](#changelog-since-v1159)
+  - [Changes by Kind](#changes-by-kind-2)
+    - [Other (Bug, Cleanup or Flake)](#other-bug-cleanup-or-flake-1)
+- [v1.15.9](#v1159)
+  - [Downloads for v1.15.9](#downloads-for-v1159)
+    - [Client Binaries](#client-binaries-3)
+    - [Server Binaries](#server-binaries-3)
+    - [Node Binaries](#node-binaries-3)
+  - [Changelog since v1.15.8](#changelog-since-v1158)
+- [v1.15.8](#v1158)
+  - [Downloads for v1.15.8](#downloads-for-v1158)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
   - [Changelog since v1.15.7](#changelog-since-v1157)
     - [Other notable changes](#other-notable-changes)
 - [v1.15.7](#v1157)
   - [Downloads for v1.15.7](#downloads-for-v1157)
-    - [Client Binaries](#client-binaries-3)
-    - [Server Binaries](#server-binaries-3)
-    - [Node Binaries](#node-binaries-3)
+    - [Client Binaries](#client-binaries-5)
+    - [Server Binaries](#server-binaries-5)
+    - [Node Binaries](#node-binaries-5)
   - [Changelog since v1.15.6](#changelog-since-v1156)
     - [Other notable changes](#other-notable-changes-1)
 - [v1.15.6](#v1156)
   - [Downloads for v1.15.6](#downloads-for-v1156)
-    - [Client Binaries](#client-binaries-4)
-    - [Server Binaries](#server-binaries-4)
-    - [Node Binaries](#node-binaries-4)
+    - [Client Binaries](#client-binaries-6)
+    - [Server Binaries](#server-binaries-6)
+    - [Node Binaries](#node-binaries-6)
   - [Changelog since v1.15.5](#changelog-since-v1155)
     - [Other notable changes](#other-notable-changes-2)
 - [v1.15.5](#v1155)
   - [Downloads for v1.15.5](#downloads-for-v1155)
-    - [Client Binaries](#client-binaries-5)
-    - [Server Binaries](#server-binaries-5)
-    - [Node Binaries](#node-binaries-5)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
+    - [Node Binaries](#node-binaries-7)
   - [Changelog since v1.15.4](#changelog-since-v1154)
     - [Other notable changes](#other-notable-changes-3)
 - [v1.15.4](#v1154)
   - [Downloads for v1.15.4](#downloads-for-v1154)
-    - [Client Binaries](#client-binaries-6)
-    - [Server Binaries](#server-binaries-6)
-    - [Node Binaries](#node-binaries-6)
+    - [Client Binaries](#client-binaries-8)
+    - [Server Binaries](#server-binaries-8)
+    - [Node Binaries](#node-binaries-8)
   - [Changelog since v1.15.3](#changelog-since-v1153)
     - [Other notable changes](#other-notable-changes-4)
 - [v1.15.3](#v1153)
   - [Downloads for v1.15.3](#downloads-for-v1153)
-    - [Client Binaries](#client-binaries-7)
-    - [Server Binaries](#server-binaries-7)
-    - [Node Binaries](#node-binaries-7)
+    - [Client Binaries](#client-binaries-9)
+    - [Server Binaries](#server-binaries-9)
+    - [Node Binaries](#node-binaries-9)
   - [Changelog since v1.15.2](#changelog-since-v1152)
     - [Other notable changes](#other-notable-changes-5)
 - [v1.15.2](#v1152)
   - [Downloads for v1.15.2](#downloads-for-v1152)
-    - [Client Binaries](#client-binaries-8)
-    - [Server Binaries](#server-binaries-8)
-    - [Node Binaries](#node-binaries-8)
+    - [Client Binaries](#client-binaries-10)
+    - [Server Binaries](#server-binaries-10)
+    - [Node Binaries](#node-binaries-10)
   - [Changelog since v1.15.1](#changelog-since-v1151)
 - [v1.15.1](#v1151)
   - [Downloads for v1.15.1](#downloads-for-v1151)
-    - [Client Binaries](#client-binaries-9)
-    - [Server Binaries](#server-binaries-9)
-    - [Node Binaries](#node-binaries-9)
+    - [Client Binaries](#client-binaries-11)
+    - [Server Binaries](#server-binaries-11)
+    - [Node Binaries](#node-binaries-11)
   - [Changelog since v1.15.0](#changelog-since-v1150)
     - [Other notable changes](#other-notable-changes-6)
 - [v1.15.0](#v1150)
   - [Downloads for v1.15.0](#downloads-for-v1150)
-    - [Client Binaries](#client-binaries-10)
-    - [Server Binaries](#server-binaries-10)
-    - [Node Binaries](#node-binaries-10)
+    - [Client Binaries](#client-binaries-12)
+    - [Server Binaries](#server-binaries-12)
+    - [Node Binaries](#node-binaries-12)
 - [Kubernetes v1.15 Release Notes](#kubernetes-v115-release-notes)
   - [1.15 What’s New](#115-what’s-new)
     - [Continuous Improvement](#continuous-improvement)
@@ -108,36 +125,177 @@
       - [Alpha](#alpha)
 - [v1.15.0-beta.1](#v1150-beta1)
   - [Downloads for v1.15.0-beta.1](#downloads-for-v1150-beta1)
-    - [Client Binaries](#client-binaries-11)
-    - [Server Binaries](#server-binaries-11)
-    - [Node Binaries](#node-binaries-11)
+    - [Client Binaries](#client-binaries-13)
+    - [Server Binaries](#server-binaries-13)
+    - [Node Binaries](#node-binaries-13)
   - [Changelog since v1.15.0-alpha.3](#changelog-since-v1150-alpha3)
     - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes-7)
 - [v1.15.0-alpha.3](#v1150-alpha3)
   - [Downloads for v1.15.0-alpha.3](#downloads-for-v1150-alpha3)
-    - [Client Binaries](#client-binaries-12)
-    - [Server Binaries](#server-binaries-12)
-    - [Node Binaries](#node-binaries-12)
+    - [Client Binaries](#client-binaries-14)
+    - [Server Binaries](#server-binaries-14)
+    - [Node Binaries](#node-binaries-14)
   - [Changelog since v1.15.0-alpha.2](#changelog-since-v1150-alpha2)
     - [Other notable changes](#other-notable-changes-8)
 - [v1.15.0-alpha.2](#v1150-alpha2)
   - [Downloads for v1.15.0-alpha.2](#downloads-for-v1150-alpha2)
-    - [Client Binaries](#client-binaries-13)
-    - [Server Binaries](#server-binaries-13)
-    - [Node Binaries](#node-binaries-13)
+    - [Client Binaries](#client-binaries-15)
+    - [Server Binaries](#server-binaries-15)
+    - [Node Binaries](#node-binaries-15)
   - [Changelog since v1.15.0-alpha.1](#changelog-since-v1150-alpha1)
     - [Other notable changes](#other-notable-changes-9)
 - [v1.15.0-alpha.1](#v1150-alpha1)
   - [Downloads for v1.15.0-alpha.1](#downloads-for-v1150-alpha1)
-    - [Client Binaries](#client-binaries-14)
-    - [Server Binaries](#server-binaries-14)
-    - [Node Binaries](#node-binaries-14)
+    - [Client Binaries](#client-binaries-16)
+    - [Server Binaries](#server-binaries-16)
+    - [Node Binaries](#node-binaries-16)
   - [Changelog since v1.14.0](#changelog-since-v1140)
     - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-10)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.15.12
+
+[Documentation](https://docs.k8s.io)
+
+## Downloads for v1.15.12
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes.tar.gz) | `32543275f6a2e01b23566eb3b72e2be220812208b2bee3ff0daa2fae751a374d59073b08621524415f252c6c264c45054da97594278e6fb011487e884fbc3654`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-src.tar.gz) | `b59132d3e1eb57663fa4aaf732b8c4280234af0286df6c7632da7287e9c7329def80955eba375e9f346d944becb8aae734e6f2afa412e9ea19f3140a8c6bcd2a`
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-darwin-386.tar.gz) | `e87b279de3ff4155f7258723589ef9e4e91eafbed962e95f3a00f6a7338d058eb8b3b392d233af5f8df08da66dbb1685142d1779b10310aacd44d853a7c63cf5`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-darwin-amd64.tar.gz) | `a2cef929980394145af8ebea63a3ba71c73d8788e46ff523c20287052c6ef0b0fa590f4d5fea4a20d62f971c099924022cdd33763a3bdd6141ccfe0234fbc35c`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-linux-386.tar.gz) | `7c74395ee8ad4700ce143a5e8d06f07280905ddd2bbe59b765f589936476ac28edd2237da83f3422a04f9cd37ddb9bc0ab24c607409fa7902b901c1803a76484`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-linux-amd64.tar.gz) | `316dcb768c0963259f685a4c433150dca3191379a8f2789f39ff50c47b995f702f6f9de89f54a1a260e9ca9fa19dd020ccf7a0a8435e31fe3a7bc5f81b23a643`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-linux-arm.tar.gz) | `0ccfa59ff829f406b25ad03c5040904ed7fcf622e2034e420c20fabbfc5b67a9dae5f073bb6975105b9260e26634a76b08950b566ebdb83e5f25f17ef08d52bb`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-linux-arm64.tar.gz) | `f651ff6adc72ac9bc691274fd6397b4744535ba7a8d4dd1fae1f4a4f4346345964a3fd2e9dc2f9783ab70e932f0511b6046fe9d2cf611ee5fa4f22ae8d9d2ab3`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-linux-ppc64le.tar.gz) | `d4128aab6954be4539ad119376a642b3e7fb994d50236317cab1a2e74ff602671a46c4d72ba5a35ca5d24d386d4beda2bac57bfdbadb254561473400b426e213`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-linux-s390x.tar.gz) | `70e627bab491c3ec56b31a07ddfe1596bcba78db46ed8c159af15b1fb9aeb14495de995909a0525c2114f5eebfe339c3e2c5bd5cbebce2b1e376fe5bf26e0d1d`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-windows-386.tar.gz) | `83904a579a0f8051959efe43c84c177ebb4f71ccd715d9ddfb688d79f0aab8190e0a6fb8c3e7d32415827453cab37e3faa6121c092be53898031cd41cc4872b6`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-client-windows-amd64.tar.gz) | `9c3572c0d9e66c4e5363525f3ed8faeb9e97df0d8d6737865e1a4a8d40663cbb2bf43dcb41a45e434664ce67c527f4b72212ed7a9a35a7277159fadd029af559`
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-server-linux-amd64.tar.gz) | `f573716e9e5b8e3960adb7cc6c37a81dc826fd7a595902c0e758a86176c1752468cb9b709867bb312276c2cd1a882a2758f617a433d52e20c689245a1df9103e`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-server-linux-arm.tar.gz) | `72386115fde83e86e38d1777de04de7022df04e857979002d34a2610efe8dddd4e7e974e85b0709815b55bda1ede76f6de48e793b37dc1c973a56d8adf96bedc`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-server-linux-arm64.tar.gz) | `033a07c2fda8218e7ec9d9869fda0813681fc6d66d6c714c38323ac6a4ff412fe80704c82d9859dfbe7d185225d0442d80fcc97c578e2ce5b3bfed7dea8be577`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-server-linux-ppc64le.tar.gz) | `526459d2abbdf2a906c25667f3a6b61044feb894bef36cbb0b08f9258a4c1397af095ea864b2c1f89390b689281582a5926538afa045a369b026e01691c70772`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-server-linux-s390x.tar.gz) | `3a8de1b8a323a01fea48a954d3498d59010f4601713ab8dbcbefbb6110c1b5e26dcade5017389f84f98b4077026a93ee3f77d8e083d65c1ce6dcb6769756bae7`
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-node-linux-amd64.tar.gz) | `b125ebc957bb56878b50275e52c5d4b8f1122f21c56e3132d91fe96259fc63f3ce716d5030e3854815a34589868b5c278b1dad3e822bed88c623b263d9c11f3d`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-node-linux-arm.tar.gz) | `074bf07b1f5d95650b70f59eb3288ba87b1010332ec97d2af1da75450de04a383f4426836dbbbd30ab1361955275e092cdefe04a28cd1e8b8d3abc3a3ddf179a`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-node-linux-arm64.tar.gz) | `9bdb9d5636d8f4f856472cf86a252571cc1f9bddf48bb7cb6d16ceadbf76ff7bf994ab6ae2de9a72741a0135232badf426f4f14e7bcc959954f55a82584f13b1`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-node-linux-ppc64le.tar.gz) | `e05f4a19767038ac29a936d009d0444e54930903b97c4d8db467e21dde50805fdd0695c75593cd3871d932768a397fed7f3912e8eb2ef65c1556279126a7f6e9`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-node-linux-s390x.tar.gz) | `08ab9b8f53d0fc06c0897fd7214327411495af4ce81a3ecbabe1e6e22fb05d881c64f35c4624b09191acb4da7e64e6fd5dc7ea3e3b920bea39720bf1c9f31fba`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.15.12/kubernetes-node-windows-amd64.tar.gz) | `455830f75a1da055424b274a1d9dd006ba871c792378f3d5f9dc56feb360016f807c20ea06607b813f9dff675e1aec5cfe686fac5643dc1d56c845e4d9a24915`
+
+## Changelog since v1.15.11
+
+## Changes by Kind
+
+### Bug or Regression
+
+- Client-go: resolves an issue with informers falling back to full list requests when timeouts are encountered, rather than re-establishing a watch. ([#89978](https://github.com/kubernetes/kubernetes/pull/89978), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Testing]
+- Fix invalid VMSS updates due to incorrect cache ([#89002](https://github.com/kubernetes/kubernetes/pull/89002), [@ArchangelSDY](https://github.com/ArchangelSDY)) [SIG Cloud Provider]
+- Fix the VMSS name and resource group name when updating Azure VMSS for LoadBalancer backendPools ([#89337](https://github.com/kubernetes/kubernetes/pull/89337), [@feiskyer](https://github.com/feiskyer)) [SIG Cloud Provider]
+- Fix: check disk status before delete azure disk ([#88360](https://github.com/kubernetes/kubernetes/pull/88360), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
+- Fixed a data race in kubelet image manager that can cause static pod workers to silently stop working. ([#88915](https://github.com/kubernetes/kubernetes/pull/88915), [@roycaihw](https://github.com/roycaihw)) [SIG Node]
+- Fixed an issue that could cause the kubelet to incorrectly run concurrent pod reconciliation loops and crash. ([#89055](https://github.com/kubernetes/kubernetes/pull/89055), [@tedyu](https://github.com/tedyu)) [SIG Node]
+- Fixes conversion error for HorizontalPodAutoscaler objects with invalid annotations ([#89969](https://github.com/kubernetes/kubernetes/pull/89969), [@liggitt](https://github.com/liggitt)) [SIG Autoscaling]
+- Fixes conversion error in multi-version custom resources that could cause metadata.generation to increment on no-op patches or updates of a custom resource. ([#88995](https://github.com/kubernetes/kubernetes/pull/88995), [@liggitt](https://github.com/liggitt)) [SIG API Machinery]
+- For GCE cluster provider, fix bug of not being able to create internal type load balancer for clusters with more than 1000 nodes in a single zone. ([#89902](https://github.com/kubernetes/kubernetes/pull/89902), [@wojtek-t](https://github.com/wojtek-t)) [SIG Cloud Provider, Network and Scalability]
+- For volumes that allow attaches across multiple nodes, attach and detach operations across different nodes are now executed in parallel. ([#89241](https://github.com/kubernetes/kubernetes/pull/89241), [@verult](https://github.com/verult)) [SIG Apps, Node and Storage]
+- Kubelet metrics gathered through metrics-server or prometheus should no longer timeout for Windows nodes running more than 3 pods. ([#87730](https://github.com/kubernetes/kubernetes/pull/87730), [@marosset](https://github.com/marosset)) [SIG Node, Testing and Windows]
+
+### Other (Cleanup or Flake)
+
+- Build: Bump kube-cross to v1.12.17-2 ([#90760](https://github.com/kubernetes/kubernetes/pull/90760), [@justaugustus](https://github.com/justaugustus)) [SIG Release]
+- Reduce event spam during a volume operation error. ([#89794](https://github.com/kubernetes/kubernetes/pull/89794), [@msau42](https://github.com/msau42)) [SIG Storage]
+
+
+# v1.15.11
+
+[Documentation](https://docs.k8s.io)
+
+## Downloads for v1.15.11
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes.tar.gz) | `7834a01bf5e4cc5d93791f0dce512ff8f40c92e588c980567fb6d715bb707a650511495d323cd27e5e8f524577efb04adb07478ecbe55876f32c7f1cc055e907`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-src.tar.gz) | `e6cd82ae8e257328c64e518bd9056b91b5827f9f4e31071c2bf2175f83848b8a0b30228117e68a9f52028d899165100d89182af9c7447677cc503f7916b7fcf6`
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-darwin-386.tar.gz) | `48f7e3346abb3c5fabc4789ff335a2816d5251444c096b2153df0791bb7d9d03ba678f5bdf92504326cebad35994437bd43c0aff1268f424b36840f1a9133d74`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-darwin-amd64.tar.gz) | `24a13ccab183a425e633710703878e80498057d751412a6a864de4890978f41e09dcd0b7523ffb609ca903f713149a3ae74741d80067a550b132b62251128435`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-linux-386.tar.gz) | `e976b23e3f2093dfd7bbb0db6877d33103627e8d1ef5a37bbb673b103898fcb0a1eb3c732e50403fc42acf5866fd528b0eeb7037912e3bd3896ef60f222c72ae`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-linux-amd64.tar.gz) | `af50d838bf27758169368bd2129249ff3b617df98b43c9e7ba1a63a73613ed1bb36b9bd3673e02083ec23b3f1b4ee66bb3f27df00c31d5ee4e464265de13c529`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-linux-arm.tar.gz) | `c2b389290c20b33856b0bd598793768a28406701533e2ce6b622ca3c05f145ed809c61f90d1e6c88c684b7e66cfca29c8f6e6ab3b573d238caf56af2a948a74d`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-linux-arm64.tar.gz) | `5cab716ed8354e51edf41e2a2e83674d95ba43bebe9e3fa8be1b556528c82fa1c1ac61ecd90d093de131427705068858de8c84f9e31ed768a137566467afadb5`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-linux-ppc64le.tar.gz) | `5079afde78b02e6a785a764834b070d360245a817f4e475bac5f5a60628500cdb2a46895b332e73405663b488583b1ce4200fa63e0013c3f9b1a514dee6510e6`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-linux-s390x.tar.gz) | `06bc06766c45fee752b76793c4f955dbadb27702689c0f98639bb58b97f1652876f0fe8853278f55fd61d7e3d1aa050fb1ec12242ab274fa1f2fca42f9528e9f`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-windows-386.tar.gz) | `8719e4edd7d4c79254ee3cf551ac37d4d91072a99b3a4d574b2aa266a664f5e819ba093950c7010c154dd1e41539f60f4a5d926ce9d2997542ecf2f77dc2d10b`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-client-windows-amd64.tar.gz) | `fb66bbef53dac95c82d77fed9f0b46d9f42d21f26de9f9f1575cbda43dcc7416eebaf6195558818cb59e68fc7977218b12ddaedcd47c45281939664cff19edab`
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-server-linux-amd64.tar.gz) | `ec7f5d443e9135f9561c78ffadf8d4234cd05e8676d1a442deed444f82b49e435f3321d3dbd79d11acddb5207aca9940adf632d8e7f1cf87ffdb1b664118b329`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-server-linux-arm.tar.gz) | `807fd30aea7998a442c79535cecbce7a0d8a0b0aefb52c77230b8c87aa17342c548810ae21e2a0249a6bacbe266f05c531a6532f418dee5e348c510ca5bc459b`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-server-linux-arm64.tar.gz) | `948b44fafd47793f03ecafe44de68d3a470a47a50f3321914ceada260dae2ff78cb6465b5e59c95147be6fabe51c619e8493c068f49d690ce2221dc125e1e5f8`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-server-linux-ppc64le.tar.gz) | `ee3ad93e4707046e50c833915a465dafbc9980ee27160434298431668e327757db9829b372de26da5ddd2f364bd2b2548a1c5447dd1ed400e594ff616f59f446`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-server-linux-s390x.tar.gz) | `2e468e85c33fc228e1abc945cb6b0f964b6d8ae9279ccf425b56674105f17161c3b8800d8e158337fb6cf9e29076b724c3b1290dab515438384c06064e6953c6`
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-node-linux-amd64.tar.gz) | `cd128ef0c9b1f8db22b54b6f6369e54e9dfbffe9e41e8063bda7b69fd1e067088e750de2a5e086d88f36d35be264be46d4eccb033cdcd8e890288493ca2dd0eb`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-node-linux-arm.tar.gz) | `d4f22417cf17fbfe5e051874ec68fa9a99918b0b08eebe57e208cb7f54aab3985fbe2ae8cea70d53857be9bdeaed01f0e33f283ff05e07b09bb713cef9c3d798`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-node-linux-arm64.tar.gz) | `72656759519ebc4631270f67d466e011f911c480ac6dec65006384b8a951508bde90d58bf15e3ca1c10c15ed204596d8a92f9b05a05351e7c4640d9b6edb1b11`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-node-linux-ppc64le.tar.gz) | `cbf4e915a8f7e16e2c81ccb2989f78cd0c7fb91a7a87948442be9b250a53ca73b5a7deac41e0c47dd1d744e8bc23d374148dfd4f6871d0475fb7fa1d959146c6`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-node-linux-s390x.tar.gz) | `1d75676fd3f70922a499d6578d8c44c0aa61c60aa23f866c6ba086778ada590c76c00c14a2258f64886a4b2427cb391765e44245e390f586c6771a7f0ae59c8c`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.15.11/kubernetes-node-windows-amd64.tar.gz) | `b7448e795a80f0b911319c590c7a51964df4d5d3d594d53c9c515f8f4cd43c0710c742afeacf368ee8f35fa5921e261ef91fd0b6afaed9ca302c448daac3b3ca`
+
+## Changelog since v1.15.10
+
+## Changes by Kind
+
+### Other (Bug, Cleanup or Flake)
+
+- Add delays between goroutines for vm instance update ([#88094](https://github.com/kubernetes/kubernetes/pull/88094), [@aramase](https://github.com/aramase)) [SIG Cloud Provider]
+- Bump debian-base to v1.0.1 and debian-iptables to v11.0.3 ([#88882](https://github.com/kubernetes/kubernetes/pull/88882), [@tallclair](https://github.com/tallclair)) [SIG API Machinery, Cluster Lifecycle, Release and Testing]
+- Fix handling of aws-load-balancer-security-groups annotation. Security-Groups assigned with this annotation are no longer modified by kubernetes which is the expected behaviour of most users. Also no unnecessary Security-Groups are created anymore if this annotation is used. ([#88691](https://github.com/kubernetes/kubernetes/pull/88691), [@Elias481](https://github.com/Elias481)) [SIG Cloud Provider]
+- Fix route conflicted operations when updating multiple routes together ([#88209](https://github.com/kubernetes/kubernetes/pull/88209), [@feiskyer](https://github.com/feiskyer)) [SIG Cloud Provider]
+- Fix the problem where couple nodes becoming NotReady at the same time could cause master instability or even complete outage in large enough clusters. ([#88962](https://github.com/kubernetes/kubernetes/pull/88962), [@mborsz](https://github.com/mborsz)) [SIG Apps]
+- Fix: add remediation in azure disk attach/detach ([#88444](https://github.com/kubernetes/kubernetes/pull/88444), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
+- Fix: azure file mount timeout issue ([#88610](https://github.com/kubernetes/kubernetes/pull/88610), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Fix: corrupted mount point in csi driver ([#88569](https://github.com/kubernetes/kubernetes/pull/88569), [@andyzhangx](https://github.com/andyzhangx)) [SIG Storage]
+- Fix: get azure disk lun timeout issue ([#88158](https://github.com/kubernetes/kubernetes/pull/88158), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Fixed `threadSafeMap` high memory usage caused by indices that have churn of high-cardinality keys. E.g. namespaces ([#88005](https://github.com/kubernetes/kubernetes/pull/88005), [@patrickshan](https://github.com/patrickshan)) [SIG API Machinery]
+- Fixes issue where you can't attach more than 15 GCE Persistent Disks to c2, n2, m1, m2 machine types. ([#88602](https://github.com/kubernetes/kubernetes/pull/88602), [@yuga711](https://github.com/yuga711)) [SIG Storage]
+- Fixes kubelet crash in client certificate rotation cases ([#88079](https://github.com/kubernetes/kubernetes/pull/88079), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Auth and Node]
+- Get-kube.sh uses the gcloud's current local GCP service account for auth when the provider is GCE or GKE instead of the metadata server default ([#88383](https://github.com/kubernetes/kubernetes/pull/88383), [@BenTheElder](https://github.com/BenTheElder)) [SIG Cluster Lifecycle]
+- Limit number of instances in a single update to GCE target pool to 1000. ([#87881](https://github.com/kubernetes/kubernetes/pull/87881), [@wojtek-t](https://github.com/wojtek-t)) [SIG Cloud Provider, Network and Scalability]
+- Update golang to go1.12.17 ([#88551](https://github.com/kubernetes/kubernetes/pull/88551), [@justaugustus](https://github.com/justaugustus)) [SIG Release and Testing]
+
 
 # v1.15.10
 

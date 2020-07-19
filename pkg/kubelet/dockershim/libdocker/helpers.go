@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -23,7 +25,7 @@ import (
 	dockerref "github.com/docker/distribution/reference"
 	dockertypes "github.com/docker/docker/api/types"
 	godigest "github.com/opencontainers/go-digest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ParseDockerTimestamp parses the timestamp returned by Interface from string to time.Time

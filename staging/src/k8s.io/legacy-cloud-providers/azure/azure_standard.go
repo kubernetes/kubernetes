@@ -28,7 +28,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 
 	"k8s.io/component-base/featuregate"
@@ -72,7 +72,7 @@ const (
 )
 
 var errNotInVMSet = errors.New("vm is not in the vmset")
-var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
+var providerIDRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
 var backendPoolIDRE = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
 var nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
 
@@ -171,8 +171,8 @@ func isMasterNode(node *v1.Node) bool {
 }
 
 // returns the deepest child's identifier from a full identifier string.
-func getLastSegment(ID string) (string, error) {
-	parts := strings.Split(ID, "/")
+func getLastSegment(ID, separator string) (string, error) {
+	parts := strings.Split(ID, separator)
 	name := parts[len(parts)-1]
 	if len(name) == 0 {
 		return "", fmt.Errorf("resource name was missing from identifier")
@@ -264,18 +264,14 @@ func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 // getBackendPoolName the LB BackendPool name for a service.
 // to ensure backword and forward compat:
 // SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
-// SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
+// SingleStack -v6 => BackendPool name == <clusterName>-IPv6 (all cluster bootstrap uses this name)
 // DualStack
 //	=> IPv4 BackendPool name == clusterName
 //  => IPv6 BackendPool name == <clusterName>-IPv6
 // This means:
-// clusters moving from IPv4 to duakstack will require no changes
-// clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
-// to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
-func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *v1.Service) string {
-	if !ipv6DualStackEnabled {
-		return clusterName
-	}
+// clusters moving from IPv4 to dualstack will require no changes
+// clusters moving from IPv6 to dualstack will require no changes as the IPv4 backend pool will created with <clusterName>
+func getBackendPoolName(clusterName string, service *v1.Service) string {
 	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
 	if IPv6 {
 		return fmt.Sprintf("%v-IPv6", clusterName)
@@ -494,8 +490,8 @@ func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, e
 	}
 
 	zone := cloudprovider.Zone{
-		FailureDomain: failureDomain,
-		Region:        to.String(vm.Location),
+		FailureDomain: strings.ToLower(failureDomain),
+		Region:        strings.ToLower(to.String(vm.Location)),
 	}
 	return zone, nil
 }
@@ -523,7 +519,7 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 	publicIP := ""
 	if ipConfig.PublicIPAddress != nil && ipConfig.PublicIPAddress.ID != nil {
 		pipID := *ipConfig.PublicIPAddress.ID
-		pipName, err := getLastSegment(pipID)
+		pipName, err := getLastSegment(pipID, "/")
 		if err != nil {
 			return "", "", fmt.Errorf("failed to publicIP name for node %q with pipID %q", name, pipID)
 		}
@@ -593,7 +589,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 			// already added in the list
 			continue
 		}
-		asName, err := getLastSegment(asID)
+		asName, err := getLastSegment(asID, "/")
 		if err != nil {
 			klog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
 			return nil, err
@@ -684,7 +680,7 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 	if err != nil {
 		return network.Interface{}, err
 	}
-	nicName, err := getLastSegment(primaryNicID)
+	nicName, err := getLastSegment(primaryNicID, "/")
 	if err != nil {
 		return network.Interface{}, err
 	}
@@ -726,36 +722,36 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
-func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
+func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) (string, string, string, *compute.VirtualMachineScaleSetVM, error) {
 	vmName := mapNodeNameToVMName(nodeName)
 	serviceName := getServiceName(service)
 	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
 			klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
-			return nil
+			return "", "", "", nil, nil
 		}
 
 		klog.Errorf("error: az.EnsureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
-		return err
+		return "", "", "", nil, err
 	}
 
 	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
 		klog.Warningf("EnsureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
-		return nil
+		return "", "", "", nil, nil
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	if !as.Cloud.ipv6DualStackEnabled {
+	ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if !as.Cloud.ipv6DualStackEnabled && !ipv6 {
 		primaryIPConfig, err = getPrimaryIPConfig(nic)
 		if err != nil {
-			return err
+			return "", "", "", nil, err
 		}
 	} else {
-		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
 		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
 		if err != nil {
-			return err
+			return "", "", "", nil, err
 		}
 	}
 
@@ -784,11 +780,11 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 			}
 			isSameLB, oldLBName, err := isBackendPoolOnSameLB(backendPoolID, newBackendPoolsIDs)
 			if err != nil {
-				return err
+				return "", "", "", nil, err
 			}
 			if !isSameLB {
 				klog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, oldLBName)
-				return nil
+				return "", "", "", nil, nil
 			}
 		}
 
@@ -803,10 +799,10 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 		klog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
 		err := as.CreateOrUpdateInterface(service, nic)
 		if err != nil {
-			return err
+			return "", "", "", nil, err
 		}
 	}
-	return nil
+	return "", "", "", nil, nil
 }
 
 // EnsureHostsInPool ensures the given Node's primary IP configurations are
@@ -826,7 +822,7 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 		}
 
 		f := func() error {
-			err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+			_, _, _, _, err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
 			if err != nil {
 				return fmt.Errorf("ensure(%s): backendPoolID(%s) - failed to ensure host in pool: %q", getServiceName(service), backendPoolID, err)
 			}

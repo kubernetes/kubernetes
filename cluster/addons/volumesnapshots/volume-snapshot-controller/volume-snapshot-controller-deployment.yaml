@@ -23,7 +23,7 @@ spec:
       containers:
         - name: volume-snapshot-controller
           # TODO(xyang): Replace with an official image when it is released
-          image: quay.io/k8scsi/snapshot-controller:v2.0.0-rc2
+          image: gcr.io/k8s-staging-csi/snapshot-controller:v2.0.0-rc2
           args:
             - "--v=5"
           imagePullPolicy: Always

@@ -264,16 +264,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(a.(*v1beta1.IngressBackend), b.(*networking.IngressBackend), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressBackend)(nil), (*v1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*networking.IngressBackend), b.(*v1beta1.IngressBackend), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressList)(nil), (*networking.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_IngressList_To_networking_IngressList(a.(*v1beta1.IngressList), b.(*networking.IngressList), scope)
 	}); err != nil {
@@ -301,16 +291,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*networking.IngressRuleValue)(nil), (*v1beta1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(a.(*networking.IngressRuleValue), b.(*v1beta1.IngressRuleValue), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressSpec_To_networking_IngressSpec(a.(*v1beta1.IngressSpec), b.(*networking.IngressSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressSpec)(nil), (*v1beta1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressSpec_To_v1beta1_IngressSpec(a.(*networking.IngressSpec), b.(*v1beta1.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -564,6 +544,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*networking.IngressBackend)(nil), (*v1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*networking.IngressBackend), b.(*v1beta1.IngressBackend), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.IngressSpec)(nil), (*v1beta1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressSpec_To_v1beta1_IngressSpec(a.(*networking.IngressSpec), b.(*v1beta1.IngressSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*networking.NetworkPolicyEgressRule)(nil), (*v1beta1.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(a.(*networking.NetworkPolicyEgressRule), b.(*v1beta1.NetworkPolicyEgressRule), scope)
 	}); err != nil {
@@ -581,6 +571,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*v1beta1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_IPBlock_To_networking_IPBlock(a.(*v1beta1.IPBlock), b.(*networking.IPBlock), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(a.(*v1beta1.IngressBackend), b.(*networking.IngressBackend), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressSpec_To_networking_IngressSpec(a.(*v1beta1.IngressSpec), b.(*networking.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -1161,6 +1161,7 @@ func Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in 
 
 func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1beta1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -1174,6 +1175,7 @@ func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.H
 
 func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*v1beta1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -1186,7 +1188,17 @@ func Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networkin
 }
 
 func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
-	out.Paths = *(*[]networking.HTTPIngressPath)(unsafe.Pointer(&in.Paths))
+	if in.Paths != nil {
+		in, out := &in.Paths, &out.Paths
+		*out = make([]networking.HTTPIngressPath, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
 	return nil
 }
 
@@ -1196,7 +1208,17 @@ func Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
-	out.Paths = *(*[]v1beta1.HTTPIngressPath)(unsafe.Pointer(&in.Paths))
+	if in.Paths != nil {
+		in, out := &in.Paths, &out.Paths
+		*out = make([]v1beta1.HTTPIngressPath, len(*in))
+		for i := range *in {
+			if err := Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
+	}
 	return nil
 }
 
@@ -1294,25 +1316,16 @@ func Convert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *
 }
 
 func autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in *v1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
-	out.ServiceName = in.ServiceName
-	out.ServicePort = in.ServicePort
+	// WARNING: in.ServiceName requires manual conversion: does not exist in peer-type
+	// WARNING: in.ServicePort requires manual conversion: does not exist in peer-type
+	out.Resource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
-}
-
-// Convert_v1beta1_IngressBackend_To_networking_IngressBackend is an autogenerated conversion function.
-func Convert_v1beta1_IngressBackend_To_networking_IngressBackend(in *v1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
-	return autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in, out, s)
 }
 
 func autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *v1beta1.IngressBackend, s conversion.Scope) error {
-	out.ServiceName = in.ServiceName
-	out.ServicePort = in.ServicePort
+	// WARNING: in.Service requires manual conversion: does not exist in peer-type
+	out.Resource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
-}
-
-// Convert_networking_IngressBackend_To_v1beta1_IngressBackend is an autogenerated conversion function.
-func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *v1beta1.IngressBackend, s conversion.Scope) error {
-	return autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in, out, s)
 }
 
 func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
@@ -1384,7 +1397,15 @@ func Convert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.Ingres
 }
 
 func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
-	out.HTTP = (*networking.HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
+	if in.HTTP != nil {
+		in, out := &in.HTTP, &out.HTTP
+		*out = new(networking.HTTPIngressRuleValue)
+		if err := Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.HTTP = nil
+	}
 	return nil
 }
 
@@ -1394,7 +1415,15 @@ func Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1beta1
 }
 
 func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *v1beta1.IngressRuleValue, s conversion.Scope) error {
-	out.HTTP = (*v1beta1.HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
+	if in.HTTP != nil {
+		in, out := &in.HTTP, &out.HTTP
+		*out = new(v1beta1.HTTPIngressRuleValue)
+		if err := Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.HTTP = nil
+	}
 	return nil
 }
 
@@ -1404,27 +1433,39 @@ func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *network
 }
 
 func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
-	out.Backend = (*networking.IngressBackend)(unsafe.Pointer(in.Backend))
+	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
+	// WARNING: in.Backend requires manual conversion: does not exist in peer-type
 	out.TLS = *(*[]networking.IngressTLS)(unsafe.Pointer(&in.TLS))
-	out.Rules = *(*[]networking.IngressRule)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]networking.IngressRule, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IngressRule_To_networking_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	return nil
-}
-
-// Convert_v1beta1_IngressSpec_To_networking_IngressSpec is an autogenerated conversion function.
-func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in, out, s)
 }
 
 func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
-	out.Backend = (*v1beta1.IngressBackend)(unsafe.Pointer(in.Backend))
+	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
+	// WARNING: in.DefaultBackend requires manual conversion: does not exist in peer-type
 	out.TLS = *(*[]v1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
-	out.Rules = *(*[]v1beta1.IngressRule)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]v1beta1.IngressRule, len(*in))
+		for i := range *in {
+			if err := Convert_networking_IngressRule_To_v1beta1_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	return nil
-}
-
-// Convert_networking_IngressSpec_To_v1beta1_IngressSpec is an autogenerated conversion function.
-func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
-	return autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {

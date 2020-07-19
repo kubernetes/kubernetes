@@ -208,6 +208,11 @@ kube::util::find-binary-for-platform() {
     locations+=("$location");
   done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
     \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
+  # search for executables for non-GNU versions of find (eg. BSD)
+  while IFS=$'\n' read -r location; do
+    locations+=("$location");
+  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -perm -111 \
+    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
@@ -445,6 +450,22 @@ function kube::util::test_openssl_installed {
     fi
 
     OPENSSL_BIN=$(command -v openssl)
+}
+
+# Query the API server for client certificate authentication capabilities
+function kube::util::test_client_certificate_authentication_enabled {
+  local output
+  kube::util::test_openssl_installed
+
+  output=$(echo \
+    | "${OPENSSL_BIN}" s_client -connect "127.0.0.1:${SECURE_API_PORT}" 2> /dev/null \
+    | grep -A3 'Acceptable client certificate CA names')
+
+  if [[ "${output}" != *"/CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
+    echo "API server not configured for client certificate authentication"
+    echo "Output of from acceptable client certificate check: ${output}"
+    exit 1
+  fi
 }
 
 # creates a client CA, args are sudo, dest-dir, ca-id, purpose

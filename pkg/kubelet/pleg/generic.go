@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -67,7 +67,7 @@ type GenericPLEG struct {
 }
 
 // plegContainerState has a one-to-one mapping to the
-// kubecontainer.ContainerState except for the non-existent state. This state
+// kubecontainer.State except for the non-existent state. This state
 // is introduced here to complete the state transition scenarios.
 type plegContainerState string
 
@@ -83,7 +83,7 @@ const (
 	relistThreshold = 3 * time.Minute
 )
 
-func convertState(state kubecontainer.ContainerState) plegContainerState {
+func convertState(state kubecontainer.State) plegContainerState {
 	switch state {
 	case kubecontainer.ContainerStateCreated:
 		// kubelet doesn't use the "created" state yet, hence convert it to "unknown".

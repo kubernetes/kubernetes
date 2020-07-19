@@ -22,13 +22,17 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient/mockstorageaccountclient"
+
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/golang/mock/gomock"
 )
 
 func TestGetStorageAccessKeys(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	cloud := &Cloud{}
-	fake := newFakeStorageAccountClient()
-	cloud.StorageAccountClient = fake
 	value := "foo bar"
 
 	tests := []struct {
@@ -63,9 +67,9 @@ func TestGetStorageAccessKeys(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		expectedKey := test.expectedKey
-		fake.Keys = test.results
-		fake.Err = test.err
+		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
+		cloud.StorageAccountClient = mockStorageAccountsClient
+		mockStorageAccountsClient.EXPECT().ListKeys(gomock.Any(), "rg", gomock.Any()).Return(test.results, nil).AnyTimes()
 		key, err := cloud.GetStorageAccesskey("acct", "rg")
 		if test.expectErr && err == nil {
 			t.Errorf("Unexpected non-error")
@@ -75,8 +79,8 @@ func TestGetStorageAccessKeys(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		if key != expectedKey {
-			t.Errorf("expected: %s, saw %s", expectedKey, key)
+		if key != test.expectedKey {
+			t.Errorf("expected: %s, saw %s", test.expectedKey, key)
 		}
 	}
 }

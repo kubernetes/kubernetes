@@ -72,7 +72,7 @@ func Example_view() {
 	// users:
 	// - name: red-user
 	//   user:
-	//     token: red-token
+	//     token: REDACTED
 }
 
 func TestCurrentContext(t *testing.T) {

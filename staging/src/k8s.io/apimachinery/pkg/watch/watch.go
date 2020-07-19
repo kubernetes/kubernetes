@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -32,8 +32,8 @@ type Interface interface {
 	Stop()
 
 	// Returns a chan which will receive all the events. If an error occurs
-	// or Stop() is called, this channel will be closed, in which case the
-	// watch should be completely cleaned up.
+	// or Stop() is called, the implementation will close this channel and
+	// release any resources used by the watch.
 	ResultChan() <-chan Event
 }
 
@@ -46,7 +46,9 @@ const (
 	Deleted  EventType = "DELETED"
 	Bookmark EventType = "BOOKMARK"
 	Error    EventType = "ERROR"
+)
 
+var (
 	DefaultChanSize int32 = 100
 )
 

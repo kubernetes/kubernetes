@@ -54,9 +54,13 @@ func XfrmMonitor(ch chan<- XfrmMsg, done <-chan struct{}, errorChan chan<- error
 	go func() {
 		defer close(ch)
 		for {
-			msgs, err := s.Receive()
+			msgs, from, err := s.Receive()
 			if err != nil {
 				errorChan <- err
+				return
+			}
+			if from.Pid != nl.PidKernel {
+				errorChan <- fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, nl.PidKernel)
 				return
 			}
 			for _, m := range msgs {

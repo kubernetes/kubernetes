@@ -344,4 +344,8 @@ const (
 	SYS_FSCONFIG               = 5431
 	SYS_FSMOUNT                = 5432
 	SYS_FSPICK                 = 5433
+	SYS_PIDFD_OPEN             = 5434
+	SYS_CLONE3                 = 5435
+	SYS_OPENAT2                = 5437
+	SYS_PIDFD_GETFD            = 5438
 )

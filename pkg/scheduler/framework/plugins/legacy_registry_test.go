@@ -102,19 +102,19 @@ func TestRegisterConfigProducers(t *testing.T) {
 				{Name: testFilterName2},
 			},
 		},
-		PreScore: &config.PluginSet{},
+		PostFilter: &config.PluginSet{},
+		PreScore:   &config.PluginSet{},
 		Score: &config.PluginSet{
 			Enabled: []config.Plugin{
 				{Name: testScoreName1, Weight: 1},
 				{Name: testScoreName2, Weight: 1},
 			},
 		},
-		Reserve:   &config.PluginSet{},
-		Permit:    &config.PluginSet{},
-		PreBind:   &config.PluginSet{},
-		Bind:      &config.PluginSet{},
-		PostBind:  &config.PluginSet{},
-		Unreserve: &config.PluginSet{},
+		Reserve:  &config.PluginSet{},
+		Permit:   &config.PluginSet{},
+		PreBind:  &config.PluginSet{},
+		Bind:     &config.PluginSet{},
+		PostBind: &config.PluginSet{},
 	}
 
 	if diff := cmp.Diff(wantPlugins, gotPlugins); diff != "" {

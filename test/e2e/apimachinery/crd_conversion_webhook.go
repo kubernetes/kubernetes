@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -209,10 +209,10 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 })
 
 func cleanCRDWebhookTest(client clientset.Interface, namespaceName string) {
-	_ = client.CoreV1().Services(namespaceName).Delete(context.TODO(), serviceCRDName, nil)
-	_ = client.AppsV1().Deployments(namespaceName).Delete(context.TODO(), deploymentCRDName, nil)
-	_ = client.CoreV1().Secrets(namespaceName).Delete(context.TODO(), secretCRDName, nil)
-	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingCRDName, nil)
+	_ = client.CoreV1().Services(namespaceName).Delete(context.TODO(), serviceCRDName, metav1.DeleteOptions{})
+	_ = client.AppsV1().Deployments(namespaceName).Delete(context.TODO(), deploymentCRDName, metav1.DeleteOptions{})
+	_ = client.CoreV1().Secrets(namespaceName).Delete(context.TODO(), secretCRDName, metav1.DeleteOptions{})
+	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingCRDName, metav1.DeleteOptions{})
 }
 
 func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespace string) {
@@ -338,11 +338,14 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 	}
 	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentCRDName, namespace)
+
 	ginkgo.By("Wait for the deployment to be ready")
-	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentCRDName, "1", image)
-	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
-	err = e2edeploy.WaitForDeploymentComplete(client, deployment)
-	framework.ExpectNoError(err, "waiting for the deployment status valid", image, deploymentCRDName, namespace)
+
+	err = e2edeployment.WaitForDeploymentRevisionAndImage(client, namespace, deploymentCRDName, "1", image)
+	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentCRDName, namespace)
+
+	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
+	framework.ExpectNoError(err, "waiting for %s deployment status valid", deploymentCRDName)
 
 	ginkgo.By("Deploying the webhook service")
 
@@ -411,10 +414,10 @@ func testCustomResourceConversionWebhook(f *framework.Framework, crd *apiextensi
 			"hostPort": "localhost:8080",
 		},
 	}
-	_, err := customResourceClients["v1"].Create(crInstance, metav1.CreateOptions{})
+	_, err := customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
 	ginkgo.By("v2 custom resource should be converted")
-	v2crd, err := customResourceClients["v2"].Get(name, metav1.GetOptions{})
+	v2crd, err := customResourceClients["v2"].Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Getting v2 of custom resource %s", name)
 	verifyV2Object(crd, v2crd)
 }
@@ -436,7 +439,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 			"hostPort": "localhost:8080",
 		},
 	}
-	_, err := customResourceClients["v1"].Create(crInstance, metav1.CreateOptions{})
+	_, err := customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
@@ -463,7 +466,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	//
 	// TODO: we have to wait for the storage version to become effective. Storage version changes are not instant.
 	for i := 0; i < 5; i++ {
-		_, err = customResourceClients["v1"].Create(crInstance, metav1.CreateOptions{})
+		_, err = customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
 		if err == nil {
 			break
 		}
@@ -473,7 +476,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	// Now that we have a v1 and v2 object, both list operation in v1 and v2 should work as expected.
 
 	ginkgo.By("List CRs in v1")
-	list, err := customResourceClients["v1"].List(metav1.ListOptions{})
+	list, err := customResourceClients["v1"].List(context.TODO(), metav1.ListOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
 	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
@@ -482,7 +485,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	verifyV1Object(crd, &list.Items[1])
 
 	ginkgo.By("List CRs in v2")
-	list, err = customResourceClients["v2"].List(metav1.ListOptions{})
+	list, err = customResourceClients["v2"].List(context.TODO(), metav1.ListOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
 	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
@@ -504,7 +507,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 				},
 			},
 		}
-		_, err := customResourceClients[version].Create(crInstance, metav1.CreateOptions{})
+		_, err := customResourceClients[version].Create(context.TODO(), crInstance, metav1.CreateOptions{})
 		if err != nil {
 			// tolerate clusters that do not set --enable-aggregator-routing and have to wait for kube-proxy
 			// to program the service network, during which conversion requests return errors
@@ -512,7 +515,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 			return false, nil
 		}
 
-		framework.ExpectNoError(customResourceClients[version].Delete(crInstance.GetName(), nil), "cleaning up stub object")
+		framework.ExpectNoError(customResourceClients[version].Delete(context.TODO(), crInstance.GetName(), metav1.DeleteOptions{}), "cleaning up stub object")
 		return true, nil
 	}))
 }

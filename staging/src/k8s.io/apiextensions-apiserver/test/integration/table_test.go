@@ -131,7 +131,7 @@ func TestTableGet(t *testing.T) {
 	t.Logf("table crd created: %#v", crd)
 
 	crClient := newNamespacedCustomResourceVersionedClient("", dynamicClient, crd, "v1")
-	foo, err := crClient.Create(newTableInstance("foo"), metav1.CreateOptions{})
+	foo, err := crClient.Create(context.TODO(), newTableInstance("foo"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestTableGet(t *testing.T) {
 				if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
 					t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
 				}
-				if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
+				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
 					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 				}
 				// Validate extra column for v1
@@ -343,7 +343,7 @@ func TestTableGet(t *testing.T) {
 				if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
 					t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
 				}
-				if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
+				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
 					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 				}
 				// Validate extra column for v1

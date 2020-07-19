@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -42,6 +43,25 @@ const (
 func legacyLogSymlink(containerID string, containerName, podName, podNamespace string) string {
 	return logSymlink(legacyContainerLogsDir, kubecontainer.BuildPodFullName(podName, podNamespace),
 		containerName, containerID)
+}
+
+// getContainerIDFromLegacyLogSymlink returns error if container Id cannot be parsed
+func getContainerIDFromLegacyLogSymlink(logSymlink string) (string, error) {
+	parts := strings.Split(logSymlink, "-")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("unable to find separator in %q", logSymlink)
+	}
+	containerIDWithSuffix := parts[len(parts)-1]
+	suffix := fmt.Sprintf(".%s", legacyLogSuffix)
+	if !strings.HasSuffix(containerIDWithSuffix, suffix) {
+		return "", fmt.Errorf("%q doesn't end with %q", logSymlink, suffix)
+	}
+	containerIDWithoutSuffix := strings.TrimSuffix(containerIDWithSuffix, suffix)
+	// container can be retrieved with container Id as short as 6 characters
+	if len(containerIDWithoutSuffix) < 6 {
+		return "", fmt.Errorf("container Id %q is too short", containerIDWithoutSuffix)
+	}
+	return containerIDWithoutSuffix, nil
 }
 
 func logSymlink(containerLogsDir, podFullName, containerName, containerID string) string {

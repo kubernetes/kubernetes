@@ -7,4 +7,4 @@ approvers:
 - tallclair
 - MrHohn
 labels:
-- sig/gcp
+- area/provider/gcp

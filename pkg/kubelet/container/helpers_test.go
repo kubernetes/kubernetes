@@ -19,11 +19,12 @@ package container
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -42,7 +43,7 @@ func TestEnvVarsToMap(t *testing.T) {
 		},
 	}
 
-	varMap := EnvVarsToMap(vars)
+	varMap := envVarsToMap(vars)
 
 	if e, a := len(vars), len(varMap); e != a {
 		t.Errorf("Unexpected map length; expected: %d, got %d", e, a)
@@ -413,7 +414,7 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		ID:        pod.UID,
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
-		ContainerStatuses: []*ContainerStatus{
+		ContainerStatuses: []*Status{
 			{
 				Name:  "alive",
 				State: ContainerStateRunning,
@@ -449,12 +450,35 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		v1.RestartPolicyOnFailure,
 		v1.RestartPolicyAlways,
 	}
+
+	// test policies
 	expected := map[string][]bool{
 		"no-history": {true, true, true},
 		"alive":      {false, false, false},
 		"succeed":    {false, false, true},
 		"failed":     {false, true, true},
 		"unknown":    {true, true, true},
+	}
+	for _, c := range pod.Spec.Containers {
+		for i, policy := range policies {
+			pod.Spec.RestartPolicy = policy
+			e := expected[c.Name][i]
+			r := ShouldContainerBeRestarted(&c, pod, podStatus)
+			if r != e {
+				t.Errorf("Restart for container %q with restart policy %q expected %t, got %t",
+					c.Name, policy, e, r)
+			}
+		}
+	}
+
+	// test deleted pod
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	expected = map[string][]bool{
+		"no-history": {false, false, false},
+		"alive":      {false, false, false},
+		"succeed":    {false, false, false},
+		"failed":     {false, false, false},
+		"unknown":    {false, false, false},
 	}
 	for _, c := range pod.Spec.Containers {
 		for i, policy := range policies {

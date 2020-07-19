@@ -6,7 +6,11 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/golang/protobuf/ptypes/any",
     importpath = "github.com/golang/protobuf/ptypes/any",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/google.golang.org/protobuf/reflect/protoreflect:go_default_library",
+        "//vendor/google.golang.org/protobuf/runtime/protoimpl:go_default_library",
+        "//vendor/google.golang.org/protobuf/types/known/anypb:go_default_library",
+    ],
 )
 
 filegroup(

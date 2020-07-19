@@ -157,6 +157,9 @@ func (h *Handle) GenlFamilyGet(name string) (*GenlFamily, error) {
 		return nil, err
 	}
 	families, err := parseFamilies(msgs)
+	if err != nil {
+		return nil, err
+	}
 	if len(families) != 1 {
 		return nil, fmt.Errorf("invalid response for GENL_CTRL_CMD_GETFAMILY")
 	}

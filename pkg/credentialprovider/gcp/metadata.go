@@ -26,7 +26,7 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -150,7 +150,7 @@ func (g *metadataProvider) Enabled() bool {
 func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg metadata key and
 	// parse them as an alternate .dockercfg
-	if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(dockerConfigKey, g.Client, metadataHeader); err != nil {
+	if cfg, err := credentialprovider.ReadDockerConfigFileFromURL(dockerConfigKey, g.Client, metadataHeader); err != nil {
 		klog.Errorf("while reading 'google-dockercfg' metadata: %v", err)
 	} else {
 		return cfg
@@ -162,11 +162,11 @@ func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.Docke
 // Provide implements DockerConfigProvider
 func (g *dockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg-url key and load a .dockercfg from there
-	if url, err := credentialprovider.ReadUrl(dockerConfigURLKey, g.Client, metadataHeader); err != nil {
+	if url, err := credentialprovider.ReadURL(dockerConfigURLKey, g.Client, metadataHeader); err != nil {
 		klog.Errorf("while reading 'google-dockercfg-url' metadata: %v", err)
 	} else {
 		if strings.HasPrefix(string(url), "http") {
-			if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(string(url), g.Client, nil); err != nil {
+			if cfg, err := credentialprovider.ReadDockerConfigFileFromURL(string(url), g.Client, nil); err != nil {
 				klog.Errorf("while reading 'google-dockercfg-url'-specified url: %s, %v", string(url), err)
 			} else {
 				return cfg
@@ -214,7 +214,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 	// Given that we are on GCE, we should keep retrying until the metadata server responds.
 	value := runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadUrl(serviceAccounts, g.Client, metadataHeader)
+		value, err := credentialprovider.ReadURL(serviceAccounts, g.Client, metadataHeader)
 		if err != nil {
 			klog.V(2).Infof("Failed to Get service accounts from gce metadata server: %v", err)
 		}
@@ -237,7 +237,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 	url := metadataScopes + "?alt=json"
 	value = runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadUrl(url, g.Client, metadataHeader)
+		value, err := credentialprovider.ReadURL(url, g.Client, metadataHeader)
 		if err != nil {
 			klog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
 		}
@@ -268,13 +268,13 @@ type tokenBlob struct {
 func (g *containerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
 
-	tokenJSONBlob, err := credentialprovider.ReadUrl(metadataToken, g.Client, metadataHeader)
+	tokenJSONBlob, err := credentialprovider.ReadURL(metadataToken, g.Client, metadataHeader)
 	if err != nil {
 		klog.Errorf("while reading access token endpoint: %v", err)
 		return cfg
 	}
 
-	email, err := credentialprovider.ReadUrl(metadataEmail, g.Client, metadataHeader)
+	email, err := credentialprovider.ReadURL(metadataEmail, g.Client, metadataHeader)
 	if err != nil {
 		klog.Errorf("while reading email endpoint: %v", err)
 		return cfg

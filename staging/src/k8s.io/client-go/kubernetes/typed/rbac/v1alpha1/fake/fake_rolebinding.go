@@ -103,7 +103,7 @@ func (c *FakeRoleBindings) Update(ctx context.Context, roleBinding *v1alpha1.Rol
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
-func (c *FakeRoleBindings) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(rolebindingsResource, c.ns, name), &v1alpha1.RoleBinding{})
 
@@ -111,8 +111,8 @@ func (c *FakeRoleBindings) Delete(ctx context.Context, name string, options *v1.
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRoleBindings) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOptions)
+func (c *FakeRoleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.RoleBindingList{})
 	return err

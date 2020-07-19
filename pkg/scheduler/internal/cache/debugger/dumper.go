@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // CacheDumper writes some information from the scheduler cache and the scheduling queue to the
@@ -61,13 +61,13 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 }
 
 // printNodeInfo writes parts of NodeInfo to a string.
-func (d *CacheDumper) printNodeInfo(n *schedulernodeinfo.NodeInfo) string {
+func (d *CacheDumper) printNodeInfo(n *framework.NodeInfo) string {
 	var nodeData strings.Builder
 	nodeData.WriteString(fmt.Sprintf("\nNode name: %+v\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
-		n.Node().Name, n.RequestedResource(), n.AllocatableResource(), len(n.Pods())))
+		n.Node().Name, n.Requested, n.Allocatable, len(n.Pods)))
 	// Dumping Pod Info
-	for _, p := range n.Pods() {
-		nodeData.WriteString(printPod(p))
+	for _, p := range n.Pods {
+		nodeData.WriteString(printPod(p.Pod))
 	}
 	// Dumping nominated pods info on the node
 	nominatedPods := d.podQueue.NominatedPodsForNode(n.Node().Name)

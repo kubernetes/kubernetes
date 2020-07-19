@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/utils/oomparser"
 )
@@ -72,7 +72,7 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
 		defer runtime.HandleCrash()
 
 		for event := range outStream {
-			if event.ContainerName == recordEventContainerName {
+			if event.VictimContainerName == recordEventContainerName {
 				klog.V(1).Infof("Got sys oom event: %v", event)
 				eventMsg := "System OOM encountered"
 				if event.ProcessName != "" && event.Pid != 0 {

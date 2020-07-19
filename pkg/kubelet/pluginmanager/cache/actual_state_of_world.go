@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations for the kubelet
@@ -79,6 +79,8 @@ var _ ActualStateOfWorld = &actualStateOfWorld{}
 type PluginInfo struct {
 	SocketPath string
 	Timestamp  time.Time
+	Handler    PluginHandler
+	Name       string
 }
 
 func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {

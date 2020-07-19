@@ -23,7 +23,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/legacy-cloud-providers/azure/clients/fileclient"
 )
 
 const (
@@ -36,26 +37,37 @@ const (
 
 // CreateFileShare creates a file share, using a matching storage account type, account kind, etc.
 // storage account will be created if specified account is not found
-func (az *Cloud) CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error) {
-	if resourceGroup == "" {
-		resourceGroup = az.resourceGroup
+func (az *Cloud) CreateFileShare(accountOptions *AccountOptions, shareOptions *fileclient.ShareOptions) (string, string, error) {
+	if accountOptions == nil {
+		return "", "", fmt.Errorf("account options is nil")
+	}
+	if shareOptions == nil {
+		return "", "", fmt.Errorf("share options is nil")
+	}
+	if accountOptions.ResourceGroup == "" {
+		accountOptions.ResourceGroup = az.resourceGroup
 	}
 
-	account, key, err := az.EnsureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, fileShareAccountNamePrefix)
+	accountOptions.EnableHTTPSTrafficOnly = true
+	if shareOptions.Protocol == storage.NFS {
+		accountOptions.EnableHTTPSTrafficOnly = false
+	}
+
+	accountName, accountKey, err := az.EnsureStorageAccount(accountOptions, fileShareAccountNamePrefix)
 	if err != nil {
-		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
+		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountOptions.Name, err)
 	}
 
-	if err := az.createFileShare(account, key, shareName, requestGiB); err != nil {
-		return "", "", fmt.Errorf("failed to create share %s in account %s: %v", shareName, account, err)
+	if err := az.createFileShare(accountOptions.ResourceGroup, accountName, shareOptions); err != nil {
+		return "", "", fmt.Errorf("failed to create share %s in account %s: %v", shareOptions.Name, accountName, err)
 	}
-	klog.V(4).Infof("created share %s in account %s", shareName, account)
-	return account, key, nil
+	klog.V(4).Infof("created share %s in account %s", shareOptions.Name, accountOptions.Name)
+	return accountName, accountKey, nil
 }
 
 // DeleteFileShare deletes a file share using storage account name and key
-func (az *Cloud) DeleteFileShare(accountName, accountKey, shareName string) error {
-	if err := az.deleteFileShare(accountName, accountKey, shareName); err != nil {
+func (az *Cloud) DeleteFileShare(resourceGroup, accountName, shareName string) error {
+	if err := az.deleteFileShare(resourceGroup, accountName, shareName); err != nil {
 		return err
 	}
 	klog.V(4).Infof("share %s deleted", shareName)
@@ -63,6 +75,11 @@ func (az *Cloud) DeleteFileShare(accountName, accountKey, shareName string) erro
 }
 
 // ResizeFileShare resizes a file share
-func (az *Cloud) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
-	return az.resizeFileShare(accountName, accountKey, name, sizeGiB)
+func (az *Cloud) ResizeFileShare(resourceGroup, accountName, name string, sizeGiB int) error {
+	return az.resizeFileShare(resourceGroup, accountName, name, sizeGiB)
+}
+
+// GetFileShare gets a file share
+func (az *Cloud) GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error) {
+	return az.getFileShare(resourceGroupName, accountName, name)
 }

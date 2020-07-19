@@ -130,7 +130,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
 		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
-			err := podClient.Delete(context.TODO(), podName, &metav1.DeleteOptions{})
+			err := podClient.Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})

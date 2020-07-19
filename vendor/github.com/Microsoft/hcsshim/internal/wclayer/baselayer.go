@@ -1,6 +1,7 @@
 package wclayer
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -8,10 +9,15 @@ import (
 
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
+	"github.com/Microsoft/hcsshim/internal/oc"
 	"github.com/Microsoft/hcsshim/internal/safefile"
+	"go.opencensus.io/trace"
 )
 
 type baseLayerWriter struct {
+	ctx context.Context
+	s   *trace.Span
+
 	root         *os.File
 	f            *os.File
 	bw           *winio.BackupFileWriter
@@ -136,12 +142,15 @@ func (w *baseLayerWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (w *baseLayerWriter) Close() error {
+func (w *baseLayerWriter) Close() (err error) {
+	defer w.s.End()
+	defer func() { oc.SetSpanStatus(w.s, err) }()
 	defer func() {
 		w.root.Close()
 		w.root = nil
 	}()
-	err := w.closeCurrentFile()
+
+	err = w.closeCurrentFile()
 	if err != nil {
 		return err
 	}
@@ -153,7 +162,7 @@ func (w *baseLayerWriter) Close() error {
 			return err
 		}
 
-		err = ProcessBaseLayer(w.root.Name())
+		err = ProcessBaseLayer(w.ctx, w.root.Name())
 		if err != nil {
 			return err
 		}
@@ -163,7 +172,7 @@ func (w *baseLayerWriter) Close() error {
 			if err != nil {
 				return err
 			}
-			err = ProcessUtilityVMImage(filepath.Join(w.root.Name(), "UtilityVM"))
+			err = ProcessUtilityVMImage(w.ctx, filepath.Join(w.root.Name(), "UtilityVM"))
 			if err != nil {
 				return err
 			}

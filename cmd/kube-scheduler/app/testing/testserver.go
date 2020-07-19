@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/configz"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeschedulerconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
@@ -66,6 +67,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
+		configz.Delete("componentconfig")
 	}
 	defer func() {
 		if result.TearDownFn == nil {
@@ -80,51 +82,52 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	s, err := options.NewOptions()
+	opts, err := options.NewOptions()
 	if err != nil {
 		return TestServer{}, err
 	}
-	namedFlagSets := s.Flags()
+	namedFlagSets := opts.Flags()
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 
 	fs.Parse(customFlags)
 
-	if s.SecureServing.BindPort != 0 {
-		s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
+	if opts.SecureServing.BindPort != 0 {
+		opts.SecureServing.Listener, opts.SecureServing.BindPort, err = createListenerOnFreePort()
 		if err != nil {
 			return result, fmt.Errorf("failed to create listener: %v", err)
 		}
-		s.SecureServing.ServerCert.CertDirectory = result.TmpDir
+		opts.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
-		t.Logf("kube-scheduler will listen securely on port %d...", s.SecureServing.BindPort)
+		t.Logf("kube-scheduler will listen securely on port %d...", opts.SecureServing.BindPort)
 	}
 
-	if s.CombinedInsecureServing.BindPort != 0 {
+	if opts.CombinedInsecureServing.BindPort != 0 {
 		listener, port, err := createListenerOnFreePort()
 		if err != nil {
 			return result, fmt.Errorf("failed to create listener: %v", err)
 		}
-		s.CombinedInsecureServing.BindPort = port
-		s.CombinedInsecureServing.Healthz.Listener = listener
-		s.CombinedInsecureServing.Metrics.Listener = listener
-		t.Logf("kube-scheduler will listen insecurely on port %d...", s.CombinedInsecureServing.BindPort)
+		opts.CombinedInsecureServing.BindPort = port
+		opts.CombinedInsecureServing.Healthz.Listener = listener
+		opts.CombinedInsecureServing.Metrics.Listener = listener
+		t.Logf("kube-scheduler will listen insecurely on port %d...", opts.CombinedInsecureServing.BindPort)
 	}
-	config, err := s.Config()
+
+	cc, sched, err := app.Setup(ctx, opts)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
 	errCh := make(chan error)
 	go func(ctx context.Context) {
-		if err := app.Run(ctx, config.Complete()); err != nil {
+		if err := app.Run(ctx, cc, sched); err != nil {
 			errCh <- err
 		}
 	}(ctx)
 
 	t.Logf("Waiting for /healthz to be ok...")
-	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)
+	client, err := kubernetes.NewForConfig(cc.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
@@ -148,9 +151,9 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	}
 
 	// from here the caller must call tearDown
-	result.LoopbackClientConfig = config.LoopbackClientConfig
-	result.Options = s
-	result.Config = config
+	result.LoopbackClientConfig = cc.LoopbackClientConfig
+	result.Options = opts
+	result.Config = cc.Config
 	result.TearDownFn = tearDown
 
 	return result, nil

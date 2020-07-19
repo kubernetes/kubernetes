@@ -31,7 +31,11 @@ import (
 	// NOTE: Importing all in-tree cloud-providers is not required when
 	// implementing an out-of-tree cloud-provider.
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	_ "k8s.io/legacy-cloud-providers/aws"
+	_ "k8s.io/legacy-cloud-providers/azure"
+	_ "k8s.io/legacy-cloud-providers/gce"
+	_ "k8s.io/legacy-cloud-providers/openstack"
+	_ "k8s.io/legacy-cloud-providers/vsphere"
 )
 
 func main() {

@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
@@ -34,15 +35,20 @@ const (
 	PodDeleteTimeout = 5 * time.Minute
 )
 
-// DeletePodOrFail deletes the pod of the specified namespace and name.
+// DeletePodOrFail deletes the pod of the specified namespace and name. Resilient to the pod
+// not existing.
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	ginkgo.By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
-	err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil)
+	err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil && apierrors.IsNotFound(err) {
+		return
+	}
+
 	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // DeletePodWithWait deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
-// not existing.
+// not existing. Also waits for all owned resources to be deleted.
 func DeletePodWithWait(c clientset.Interface, pod *v1.Pod) error {
 	if pod == nil {
 		return nil
@@ -51,10 +57,17 @@ func DeletePodWithWait(c clientset.Interface, pod *v1.Pod) error {
 }
 
 // DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
-// not existing.
+// not existing. Also waits for all owned resources to be deleted.
 func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string) error {
 	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
-	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, nil)
+	deletionPolicy := metav1.DeletePropagationForeground
+	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName,
+		metav1.DeleteOptions{
+			// If the pod is the owner of some resources (like ephemeral inline volumes),
+			// then we want to be sure that those are also gone before we return.
+			// Blocking pod deletion via metav1.DeletePropagationForeground achieves that.
+			PropagationPolicy: &deletionPolicy,
+		})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil // assume pod was already deleted
@@ -65,6 +78,34 @@ func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string
 	err = WaitForPodNotFoundInNamespace(c, podName, podNamespace, PodDeleteTimeout)
 	if err != nil {
 		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
+	}
+	return nil
+}
+
+// DeletePodWithGracePeriod deletes the passed-in pod. Resilient to the pod not existing.
+func DeletePodWithGracePeriod(c clientset.Interface, pod *v1.Pod, grace int64) error {
+	return DeletePodWithGracePeriodByName(c, pod.GetName(), pod.GetNamespace(), grace)
+}
+
+// DeletePodsWithGracePeriod deletes the passed-in pods. Resilient to the pods not existing.
+func DeletePodsWithGracePeriod(c clientset.Interface, pods []v1.Pod, grace int64) error {
+	for _, pod := range pods {
+		if err := DeletePodWithGracePeriod(c, &pod, grace); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DeletePodWithGracePeriodByName deletes a pod by name and namespace. Resilient to the pod not existing.
+func DeletePodWithGracePeriodByName(c clientset.Interface, podName, podNamespace string, grace int64) error {
+	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(grace))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // assume pod was already deleted
+		}
+		return fmt.Errorf("pod Delete API error: %v", err)
 	}
 	return nil
 }

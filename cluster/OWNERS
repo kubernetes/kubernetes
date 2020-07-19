@@ -2,21 +2,19 @@
 
 reviewers:
   - bentheelder
-  - eparis
-  - justaugustus
-  - Katharine
-  - mikedanese
-  - zmerlynn
+  - cheftako
   - dims
-approvers:
-  - eparis
+  - justaugustus
   - mikedanese
   - spiffxp
-  - zmerlynn
+approvers:
+  - bentheelder
+  - cheftako
   - dims
+  - mikedanese
+  - spiffxp
 emeritus_approvers:
+  - eparis
   - roberthbailey   # 2019-03-08
   - jbeda
-labels:
-- sig/cluster-lifecycle
-- area/release-eng
+  - zmerlynn

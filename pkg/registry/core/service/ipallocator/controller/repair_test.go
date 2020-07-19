@@ -529,7 +529,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	if !secondaryAfter.Has(net.ParseIP("2000::1")) || !secondaryAfter.Has(net.ParseIP("2000::2")) {
 		t.Errorf("unexpected ipallocator state: %#v", secondaryAfter)
 	}
-	if free := secondaryAfter.Free(); free != 65532 {
+	if free := secondaryAfter.Free(); free != 65533 {
 		t.Errorf("unexpected ipallocator state: %d free (number of free ips is not 65532)", free)
 	}
 

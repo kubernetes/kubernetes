@@ -24,17 +24,24 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 type BuiltInAuthenticationOptions struct {
@@ -43,7 +50,6 @@ type BuiltInAuthenticationOptions struct {
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
 	OIDC            *OIDCAuthenticationOptions
-	PasswordFile    *PasswordFileAuthenticationOptions
 	RequestHeader   *genericoptions.RequestHeaderAuthenticationOptions
 	ServiceAccounts *ServiceAccountAuthenticationOptions
 	TokenFile       *TokenFileAuthenticationOptions
@@ -73,16 +79,13 @@ type OIDCAuthenticationOptions struct {
 	RequiredClaims map[string]string
 }
 
-type PasswordFileAuthenticationOptions struct {
-	BasicAuthFile string
-}
-
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles      []string
-	Lookup        bool
-	Issuer        string
-	JWKSURI       string
-	MaxExpiration time.Duration
+	KeyFiles         []string
+	Lookup           bool
+	Issuer           string
+	JWKSURI          string
+	MaxExpiration    time.Duration
+	ExtendExpiration bool
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -108,7 +111,6 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithBootstrapToken().
 		WithClientCert().
 		WithOIDC().
-		WithPasswordFile().
 		WithRequestHeader().
 		WithServiceAccounts().
 		WithTokenFile().
@@ -132,11 +134,6 @@ func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOp
 
 func (s *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
 	s.OIDC = &OIDCAuthenticationOptions{}
-	return s
-}
-
-func (s *BuiltInAuthenticationOptions) WithPasswordFile() *BuiltInAuthenticationOptions {
-	s.PasswordFile = &PasswordFileAuthenticationOptions{}
 	return s
 }
 
@@ -274,13 +271,6 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Repeat this flag to specify multiple claims.")
 	}
 
-	if s.PasswordFile != nil {
-		fs.StringVar(&s.PasswordFile.BasicAuthFile, "basic-auth-file", s.PasswordFile.BasicAuthFile, ""+
-			"If set, the file that will be used to admit requests to the secure port of the API server "+
-			"via http basic authentication.")
-		fs.MarkDeprecated("basic-auth-file", "Basic authentication mode is deprecated and will be removed in a future release. It is not recommended for production environments.")
-	}
-
 	if s.RequestHeader != nil {
 		s.RequestHeader.AddFlags(fs)
 	}
@@ -322,6 +312,12 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.DurationVar(&s.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", s.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
 			"TokenRequest with a validity duration larger than this value is requested, a token will be issued with a validity duration of this value.")
+
+		fs.BoolVar(&s.ServiceAccounts.ExtendExpiration, "service-account-extend-token-expiration", s.ServiceAccounts.ExtendExpiration, ""+
+			"Turns on projected service account expiration extension during token generation, "+
+			"which helps safe transition from legacy token to bound service account token feature. "+
+			"If this flag is enabled, admission injected tokens would be extended up to 1 year to "+
+			"prevent unexpected failure during transition, ignoring value of service-account-max-token-expiration.")
 	}
 
 	if s.TokenFile != nil {
@@ -377,10 +373,6 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.OIDCRequiredClaims = s.OIDC.RequiredClaims
 	}
 
-	if s.PasswordFile != nil {
-		ret.BasicAuthFile = s.PasswordFile.BasicAuthFile
-	}
-
 	if s.RequestHeader != nil {
 		var err error
 		ret.RequestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
@@ -421,37 +413,60 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 	return ret, nil
 }
 
-func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
+// ApplyTo requires already applied OpenAPIConfig and EgressSelector if present.
+func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, egressSelector *egressselector.EgressSelector, openAPIConfig *openapicommon.Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory) error {
 	if o == nil {
 		return nil
 	}
 
-	if o.ClientCert != nil {
-		clientCertificateCAContentProvider, err := o.ClientCert.GetClientCAContentProvider()
-		if err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
-		}
-		if err = c.Authentication.ApplyClientCert(clientCertificateCAContentProvider, c.SecureServing); err != nil {
+	if openAPIConfig == nil {
+		return errors.New("uninitialized OpenAPIConfig")
+	}
+
+	authenticatorConfig, err := o.ToAuthenticationConfig()
+	if err != nil {
+		return err
+	}
+
+	if authenticatorConfig.ClientCAContentProvider != nil {
+		if err = authInfo.ApplyClientCert(authenticatorConfig.ClientCAContentProvider, secureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
-	if o.RequestHeader != nil {
-		requestHeaderConfig, err := o.RequestHeader.ToAuthenticationRequestHeaderConfig()
-		if err != nil {
-			return fmt.Errorf("unable to create request header authentication config: %v", err)
-		}
-		if requestHeaderConfig != nil {
-			if err = c.Authentication.ApplyClientCert(requestHeaderConfig.CAContentProvider, c.SecureServing); err != nil {
-				return fmt.Errorf("unable to load client CA file: %v", err)
-			}
+	if authenticatorConfig.RequestHeaderConfig != nil && authenticatorConfig.RequestHeaderConfig.CAContentProvider != nil {
+		if err = authInfo.ApplyClientCert(authenticatorConfig.RequestHeaderConfig.CAContentProvider, secureServing); err != nil {
+			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 
-	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
-
-	c.Authentication.APIAudiences = o.APIAudiences
+	authInfo.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
-		c.Authentication.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+	}
+
+	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+			versionedInformer.Core().V1().Pods().Lister(),
+		)
+	}
+	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+		versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
+	)
+
+	if egressSelector != nil {
+		egressDialer, err := egressSelector.Lookup(egressselector.Master.AsNetworkContext())
+		if err != nil {
+			return err
+		}
+		authenticatorConfig.CustomDial = egressDialer
+	}
+
+	authInfo.Authenticator, openAPIConfig.SecurityDefinitions, err = authenticatorConfig.New()
+	if err != nil {
+		return err
 	}
 
 	return nil

@@ -103,7 +103,7 @@ func (c *FakeRoles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.Upd
 }
 
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *FakeRoles) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1alpha1.Role{})
 
@@ -111,8 +111,8 @@ func (c *FakeRoles) Delete(ctx context.Context, name string, options *v1.DeleteO
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRoles) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
+func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.RoleList{})
 	return err

@@ -115,7 +115,7 @@ func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingre
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
-func (c *FakeIngresses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeIngresses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(ingressesResource, c.ns, name), &v1beta1.Ingress{})
 
@@ -123,8 +123,8 @@ func (c *FakeIngresses) Delete(ctx context.Context, name string, options *v1.Del
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeIngresses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
+func (c *FakeIngresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(ingressesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.IngressList{})
 	return err

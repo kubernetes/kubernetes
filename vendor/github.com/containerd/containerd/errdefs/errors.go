@@ -1,3 +1,19 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 // Package errdefs defines the common errors used throughout containerd
 // packages.
 //
@@ -10,7 +26,11 @@
 // client-side errors to the correct types.
 package errdefs
 
-import "github.com/pkg/errors"
+import (
+	"context"
+
+	"github.com/pkg/errors"
+)
 
 // Definitions of common error types used throughout containerd. All containerd
 // errors returned by most packages will map into one of these errors classes.
@@ -59,4 +79,15 @@ func IsUnavailable(err error) bool {
 // IsNotImplemented returns true if the error is due to not being implemented
 func IsNotImplemented(err error) bool {
 	return errors.Cause(err) == ErrNotImplemented
+}
+
+// IsCanceled returns true if the error is due to `context.Canceled`.
+func IsCanceled(err error) bool {
+	return errors.Cause(err) == context.Canceled
+}
+
+// IsDeadlineExceeded returns true if the error is due to
+// `context.DeadlineExceeded`.
+func IsDeadlineExceeded(err error) bool {
+	return errors.Cause(err) == context.DeadlineExceeded
 }

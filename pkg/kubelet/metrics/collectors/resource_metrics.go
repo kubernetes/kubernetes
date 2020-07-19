@@ -20,13 +20,13 @@ import (
 	"time"
 
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	summary "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 )
 
 var (
-	nodeCPUUsageDesc = metrics.NewDesc("node_cpu_usage_seconds",
+	nodeCPUUsageDesc = metrics.NewDesc("node_cpu_usage_seconds_total",
 		"Cumulative cpu time consumed by the node in core-seconds",
 		nil,
 		nil,
@@ -40,7 +40,7 @@ var (
 		metrics.ALPHA,
 		"")
 
-	containerCPUUsageDesc = metrics.NewDesc("container_cpu_usage_seconds",
+	containerCPUUsageDesc = metrics.NewDesc("container_cpu_usage_seconds_total",
 		"Cumulative cpu time consumed by the container in core-seconds",
 		[]string{"container", "pod", "namespace"},
 		nil,
@@ -120,7 +120,7 @@ func (rc *resourceMetricsCollector) collectNodeCPUMetrics(ch chan<- metrics.Metr
 	}
 
 	ch <- metrics.NewLazyMetricWithTimestamp(s.CPU.Time.Time,
-		metrics.NewLazyConstMetric(nodeCPUUsageDesc, metrics.GaugeValue, float64(*s.CPU.UsageCoreNanoSeconds)/float64(time.Second)))
+		metrics.NewLazyConstMetric(nodeCPUUsageDesc, metrics.CounterValue, float64(*s.CPU.UsageCoreNanoSeconds)/float64(time.Second)))
 }
 
 func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
@@ -138,7 +138,7 @@ func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics
 	}
 
 	ch <- metrics.NewLazyMetricWithTimestamp(s.CPU.Time.Time,
-		metrics.NewLazyConstMetric(containerCPUUsageDesc, metrics.GaugeValue,
+		metrics.NewLazyConstMetric(containerCPUUsageDesc, metrics.CounterValue,
 			float64(*s.CPU.UsageCoreNanoSeconds)/float64(time.Second), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
 }
 

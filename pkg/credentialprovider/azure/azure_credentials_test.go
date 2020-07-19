@@ -22,7 +22,10 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type fakeClient struct {
@@ -95,7 +98,67 @@ func Test(t *testing.T) {
 	}
 }
 
+func TestProvide(t *testing.T) {
+	testCases := []struct {
+		desc                string
+		configStr           string
+		expectedCredsLength int
+	}{
+		{
+			desc: "return multiple credentials using Service Principal",
+			configStr: `
+    {
+        "aadClientId": "foo",
+        "aadClientSecret": "bar"
+    }`,
+			expectedCredsLength: 5,
+		},
+		{
+			desc: "retuen 0 credential for non-ACR image using Managed Identity",
+			configStr: `
+    {
+	"UseManagedIdentityExtension": true
+    }`,
+			expectedCredsLength: 0,
+		},
+	}
+
+	for i, test := range testCases {
+		provider := &acrProvider{
+			registryClient: &fakeClient{},
+		}
+		provider.loadConfig(bytes.NewBufferString(test.configStr))
+
+		creds := provider.Provide("busybox")
+		assert.Equal(t, test.expectedCredsLength, len(creds), "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
 func TestParseACRLoginServerFromImage(t *testing.T) {
+	configStr := `
+    {
+        "aadClientId": "foo",
+        "aadClientSecret": "bar"
+    }`
+	result := []containerregistry.Registry{
+		{
+			Name: to.StringPtr("foo"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.io"),
+			},
+		},
+	}
+	fakeClient := &fakeClient{
+		results: result,
+	}
+
+	provider := &acrProvider{
+		registryClient: fakeClient,
+	}
+	provider.loadConfig(bytes.NewBufferString(configStr))
+	provider.environment = &azure.Environment{
+		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",
+	}
 	tests := []struct {
 		image    string
 		expected string
@@ -124,9 +187,13 @@ func TestParseACRLoginServerFromImage(t *testing.T) {
 			image:    "foo.azurecr.us/bar/image:version",
 			expected: "foo.azurecr.us",
 		},
+		{
+			image:    "foo.azurecr.my.cloud/bar/image:version",
+			expected: "foo.azurecr.my.cloud",
+		},
 	}
 	for _, test := range tests {
-		if loginServer := parseACRLoginServerFromImage(test.image); loginServer != test.expected {
+		if loginServer := provider.parseACRLoginServerFromImage(test.image); loginServer != test.expected {
 			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
 		}
 	}

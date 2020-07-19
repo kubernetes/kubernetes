@@ -54,10 +54,10 @@ func TestReadEgressSelectorConfiguration(t *testing.T) {
 			expectedError:  strptr("unable to read egress selector configuration from \"test-egress-selector-config-absent\" [open test-egress-selector-config-absent: no such file or directory]"),
 		},
 		{
-			name:       "v1alpha1",
+			name:       "v1beta1",
 			createFile: true,
 			contents: `
-apiVersion: apiserver.k8s.io/v1alpha1
+apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: "cluster"

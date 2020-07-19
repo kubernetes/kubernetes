@@ -19,6 +19,11 @@ var randBool = rand.New(rand.NewSource(time.Now().Unix())).Intn(2) == 0
 type indentMode int
 
 func (n indentMode) appendIndent(b []byte, d diffMode) []byte {
+	// The output of Diff is documented as being unstable to provide future
+	// flexibility in changing the output for more humanly readable reports.
+	// This logic intentionally introduces instability to the exact output
+	// so that users can detect accidental reliance on stability early on,
+	// rather than much later when an actual change to the format occurs.
 	if flags.Deterministic || randBool {
 		// Use regular spaces (U+0020).
 		switch d {
@@ -360,7 +365,7 @@ func (s diffStats) String() string {
 	// Pluralize the name (adjusting for some obscure English grammar rules).
 	name := s.Name
 	if sum > 1 {
-		name = name + "s"
+		name += "s"
 		if strings.HasSuffix(name, "ys") {
 			name = name[:len(name)-2] + "ies" // e.g., "entrys" => "entries"
 		}

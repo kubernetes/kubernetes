@@ -11,7 +11,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/job",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller/job:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

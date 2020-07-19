@@ -373,8 +373,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "nsA", UID: types.UID("poduid")}}
 	fakeManager := &fakePDManager{}
-	fakeConfig := &fakeConfig{}
-	apiCfg := fakeConfig.GetAPIConfig()
+	apiCfg := GetAPIConfig()
 	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Fatalf("error creating a new internal mounter:%v", err)

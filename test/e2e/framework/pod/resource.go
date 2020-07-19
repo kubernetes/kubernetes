@@ -32,13 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/conditions"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/util/podutils"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
+
+// errPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
+// the pod has already reached completed state.
+var errPodCompleted = fmt.Errorf("pod ran to completion")
 
 // TODO: Move to its own subpkg.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
@@ -155,7 +158,7 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 		case v1.PodRunning:
 			return true, nil
 		case v1.PodFailed, v1.PodSucceeded:
-			return false, conditions.ErrPodCompleted
+			return false, errPodCompleted
 		}
 		return false, nil
 	}
@@ -184,10 +187,10 @@ func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.C
 		switch pod.Status.Phase {
 		case v1.PodFailed, v1.PodSucceeded:
 			e2elog.Logf("The status of Pod %s is %s which is unexpected", podName, pod.Status.Phase)
-			return false, conditions.ErrPodCompleted
+			return false, errPodCompleted
 		case v1.PodRunning:
-			e2elog.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, podutil.IsPodReady(pod))
-			return podutil.IsPodReady(pod), nil
+			e2elog.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, podutils.IsPodReady(pod))
+			return podutils.IsPodReady(pod), nil
 		}
 		e2elog.Logf("The status of Pod %s is %s, waiting for it to be Running (with Ready = true)", podName, pod.Status.Phase)
 		return false, nil
@@ -376,7 +379,8 @@ func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
 }
 
 func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
-	if !kubetypes.IsMirrorPod(p) {
+	// Check if the pod is a mirror pod
+	if _, ok := p.Annotations[v1.MirrorPodAnnotationKey]; !ok {
 		return false
 	}
 	return p.Spec.RestartPolicy != v1.RestartPolicyAlways
@@ -448,7 +452,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
-	expectNoError(err)
+	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	return execPod
 }
 
@@ -542,4 +546,62 @@ func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[strin
 		filtered = append(filtered, &p)
 	}
 	return filtered, nil
+}
+
+// GetPodSecretUpdateTimeout returns the timeout duration for updating pod secret.
+func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
+	// With SecretManager(ConfigMapManager), we may have to wait up to full sync period +
+	// TTL of secret(configmap) to elapse before the Kubelet projects the update into the
+	// volume and the container picks it up.
+	// So this timeout is based on default Kubelet sync period (1 minute) + maximum TTL for
+	// secret(configmap) that's based on cluster size + additional time as a fudge factor.
+	secretTTL, err := getNodeTTLAnnotationValue(c)
+	if err != nil {
+		e2elog.Logf("Couldn't get node TTL annotation (using default value of 0): %v", err)
+	}
+	podLogTimeout := 240*time.Second + secretTTL
+	return podLogTimeout
+}
+
+func getNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {
+	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil || len(nodes.Items) == 0 {
+		return time.Duration(0), fmt.Errorf("Couldn't list any nodes to get TTL annotation: %v", err)
+	}
+	// Since TTL the kubelet is using is stored in node object, for the timeout
+	// purpose we take it from the first node (all of them should be the same).
+	node := &nodes.Items[0]
+	if node.Annotations == nil {
+		return time.Duration(0), fmt.Errorf("No annotations found on the node")
+	}
+	value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]
+	if !ok {
+		return time.Duration(0), fmt.Errorf("No TTL annotation found on the node")
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		return time.Duration(0), fmt.Errorf("Cannot convert TTL annotation from %#v to int", *node)
+	}
+	return time.Duration(intValue) * time.Second, nil
+}
+
+// FilterActivePods returns pods that have not terminated.
+func FilterActivePods(pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for _, p := range pods {
+		if IsPodActive(p) {
+			result = append(result, p)
+		} else {
+			klog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
+				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
+		}
+	}
+	return result
+}
+
+// IsPodActive return true if the pod meets certain conditions.
+func IsPodActive(p *v1.Pod) bool {
+	return v1.PodSucceeded != p.Status.Phase &&
+		v1.PodFailed != p.Status.Phase &&
+		p.DeletionTimestamp == nil
 }

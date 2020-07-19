@@ -79,3 +79,29 @@ func (msg *RtNexthop) Serialize() []byte {
 	}
 	return buf
 }
+
+type RtGenMsg struct {
+	unix.RtGenmsg
+}
+
+func NewRtGenMsg() *RtGenMsg {
+	return &RtGenMsg{
+		RtGenmsg: unix.RtGenmsg{
+			Family: unix.AF_UNSPEC,
+		},
+	}
+}
+
+func (msg *RtGenMsg) Len() int {
+	return rtaAlignOf(unix.SizeofRtGenmsg)
+}
+
+func DeserializeRtGenMsg(b []byte) *RtGenMsg {
+	return &RtGenMsg{RtGenmsg: unix.RtGenmsg{Family: b[0]}}
+}
+
+func (msg *RtGenMsg) Serialize() []byte {
+	out := make([]byte, msg.Len())
+	out[0] = msg.Family
+	return out
+}

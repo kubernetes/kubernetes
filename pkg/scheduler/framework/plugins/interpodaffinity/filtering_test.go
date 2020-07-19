@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 var (
@@ -708,7 +707,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
 				ErrReasonAffinityNotMatch,
-				ErrReasonExistingAntiAffinityRulesNotMatch,
+				ErrReasonAntiAffinityRulesNotMatch,
 			),
 			name: "PodAntiAffinity symmetry check b1: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
@@ -769,7 +768,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
 				ErrReasonAffinityNotMatch,
-				ErrReasonExistingAntiAffinityRulesNotMatch,
+				ErrReasonAntiAffinityRulesNotMatch,
 			),
 			name: "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
@@ -888,6 +887,53 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{nil, nil},
 			name: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
 				"should not be blocked from being scheduled onto any node, even there's no existing pod that matches the rule anywhere.",
+		},
+		{
+			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"foo": "bar", "service": "securityscan"},
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "foo",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"bar"},
+								},
+							},
+						},
+						TopologyKey: "zone",
+					},
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"securityscan"},
+								},
+							},
+						},
+						TopologyKey: "zone",
+					},
+				}, nil),
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: map[string]string{"foo": "bar"}}}},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zoneLabel": "az1", "hostname": "h1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zoneLabel": "az2", "hostname": "h2"}}},
+			},
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					ErrReasonAffinityNotMatch,
+					ErrReasonAffinityRulesNotMatch,
+				),
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					ErrReasonAffinityNotMatch,
+					ErrReasonAffinityRulesNotMatch,
+				),
+			},
+			name: "The first pod of the collection can only be scheduled on nodes labelled with the requested topology keys",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
@@ -1636,7 +1682,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := nodeinfo.NewNodeInfo()
+	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := &InterPodAffinity{}
@@ -2036,7 +2082,6 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		pod                     *v1.Pod
 		wantAffinityPodsMap     topologyToMatchedTermCount
 		wantAntiAffinityPodsMap topologyToMatchedTermCount
-		wantErr                 bool
 	}{
 		{
 			name:  "nil test",
@@ -2196,11 +2241,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			l, _ := s.NodeInfos().List()
-			gotAffinityPodsMap, gotAntiAffinityPodsMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(tt.pod, l)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			gotAffinityPodsMap, gotAntiAffinityPodsMap := getTPMapMatchingIncomingAffinityAntiAffinity(framework.NewPodInfo(tt.pod), l)
 			if !reflect.DeepEqual(gotAffinityPodsMap, tt.wantAffinityPodsMap) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMap = %#v, want %#v", gotAffinityPodsMap, tt.wantAffinityPodsMap)
 			}
@@ -2211,7 +2252,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 }
 
-func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *nodeinfo.NodeInfo {
+func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *framework.NodeInfo {
 	t.Helper()
 	nodeInfo, err := snapshot.NodeInfos().Get(name)
 	if err != nil {

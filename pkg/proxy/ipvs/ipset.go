@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -39,6 +39,9 @@ const (
 
 	kubeExternalIPSetComment = "Kubernetes service external ip + port for masquerade and filter purpose"
 	kubeExternalIPSet        = "KUBE-EXTERNAL-IP"
+
+	kubeExternalIPLocalSetComment = "Kubernetes service external ip + port with externalTrafficPolicy=local"
+	kubeExternalIPLocalSet        = "KUBE-EXTERNAL-IP-LOCAL"
 
 	kubeLoadBalancerSetComment = "Kubernetes service lb portal"
 	kubeLoadBalancerSet        = "KUBE-LOAD-BALANCER"

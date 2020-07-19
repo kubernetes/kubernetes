@@ -10,7 +10,8 @@ package netns
 
 import (
 	"fmt"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // NsHandle is a handle to a network namespace. It can be cast directly
@@ -24,11 +25,11 @@ func (ns NsHandle) Equal(other NsHandle) bool {
 	if ns == other {
 		return true
 	}
-	var s1, s2 syscall.Stat_t
-	if err := syscall.Fstat(int(ns), &s1); err != nil {
+	var s1, s2 unix.Stat_t
+	if err := unix.Fstat(int(ns), &s1); err != nil {
 		return false
 	}
-	if err := syscall.Fstat(int(other), &s2); err != nil {
+	if err := unix.Fstat(int(other), &s2); err != nil {
 		return false
 	}
 	return (s1.Dev == s2.Dev) && (s1.Ino == s2.Ino)
@@ -36,11 +37,11 @@ func (ns NsHandle) Equal(other NsHandle) bool {
 
 // String shows the file descriptor number and its dev and inode.
 func (ns NsHandle) String() string {
-	var s syscall.Stat_t
 	if ns == -1 {
 		return "NS(None)"
 	}
-	if err := syscall.Fstat(int(ns), &s); err != nil {
+	var s unix.Stat_t
+	if err := unix.Fstat(int(ns), &s); err != nil {
 		return fmt.Sprintf("NS(%d: unknown)", ns)
 	}
 	return fmt.Sprintf("NS(%d: %d, %d)", ns, s.Dev, s.Ino)
@@ -49,11 +50,11 @@ func (ns NsHandle) String() string {
 // UniqueId returns a string which uniquely identifies the namespace
 // associated with the network handle.
 func (ns NsHandle) UniqueId() string {
-	var s syscall.Stat_t
 	if ns == -1 {
 		return "NS(none)"
 	}
-	if err := syscall.Fstat(int(ns), &s); err != nil {
+	var s unix.Stat_t
+	if err := unix.Fstat(int(ns), &s); err != nil {
 		return "NS(unknown)"
 	}
 	return fmt.Sprintf("NS(%d:%d)", s.Dev, s.Ino)
@@ -67,7 +68,7 @@ func (ns NsHandle) IsOpen() bool {
 // Close closes the NsHandle and resets its file descriptor to -1.
 // It is not safe to use an NsHandle after Close() is called.
 func (ns *NsHandle) Close() error {
-	if err := syscall.Close(int(*ns)); err != nil {
+	if err := unix.Close(int(*ns)); err != nil {
 		return err
 	}
 	(*ns) = -1

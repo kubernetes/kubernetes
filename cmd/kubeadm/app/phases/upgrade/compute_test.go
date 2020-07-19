@@ -18,12 +18,12 @@ package upgrade
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +31,6 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 type fakeVersionGetter struct {
@@ -72,54 +71,18 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 }
 
 const fakeCurrentEtcdVersion = "3.1.12"
-
-type fakeEtcdClient struct {
-	TLS                bool
-	mismatchedVersions bool
-}
-
-func (f fakeEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
-	return true, nil
-}
-
-func (f fakeEtcdClient) CheckClusterHealth() error {
-	return nil
-}
-
-func (f fakeEtcdClient) GetVersion() (string, error) {
-	versions, _ := f.GetClusterVersions()
-	if f.mismatchedVersions {
-		return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
-	}
-	return fakeCurrentEtcdVersion, nil
-}
-
-func (f fakeEtcdClient) GetClusterVersions() (map[string]string, error) {
-	if f.mismatchedVersions {
-		return map[string]string{
-			"foo": fakeCurrentEtcdVersion,
-			"bar": "3.2.0",
-		}, nil
-	}
-	return map[string]string{
-		"foo": fakeCurrentEtcdVersion,
-		"bar": fakeCurrentEtcdVersion,
-	}, nil
-}
-
-func (f fakeEtcdClient) Sync() error { return nil }
-
-func (f fakeEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
-	return []etcdutil.Member{}, nil
-}
-
-func (f fakeEtcdClient) GetMemberID(peerURL string) (uint64, error) {
-	return 0, nil
-}
-
-func (f fakeEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
-	return []etcdutil.Member{}, nil
-}
+const etcdStaticPod = `apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - name: etcd
+    image: k8s.gcr.io/etcd:` + fakeCurrentEtcdVersion
 
 func getEtcdVersion(v *versionutil.Version) string {
 	return constants.SupportedEtcdVersion[uint8(v.Minor())]
@@ -154,14 +117,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	v1Z0rc1 := v1Z0.WithPreRelease("rc.1")
 	v1Z1 := v1Z0.WithPatch(1)
 
-	etcdClient := fakeEtcdClient{}
 	tests := []struct {
 		name                        string
 		vg                          VersionGetter
 		expectedUpgrades            []Upgrade
 		allowExperimental, allowRCs bool
 		errExpected                 bool
-		etcdClient                  etcdutil.ClusterInterrogator
+		externalEtcd                bool
 		beforeDNSType               kubeadmapi.DNSAddOnType
 		beforeDNSVersion            string
 		dnsType                     kubeadmapi.DNSAddOnType
@@ -182,7 +144,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  []Upgrade{},
 			allowExperimental: false,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "simple patch version upgrade",
@@ -221,7 +182,45 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
-			etcdClient:        etcdClient,
+		},
+		{
+			name: "simple patch version upgrade with external etcd",
+			vg: &fakeVersionGetter{
+				clusterVersion: v1Y1.String(),
+				kubeletVersion: v1Y1.String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: v1Y2.String(),
+
+				stablePatchVersion: v1Y3.String(),
+				stableVersion:      v1Y3.String(),
+			},
+			beforeDNSType:    kubeadmapi.CoreDNS,
+			beforeDNSVersion: fakeCurrentCoreDNSVersion,
+			dnsType:          kubeadmapi.CoreDNS,
+			externalEtcd:     true,
+			expectedUpgrades: []Upgrade{
+				{
+					Description: fmt.Sprintf("version in the v%d.%d series", v1Y0.Major(), v1Y0.Minor()),
+					Before: ClusterState{
+						KubeVersion: v1Y1.String(),
+						KubeletVersions: map[string]uint16{
+							v1Y1.String(): 1,
+						},
+						KubeadmVersion: v1Y2.String(),
+						DNSType:        kubeadmapi.CoreDNS,
+						DNSVersion:     fakeCurrentCoreDNSVersion,
+						EtcdVersion:    "",
+					},
+					After: ClusterState{
+						KubeVersion:    v1Y3.String(),
+						KubeadmVersion: v1Y3.String(),
+						DNSType:        kubeadmapi.CoreDNS,
+						DNSVersion:     constants.CoreDNSVersion,
+						EtcdVersion:    "",
+					},
+				},
+			},
+			allowExperimental: false,
+			errExpected:       false,
 		},
 		{
 			name: "no version provided to offline version getter does not change behavior",
@@ -260,7 +259,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "minor version upgrade only",
@@ -299,7 +297,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "both minor version upgrade and patch version upgrade available",
@@ -358,7 +355,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "allow experimental upgrades, but no upgrade available",
@@ -377,7 +373,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  []Upgrade{},
 			allowExperimental: true,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "upgrade to an unstable version should be supported",
@@ -417,7 +412,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "upgrade from an unstable version to an unstable version should be supported",
@@ -457,7 +451,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "v1.X.0-alpha.0 should be ignored",
@@ -498,7 +491,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "upgrade to an RC version should be supported",
@@ -539,7 +531,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowRCs:    true,
 			errExpected: false,
-			etcdClient:  etcdClient,
 		},
 		{
 			name: "it is possible (but very uncommon) that the latest version from the previous branch is an rc and the current latest version is alpha.0. In that case, show the RC",
@@ -580,7 +571,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
-			etcdClient:        etcdClient,
 		},
 		{
 			name: "upgrade to an RC version should be supported. There may also be an even newer unstable version.",
@@ -642,22 +632,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			allowRCs:          true,
 			allowExperimental: true,
 			errExpected:       false,
-			etcdClient:        etcdClient,
-		},
-		{
-			name: "Upgrades with external etcd with mismatched versions should not be allowed.",
-			vg: &fakeVersionGetter{
-				clusterVersion:     v1Y3.String(),
-				kubeletVersion:     v1Y3.String(),
-				kubeadmVersion:     v1Y3.String(),
-				stablePatchVersion: v1Y3.String(),
-				stableVersion:      v1Y3.String(),
-			},
-			allowRCs:          false,
-			allowExperimental: false,
-			etcdClient:        fakeEtcdClient{mismatchedVersions: true},
-			expectedUpgrades:  []Upgrade{},
-			errExpected:       true,
 		},
 		{
 			name: "offline version getter",
@@ -666,7 +640,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				kubeletVersion: v1Y0.String(),
 				kubeadmVersion: v1Y1.String(),
 			}, v1Z1.String()),
-			etcdClient:       etcdClient,
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: fakeCurrentCoreDNSVersion,
 			dnsType:          kubeadmapi.CoreDNS,
@@ -703,7 +676,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				stablePatchVersion: v1Z0.String(),
 				stableVersion:      v1Z0.String(),
 			},
-			etcdClient:       etcdClient,
 			beforeDNSType:    kubeadmapi.KubeDNS,
 			beforeDNSVersion: fakeCurrentKubeDNSVersion,
 			dnsType:          kubeadmapi.CoreDNS,
@@ -740,7 +712,6 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				stablePatchVersion: v1Z0.String(),
 				stableVersion:      v1Z0.String(),
 			},
-			etcdClient:       etcdClient,
 			beforeDNSType:    kubeadmapi.KubeDNS,
 			beforeDNSVersion: fakeCurrentKubeDNSVersion,
 			dnsType:          kubeadmapi.KubeDNS,
@@ -804,13 +775,24 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				},
 			})
 
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.etcdClient, rt.dnsType, client)
+			manifestsDir, err := ioutil.TempDir("", "GetAvailableUpgrades-test-manifests")
+			if err != nil {
+				t.Fatalf("Unable to create temporary directory: %v", err)
+			}
+			defer os.RemoveAll(manifestsDir)
+
+			if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+				t.Fatalf("Unable to create test static pod manifest: %v", err)
+			}
+
+			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, rt.dnsType, client, manifestsDir)
 			if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 			}
-			if (actualErr != nil) != rt.errExpected {
-				fmt.Printf("Hello error")
-				t.Errorf("failed TestGetAvailableUpgrades\n\texpected error: %t\n\tgot error: %t", rt.errExpected, (actualErr != nil))
+			if rt.errExpected && actualErr == nil {
+				t.Error("unexpected success")
+			} else if !rt.errExpected && actualErr != nil {
+				t.Errorf("unexpected failure: %v", actualErr)
 			}
 			if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)

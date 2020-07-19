@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# create a nice clean place to put our new licenses
+# create a nice clean place to put our new vendor tree
 # must be in the user dir (e.g. KUBE_ROOT) in order for the docker volume mount
 # to work with docker-machine on macs
 mkdir -p "${KUBE_ROOT}/_tmp"
@@ -48,18 +48,16 @@ function cleanup {
 kube::util::trap_add cleanup EXIT
 
 # Copy the contents of the kube directory into the nice clean place (which is NOT shaped like a GOPATH)
-_kubetmp="${_tmpdir}"
+_kubetmp="${_tmpdir}/kubernetes"
 mkdir -p "${_kubetmp}"
-# should create ${_kubectmp}/kubernetes
-git archive --format=tar --prefix=kubernetes/ "$(git write-tree)" | (cd "${_kubetmp}" && tar xf -)
-_kubetmp="${_kubetmp}/kubernetes"
+tar --exclude=.git --exclude="./_*" -c . | (cd "${_kubetmp}" && tar xf -)
 
 # Do all our work in module mode
 export GO111MODULE=on
 
 pushd "${_kubetmp}" > /dev/null 2>&1
   # Destroy deps in the copy of the kube tree
-  rm -rf ./Godeps/LICENSES ./vendor
+  rm -rf ./vendor ./LICENSES
 
   # Recreate the vendor tree using the nice clean set we just downloaded
   hack/update-vendor.sh

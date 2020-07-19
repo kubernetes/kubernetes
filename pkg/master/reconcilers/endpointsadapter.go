@@ -99,7 +99,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 
 	// required for transition from IP to IPv4 address type.
 	if currentEndpointSlice.AddressType != endpointSlice.AddressType {
-		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, &metav1.DeleteOptions{})
+		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -192,4 +192,18 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 	}
 
 	return true
+}
+
+// setSkipMirrorTrue sets endpointslice.kubernetes.io/skip-mirror to true. It
+// returns true if this has resulted in a change to the Endpoints resource.
+func setSkipMirrorTrue(e *corev1.Endpoints) bool {
+	skipMirrorVal, ok := e.Labels[discovery.LabelSkipMirror]
+	if !ok || skipMirrorVal != "true" {
+		if e.Labels == nil {
+			e.Labels = map[string]string{}
+		}
+		e.Labels[discovery.LabelSkipMirror] = "true"
+		return true
+	}
+	return false
 }

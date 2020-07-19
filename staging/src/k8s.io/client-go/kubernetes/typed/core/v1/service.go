@@ -41,7 +41,7 @@ type ServiceInterface interface {
 	Create(ctx context.Context, service *v1.Service, opts metav1.CreateOptions) (*v1.Service, error)
 	Update(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (*v1.Service, error)
 	UpdateStatus(ctx context.Context, service *v1.Service, opts metav1.UpdateOptions) (*v1.Service, error)
-	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Service, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ServiceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
@@ -152,12 +152,12 @@ func (c *services) UpdateStatus(ctx context.Context, service *v1.Service, opts m
 }
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
-func (c *services) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
+func (c *services) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").
 		Name(name).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }

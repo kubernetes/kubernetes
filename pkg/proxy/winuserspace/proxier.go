@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -213,7 +213,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 			return nil, fmt.Errorf("could not parse ip '%q'", listenIP)
 		}
 		// add the IP address.  Node port binds to all interfaces.
-		args := proxier.netshIpv4AddressAddArgs(serviceIP)
+		args := proxier.netshIPv4AddressAddArgs(serviceIP)
 		if existed, err := proxier.netsh.EnsureIPAddress(args, serviceIP); err != nil {
 			return nil, err
 		} else if !existed {
@@ -262,7 +262,7 @@ func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePort
 	// close the PortalProxy by deleting the service IP address
 	if info.portal.ip != allAvailableInterfaces {
 		serviceIP := net.ParseIP(info.portal.ip)
-		args := proxier.netshIpv4AddressDeleteArgs(serviceIP)
+		args := proxier.netshIPv4AddressDeleteArgs(serviceIP)
 		if err := proxier.netsh.DeleteIPAddress(args); err != nil {
 			return err
 		}
@@ -411,34 +411,50 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPortPortals 
 	}
 }
 
+// OnServiceAdd is called whenever creation of new service object
+// is observed.
 func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 	_ = proxier.mergeService(service)
 }
 
+// OnServiceUpdate is called whenever modification of an existing
+// service object is observed.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	existingPortPortals := proxier.mergeService(service)
 	proxier.unmergeService(oldService, existingPortPortals)
 }
 
+// OnServiceDelete is called whenever deletion of an existing service
+// object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.unmergeService(service, map[ServicePortPortalName]bool{})
 }
 
+// OnServiceSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 }
 
+// OnEndpointsAdd is called whenever creation of new endpoints object
+// is observed.
 func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsAdd(endpoints)
 }
 
+// OnEndpointsUpdate is called whenever modification of an existing
+// endpoints object is observed.
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsUpdate(oldEndpoints, endpoints)
 }
 
+// OnEndpointsDelete is called whenever deletion of an existing endpoints
+// object is observed.
 func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsDelete(endpoints)
 }
 
+// OnEndpointsSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.loadBalancer.OnEndpointsSynced()
 }
@@ -458,7 +474,7 @@ func isClosedError(err error) bool {
 	return strings.HasSuffix(err.Error(), "use of closed network connection")
 }
 
-func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
+func (proxier *Proxier) netshIPv4AddressAddArgs(destIP net.IP) []string {
 	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "add", "address",
@@ -469,7 +485,7 @@ func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 	return args
 }
 
-func (proxier *Proxier) netshIpv4AddressDeleteArgs(destIP net.IP) []string {
+func (proxier *Proxier) netshIPv4AddressDeleteArgs(destIP net.IP) []string {
 	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "delete", "address",

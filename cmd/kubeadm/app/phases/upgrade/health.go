@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -200,10 +200,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error {
 	klog.V(2).Infof("Deleting Job %q in the namespace %q", jobName, ns)
 	propagation := metav1.DeletePropagationForeground
-	deleteOptions := &metav1.DeleteOptions{
-		PropagationPolicy: &propagation,
-	}
-	if err := client.BatchV1().Jobs(ns).Delete(context.TODO(), jobName, deleteOptions); err != nil {
+	if err := client.BatchV1().Jobs(ns).Delete(context.TODO(), jobName, metav1.DeleteOptions{PropagationPolicy: &propagation}); err != nil {
 		return errors.Wrapf(err, "could not delete Job %q in the namespace %q", jobName, ns)
 	}
 	return nil

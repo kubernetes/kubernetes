@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -706,5 +707,35 @@ func TestRequiresExactMatch(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestValidatedSelectorFromSet(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            Set
+		expectedSelector internalSelector
+		expectedError    error
+	}{
+		{
+			name:             "Simple Set, no error",
+			input:            Set{"key": "val"},
+			expectedSelector: internalSelector([]Requirement{{key: "key", operator: selection.Equals, strValues: []string{"val"}}}),
+		},
+		{
+			name:          "Invalid Set, value too long",
+			input:         Set{"Key": "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui"},
+			expectedError: fmt.Errorf(`invalid label value: "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui": at key: "Key": must be no more than 63 characters`),
+		},
+	}
+
+	for _, tc := range tests {
+		selector, err := ValidatedSelectorFromSet(tc.input)
+		if !reflect.DeepEqual(err, tc.expectedError) {
+			t.Fatalf("expected error %v, got error %v", tc.expectedError, err)
+		}
+		if err == nil && !reflect.DeepEqual(selector, tc.expectedSelector) {
+			t.Errorf("expected selector %v, got selector %v", tc.expectedSelector, selector)
+		}
 	}
 }

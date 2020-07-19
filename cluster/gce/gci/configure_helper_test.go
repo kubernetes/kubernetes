@@ -106,15 +106,19 @@ func (c *ManifestTestCase) mustCreateManifestDstDir() {
 	}
 }
 
-func (c *ManifestTestCase) mustInvokeFunc(env interface{}, scriptName, targetTemplate string, templates ...string) {
+func (c *ManifestTestCase) mustInvokeFunc(env interface{}, scriptNames []string, targetTemplate string, templates ...string) {
 	envScriptPath := c.mustCreateEnv(env, targetTemplate, templates...)
-	args := fmt.Sprintf("source %q ; source %q; %s", envScriptPath, scriptName, c.manifestFuncName)
+	args := fmt.Sprintf("source %q ;", envScriptPath)
+	for _, script := range scriptNames {
+		args += fmt.Sprintf("source %q ;", script)
+	}
+	args += c.manifestFuncName
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()
 	if err != nil {
 		c.t.Logf("%q", bs)
-		c.t.Fatalf("Failed to run %q: %v", scriptName, err)
+		c.t.Fatalf("Failed to run %q: %v", cmd.Args, err)
 	}
 	c.t.Logf("%s", string(bs))
 }

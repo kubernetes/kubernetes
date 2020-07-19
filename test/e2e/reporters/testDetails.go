@@ -25,7 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DetailsReporter is a ginkgo reporter which dumps information regarding the tests which is difficult to get

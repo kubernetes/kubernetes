@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // alwaysAllowDelayFiveSeconds sleeps for five seconds and allows all requests made to this function.

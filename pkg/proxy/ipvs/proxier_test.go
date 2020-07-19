@@ -33,6 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
@@ -54,11 +57,16 @@ import (
 const testHostname = "test-hostname"
 
 type fakeIPGetter struct {
-	nodeIPs []net.IP
+	nodeIPs   []net.IP
+	bindedIPs sets.String
 }
 
 func (f *fakeIPGetter) NodeIPs() ([]net.IP, error) {
 	return f.nodeIPs, nil
+}
+
+func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
+	return f.bindedIPs, nil
 }
 
 // fakePortOpener implements portOpener.
@@ -119,9 +127,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 	p := &Proxier{
 		exec:                  fexec,
 		serviceMap:            make(proxy.ServiceMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil, endpointSlicesEnabled),
+		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil, endpointSlicesEnabled, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
@@ -1256,6 +1264,92 @@ func TestExternalIPs(t *testing.T) {
 	}
 }
 
+func TestOnlyLocalExternalIPs(t *testing.T) {
+	// TODO(freehan): remove this in k8s 1.19
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalPolicyForExternalIP, true)()
+
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalIPs = svcExternalIPs.UnsortedList()
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       svcPortName.Port,
+				Port:       int32(svcPort),
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(svcPort),
+			}}
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		}),
+	)
+	epIP := "10.180.0.1"
+	epIP1 := "10.180.1.1"
+	thisHostname := testHostname
+	otherHostname := "other-hostname"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP:       epIP,
+					NodeName: utilpointer.StringPtr(thisHostname),
+				},
+					{
+						IP:       epIP1,
+						NodeName: utilpointer.StringPtr(otherHostname),
+					},
+				},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	// check ipvs service and destinations
+	services, err := ipvs.GetVirtualServers()
+	if err != nil {
+		t.Errorf("Failed to get ipvs services, err: %v", err)
+	}
+	if len(services) != 4 {
+		t.Errorf("Expect 4 ipvs services, got %d", len(services))
+	}
+	found := false
+	for _, svc := range services {
+		if svcExternalIPs.Has(svc.Address.String()) && svc.Port == uint16(svcPort) && svc.Protocol == string(v1.ProtocolTCP) {
+			found = true
+			destinations, _ := ipvs.GetRealServers(svc)
+			if len(destinations) != 1 {
+				t.Errorf("Expect only 1 local endpoint. but got %v", len(destinations))
+			}
+			for _, dest := range destinations {
+				if dest.Address.String() != epIP || dest.Port != uint16(svcPort) {
+					t.Errorf("service Endpoint mismatch ipvs service destination")
+				}
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expect external ip type service, got none")
+	}
+}
+
 func TestLoadBalancer(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 	svcIP := "10.20.30.41"
@@ -1432,6 +1526,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	}
 	checkIptables(t, ipt, epIpt)
 }
+
 func TestLoadBalanceSourceRanges(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
@@ -2966,6 +3061,7 @@ func Test_syncService(t *testing.T) {
 		svcName          string
 		newVirtualServer *utilipvs.VirtualServer
 		bindAddr         bool
+		bindedAddrs      sets.String
 	}{
 		{
 			// case 0, old virtual server is same as new virtual server
@@ -2984,7 +3080,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 1, old virtual server is different from new virtual server
@@ -3003,7 +3100,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 2, old virtual server is different from new virtual server
@@ -3022,7 +3120,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 3, old virtual server is nil, and create new virtual server
@@ -3035,7 +3134,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: true,
+			bindAddr:    true,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 4, SCTP, old virtual server is same as new virtual server
@@ -3054,7 +3154,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 5, old virtual server is different from new virtual server
@@ -3073,7 +3174,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 6, old virtual server is different from new virtual server
@@ -3092,7 +3194,8 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: false,
+			bindAddr:    false,
+			bindedAddrs: sets.NewString(),
 		},
 		{
 			// case 7, old virtual server is nil, and create new virtual server
@@ -3105,7 +3208,28 @@ func Test_syncService(t *testing.T) {
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
 			},
-			bindAddr: true,
+			bindAddr:    true,
+			bindedAddrs: sets.NewString(),
+		},
+		{
+			// case 8, virtual server address already binded, skip sync
+			oldVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(v1.ProtocolSCTP),
+				Port:      53,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			svcName: "baz",
+			newVirtualServer: &utilipvs.VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  string(v1.ProtocolSCTP),
+				Port:      53,
+				Scheduler: "rr",
+				Flags:     utilipvs.FlagHashed,
+			},
+			bindAddr:    true,
+			bindedAddrs: sets.NewString("1.2.3.4"),
 		},
 	}
 
@@ -3121,7 +3245,7 @@ func Test_syncService(t *testing.T) {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
 			}
 		}
-		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr); err != nil {
+		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, testCases[i].bindedAddrs); err != nil {
 			t.Errorf("Case [%d], unexpected sync IPVS virtual server error: %v", i, err)
 		}
 		// check

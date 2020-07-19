@@ -13,7 +13,7 @@ go_library(
     importpath = "github.com/spf13/cobra/doc",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/cpuguy83/go-md2man/md2man:go_default_library",
+        "//vendor/github.com/cpuguy83/go-md2man/v2/md2man:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",

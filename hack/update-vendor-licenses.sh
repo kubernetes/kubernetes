@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Update the Godeps/LICENSES document.
-# Generates a table of Godep dependencies and their license.
+# Update the LICENSES directory.
+# Generates a table of Go dependencies and their licenses.
 #
 # Usage:
 #    $0 [--create-missing] [/path/to/licenses]
@@ -24,11 +24,14 @@
 #    additionally created files into the vendor auto-generated tree.
 #
 #    Run every time a license file is added/modified within /vendor to
-#    update /Godeps/LICENSES
+#    update /LICENSES
 
 set -o errexit
 set -o nounset
 set -o pipefail
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 export LANG=C
 export LC_ALL=C
@@ -130,10 +133,10 @@ process_content () {
 #############################################################################
 # MAIN
 #############################################################################
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# use modules, and use module info rather than the vendor dir for computing dependencies
 export GO111MODULE=on
+export GOFLAGS=-mod=mod
 
 # Check bash version
 if (( BASH_VERSINFO[0] < 4 )); then
@@ -153,53 +156,81 @@ fi
 LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
-VENDOR_LICENSE_FILE="Godeps/LICENSES"
-TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
+kube::util::ensure-temp-dir
+
+# Save the genreated LICENSE file for each package temporarily
+TMP_LICENSE_FILE="${KUBE_TEMP}/LICENSES.$$"
+
+# The directory to save all the LICENSE files
+LICENSES_DIR="${LICENSES_DIR:-${LICENSE_ROOT}/LICENSES}"
+mkdir -p "${LICENSES_DIR}"
+
+# The tmp directory to save all the LICENSE files, will move to LICENSES_DIR
+TMP_LICENSES_DIR="${KUBE_TEMP}/LICENSES.DIR.$$"
+mkdir -p "${TMP_LICENSES_DIR}"
+
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
 # Put the K8S LICENSE on top
-(
-echo "================================================================================"
-echo "= Kubernetes licensed under: ="
-echo
-cat "${LICENSE_ROOT}/LICENSE"
-echo
-echo "= LICENSE $(kube::util::md5 "${LICENSE_ROOT}/LICENSE")"
-echo "================================================================================"
-) > ${TMP_LICENSE_FILE}
+if [ -f "${LICENSE_ROOT}/LICENSE" ]; then
+  (
+    echo "================================================================================"
+    echo "= Kubernetes licensed under: ="
+    echo
+    cat "${LICENSE_ROOT}/LICENSE"
+    echo
+    echo "= LICENSE $(kube::util::md5 "${LICENSE_ROOT}/LICENSE")"
+    echo "================================================================================"
+  ) > "${TMP_LICENSE_FILE}"
+  mv "${TMP_LICENSE_FILE}" "${TMP_LICENSES_DIR}/LICENSE"
+fi
 
 # Loop through every vendored package
 for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
   if [[ -e "staging/src/${PACKAGE}" ]]; then
-    echo "$PACKAGE is a staging package, skipping" > /dev/stderr
+    echo "${PACKAGE} is a staging package, skipping" >&2
     continue
   fi
   if [[ ! -e "${DEPS_DIR}/${PACKAGE}" ]]; then
-    echo "$PACKAGE doesn't exist in vendor, skipping" > /dev/stderr
+    echo "${PACKAGE} doesn't exist in ${DEPS_DIR}, skipping" >&2
     continue
   fi
+  # Skip a directory if 1) it has no files and 2) all the subdirectories contain a go.mod file.
+  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type f)" ]]; then
+      misses_go_mod=false
+      while read -d "" -r SUBDIR; do
+          if [[ ! -e "${SUBDIR}/go.mod" ]]; then
+              misses_go_mod=true
+              break
+          fi
+      done < <(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d -print0)
+      if [[ $misses_go_mod = false ]]; then
+          echo "${PACKAGE} has no files, skipping" >&2
+          continue
+      fi
+  fi
+  echo "${PACKAGE}"
 
   process_content "${PACKAGE}" LICENSE
   process_content "${PACKAGE}" COPYRIGHT
   process_content "${PACKAGE}" COPYING
 
-  # display content
-  echo
-  echo "================================================================================"
-  echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
-  echo
+  # copy content and throw error message
+  {
+    echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
+    echo
 
-  file=""
-  if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
+    file=""
+    if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
       file="${CONTENT[${PACKAGE}-LICENSE]-}"
-  elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
+    elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
       file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
-  elif [[ -n "${CONTENT[${PACKAGE}-COPYING]-}" ]]; then
+    elif [[ -n "${CONTENT[${PACKAGE}-COPYING]-}" ]]; then
       file="${CONTENT[${PACKAGE}-COPYING]-}"
-  fi
-  if [[ -z "${file}" ]]; then
-      cat > /dev/stderr << __EOF__
+    fi
+    if [[ -z "${file}" ]]; then
+      cat >&2 << __EOF__
 No license could be found for ${PACKAGE} - aborting.
 
 Options:
@@ -210,13 +241,19 @@ Options:
 3. Do not use this package in Kubernetes.
 __EOF__
       exit 9
-  fi
-  cat "${file}"
+    fi
 
-  echo
-  echo "= ${file} $(kube::util::md5 "${file}")"
-  echo "================================================================================"
-  echo
-done >> ${TMP_LICENSE_FILE}
+    cat "${file}"
+    echo
+    echo "= ${file} $(kube::util::md5 "${file}")"
+  } >> "${TMP_LICENSE_FILE}"
 
-cat ${TMP_LICENSE_FILE} > ${VENDOR_LICENSE_FILE}
+  dest_dir="${TMP_LICENSES_DIR}/vendor/${PACKAGE}"
+  mkdir -p "${dest_dir}"
+  mv "${TMP_LICENSE_FILE}" "${dest_dir}/LICENSE"
+done
+
+# Leave things like OWNERS alone.
+rm -f "${LICENSES_DIR}/LICENSE"
+rm -rf "${LICENSES_DIR}/vendor"
+mv "${TMP_LICENSES_DIR}"/* "${LICENSES_DIR}"

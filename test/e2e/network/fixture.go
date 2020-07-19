@@ -103,7 +103,7 @@ func (t *TestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
 
 // DeleteService deletes a service, and remove it from the cleanup list
 func (t *TestFixture) DeleteService(serviceName string) error {
-	err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, nil)
+	err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
 	if err == nil {
 		delete(t.services, serviceName)
 	}
@@ -139,7 +139,7 @@ func (t *TestFixture) Cleanup() []error {
 		}
 		// TODO(mikedanese): Wait.
 		// Then, delete the RC altogether.
-		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(context.TODO(), rcName, nil); err != nil {
+		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(context.TODO(), rcName, metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
@@ -148,7 +148,7 @@ func (t *TestFixture) Cleanup() []error {
 
 	for serviceName := range t.services {
 		ginkgo.By("deleting service " + serviceName + " in namespace " + t.Namespace)
-		err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, nil)
+		err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				errs = append(errs, err)

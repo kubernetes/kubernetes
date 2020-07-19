@@ -44,8 +44,6 @@ type TopNodeOptions struct {
 	SortBy          string
 	NoHeaders       bool
 	NodeClient      corev1client.CoreV1Interface
-	HeapsterOptions HeapsterTopOptions
-	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
 	MetricsClient   metricsclientset.Interface
@@ -53,31 +51,15 @@ type TopNodeOptions struct {
 	genericclioptions.IOStreams
 }
 
-type HeapsterTopOptions struct {
-	Namespace string
-	Service   string
-	Scheme    string
-	Port      string
-}
-
-func (o *HeapsterTopOptions) Bind(flags *pflag.FlagSet) {
-	if len(o.Namespace) == 0 {
-		o.Namespace = metricsutil.DefaultHeapsterNamespace
-	}
-	if len(o.Service) == 0 {
-		o.Service = metricsutil.DefaultHeapsterService
-	}
-	if len(o.Scheme) == 0 {
-		o.Scheme = metricsutil.DefaultHeapsterScheme
-	}
-	if len(o.Port) == 0 {
-		o.Port = metricsutil.DefaultHeapsterPort
-	}
-
-	flags.StringVar(&o.Namespace, "heapster-namespace", o.Namespace, "Namespace Heapster service is located in")
-	flags.StringVar(&o.Service, "heapster-service", o.Service, "Name of Heapster service")
-	flags.StringVar(&o.Scheme, "heapster-scheme", o.Scheme, "Scheme (http or https) to connect to Heapster as")
-	flags.StringVar(&o.Port, "heapster-port", o.Port, "Port name in service to use")
+func heapsterTopOptions(flags *pflag.FlagSet) {
+	flags.String("heapster-namespace", "kube-system", "Namespace Heapster service is located in")
+	flags.MarkDeprecated("heapster-namespace", "This flag is currently no-op and will be deleted.")
+	flags.String("heapster-service", "heapster", "Name of Heapster service")
+	flags.MarkDeprecated("heapster-service", "This flag is currently no-op and will be deleted.")
+	flags.String("heapster-scheme", "http", "Scheme (http or https) to connect to Heapster as")
+	flags.MarkDeprecated("heapster-scheme", "This flag is currently no-op and will be deleted.")
+	flags.String("heapster-port", "", "Port name in service to use")
+	flags.MarkDeprecated("heapster-port", "This flag is currently no-op and will be deleted.")
 }
 
 var (
@@ -117,8 +99,8 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
+	heapsterTopOptions(cmd.Flags())
 
-	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
 
@@ -146,7 +128,6 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 
 	o.NodeClient = clientset.CoreV1()
-	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
 	return nil
@@ -181,17 +162,13 @@ func (o TopNodeOptions) RunTopNode() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	var metrics *metricsapi.NodeMetricsList
-	if metricsAPIAvailable {
-		metrics, err = getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
-		if err != nil {
-			return err
-		}
-	} else {
-		metrics, err = o.Client.GetNodeMetrics(o.ResourceName, selector.String())
-		if err != nil {
-			return err
-		}
+	if !metricsAPIAvailable {
+		return errors.New("Metrics API not available")
+	}
+
+	metrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
+	if err != nil {
+		return err
 	}
 
 	if len(metrics.Items) == 0 {

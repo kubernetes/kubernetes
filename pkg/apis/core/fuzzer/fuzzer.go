@@ -263,6 +263,14 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				i.ISCSIInterface = "default"
 			}
 		},
+		func(i *core.PersistentVolumeClaimSpec, c fuzz.Continue) {
+			// Match defaulting in pkg/apis/core/v1/defaults.go.
+			volumeMode := core.PersistentVolumeMode(c.RandString())
+			if volumeMode == "" {
+				volumeMode = core.PersistentVolumeFilesystem
+			}
+			i.VolumeMode = &volumeMode
+		},
 		func(d *core.DNSPolicy, c fuzz.Continue) {
 			policies := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault}
 			*d = policies[c.Rand.Intn(len(policies))]

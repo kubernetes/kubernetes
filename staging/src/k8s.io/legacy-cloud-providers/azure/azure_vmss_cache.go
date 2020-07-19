@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
@@ -73,7 +73,8 @@ func (ss *scaleSet) newVMSSCache() (*azcache.TimedCache, error) {
 				return nil, rerr.Error()
 			}
 
-			for _, scaleSet := range allScaleSets {
+			for i := range allScaleSets {
+				scaleSet := allScaleSets[i]
 				if scaleSet.Name == nil || *scaleSet.Name == "" {
 					klog.Warning("failed to get the name of VMSS")
 					continue
@@ -172,9 +173,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*azcache.TimedCache, error) {
 					}
 					localCache.Store(computerName, vmssVMCacheEntry)
 
-					if _, exists := oldCache[computerName]; exists {
-						delete(oldCache, computerName)
-					}
+					delete(oldCache, computerName)
 				}
 			}
 
@@ -183,7 +182,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*azcache.TimedCache, error) {
 			for name, vmEntry := range oldCache {
 				// if the nil cache entry has existed for 15 minutes in the cache
 				// then it should not be added back to the cache
-				if vmEntry.virtualMachine == nil || time.Since(vmEntry.lastUpdate) > 15*time.Minute {
+				if vmEntry.virtualMachine == nil && time.Since(vmEntry.lastUpdate) > 15*time.Minute {
 					klog.V(5).Infof("ignoring expired entries from old cache for %s", name)
 					continue
 				}

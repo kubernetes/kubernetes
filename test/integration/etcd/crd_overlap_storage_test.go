@@ -152,7 +152,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	// Make sure API requests are still handled by the built-in handler (and return built-in kinds)
 
 	// Listing v1 succeeds
-	v1DynamicList, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "apiregistration.k8s.io", Version: "v1", Resource: "apiservices"}).List(metav1.ListOptions{})
+	v1DynamicList, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "apiregistration.k8s.io", Version: "v1", Resource: "apiservices"}).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = apiServiceClient.APIServices().Delete(context.TODO(), testAPIService.Name, &metav1.DeleteOptions{})
+	err = apiServiceClient.APIServices().Delete(context.TODO(), testAPIService.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 	}
 
 	// Delete the overlapping CRD
-	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, &metav1.DeleteOptions{})
+	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +315,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	// Make sure API requests are still handled by the built-in handler (and return built-in kinds)
 
 	// Listing v1 succeeds
-	v1DynamicList, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}).List(metav1.ListOptions{})
+	v1DynamicList, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 	}
 
 	// Delete the overlapping CRD
-	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, &metav1.DeleteOptions{})
+	err = crdClient.CustomResourceDefinitions().Delete(context.TODO(), crdCRD.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

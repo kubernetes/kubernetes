@@ -20,6 +20,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//build/go-runner:all-srcs",
         "//build/release-tars:all-srcs",
         "//build/visible_to:all-srcs",
     ],
@@ -30,15 +31,15 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "kube-apiserver": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
@@ -52,6 +53,7 @@ DOCKERIZED_BINARIES = {
     srcs = select({"@io_bazel_rules_go//go/platform:" + arch: ["//cmd/" + binary]}),
     mode = "0755",
     package_dir = "/usr/bin",
+    tags = ["manual"],
     visibility = ["//visibility:private"],
 ) for binary in DOCKERIZED_BINARIES.keys() for arch in SERVER_PLATFORMS["linux"]]
 

@@ -22,8 +22,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerconfigv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
-	kubeschedulerconfigv1alpha1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1"
-	kubeschedulerconfigv1alpha2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha2"
+	kubeschedulerconfigv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 )
 
 var (
@@ -42,7 +41,6 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(kubeschedulerconfig.AddToScheme(scheme))
 	utilruntime.Must(kubeschedulerconfigv1.AddToScheme(scheme))
-	utilruntime.Must(kubeschedulerconfigv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(kubeschedulerconfigv1alpha2.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(kubeschedulerconfigv1alpha2.SchemeGroupVersion, kubeschedulerconfigv1alpha1.SchemeGroupVersion))
+	utilruntime.Must(kubeschedulerconfigv1beta1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(kubeschedulerconfigv1beta1.SchemeGroupVersion))
 }

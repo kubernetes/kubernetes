@@ -35,7 +35,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -57,7 +57,7 @@ var (
 		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. By default, the "diff" command available in your path will be
 		run with "-u" (unified diff) and "-N" (treat absent files as empty) options.
-		
+
 		Exit status:
 		 0
 		No differences were found.
@@ -92,8 +92,10 @@ type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
 
 	ServerSideApply bool
+	FieldManager    string
 	ForceConflicts  bool
 
+	Selector         string
 	OpenAPISchema    openapi.Resources
 	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
@@ -147,8 +149,10 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	usage := "contains the configuration to diff"
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
 
 	return cmd
 }
@@ -296,6 +300,7 @@ type InfoObject struct {
 	OpenAPI         openapi.Resources
 	Force           bool
 	ServerSideApply bool
+	FieldManager    string
 	ForceConflicts  bool
 	genericclioptions.IOStreams
 }
@@ -310,16 +315,19 @@ func (obj InfoObject) Live() runtime.Object {
 // Returns the "merged" object, as it would look like if applied or
 // created.
 func (obj InfoObject) Merged() (runtime.Object, error) {
+	helper := resource.NewHelper(obj.Info.Client, obj.Info.Mapping).
+		DryRun(true).
+		WithFieldManager(obj.FieldManager)
 	if obj.ServerSideApply {
 		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj.LocalObj)
 		if err != nil {
 			return nil, err
 		}
 		options := metav1.PatchOptions{
-			Force:  &obj.ForceConflicts,
-			DryRun: []string{metav1.DryRunAll},
+			Force:        &obj.ForceConflicts,
+			FieldManager: obj.FieldManager,
 		}
-		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).Patch(
+		return helper.Patch(
 			obj.Info.Namespace,
 			obj.Info.Name,
 			types.ApplyPatchType,
@@ -331,11 +339,11 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.
 	if obj.Live() == nil {
 		// Dry-run create if the object doesn't exist.
-		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).CreateWithOptions(
+		return helper.CreateWithOptions(
 			obj.Info.Namespace,
 			true,
 			obj.LocalObj,
-			&metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			&metav1.CreateOptions{},
 		)
 	}
 
@@ -358,10 +366,9 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// We plan on replacing this with server-side apply when it becomes available.
 	patcher := &apply.Patcher{
 		Mapping:         obj.Info.Mapping,
-		Helper:          resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Helper:          helper,
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
-		ServerDryRun:    true,
 		OpenapiSchema:   obj.OpenAPI,
 		ResourceVersion: resourceVersion,
 	}
@@ -441,6 +448,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+	o.FieldManager = apply.GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
@@ -490,6 +498,7 @@ func (o *DiffOptions) Run() error {
 		Unstructured().
 		NamespaceParam(o.CmdNamespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.Selector).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -529,6 +538,7 @@ func (o *DiffOptions) Run() error {
 				OpenAPI:         o.OpenAPISchema,
 				Force:           force,
 				ServerSideApply: o.ServerSideApply,
+				FieldManager:    o.FieldManager,
 				ForceConflicts:  o.ForceConflicts,
 				IOStreams:       o.Diff.IOStreams,
 			}

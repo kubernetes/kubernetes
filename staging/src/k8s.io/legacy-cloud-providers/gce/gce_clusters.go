@@ -23,7 +23,7 @@ import (
 	"fmt"
 
 	"google.golang.org/api/container/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func newClustersMetricContext(request, zone string) *metricContext {

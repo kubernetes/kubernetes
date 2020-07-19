@@ -132,6 +132,9 @@ ephemeralContainers:
       role: "83"
       type: "84"
       user: "82"
+    seccompProfile:
+      localhostProfile: "89"
+      type: 嵒ƫS捕ɷD¡轫n
     windowsOptions:
       gmsaCredentialSpec: "87"
       gmsaCredentialSpecName: "86"
@@ -157,10 +160,9 @@ ephemeralContainers:
       port: "64"
     timeoutSeconds: 1229400382
   stdin: true
-  targetContainerName: "89"
+  targetContainerName: "90"
   terminationMessagePath: "81"
   terminationMessagePolicy: Ņ£
-  tty: true
   volumeDevices:
   - devicePath: "44"
     name: "43"

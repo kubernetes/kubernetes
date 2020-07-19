@@ -29,7 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,13 +41,11 @@ import (
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
@@ -91,7 +89,6 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 	cmd.AddCommand(NewCmdConfigPrint(out))
 	cmd.AddCommand(NewCmdConfigMigrate(out))
-	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigImages(out))
 	return cmd
@@ -140,6 +137,7 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 			}
 			return runConfigPrintActionDefaults(out, groups, configBytesProc)
 		},
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringSliceVar(&kinds, "component-configs", kinds,
 		fmt.Sprintf("A comma-separated list for component config API objects to print the default values for. Available values: %v. If this flag is not set, no component configs will be printed.", getSupportedComponentConfigKinds()))
@@ -295,32 +293,19 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			}
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
 	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
 	return cmd
 }
 
-// NewCmdConfigUpload (Deprecated) returns cobra.Command for "kubeadm config upload" command
-// Deprecated: please see kubeadm init phase upload-config
-func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cmd := &cobra.Command{
-		Deprecated: "please see kubeadm init phase upload-config",
-		Use:        "upload",
-		Short:      "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster",
-		RunE:       cmdutil.SubCmdRunE("upload"),
-	}
-
-	cmd.AddCommand(NewCmdConfigUploadFromFile(out, kubeConfigFile))
-	cmd.AddCommand(NewCmdConfigUploadFromFlags(out, kubeConfigFile))
-	return cmd
-}
-
 // NewCmdConfigView returns cobra.Command for "kubeadm config view" command
 func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "view",
-		Short: "View the kubeadm configuration stored inside the cluster",
+		Use:        "view",
+		Short:      "View the kubeadm configuration stored inside the cluster",
+		Deprecated: "This command is deprecated and will be removed in a future release, please use 'kubectl get cm -o yaml -n kube-system kubeadm-config' to get the kubeadm config directly.",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
 
@@ -335,104 +320,8 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 
 			return RunConfigView(out, client)
 		},
+		Args: cobra.NoArgs,
 	}
-}
-
-// NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
-// "kubeadm config upload from-file" command
-// Deprecated: please see kubeadm init phase upload-config
-func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	var cfgPath string
-	cmd := &cobra.Command{
-		Deprecated: "please see kubeadm init phase upload-config",
-		Use:        "from-file",
-		Short:      "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration",
-		Long: fmt.Sprintf(dedent.Dedent(`
-			Using this command, you can upload configuration to the ConfigMap in the cluster using the same config file you gave to 'kubeadm init'.
-			If you initialized your cluster using a v1.7.x or lower kubeadm client and used the --config option, you need to run this command with the
-			same config file before upgrading to v1.8 using 'kubeadm upgrade'.
-
-			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(cfgPath) == 0 {
-				return errors.New("the --config flag is mandatory")
-			}
-
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
-			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
-			if err != nil {
-				return err
-			}
-
-			// Default both statically and dynamically, convert to internal API type, and validate everything
-			internalcfg, err := configutil.LoadInitConfigurationFromFile(cfgPath)
-			if err != nil {
-				return err
-			}
-
-			// Upload the configuration using the file
-			klog.V(1).Infof("[config] uploading configuration")
-			return uploadconfig.UploadConfiguration(internalcfg, client)
-		},
-	}
-	options.AddConfigFlag(cmd.Flags(), &cfgPath)
-	return cmd
-}
-
-// NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
-// Deprecated: please see kubeadm init phase upload-config
-func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{}
-	kubeadmscheme.Scheme.Default(initCfg)
-
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
-	kubeadmscheme.Scheme.Default(clusterCfg)
-
-	var featureGatesString string
-
-	cmd := &cobra.Command{
-		Deprecated: "please see kubeadm init phase upload-config",
-		Use:        "from-flags",
-		Short:      "Create the in-cluster configuration file for the first time from using flags",
-		Long: fmt.Sprintf(dedent.Dedent(`
-			Using this command, you can upload configuration to the ConfigMap in the cluster using the same flags you gave to 'kubeadm init'.
-			If you initialized your cluster using a v1.7.x or lower kubeadm client and set certain flags, you need to run this command with the
-			same flags before upgrading to v1.8 using 'kubeadm upgrade'.
-
-			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
-			klog.V(1).Infoln("[config] creating new FeatureGates")
-			if clusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
-				return nil
-			}
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
-			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
-			if err != nil {
-				return err
-			}
-
-			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-			// of the version from the internet when executing DefaultedInitConfiguration
-			phaseutil.SetKubernetesVersion(clusterCfg)
-
-			// Default both statically and dynamically, convert to internal API type, and validate everything
-			klog.V(1).Infoln("[config] converting to internal API type")
-			internalcfg, err := configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
-			if err != nil {
-				return err
-			}
-
-			// Finally, upload the configuration
-			klog.V(1).Infof("[config] uploading configuration")
-			return uploadconfig.UploadConfiguration(internalcfg, client)
-		},
-	}
-	AddInitConfigFlags(cmd.PersistentFlags(), initCfg)
-	AddClusterConfigFlags(cmd.PersistentFlags(), clusterCfg, &featureGatesString)
-	return cmd
 }
 
 // RunConfigView gets the configuration persisted in the cluster
@@ -487,6 +376,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			}
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
+		Args: cobra.NoArgs,
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalClusterCfg, &cfgPath, &featureGatesString)
 	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &externalInitCfg.NodeRegistration.CRISocket)
@@ -556,6 +446,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 			return imagesList.Run(out, printer)
 		},
+		Args: cobra.NoArgs,
 	}
 	outputFlags.AddFlags(cmd)
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)

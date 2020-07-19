@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -23,6 +18,7 @@ go_library(
         "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/apps",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps:go_default_library",
@@ -36,8 +32,9 @@ go_library(
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/master/ports:go_default_library",
-        "//pkg/scheduler/nodeinfo:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -74,6 +71,7 @@ go_library(
         "//test/e2e/framework/pv:go_default_library",
         "//test/e2e/framework/rc:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
+        "//test/e2e/framework/resource:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
@@ -99,4 +97,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

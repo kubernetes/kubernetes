@@ -19,9 +19,11 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSimpleLockEntry(t *testing.T) {
@@ -85,65 +87,67 @@ func ensureNoCallback(t *testing.T, callbackChan <-chan interface{}) bool {
 	}
 }
 
-// running same unit tests as https://github.com/kubernetes/apimachinery/blob/master/pkg/util/errors/errors_test.go#L371
-func TestAggregateGoroutinesWithDelay(t *testing.T) {
+func TestConvertTagsToMap(t *testing.T) {
 	testCases := []struct {
-		errs     []error
-		expected map[string]bool
+		desc           string
+		tags           string
+		expectedOutput map[string]string
+		expectedError  bool
 	}{
 		{
-			[]error{},
-			nil,
+			desc:           "should return empty map when tag is empty",
+			tags:           "",
+			expectedOutput: map[string]string{},
+			expectedError:  false,
 		},
 		{
-			[]error{nil},
-			nil,
+			desc: "sing valid tag should be converted",
+			tags: "key=value",
+			expectedOutput: map[string]string{
+				"key": "value",
+			},
+			expectedError: false,
 		},
 		{
-			[]error{nil, nil},
-			nil,
+			desc: "multiple valid tags should be converted",
+			tags: "key1=value1,key2=value2",
+			expectedOutput: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			expectedError: false,
 		},
 		{
-			[]error{fmt.Errorf("1")},
-			map[string]bool{"1": true},
+			desc: "whitespaces should be trimmed",
+			tags: "key1=value1, key2=value2",
+			expectedOutput: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			expectedError: false,
 		},
 		{
-			[]error{fmt.Errorf("1"), nil},
-			map[string]bool{"1": true},
+			desc:           "should return error for invalid format",
+			tags:           "foo,bar",
+			expectedOutput: nil,
+			expectedError:  true,
 		},
 		{
-			[]error{fmt.Errorf("1"), fmt.Errorf("267")},
-			map[string]bool{"1": true, "267": true},
-		},
-		{
-			[]error{fmt.Errorf("1"), nil, fmt.Errorf("1234")},
-			map[string]bool{"1": true, "1234": true},
-		},
-		{
-			[]error{nil, fmt.Errorf("1"), nil, fmt.Errorf("1234"), fmt.Errorf("22")},
-			map[string]bool{"1": true, "1234": true, "22": true},
+			desc:           "should return error for when key is missed",
+			tags:           "key1=value1,=bar",
+			expectedOutput: nil,
+			expectedError:  true,
 		},
 	}
-	for i, testCase := range testCases {
-		funcs := make([]func() error, len(testCase.errs))
-		for i := range testCase.errs {
-			err := testCase.errs[i]
-			funcs[i] = func() error { return err }
-		}
-		agg := aggregateGoroutinesWithDelay(100*time.Millisecond, funcs...)
-		if agg == nil {
-			if len(testCase.expected) > 0 {
-				t.Errorf("%d: expected %v, got nil", i, testCase.expected)
-			}
-			continue
-		}
-		if len(agg.Errors()) != len(testCase.expected) {
-			t.Errorf("%d: expected %d errors in aggregate, got %v", i, len(testCase.expected), agg)
-			continue
-		}
-		for _, err := range agg.Errors() {
-			if !testCase.expected[err.Error()] {
-				t.Errorf("%d: expected %v, got aggregate containing %v", i, testCase.expected, err)
+
+	for i, c := range testCases {
+		m, err := ConvertTagsToMap(c.tags)
+		if c.expectedError {
+			assert.NotNil(t, err, "TestCase[%d]: %s", i, c.desc)
+		} else {
+			assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+			if !reflect.DeepEqual(m, c.expectedOutput) {
+				t.Errorf("got: %v, expected: %v, desc: %v", m, c.expectedOutput, c.desc)
 			}
 		}
 	}

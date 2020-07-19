@@ -30,7 +30,7 @@ import (
 )
 
 // View allows users to aggregate the recorded stats.Measurements.
-// Views need to be passed to the Register function to be before data will be
+// Views need to be passed to the Register function before data will be
 // collected and sent to Exporters.
 type View struct {
 	Name        string // Name of View. Must be unique. If unset, will default to the name of the Measure.
@@ -43,7 +43,7 @@ type View struct {
 	// Measure is a stats.Measure to aggregate in this view.
 	Measure stats.Measure
 
-	// Aggregation is the aggregation function tp apply to the set of Measurements.
+	// Aggregation is the aggregation function to apply to the set of Measurements.
 	Aggregation *Aggregation
 }
 
@@ -189,7 +189,7 @@ func (r *Row) String() string {
 }
 
 // Equal returns true if both rows are equal. Tags are expected to be ordered
-// by the key name. Even both rows have the same tags but the tags appear in
+// by the key name. Even if both rows have the same tags but the tags appear in
 // different orders it will return false.
 func (r *Row) Equal(other *Row) bool {
 	if r == other {

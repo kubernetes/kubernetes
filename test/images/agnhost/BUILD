@@ -32,6 +32,7 @@ go_library(
         "//test/images/agnhost/nettest:go_default_library",
         "//test/images/agnhost/no-snat-test:go_default_library",
         "//test/images/agnhost/no-snat-test-proxy:go_default_library",
+        "//test/images/agnhost/openidmetadata:go_default_library",
         "//test/images/agnhost/pause:go_default_library",
         "//test/images/agnhost/port-forward-tester:go_default_library",
         "//test/images/agnhost/porter:go_default_library",
@@ -40,7 +41,7 @@ go_library(
         "//test/images/agnhost/test-webserver:go_default_library",
         "//test/images/agnhost/webhook:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -71,6 +72,7 @@ filegroup(
         "//test/images/agnhost/nettest:all-srcs",
         "//test/images/agnhost/no-snat-test:all-srcs",
         "//test/images/agnhost/no-snat-test-proxy:all-srcs",
+        "//test/images/agnhost/openidmetadata:all-srcs",
         "//test/images/agnhost/pause:all-srcs",
         "//test/images/agnhost/port-forward-tester:all-srcs",
         "//test/images/agnhost/porter:all-srcs",

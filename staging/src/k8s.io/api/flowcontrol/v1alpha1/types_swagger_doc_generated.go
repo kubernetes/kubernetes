@@ -38,9 +38,9 @@ func (FlowDistinguisherMethod) SwaggerDoc() map[string]string {
 
 var map_FlowSchema = map[string]string{
 	"":         "FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with similar attributes and is identified by a pair of strings: the name of the FlowSchema and a \"flow distinguisher\".",
-	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-	"status":   "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (FlowSchema) SwaggerDoc() map[string]string {
@@ -62,7 +62,7 @@ func (FlowSchemaCondition) SwaggerDoc() map[string]string {
 
 var map_FlowSchemaList = map[string]string{
 	"":         "FlowSchemaList is a list of FlowSchema objects.",
-	"metadata": "`metadata` is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "`metadata` is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "`items` is a list of FlowSchemas.",
 }
 
@@ -143,9 +143,9 @@ func (PolicyRulesWithSubjects) SwaggerDoc() map[string]string {
 
 var map_PriorityLevelConfiguration = map[string]string{
 	"":         "PriorityLevelConfiguration represents the configuration of a priority level.",
-	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-	"status":   "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (PriorityLevelConfiguration) SwaggerDoc() map[string]string {
@@ -167,7 +167,7 @@ func (PriorityLevelConfigurationCondition) SwaggerDoc() map[string]string {
 
 var map_PriorityLevelConfigurationList = map[string]string{
 	"":         "PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.",
-	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "`items` is a list of request-priorities.",
 }
 

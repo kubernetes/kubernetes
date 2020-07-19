@@ -384,6 +384,13 @@ func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
 				ShareName:  string(uuid.NewUUID()),
 			},
 		}, nil
+	case plugins.VSphereDriverName:
+		return v1.VolumeSource{
+			VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+				VolumePath: " [vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-" + string(uuid.NewUUID()+".vmdk"),
+				FSType:     "ext4",
+			},
+		}, nil
 	default:
 		return v1.VolumeSource{}, fmt.Errorf("couldn't find logic for driver: %v", driverName)
 	}

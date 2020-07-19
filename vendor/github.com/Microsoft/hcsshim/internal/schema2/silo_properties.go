@@ -11,7 +11,6 @@ package hcsschema
 
 //  Silo job information
 type SiloProperties struct {
-
 	Enabled bool `json:"Enabled,omitempty"`
 
 	JobName string `json:"JobName,omitempty"`

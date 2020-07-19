@@ -73,7 +73,7 @@ func getType(v *View) metricdata.Type {
 	}
 }
 
-func getLableKeys(v *View) []metricdata.LabelKey {
+func getLabelKeys(v *View) []metricdata.LabelKey {
 	labelKeys := []metricdata.LabelKey{}
 	for _, k := range v.TagKeys {
 		labelKeys = append(labelKeys, metricdata.LabelKey{Key: k.Name()})
@@ -85,9 +85,18 @@ func viewToMetricDescriptor(v *View) *metricdata.Descriptor {
 	return &metricdata.Descriptor{
 		Name:        v.Name,
 		Description: v.Description,
-		Unit:        getUnit(v.Measure.Unit()),
+		Unit:        convertUnit(v),
 		Type:        getType(v),
-		LabelKeys:   getLableKeys(v),
+		LabelKeys:   getLabelKeys(v),
+	}
+}
+
+func convertUnit(v *View) metricdata.Unit {
+	switch v.Aggregation.Type {
+	case AggTypeCount:
+		return metricdata.UnitDimensionless
+	default:
+		return getUnit(v.Measure.Unit())
 	}
 }
 

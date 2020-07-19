@@ -51,50 +51,14 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 		return errors.Wrap(err, "error when creating kube-proxy service account")
 	}
 
-	// Generate ControlPlane Enpoint kubeconfig file
-	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
-	if err != nil {
+	if err := createKubeProxyConfigMap(cfg, localEndpoint, client); err != nil {
 		return err
 	}
 
-	kubeProxyCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeProxyGroup]
-	if !ok {
-		return errors.New("no kube-proxy component config found in the active component config set")
-	}
-
-	proxyBytes, err := kubeProxyCfg.Marshal()
-	if err != nil {
-		return errors.Wrap(err, "error when marshaling")
-	}
-	var prefixBytes bytes.Buffer
-	apiclient.PrintBytesWithLinePrefix(&prefixBytes, proxyBytes, "    ")
-	var proxyConfigMapBytes, proxyDaemonSetBytes []byte
-	proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
-		struct {
-			ControlPlaneEndpoint string
-			ProxyConfig          string
-			ProxyConfigMap       string
-			ProxyConfigMapKey    string
-		}{
-			ControlPlaneEndpoint: controlPlaneEndpoint,
-			ProxyConfig:          prefixBytes.String(),
-			ProxyConfigMap:       constants.KubeProxyConfigMap,
-			ProxyConfigMapKey:    constants.KubeProxyConfigMapKey,
-		})
-	if err != nil {
-		return errors.Wrap(err, "error when parsing kube-proxy configmap template")
-	}
-	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
-		Image:             images.GetKubernetesImage(constants.KubeProxy, cfg),
-		ProxyConfigMap:    constants.KubeProxyConfigMap,
-		ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
-	})
-	if err != nil {
-		return errors.Wrap(err, "error when parsing kube-proxy daemonset template")
-	}
-	if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
+	if err := createKubeProxyAddon(cfg, client); err != nil {
 		return err
 	}
+
 	if err := CreateRBACRules(client); err != nil {
 		return errors.Wrap(err, "error when creating kube-proxy RBAC rules")
 	}
@@ -119,15 +83,61 @@ func CreateRBACRules(client clientset.Interface) error {
 	return createClusterRoleBindings(client)
 }
 
-func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
+func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface) error {
+	// Generate ControlPlane Enpoint kubeconfig file
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
+	if err != nil {
+		return err
+	}
+
+	kubeProxyCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeProxyGroup]
+	if !ok {
+		return errors.New("no kube-proxy component config found in the active component config set")
+	}
+
+	proxyBytes, err := kubeProxyCfg.Marshal()
+	if err != nil {
+		return errors.Wrap(err, "error when marshaling")
+	}
+	var prefixBytes bytes.Buffer
+	apiclient.PrintBytesWithLinePrefix(&prefixBytes, proxyBytes, "    ")
+	configMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
+		struct {
+			ControlPlaneEndpoint string
+			ProxyConfig          string
+			ProxyConfigMap       string
+			ProxyConfigMapKey    string
+		}{
+			ControlPlaneEndpoint: controlPlaneEndpoint,
+			ProxyConfig:          prefixBytes.String(),
+			ProxyConfigMap:       constants.KubeProxyConfigMap,
+			ProxyConfigMapKey:    constants.KubeProxyConfigMapKey,
+		})
+	if err != nil {
+		return errors.Wrap(err, "error when parsing kube-proxy configmap template")
+	}
+
 	kubeproxyConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
 		return errors.Wrap(err, "unable to decode kube-proxy configmap")
 	}
 
+	if !kubeProxyCfg.IsUserSupplied() {
+		componentconfigs.SignConfigMap(kubeproxyConfigMap)
+	}
+
 	// Create the ConfigMap for kube-proxy or update it in case it already exists
-	if err := apiclient.CreateOrUpdateConfigMap(client, kubeproxyConfigMap); err != nil {
-		return err
+	return apiclient.CreateOrUpdateConfigMap(client, kubeproxyConfigMap)
+}
+
+func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
+	daemonSetbytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
+		Image:             images.GetKubernetesImage(constants.KubeProxy, cfg),
+		ProxyConfigMap:    constants.KubeProxyConfigMap,
+		ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
+	})
+	if err != nil {
+		return errors.Wrap(err, "error when parsing kube-proxy daemonset template")
 	}
 
 	kubeproxyDaemonSet := &apps.DaemonSet{}

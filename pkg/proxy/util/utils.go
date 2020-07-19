@@ -29,9 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilnet "k8s.io/utils/net"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -145,15 +146,15 @@ func GetLocalAddrs() ([]net.IP, error) {
 }
 
 // ShouldSkipService checks if a given service should skip proxying
-func ShouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
+func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		klog.V(3).Infof("Skipping service %s in namespace %s due to clusterIP = %q", service.Name, service.Namespace, service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).Infof("Skipping service %s due to Type=ExternalName", svcName)
+		klog.V(3).Infof("Skipping service %s in namespace %s due to Type=ExternalName", service.Name, service.Namespace)
 		return true
 	}
 	return false
@@ -180,29 +181,35 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			uniqueAddressList.Insert(cidr)
 		}
 	}
+
+	itfs, err := nw.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("error listing all interfaces from host, error: %v", err)
+	}
+
 	// Second round of iteration to parse IPs based on cidr.
 	for _, cidr := range cidrs {
 		if IsZeroCIDR(cidr) {
 			continue
 		}
+
 		_, ipNet, _ := net.ParseCIDR(cidr)
-		itfs, err := nw.Interfaces()
-		if err != nil {
-			return nil, fmt.Errorf("error listing all interfaces from host, error: %v", err)
-		}
 		for _, itf := range itfs {
 			addrs, err := nw.Addrs(&itf)
 			if err != nil {
 				return nil, fmt.Errorf("error getting address from interface %s, error: %v", itf.Name, err)
 			}
+
 			for _, addr := range addrs {
 				if addr == nil {
 					continue
 				}
+
 				ip, _, err := net.ParseCIDR(addr.String())
 				if err != nil {
 					return nil, fmt.Errorf("error parsing CIDR for interface %s, error: %v", itf.Name, err)
 				}
+
 				if ipNet.Contains(ip) {
 					if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
 						uniqueAddressList.Insert(ip.String())
@@ -214,6 +221,11 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			}
 		}
 	}
+
+	if uniqueAddressList.Len() == 0 {
+		return nil, fmt.Errorf("no addresses found for cidrs %v", cidrs)
+	}
+
 	return uniqueAddressList, nil
 }
 
@@ -287,4 +299,15 @@ func ShuffleStrings(s []string) []string {
 		shuffled[j] = s[i]
 	}
 	return shuffled
+}
+
+// EnsureSysctl sets a kernel sysctl to a given numeric value.
+func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
+	if oldVal, _ := sysctl.GetSysctl(name); oldVal != newVal {
+		if err := sysctl.SetSysctl(name, newVal); err != nil {
+			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
+		}
+		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
+	}
+	return nil
 }

@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
 )
 
 // Config holds various options for establishing a transport.
@@ -68,6 +69,13 @@ type Config struct {
 
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// Proxy is the the proxy func to be used for all requests made by this
+	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
+	// returns a nil *URL, no proxy is used.
+	//
+	// socks5 proxying does not currently support spdy streaming endpoints.
+	Proxy func(*http.Request) (*url.URL, error)
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -115,9 +123,10 @@ func (c *Config) Wrap(fn WrapperFunc) {
 
 // TLSConfig holds the information needed to set up a TLS transport.
 type TLSConfig struct {
-	CAFile   string // Path of the PEM-encoded server trusted root certificates.
-	CertFile string // Path of the PEM-encoded client certificate.
-	KeyFile  string // Path of the PEM-encoded client key.
+	CAFile         string // Path of the PEM-encoded server trusted root certificates.
+	CertFile       string // Path of the PEM-encoded client certificate.
+	KeyFile        string // Path of the PEM-encoded client key.
+	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded
 
 	Insecure   bool   // Server should be accessed without verifying the certificate. For testing only.
 	ServerName string // Override for the server name passed to the server for SNI and used to verify certificates.

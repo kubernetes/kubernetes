@@ -18,16 +18,12 @@ package fieldmanager
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"k8s.io/klog"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v3/merge"
 )
@@ -45,12 +41,7 @@ var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
-	typeConverter, err := internal.NewTypeConverter(models, false)
-	if err != nil {
-		return nil, err
-	}
-
+func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -58,7 +49,7 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub),
+			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
 		},
 	}, nil
 }
@@ -66,14 +57,7 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ Manager, err error) {
-	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
-	if models != nil {
-		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
-		if err != nil {
-			return nil, err
-		}
-	}
+func NewCRDStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ Manager, err error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -98,38 +82,20 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	}
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
-		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
-		return newObj, managed, nil
+		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
-		return newObj, managed, nil
+		return nil, nil, fmt.Errorf("failed to convert live object (%v) to smd typed: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
 	// TODO(apelisse) use the first return value when unions are implemented
-	self := "current-operation"
-	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), self)
+	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), manager)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
 	managed = internal.NewManaged(managedFields, managed.Times())
-
-	// If the current operation took any fields from anything, it means the object changed,
-	// so update the timestamp of the managedFieldsEntry and merge with any previous updates from the same manager
-	if vs, ok := managed.Fields()[self]; ok {
-		delete(managed.Fields(), self)
-
-		managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
-		if previous, ok := managed.Fields()[manager]; ok {
-			managed.Fields()[manager] = fieldpath.NewVersionedSet(vs.Set().Union(previous.Set()), vs.APIVersion(), vs.Applied())
-		} else {
-			managed.Fields()[manager] = vs
-		}
-	}
 
 	return newObj, managed, nil
 }
@@ -170,15 +136,13 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed.Fields(), manager, force)
 	if err != nil {
-		if conflicts, ok := err.(merge.Conflicts); ok {
-			return nil, nil, internal.NewConflictError(conflicts)
-		}
 		return nil, nil, err
 	}
 	managed = internal.NewManaged(managedFields, managed.Times())
 
-	// Update the time in the managedFieldsEntry for this operation
-	managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
+	if newObjTyped == nil {
+		return nil, managed, nil
+	}
 
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {

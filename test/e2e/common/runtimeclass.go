@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
 
 		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
-			err := rcClient.Delete(context.TODO(), rcName, nil)
+			err := rcClient.Delete(context.TODO(), rcName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
 
 			ginkgo.By("Waiting for the RuntimeClass to disappear")

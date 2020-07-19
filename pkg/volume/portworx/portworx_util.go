@@ -25,11 +25,11 @@ import (
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
 	volumeapi "github.com/libopenstorage/openstorage/volume"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -60,7 +60,10 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GiB
-	requestGiB := volumehelpers.RoundUpToGiB(capacity)
+	requestGiB, err := volumehelpers.RoundUpToGiB(capacity)
+	if err != nil {
+		return "", 0, nil, err
+	}
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or
@@ -211,7 +214,11 @@ func (util *portworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	newSizeInBytes := uint64(volumehelpers.RoundUpToGiB(newSize) * volumehelpers.GiB)
+	tBytes, ok := newSize.AsInt64()
+	if !ok {
+		return fmt.Errorf("quantity %v is too great, overflows int64", newSize)
+	}
+	newSizeInBytes := uint64(tBytes)
 	if vol.Spec.Size >= newSizeInBytes {
 		klog.Infof("Portworx volume: %s already at size: %d greater than or equal to new "+
 			"requested size: %d. Skipping resize.", spec.Name(), vol.Spec.Size, newSizeInBytes)

@@ -559,7 +559,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
-	if err := c.CoreV1().Pods(ns.Name).Delete(context.TODO(), deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Pods(ns.Name).Delete(context.TODO(), deletingPod.Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Error deleting pod %s: %v", deletingPod.Name, err)
 	}
 
@@ -911,7 +911,7 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 	}
 
 	rsClient := c.AppsV1().ReplicaSets(ns.Name)
-	err := rsClient.Delete(context.TODO(), rs.Name, nil)
+	err := rsClient.Delete(context.TODO(), rs.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete rs: %v", err)
 	}
@@ -944,5 +944,5 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 		rs.Finalizers = finalizers
 	})
 
-	rsClient.Delete(context.TODO(), rs.Name, nil)
+	rsClient.Delete(context.TODO(), rs.Name, metav1.DeleteOptions{})
 }

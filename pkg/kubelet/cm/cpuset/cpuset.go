@@ -19,7 +19,7 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"reflect"
 	"sort"
 	"strconv"

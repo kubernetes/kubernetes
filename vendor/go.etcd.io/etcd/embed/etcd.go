@@ -192,6 +192,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		ClientCertAuthEnabled:      cfg.ClientTLSInfo.ClientCertAuth,
 		AuthToken:                  cfg.AuthToken,
 		BcryptCost:                 cfg.BcryptCost,
+		TokenTTL:                   cfg.AuthTokenTTL,
 		CORS:                       cfg.CORS,
 		HostWhitelist:              cfg.HostWhitelist,
 		InitialCorruptCheck:        cfg.ExperimentalInitialCorruptCheck,
@@ -204,6 +205,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		Debug:                      cfg.Debug,
 		ForceNewCluster:            cfg.ForceNewCluster,
 		EnableGRPCGateway:          cfg.EnableGRPCGateway,
+		UnsafeNoFsync:              cfg.UnsafeNoFsync,
 		EnableLeaseCheckpoint:      cfg.ExperimentalEnableLeaseCheckpoint,
 		CompactionBatchLimit:       cfg.ExperimentalCompactionBatchLimit,
 	}
@@ -811,7 +813,7 @@ func (e *Etcd) GetLogger() *zap.Logger {
 
 func parseCompactionRetention(mode, retention string) (ret time.Duration, err error) {
 	h, err := strconv.Atoi(retention)
-	if err == nil {
+	if err == nil && h >= 0 {
 		switch mode {
 		case CompactorModeRevision:
 			ret = time.Duration(int64(h))

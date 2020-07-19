@@ -115,7 +115,7 @@ func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta
 }
 
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
-func (c *FakeStatefulSets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeStatefulSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(statefulsetsResource, c.ns, name), &v1beta2.StatefulSet{})
 
@@ -123,8 +123,8 @@ func (c *FakeStatefulSets) Delete(ctx context.Context, name string, options *v1.
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
+func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta2.StatefulSetList{})
 	return err

@@ -91,6 +91,13 @@ const (
 	SystemContainerPods = "pods"
 )
 
+// ProcessStats are stats pertaining to processes.
+type ProcessStats struct {
+	// Number of processes
+	// +optional
+	ProcessCount *uint64 `json:"process_count,omitempty"`
+}
+
 // PodStats holds pod-level unprocessed sample stats.
 type PodStats struct {
 	// Reference to the measured Pod.
@@ -119,6 +126,9 @@ type PodStats struct {
 	// EphemeralStorage reports the total filesystem usage for the containers and emptyDir-backed volumes in the measured Pod.
 	// +optional
 	EphemeralStorage *FsStats `json:"ephemeral-storage,omitempty"`
+	// ProcessStats pertaining to processes.
+	// +optional
+	ProcessStats *ProcessStats `json:"process_stats,omitempty"`
 }
 
 // ContainerStats holds container-level unprocessed sample stats.
@@ -252,7 +262,7 @@ type AcceleratorStats struct {
 // VolumeStats contains data about Volume filesystem usage.
 type VolumeStats struct {
 	// Embedded FsStats
-	FsStats
+	FsStats `json:",inline"`
 	// Name is the name given to the Volume
 	// +optional
 	Name string `json:"name,omitempty"`

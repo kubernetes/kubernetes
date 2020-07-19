@@ -103,7 +103,7 @@ func (c *FakeConfigMaps) Update(ctx context.Context, configMap *corev1.ConfigMap
 }
 
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
-func (c *FakeConfigMaps) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeConfigMaps) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(configmapsResource, c.ns, name), &corev1.ConfigMap{})
 
@@ -111,8 +111,8 @@ func (c *FakeConfigMaps) Delete(ctx context.Context, name string, options *v1.De
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
+func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.ConfigMapList{})
 	return err

@@ -46,7 +46,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -119,7 +119,7 @@ func NewHorizontalController(
 
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
@@ -357,6 +357,9 @@ func (a *HorizontalController) reconcileKey(key string) (deleted bool, err error
 		delete(a.scaleDownEvents, key)
 		return true, nil
 	}
+	if err != nil {
+		return false, err
+	}
 
 	return false, a.reconcileAutoscaler(hpa, key)
 }
@@ -452,34 +455,31 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 			},
 		}
 		return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
-	} else {
-		if metricSpec.Resource.Target.AverageUtilization == nil {
-			errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
-			err = fmt.Errorf(errMsg)
-			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
-			return 0, time.Time{}, "", condition, fmt.Errorf(errMsg)
-		}
-		targetUtilization := *metricSpec.Resource.Target.AverageUtilization
-		var percentageProposal int32
-		var rawProposal int64
-		replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
-		if err != nil {
-			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
-			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
-		}
-		metricNameProposal = fmt.Sprintf("%s resource utilization (percentage of request)", metricSpec.Resource.Name)
-		*status = autoscalingv2.MetricStatus{
-			Type: autoscalingv2.ResourceMetricSourceType,
-			Resource: &autoscalingv2.ResourceMetricStatus{
-				Name: metricSpec.Resource.Name,
-				Current: autoscalingv2.MetricValueStatus{
-					AverageUtilization: &percentageProposal,
-					AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
-				},
-			},
-		}
-		return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
+	if metricSpec.Resource.Target.AverageUtilization == nil {
+		errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
+		err = fmt.Errorf(errMsg)
+		condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
+		return 0, time.Time{}, "", condition, fmt.Errorf(errMsg)
+	}
+	targetUtilization := *metricSpec.Resource.Target.AverageUtilization
+	replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
+	if err != nil {
+		condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
+		return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
+	}
+	metricNameProposal = fmt.Sprintf("%s resource utilization (percentage of request)", metricSpec.Resource.Name)
+	*status = autoscalingv2.MetricStatus{
+		Type: autoscalingv2.ResourceMetricSourceType,
+		Resource: &autoscalingv2.ResourceMetricStatus{
+			Name: metricSpec.Resource.Name,
+			Current: autoscalingv2.MetricValueStatus{
+				AverageUtilization: &percentageProposal,
+				AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+			},
+		},
+	}
+	return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 }
 
 // computeStatusForExternalMetric computes the desired number of replicas for the specified metric of type ExternalMetricSourceType.
@@ -648,7 +648,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(targetGR, scale)
+		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(context.TODO(), targetGR, scale, metav1.UpdateOptions{})
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
@@ -992,7 +992,7 @@ func getLongestPolicyPeriod(scalingRules *autoscalingv2.HPAScalingRules) int32 {
 
 // calculateScaleUpLimitWithScalingRules returns the maximum number of pods that could be added for the given HPAScalingRules
 func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleEvents []timestampedScaleEvent, scalingRules *autoscalingv2.HPAScalingRules) int32 {
-	var result int32 = 0
+	var result int32
 	var proposed int32
 	var selectPolicyFn func(int32, int32) int32
 	if *scalingRules.SelectPolicy == autoscalingv2.DisabledPolicySelect {
@@ -1050,7 +1050,7 @@ func (a *HorizontalController) scaleForResourceMappings(namespace, name string, 
 	var firstErr error
 	for i, mapping := range mappings {
 		targetGR := mapping.Resource.GroupResource()
-		scale, err := a.scaleNamespacer.Scales(namespace).Get(targetGR, name)
+		scale, err := a.scaleNamespacer.Scales(namespace).Get(context.TODO(), targetGR, name, metav1.GetOptions{})
 		if err == nil {
 			return scale, targetGR, nil
 		}
@@ -1180,15 +1180,13 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 func max(a, b int32) int32 {
 	if a >= b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }
 
 func min(a, b int32) int32 {
 	if a <= b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }

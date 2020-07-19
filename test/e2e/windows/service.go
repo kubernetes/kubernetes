@@ -62,6 +62,7 @@ var _ = SIGDescribe("Services", func() {
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
 		assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s:%d", nodeIP, nodePort)))

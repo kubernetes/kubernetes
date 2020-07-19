@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
@@ -78,8 +78,8 @@ func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		}
 
 		return cloudprovider.Zone{
-			FailureDomain: zone,
-			Region:        location,
+			FailureDomain: strings.ToLower(zone),
+			Region:        strings.ToLower(location),
 		}, nil
 	}
 	// if UseInstanceMetadata is false, get Zone name by calling ARM

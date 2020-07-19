@@ -26,6 +26,7 @@ import (
 	autorest "github.com/Azure/go-autorest/autorest"
 	azure "github.com/Azure/go-autorest/autorest/azure"
 	gomock "github.com/golang/mock/gomock"
+	armclient "k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	retry "k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -225,6 +226,20 @@ func (m *MockInterface) PutResource(ctx context.Context, resourceID string, para
 func (mr *MockInterfaceMockRecorder) PutResource(ctx, resourceID, parameters interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutResource", reflect.TypeOf((*MockInterface)(nil).PutResource), ctx, resourceID, parameters)
+}
+
+// PutResources mocks base method
+func (m *MockInterface) PutResources(ctx context.Context, resources map[string]interface{}) map[string]*armclient.PutResourcesResponse {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutResources", ctx, resources)
+	ret0, _ := ret[0].(map[string]*armclient.PutResourcesResponse)
+	return ret0
+}
+
+// PutResources indicates an expected call of PutResources
+func (mr *MockInterfaceMockRecorder) PutResources(ctx, resources interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutResources", reflect.TypeOf((*MockInterface)(nil).PutResources), ctx, resources)
 }
 
 // PutResourceWithDecorators mocks base method

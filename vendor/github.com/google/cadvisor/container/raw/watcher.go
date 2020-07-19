@@ -28,7 +28,7 @@ import (
 	"github.com/google/cadvisor/watcher"
 	inotify "k8s.io/utils/inotify"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type rawContainerWatcher struct {
@@ -68,10 +68,10 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 	return rawWatcher, nil
 }
 
-func (self *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error {
+func (w *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error {
 	// Watch this container (all its cgroups) and all subdirectories.
-	for _, cgroupPath := range self.cgroupPaths {
-		_, err := self.watchDirectory(events, cgroupPath, "/")
+	for _, cgroupPath := range w.cgroupPaths {
+		_, err := w.watchDirectory(events, cgroupPath, "/")
 		if err != nil {
 			return err
 		}
@@ -81,17 +81,17 @@ func (self *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error
 	go func() {
 		for {
 			select {
-			case event := <-self.watcher.Event():
-				err := self.processEvent(event, events)
+			case event := <-w.watcher.Event():
+				err := w.processEvent(event, events)
 				if err != nil {
 					klog.Warningf("Error while processing event (%+v): %v", event, err)
 				}
-			case err := <-self.watcher.Error():
+			case err := <-w.watcher.Error():
 				klog.Warningf("Error while watching %q: %v", "/", err)
-			case <-self.stopWatcher:
-				err := self.watcher.Close()
+			case <-w.stopWatcher:
+				err := w.watcher.Close()
 				if err == nil {
-					self.stopWatcher <- err
+					w.stopWatcher <- err
 					return
 				}
 			}
@@ -101,21 +101,21 @@ func (self *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error
 	return nil
 }
 
-func (self *rawContainerWatcher) Stop() error {
+func (w *rawContainerWatcher) Stop() error {
 	// Rendezvous with the watcher thread.
-	self.stopWatcher <- nil
-	return <-self.stopWatcher
+	w.stopWatcher <- nil
+	return <-w.stopWatcher
 }
 
 // Watches the specified directory and all subdirectories. Returns whether the path was
 // already being watched and an error (if any).
-func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent, dir string, containerName string) (bool, error) {
+func (w *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent, dir string, containerName string) (bool, error) {
 	// Don't watch .mount cgroups because they never have containers as sub-cgroups.  A single container
 	// can have many .mount cgroups associated with it which can quickly exhaust the inotify watches on a node.
 	if strings.HasSuffix(containerName, ".mount") {
 		return false, nil
 	}
-	alreadyWatching, err := self.watcher.AddWatch(containerName, dir)
+	alreadyWatching, err := w.watcher.AddWatch(containerName, dir)
 	if err != nil {
 		return alreadyWatching, err
 	}
@@ -124,7 +124,7 @@ func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEve
 	cleanup := true
 	defer func() {
 		if cleanup {
-			_, err := self.watcher.RemoveWatch(containerName, dir)
+			_, err := w.watcher.RemoveWatch(containerName, dir)
 			if err != nil {
 				klog.Warningf("Failed to remove inotify watch for %q: %v", dir, err)
 			}
@@ -141,7 +141,7 @@ func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEve
 		if entry.IsDir() {
 			entryPath := path.Join(dir, entry.Name())
 			subcontainerName := path.Join(containerName, entry.Name())
-			alreadyWatchingSubDir, err := self.watchDirectory(events, entryPath, subcontainerName)
+			alreadyWatchingSubDir, err := w.watchDirectory(events, entryPath, subcontainerName)
 			if err != nil {
 				klog.Errorf("Failed to watch directory %q: %v", entryPath, err)
 				if os.IsNotExist(err) {
@@ -168,7 +168,7 @@ func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEve
 	return alreadyWatching, nil
 }
 
-func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan watcher.ContainerEvent) error {
+func (w *rawContainerWatcher) processEvent(event *inotify.Event, events chan watcher.ContainerEvent) error {
 	// Convert the inotify event type to a container create or delete.
 	var eventType watcher.ContainerEventType
 	switch {
@@ -187,7 +187,7 @@ func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan 
 
 	// Derive the container name from the path name.
 	var containerName string
-	for _, mount := range self.cgroupSubsystems.Mounts {
+	for _, mount := range w.cgroupSubsystems.Mounts {
 		mountLocation := path.Clean(mount.Mountpoint) + "/"
 		if strings.HasPrefix(event.Name, mountLocation) {
 			containerName = event.Name[len(mountLocation)-1:]
@@ -202,7 +202,7 @@ func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan 
 	switch eventType {
 	case watcher.ContainerAdd:
 		// New container was created, watch it.
-		alreadyWatched, err := self.watchDirectory(events, event.Name, containerName)
+		alreadyWatched, err := w.watchDirectory(events, event.Name, containerName)
 		if err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan 
 		}
 	case watcher.ContainerDelete:
 		// Container was deleted, stop watching for it.
-		lastWatched, err := self.watcher.RemoveWatch(containerName, event.Name)
+		lastWatched, err := w.watcher.RemoveWatch(containerName, event.Name)
 		if err != nil {
 			return err
 		}

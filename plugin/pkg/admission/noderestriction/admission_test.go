@@ -146,9 +146,6 @@ func setAllLabels(node *api.Node, value string) *api.Node {
 
 func setAllowedCreateLabels(node *api.Node, value string) *api.Node {
 	node = setAllowedUpdateLabels(node, value)
-	// also allow other kubernetes labels on create until 1.17 (TODO: remove this in 1.17)
-	node.Labels["other.kubernetes.io/foo"] = value
-	node.Labels["other.k8s.io/foo"] = value
 	return node
 }
 
@@ -206,9 +203,8 @@ func setForbiddenCreateLabels(node *api.Node, value string) *api.Node {
 	// node restriction labels are forbidden
 	node.Labels["node-restriction.kubernetes.io/foo"] = value
 	node.Labels["foo.node-restriction.kubernetes.io/foo"] = value
-	// TODO: in 1.17, forbid arbitrary kubernetes labels on create
-	// node.Labels["other.kubernetes.io/foo"] = value
-	// node.Labels["other.k8s.io/foo"] = value
+	node.Labels["other.kubernetes.io/foo"] = value
+	node.Labels["other.k8s.io/foo"] = value
 	return node
 }
 
@@ -925,7 +921,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of my node with forbidden labels",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        `is not allowed to set the following labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo`,
+			err:        `is not allowed to set the following labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 		{
 			name:       "allow update of my node",

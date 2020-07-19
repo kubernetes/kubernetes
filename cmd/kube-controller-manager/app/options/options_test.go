@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -37,6 +39,7 @@ import (
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
+	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -66,6 +69,14 @@ var args = []string{
 	"--cluster-name=k8s",
 	"--cluster-signing-cert-file=/cluster-signing-cert",
 	"--cluster-signing-key-file=/cluster-signing-key",
+	"--cluster-signing-kubelet-serving-cert-file=/cluster-signing-kubelet-serving/cert-file",
+	"--cluster-signing-kubelet-serving-key-file=/cluster-signing-kubelet-serving/key-file",
+	"--cluster-signing-kubelet-client-cert-file=/cluster-signing-kubelet-client/cert-file",
+	"--cluster-signing-kubelet-client-key-file=/cluster-signing-kubelet-client/key-file",
+	"--cluster-signing-kube-apiserver-client-cert-file=/cluster-signing-kube-apiserver-client/cert-file",
+	"--cluster-signing-kube-apiserver-client-key-file=/cluster-signing-kube-apiserver-client/key-file",
+	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
+	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
@@ -87,7 +98,7 @@ var args = []string{
 	"--enable-garbage-collector=false",
 	"--enable-hostpath-provisioner=true",
 	"--enable-taint-manager=false",
-	"--experimental-cluster-signing-duration=10h",
+	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
 	"--horizontal-pod-autoscaler-downscale-delay=2m",
 	"--horizontal-pod-autoscaler-sync-period=45s",
@@ -109,6 +120,8 @@ var args = []string{
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
 	"--min-resync-period=8h",
+	"--mirroring-concurrent-service-endpoint-syncs=2",
+	"--mirroring-max-endpoints-per-subset=1000",
 	"--namespace-sync-period=10m",
 	"--node-cidr-mask-size=48",
 	"--node-cidr-mask-size-ipv4=48",
@@ -214,6 +227,22 @@ func TestAddFlags(t *testing.T) {
 				ClusterSigningCertFile: "/cluster-signing-cert",
 				ClusterSigningKeyFile:  "/cluster-signing-key",
 				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+				KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-serving/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+				},
+				KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-client/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-client/key-file",
+				},
+				KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+					KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+				},
+				LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-legacy-unknown/cert-file",
+					KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+				},
 			},
 		},
 		DaemonSetController: &DaemonSetControllerOptions{
@@ -247,6 +276,12 @@ func TestAddFlags(t *testing.T) {
 			&endpointsliceconfig.EndpointSliceControllerConfiguration{
 				ConcurrentServiceEndpointSyncs: 10,
 				MaxEndpointsPerSlice:           200,
+			},
+		},
+		EndpointSliceMirroringController: &EndpointSliceMirroringControllerOptions{
+			&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+				MirroringConcurrentServiceEndpointSyncs: 2,
+				MirroringMaxEndpointsPerSubset:          1000,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
@@ -381,6 +416,8 @@ func TestAddFlags(t *testing.T) {
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
+		Metrics:    &metrics.Options{},
+		Logs:       logs.NewOptions(),
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -457,6 +494,22 @@ func TestApplyTo(t *testing.T) {
 				ClusterSigningCertFile: "/cluster-signing-cert",
 				ClusterSigningKeyFile:  "/cluster-signing-key",
 				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+				KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-serving/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+				},
+				KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-client/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-client/key-file",
+				},
+				KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+					KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+				},
+				LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-legacy-unknown/cert-file",
+					KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+				},
 			},
 			DaemonSetController: daemonconfig.DaemonSetControllerConfiguration{
 				ConcurrentDaemonSetSyncs: 2,
@@ -478,6 +531,10 @@ func TestApplyTo(t *testing.T) {
 			EndpointSliceController: endpointsliceconfig.EndpointSliceControllerConfiguration{
 				ConcurrentServiceEndpointSyncs: 10,
 				MaxEndpointsPerSlice:           200,
+			},
+			EndpointSliceMirroringController: endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+				MirroringConcurrentServiceEndpointSyncs: 2,
+				MirroringMaxEndpointsPerSubset:          1000,
 			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,

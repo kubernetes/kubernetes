@@ -18,9 +18,14 @@ package validation
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
+	"k8s.io/api/core/v1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -33,8 +38,88 @@ const (
 	NoteLengthLimit              = 1024
 )
 
-// ValidateEvent makes sure that the event makes sense.
-func ValidateEvent(event *core.Event) field.ErrorList {
+func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
+	// Make sure events always pass legacy validation.
+	allErrs := legacyValidateEvent(event)
+	if requestVersion == v1.SchemeGroupVersion || requestVersion == eventsv1beta1.SchemeGroupVersion {
+		// No further validation for backwards compatibility.
+		return allErrs
+	}
+
+	// Strict validation applies to creation via events.k8s.io/v1 API and newer.
+	allErrs = append(allErrs, ValidateObjectMeta(&event.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateV1EventSeries(event)...)
+	zeroTime := time.Time{}
+	if event.EventTime.Time == zeroTime {
+		allErrs = append(allErrs, field.Required(field.NewPath("eventTime"), ""))
+	}
+	if event.Type != v1.EventTypeNormal && event.Type != v1.EventTypeWarning {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("type"), "", fmt.Sprintf("has invalid value: %v", event.Type)))
+	}
+	if event.FirstTimestamp.Time != zeroTime {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("firstTimestamp"), "", "needs to be unset"))
+	}
+	if event.LastTimestamp.Time != zeroTime {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("lastTimestamp"), "", "needs to be unset"))
+	}
+	if event.Count != 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("count"), "", "needs to be unset"))
+	}
+	if event.Source.Component != "" || event.Source.Host != "" {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("source"), "", "needs to be unset"))
+	}
+	return allErrs
+}
+
+func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
+	// Make sure the new event always passes legacy validation.
+	allErrs := legacyValidateEvent(newEvent)
+	if requestVersion == v1.SchemeGroupVersion || requestVersion == eventsv1beta1.SchemeGroupVersion {
+		// No further validation for backwards compatibility.
+		return allErrs
+	}
+
+	// Strict validation applies to update via events.k8s.io/v1 API and newer.
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newEvent.ObjectMeta, &oldEvent.ObjectMeta, field.NewPath("metadata"))...)
+	// if the series was modified, validate the new data
+	if !reflect.DeepEqual(newEvent.Series, oldEvent.Series) {
+		allErrs = append(allErrs, validateV1EventSeries(newEvent)...)
+	}
+
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.InvolvedObject, oldEvent.InvolvedObject, field.NewPath("involvedObject"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Message, oldEvent.Message, field.NewPath("message"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Source, oldEvent.Source, field.NewPath("source"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.FirstTimestamp, oldEvent.FirstTimestamp, field.NewPath("firstTimestamp"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.LastTimestamp, oldEvent.LastTimestamp, field.NewPath("lastTimestamp"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Action, oldEvent.Action, field.NewPath("action"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.Related, oldEvent.Related, field.NewPath("related"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.ReportingController, oldEvent.ReportingController, field.NewPath("reportingController"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newEvent.ReportingInstance, oldEvent.ReportingInstance, field.NewPath("reportingInstance"))...)
+
+	return allErrs
+}
+
+func validateV1EventSeries(event *core.Event) field.ErrorList {
+	allErrs := field.ErrorList{}
+	zeroTime := time.Time{}
+	if event.Series != nil {
+		if event.Series.Count < 2 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", fmt.Sprintf("should be at least 2")))
+		}
+		if event.Series.LastObservedTime.Time == zeroTime {
+			allErrs = append(allErrs, field.Required(field.NewPath("series.lastObservedTime"), ""))
+		}
+	}
+	return allErrs
+}
+
+// legacyValidateEvent makes sure that the event makes sense.
+func legacyValidateEvent(event *core.Event) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// Because go
 	zeroTime := time.Time{}

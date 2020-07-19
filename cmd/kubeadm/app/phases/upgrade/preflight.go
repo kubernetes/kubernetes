@@ -17,15 +17,18 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/coredns/corefile-migration/migration"
 	"github.com/pkg/errors"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -67,6 +70,11 @@ func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors 
 			name:   "CoreDNSMigration",
 			client: client,
 			f:      checkMigration,
+		},
+		&CoreDNSCheck{
+			name:   "kubeDNSTranslation",
+			client: client,
+			f:      checkKubeDNSConfigMap,
 		},
 	}
 
@@ -111,6 +119,24 @@ func checkMigration(client clientset.Interface) error {
 	_, err = migration.Migrate(currentInstalledCoreDNSversion, kubeadmconstants.CoreDNSVersion, corefile, false)
 	if err != nil {
 		return errors.Wrap(err, "CoreDNS will not be upgraded")
+	}
+	return nil
+}
+
+// checkKubeDNSConfigMap checks if the translation of kube-dns to CoreDNS ConfigMap is supported
+func checkKubeDNSConfigMap(client clientset.Interface) error {
+	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeDNSConfigMap, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if kubeDNSConfigMap == nil {
+		return nil
+	}
+
+	if _, ok := kubeDNSConfigMap.Data["federations"]; ok {
+		klog.V(1).Infoln("CoreDNS no longer supports Federation and " +
+			"hence will not translate the federation data from kube-dns to CoreDNS ConfigMap")
+		return errors.Wrap(err, "kube-dns Federation data will not be translated")
 	}
 	return nil
 }

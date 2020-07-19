@@ -46,7 +46,7 @@ var kindWhiteList = sets.NewString()
 const testNamespace = "dryrunnamespace"
 
 func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstructured.Unstructured, gvResource schema.GroupVersionResource) {
-	createdObj, err := rsc.Create(obj, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	createdObj, err := rsc.Create(context.TODO(), obj, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("failed to dry-run create stub for %s: %#v", gvResource, err)
 	}
@@ -56,21 +56,21 @@ func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstruct
 			obj.GroupVersionKind())
 	}
 
-	if _, err := rsc.Get(obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+	if _, err := rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 		t.Fatalf("object shouldn't exist: %v", err)
 	}
 }
 
 func DryRunPatchTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	patch := []byte(`{"metadata":{"annotations":{"patch": "true"}}}`)
-	obj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}})
+	obj, err := rsc.Patch(context.TODO(), name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}
 	if v := obj.GetAnnotations()["patch"]; v != "true" {
 		t.Fatalf("dry-run patched annotations should be returned, got: %v", obj.GetAnnotations())
 	}
-	obj, err = rsc.Get(obj.GetName(), metav1.GetOptions{})
+	obj, err = rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get object: %v", err)
 	}
@@ -92,7 +92,7 @@ func getReplicasOrFail(t *testing.T, obj *unstructured.Unstructured) int64 {
 }
 
 func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
-	obj, err := rsc.Get(name, metav1.GetOptions{}, "scale")
+	obj, err := rsc.Get(context.TODO(), name, metav1.GetOptions{}, "scale")
 	if apierrors.IsNotFound(err) {
 		return
 	}
@@ -102,14 +102,14 @@ func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name stri
 
 	replicas := getReplicasOrFail(t, obj)
 	patch := []byte(`{"spec":{"replicas":10}}`)
-	patchedObj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
+	patchedObj, err := rsc.Patch(context.TODO(), name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}
 	if newReplicas := getReplicasOrFail(t, patchedObj); newReplicas != 10 {
 		t.Fatalf("dry-run patch to replicas didn't return new value: %v", newReplicas)
 	}
-	persistedObj, err := rsc.Get(name, metav1.GetOptions{}, "scale")
+	persistedObj, err := rsc.Get(context.TODO(), name, metav1.GetOptions{}, "scale")
 	if err != nil {
 		t.Fatalf("failed to get scale sub-resource")
 	}
@@ -119,7 +119,7 @@ func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name stri
 }
 
 func DryRunScaleUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
-	obj, err := rsc.Get(name, metav1.GetOptions{}, "scale")
+	obj, err := rsc.Get(context.TODO(), name, metav1.GetOptions{}, "scale")
 	if apierrors.IsNotFound(err) {
 		return
 	}
@@ -131,14 +131,14 @@ func DryRunScaleUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name str
 	if err := unstructured.SetNestedField(obj.Object, int64(10), "spec", "replicas"); err != nil {
 		t.Fatalf("failed to set spec.replicas: %v", err)
 	}
-	updatedObj, err := rsc.Update(obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
+	updatedObj, err := rsc.Update(context.TODO(), obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
 	if err != nil {
 		t.Fatalf("failed to dry-run update scale sub-resource: %v", err)
 	}
 	if newReplicas := getReplicasOrFail(t, updatedObj); newReplicas != 10 {
 		t.Fatalf("dry-run update to replicas didn't return new value: %v", newReplicas)
 	}
-	persistedObj, err := rsc.Get(name, metav1.GetOptions{}, "scale")
+	persistedObj, err := rsc.Get(context.TODO(), name, metav1.GetOptions{}, "scale")
 	if err != nil {
 		t.Fatalf("failed to get scale sub-resource")
 	}
@@ -151,12 +151,12 @@ func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 	var err error
 	var obj *unstructured.Unstructured
 	for i := 0; i < 3; i++ {
-		obj, err = rsc.Get(name, metav1.GetOptions{})
+		obj, err = rsc.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to retrieve object: %v", err)
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
-		obj, err = rsc.Update(obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+		obj, err = rsc.Update(context.TODO(), obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
 		if err == nil || !apierrors.IsConflict(err) {
 			break
 		}
@@ -168,7 +168,7 @@ func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 		t.Fatalf("dry-run updated annotations should be returned, got: %v", obj.GetAnnotations())
 	}
 
-	obj, err = rsc.Get(obj.GetName(), metav1.GetOptions{})
+	obj, err = rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get object: %v", err)
 	}
@@ -178,11 +178,11 @@ func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 }
 
 func DryRunDeleteCollectionTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
-	err := rsc.DeleteCollection(&metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}, metav1.ListOptions{})
+	err := rsc.DeleteCollection(context.TODO(), metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("dry-run delete collection failed: %v", err)
 	}
-	obj, err := rsc.Get(name, metav1.GetOptions{})
+	obj, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get object: %v", err)
 	}
@@ -193,11 +193,11 @@ func DryRunDeleteCollectionTest(t *testing.T, rsc dynamic.ResourceInterface, nam
 }
 
 func DryRunDeleteTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
-	err := rsc.Delete(name, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+	err := rsc.Delete(context.TODO(), name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("dry-run delete failed: %v", err)
 	}
-	obj, err := rsc.Get(name, metav1.GetOptions{})
+	obj, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get object: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestDryRun(t *testing.T) {
 
 			DryRunCreateTest(t, rsc, obj, gvResource)
 
-			if _, err := rsc.Create(obj, metav1.CreateOptions{}); err != nil {
+			if _, err := rsc.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("failed to create stub for %s: %#v", gvResource, err)
 			}
 
@@ -294,7 +294,7 @@ func TestDryRun(t *testing.T) {
 			}
 			DryRunDeleteTest(t, rsc, name)
 
-			if err = rsc.Delete(obj.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+			if err = rsc.Delete(context.TODO(), obj.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 				t.Fatalf("deleting final object failed: %v", err)
 			}
 		})

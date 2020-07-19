@@ -26,7 +26,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -99,47 +98,6 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 				},
 			},
 		},
-	}
-}
-
-func newReplicaSet(name, ns string, replicas int32) *apps.ReplicaSet {
-	return &apps.ReplicaSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicaSet",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-			Labels:    testLabels(),
-		},
-		Spec: apps.ReplicaSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: testLabels(),
-			},
-			Replicas: &replicas,
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: testLabels(),
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  fakeContainerName,
-							Image: fakeImage,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func newDeploymentRollback(name string, annotations map[string]string, revision int64) *extensions.DeploymentRollback {
-	return &extensions.DeploymentRollback{
-		Name:               name,
-		UpdatedAnnotations: annotations,
-		RollbackTo:         extensions.RollbackConfig{Revision: revision},
 	}
 }
 
@@ -252,7 +210,7 @@ func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
 		return false, nil
 	})
 	if err != nil {
-		d.t.Fatalf("failed to mark updated Deployment pods to ready: %v", err)
+		d.t.Errorf("failed to mark updated Deployment pods to ready: %v", err)
 	}
 }
 
@@ -366,20 +324,6 @@ func (d *deploymentTester) expectNewReplicaSet() (*apps.ReplicaSet, error) {
 
 func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
-}
-
-func (d *deploymentTester) updateReplicaSetStatus(name string, applyStatusUpdate testutil.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
-	return testutil.UpdateReplicaSetStatusWithRetries(d.c, d.deployment.Namespace, name, applyStatusUpdate, d.t.Logf, pollInterval, pollTimeout)
-}
-
-// waitForDeploymentRollbackCleared waits for deployment either started rolling back or doesn't need to rollback.
-func (d *deploymentTester) waitForDeploymentRollbackCleared() error {
-	return testutil.WaitForDeploymentRollbackCleared(d.c, d.deployment.Namespace, d.deployment.Name, pollInterval, pollTimeout)
-}
-
-// checkDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
-func (d *deploymentTester) checkDeploymentRevisionAndImage(revision, image string) error {
-	return testutil.CheckDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image)
 }
 
 func (d *deploymentTester) waitForDeploymentUpdatedReplicasGTE(minUpdatedReplicas int32) error {

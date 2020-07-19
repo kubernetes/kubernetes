@@ -169,7 +169,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 	twist()
 
 	ginkgo.By("Remove test pod")
-	f.PodClient().DeleteSync(podName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+	f.PodClient().DeleteSync(podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 	ginkgo.By("Waiting for checkpoint to be removed")
 	if err := wait.PollImmediate(10*time.Second, gcTimeout, func() (bool, error) {

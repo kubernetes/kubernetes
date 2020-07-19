@@ -41,10 +41,11 @@ import (
 	"strconv"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,7 +56,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -72,6 +73,7 @@ const (
 type hostpathCSIDriver struct {
 	driverInfo       testsuites.DriverInfo
 	manifests        []string
+	cleanupHandle    framework.CleanupActionHandle
 	volumeAttributes []map[string]string
 }
 
@@ -84,7 +86,7 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
@@ -168,8 +170,13 @@ func (h *hostpathCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *
 }
 
 func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	// Create secondary namespace which will be used for creating driver
+	driverNamespace := utils.CreateDriverNamespace(f)
+	ns2 := driverNamespace.Name
+	ns1 := f.Namespace.Name
+
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
-	cancelLogging := testsuites.StartPodLogs(f)
+	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
 	cs := f.ClientSet
 
 	// The hostpath CSI driver only works when everything runs on the same node.
@@ -180,6 +187,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		Prefix:              "hostpath",
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: node.Name},
+		DriverNamespace:     driverNamespace,
 	}
 
 	o := utils.PatchCSIOptions{
@@ -191,19 +199,38 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
-	cleanup, err := utils.CreateFromManifests(config.Framework, func(item interface{}) error {
+	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
 		return utils.PatchCSIDeployment(config.Framework, o, item)
-	},
-		h.manifests...)
+	}, h.manifests...)
+
 	if err != nil {
 		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
 	}
 
-	return config, func() {
-		ginkgo.By(fmt.Sprintf("uninstalling %s driver", h.driverInfo.Name))
-		cleanup()
-		cancelLogging()
+	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
+	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
+	cleanupFunc := func() {
+		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
+		// Delete the primary namespace but its okay to fail here because this namespace will
+		// also be deleted by framework.Aftereach hook
+		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
+
+		ginkgo.By("uninstalling csi mock driver")
+		tryFunc(cleanup)
+		tryFunc(cancelLogging)
+
+		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
+		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		// cleanup function has already ran and hence we don't need to run it again.
+		// We do this as very last action because in-case defer(or AfterEach) races
+		// with AfterSuite and test routine gets killed then this block still
+		// runs in AfterSuite
+		framework.RemoveCleanupAction(h.cleanupHandle)
+
 	}
+	h.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
+
+	return config, cleanupFunc
 }
 
 // mockCSI
@@ -211,9 +238,13 @@ type mockCSIDriver struct {
 	driverInfo          testsuites.DriverInfo
 	manifests           []string
 	podInfo             *bool
+	storageCapacity     *bool
 	attachable          bool
 	attachLimit         int
+	enableTopology      bool
 	enableNodeExpansion bool
+	cleanupHandle       framework.CleanupActionHandle
+	javascriptHooks     map[string]string
 }
 
 // CSIMockDriverOpts defines options used for csi driver
@@ -221,9 +252,12 @@ type CSIMockDriverOpts struct {
 	RegisterDriver      bool
 	DisableAttach       bool
 	PodInfo             *bool
+	StorageCapacity     *bool
 	AttachLimit         int
+	EnableTopology      bool
 	EnableResizing      bool
 	EnableNodeExpansion bool
+	JavascriptHooks     map[string]string
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
@@ -269,9 +303,12 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		},
 		manifests:           driverManifests,
 		podInfo:             driverOpts.PodInfo,
+		storageCapacity:     driverOpts.StorageCapacity,
+		enableTopology:      driverOpts.EnableTopology,
 		attachable:          !driverOpts.DisableAttach,
 		attachLimit:         driverOpts.AttachLimit,
 		enableNodeExpansion: driverOpts.EnableNodeExpansion,
+		javascriptHooks:     driverOpts.JavascriptHooks,
 	}
 }
 
@@ -292,8 +329,13 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTe
 }
 
 func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	// Create secondary namespace which will be used for creating driver
+	driverNamespace := utils.CreateDriverNamespace(f)
+	ns2 := driverNamespace.Name
+	ns1 := f.Namespace.Name
+
 	ginkgo.By("deploying csi mock driver")
-	cancelLogging := testsuites.StartPodLogs(f)
+	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
@@ -304,11 +346,16 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		Prefix:              "mock",
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: node.Name},
+		DriverNamespace:     driverNamespace,
 	}
 
 	containerArgs := []string{"--name=csi-mock-" + f.UniqueName}
 	if !m.attachable {
 		containerArgs = append(containerArgs, "--disable-attach")
+	}
+
+	if m.enableTopology {
+		containerArgs = append(containerArgs, "--enable-topology")
 	}
 
 	if m.attachLimit > 0 {
@@ -319,6 +366,27 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		containerArgs = append(containerArgs, "--node-expand-required=true")
 	}
 
+	// Create a config map with javascript hooks. Create it even when javascriptHooks
+	// are empty, so we can unconditionally add it to the mock pod.
+	const hooksConfigMapName = "mock-driver-hooks"
+	hooksYaml, err := yaml.Marshal(m.javascriptHooks)
+	framework.ExpectNoError(err)
+	hooks := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hooksConfigMapName,
+		},
+		Data: map[string]string{
+			"hooks.yaml": string(hooksYaml),
+		},
+	}
+
+	_, err = f.ClientSet.CoreV1().ConfigMaps(ns2).Create(context.TODO(), hooks, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	if len(m.javascriptHooks) > 0 {
+		containerArgs = append(containerArgs, "--hooks-file=/etc/hooks/hooks.yaml")
+	}
+
 	o := utils.PatchCSIOptions{
 		OldDriverName:            "csi-mock",
 		NewDriverName:            "csi-mock-" + f.UniqueName,
@@ -327,30 +395,58 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 node.Name,
 		PodInfo:                  m.podInfo,
+		StorageCapacity:          m.storageCapacity,
 		CanAttach:                &m.attachable,
-		VolumeLifecycleModes: &[]storagev1beta1.VolumeLifecycleMode{
-			storagev1beta1.VolumeLifecyclePersistent,
-			storagev1beta1.VolumeLifecycleEphemeral,
+		VolumeLifecycleModes: &[]storagev1.VolumeLifecycleMode{
+			storagev1.VolumeLifecyclePersistent,
+			storagev1.VolumeLifecycleEphemeral,
 		},
 	}
-	cleanup, err := utils.CreateFromManifests(f, func(item interface{}) error {
+	cleanup, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)
-	},
-		m.manifests...)
+	}, m.manifests...)
+
 	if err != nil {
 		framework.Failf("deploying csi mock driver: %v", err)
 	}
 
-	return config, func() {
+	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
+	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
+	cleanupFunc := func() {
+		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
+		// Delete the primary namespace but its okay to fail here because this namespace will
+		// also be deleted by framework.Aftereach hook
+		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
+
 		ginkgo.By("uninstalling csi mock driver")
-		cleanup()
-		cancelLogging()
+		tryFunc(func() {
+			err := f.ClientSet.CoreV1().ConfigMaps(ns2).Delete(context.TODO(), hooksConfigMapName, metav1.DeleteOptions{})
+			if err != nil {
+				framework.Logf("deleting failed: %s", err)
+			}
+		})
+
+		tryFunc(cleanup)
+		tryFunc(cancelLogging)
+		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
+		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		// cleanup function has already ran and hence we don't need to run it again.
+		// We do this as very last action because in-case defer(or AfterEach) races
+		// with AfterSuite and test routine gets killed then this block still
+		// runs in AfterSuite
+		framework.RemoveCleanupAction(m.cleanupHandle)
+
 	}
+
+	m.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
+
+	return config, cleanupFunc
 }
 
 // gce-pd
 type gcePDCSIDriver struct {
-	driverInfo testsuites.DriverInfo
+	driverInfo    testsuites.DriverInfo
+	cleanupHandle framework.CleanupActionHandle
 }
 
 var _ testsuites.TestDriver = &gcePDCSIDriver{}
@@ -364,7 +460,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -391,6 +487,10 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
+			StressTestOptions: &testsuites.StressTestOptions{
+				NumPods:     10,
+				NumRestarts: 10,
+			},
 		},
 	}
 }
@@ -434,7 +534,12 @@ func (g *gcePDCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *uns
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	ginkgo.By("deploying csi gce-pd driver")
-	cancelLogging := testsuites.StartPodLogs(f)
+	// Create secondary namespace which will be used for creating driver
+	driverNamespace := utils.CreateDriverNamespace(f)
+	ns2 := driverNamespace.Name
+	ns1 := f.Namespace.Name
+
+	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
 	// It would be safer to rename the gcePD driver, but that
 	// hasn't been done before either and attempts to do so now led to
 	// errors during driver registration, therefore it is disabled
@@ -447,7 +552,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }
-	createGCESecrets(f.ClientSet, f.Namespace.Name)
+	createGCESecrets(f.ClientSet, ns2)
 
 	manifests := []string{
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
@@ -457,7 +562,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	cleanup, err := utils.CreateFromManifests(f, nil, manifests...)
+	cleanup, err := utils.CreateFromManifests(f, driverNamespace, nil, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
@@ -466,15 +571,35 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		framework.Failf("waiting for csi driver node registration on: %v", err)
 	}
 
+	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
+	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
+	cleanupFunc := func() {
+		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
+		// Delete the primary namespace but its okay to fail here because this namespace will
+		// also be deleted by framework.Aftereach hook
+		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
+
+		ginkgo.By("uninstalling csi mock driver")
+		tryFunc(cleanup)
+		tryFunc(cancelLogging)
+
+		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
+		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		// cleanup function has already ran and hence we don't need to run it again.
+		// We do this as very last action because in-case defer(or AfterEach) races
+		// with AfterSuite and test routine gets killed then this block still
+		// runs in AfterSuite
+		framework.RemoveCleanupAction(g.cleanupHandle)
+
+	}
+	g.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
+
 	return &testsuites.PerTestConfig{
-			Driver:    g,
-			Prefix:    "gcepd",
-			Framework: f,
-		}, func() {
-			ginkgo.By("uninstalling gce-pd driver")
-			cleanup()
-			cancelLogging()
-		}
+		Driver:          g,
+		Prefix:          "gcepd",
+		Framework:       f,
+		DriverNamespace: driverNamespace,
+	}, cleanupFunc
 }
 
 func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
@@ -491,7 +616,7 @@ func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Inte
 }
 
 func waitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs clientset.Interface) error {
-	const csiNodeRegisterTimeout = 1 * time.Minute
+	const csiNodeRegisterTimeout = 5 * time.Minute
 
 	waitErr := wait.PollImmediate(10*time.Second, csiNodeRegisterTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
@@ -509,4 +634,31 @@ func waitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs c
 		return fmt.Errorf("error waiting for CSI driver %s registration on node %s: %v", driverName, nodeName, waitErr)
 	}
 	return nil
+}
+
+func deleteNamespaceFunc(cs clientset.Interface, ns string, timeout time.Duration) func() {
+	return func() {
+		err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Logf("error deleting namespace %s: %v", ns, err)
+		}
+		err = framework.WaitForNamespacesDeleted(cs, []string{ns}, timeout)
+		if err != nil {
+			framework.Logf("error deleting namespace %s: %v", ns, err)
+		}
+	}
+}
+
+func tryFunc(f func()) error {
+	var err error
+	if f == nil {
+		return nil
+	}
+	defer func() {
+		if recoverError := recover(); recoverError != nil {
+			err = fmt.Errorf("%v", recoverError)
+		}
+	}()
+	f()
+	return err
 }

@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "ipnet.go",
         "net.go",
+        "port.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/utils/net",
     importpath = "k8s.io/utils/net",

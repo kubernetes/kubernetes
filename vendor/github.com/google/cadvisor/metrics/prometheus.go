@@ -17,34 +17,17 @@ package metrics
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
+	v2 "github.com/google/cadvisor/info/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
-
-// infoProvider will usually be manager.Manager, but can be swapped out for testing.
-type infoProvider interface {
-	// SubcontainersInfo provides information about all subcontainers of the
-	// specified container including itself.
-	SubcontainersInfo(containerName string, query *info.ContainerInfoRequest) ([]*info.ContainerInfo, error)
-	// GetVersionInfo provides information about the version.
-	GetVersionInfo() (*info.VersionInfo, error)
-	// GetMachineInfo provides information about the machine.
-	GetMachineInfo() (*info.MachineInfo, error)
-}
-
-// metricValue describes a single metric value for a given set of label values
-// within a parent containerMetric.
-type metricValue struct {
-	value     float64
-	labels    []string
-	timestamp time.Time
-}
-
-type metricValues []metricValue
 
 // asFloat64 converts a uint64 into a float64.
 func asFloat64(v uint64) float64 { return float64(v) }
@@ -115,13 +98,14 @@ type PrometheusCollector struct {
 	containerMetrics    []containerMetric
 	containerLabelsFunc ContainerLabelsFunc
 	includedMetrics     container.MetricSet
+	opts                v2.RequestOptions
 }
 
 // NewPrometheusCollector returns a new PrometheusCollector. The passed
 // ContainerLabelsFunc specifies which base labels will be attached to all
 // exported metrics. If left to nil, the DefaultContainerLabels function
 // will be used instead.
-func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetrics container.MetricSet) *PrometheusCollector {
+func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetrics container.MetricSet, now clock.Clock, opts v2.RequestOptions) *PrometheusCollector {
 	if f == nil {
 		f = DefaultContainerLabels
 	}
@@ -140,13 +124,14 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{
-						value:     float64(time.Now().Unix()),
-						timestamp: time.Now(),
+						value:     float64(now.Now().Unix()),
+						timestamp: now.Now(),
 					}}
 				},
 			},
 		},
 		includedMetrics: includedMetrics,
+		opts:            opts,
 	}
 	if includedMetrics.Has(container.CpuUsageMetrics) {
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
@@ -317,6 +302,60 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 							timestamp: s.Timestamp,
 						},
 					}
+				},
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.HugetlbUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:        "container_hugetlb_failcnt",
+				help:        "Number of hugepage usage hits limits",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"pagesize"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Hugetlb))
+					for k, v := range s.Hugetlb {
+						values = append(values, metricValue{
+							value:     float64(v.Failcnt),
+							labels:    []string{k},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			}, {
+				name:        "container_hugetlb_usage_bytes",
+				help:        "Current hugepage usage in bytes",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"pagesize"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Hugetlb))
+					for k, v := range s.Hugetlb {
+						values = append(values, metricValue{
+							value:     float64(v.Usage),
+							labels:    []string{k},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+			{
+				name:        "container_hugetlb_max_usage_bytes",
+				help:        "Maximum hugepage usage recorded in bytes",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"pagesize"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Hugetlb))
+					for k, v := range s.Hugetlb {
+						values = append(values, metricValue{
+							value:     float64(v.MaxUsage),
+							labels:    []string{k},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
 				},
 			},
 		}...)
@@ -961,6 +1000,417 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
+	if includedMetrics.Has(container.NetworkAdvancedTcpUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:        "container_network_advance_tcp_stats_total",
+				help:        "advance tcp connections statistic for container",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"tcp_state"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:     float64(s.Network.TcpAdvanced.RtoAlgorithm),
+							labels:    []string{"rtoalgorithm"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RtoMin),
+							labels:    []string{"rtomin"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RtoMax),
+							labels:    []string{"rtomax"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.MaxConn),
+							labels:    []string{"maxconn"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.ActiveOpens),
+							labels:    []string{"activeopens"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PassiveOpens),
+							labels:    []string{"passiveopens"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.AttemptFails),
+							labels:    []string{"attemptfails"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.EstabResets),
+							labels:    []string{"estabresets"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.CurrEstab),
+							labels:    []string{"currestab"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.InSegs),
+							labels:    []string{"insegs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OutSegs),
+							labels:    []string{"outsegs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RetransSegs),
+							labels:    []string{"retranssegs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.InErrs),
+							labels:    []string{"inerrs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OutRsts),
+							labels:    []string{"outrsts"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.InCsumErrors),
+							labels:    []string{"incsumerrors"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.EmbryonicRsts),
+							labels:    []string{"embryonicrsts"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.SyncookiesSent),
+							labels:    []string{"syncookiessent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.SyncookiesRecv),
+							labels:    []string{"syncookiesrecv"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.SyncookiesFailed),
+							labels:    []string{"syncookiesfailed"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PruneCalled),
+							labels:    []string{"prunecalled"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RcvPruned),
+							labels:    []string{"rcvpruned"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OfoPruned),
+							labels:    []string{"ofopruned"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OutOfWindowIcmps),
+							labels:    []string{"outofwindowicmps"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.LockDroppedIcmps),
+							labels:    []string{"lockdroppedicmps"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TW),
+							labels:    []string{"tw"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TWRecycled),
+							labels:    []string{"twrecycled"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TWKilled),
+							labels:    []string{"twkilled"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPTimeWaitOverflow),
+							labels:    []string{"tcptimewaitoverflow"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPTimeouts),
+							labels:    []string{"tcptimeouts"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSpuriousRTOs),
+							labels:    []string{"tcpspuriousrtos"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossProbes),
+							labels:    []string{"tcplossprobes"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossProbeRecovery),
+							labels:    []string{"tcplossproberecovery"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoRecoveryFail),
+							labels:    []string{"tcprenorecoveryfail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackRecoveryFail),
+							labels:    []string{"tcpsackrecoveryfail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoFailures),
+							labels:    []string{"tcprenofailures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackFailures),
+							labels:    []string{"tcpsackfailures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossFailures),
+							labels:    []string{"tcplossfailures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.DelayedACKs),
+							labels:    []string{"delayedacks"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.DelayedACKLocked),
+							labels:    []string{"delayedacklocked"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.DelayedACKLost),
+							labels:    []string{"delayedacklost"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.ListenOverflows),
+							labels:    []string{"listenoverflows"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.ListenDrops),
+							labels:    []string{"listendrops"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPHPHits),
+							labels:    []string{"tcphphits"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPPureAcks),
+							labels:    []string{"tcppureacks"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPHPAcks),
+							labels:    []string{"tcphpacks"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoRecovery),
+							labels:    []string{"tcprenorecovery"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackRecovery),
+							labels:    []string{"tcpsackrecovery"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSACKReneging),
+							labels:    []string{"tcpsackreneging"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFACKReorder),
+							labels:    []string{"tcpfackreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSACKReorder),
+							labels:    []string{"tcpsackreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoReorder),
+							labels:    []string{"tcprenoreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPTSReorder),
+							labels:    []string{"tcptsreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFullUndo),
+							labels:    []string{"tcpfullundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPPartialUndo),
+							labels:    []string{"tcppartialundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKUndo),
+							labels:    []string{"tcpdsackundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossUndo),
+							labels:    []string{"tcplossundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastRetrans),
+							labels:    []string{"tcpfastretrans"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSlowStartRetrans),
+							labels:    []string{"tcpslowstartretrans"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLostRetransmit),
+							labels:    []string{"tcplostretransmit"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRetransFail),
+							labels:    []string{"tcpretransfail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRcvCollapsed),
+							labels:    []string{"tcprcvcollapsed"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKOldSent),
+							labels:    []string{"tcpdsackoldsent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKOfoSent),
+							labels:    []string{"tcpdsackofosent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKRecv),
+							labels:    []string{"tcpdsackrecv"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKOfoRecv),
+							labels:    []string{"tcpdsackoforecv"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnData),
+							labels:    []string{"tcpabortondata"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnClose),
+							labels:    []string{"tcpabortonclose"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnMemory),
+							labels:    []string{"tcpabortonmemory"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnTimeout),
+							labels:    []string{"tcpabortontimeout"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnLinger),
+							labels:    []string{"tcpabortonlinger"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortFailed),
+							labels:    []string{"tcpabortfailed"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMemoryPressures),
+							labels:    []string{"tcpmemorypressures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMemoryPressuresChrono),
+							labels:    []string{"tcpmemorypressureschrono"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSACKDiscard),
+							labels:    []string{"tcpsackdiscard"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKIgnoredOld),
+							labels:    []string{"tcpdsackignoredold"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKIgnoredNoUndo),
+							labels:    []string{"tcpdsackignorednoundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMD5NotFound),
+							labels:    []string{"tcpmd5notfound"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMD5Unexpected),
+							labels:    []string{"tcpmd5unexpected"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMD5Failure),
+							labels:    []string{"tcpmd5failure"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackShifted),
+							labels:    []string{"tcpsackshifted"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackMerged),
+							labels:    []string{"tcpsackmerged"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackShiftFallback),
+							labels:    []string{"tcpsackshiftfallback"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPBacklogDrop),
+							labels:    []string{"tcpbacklogdrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PFMemallocDrop),
+							labels:    []string{"pfmemallocdrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMinTTLDrop),
+							labels:    []string{"tcpminttldrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDeferAcceptDrop),
+							labels:    []string{"tcpdeferacceptdrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.IPReversePathFilter),
+							labels:    []string{"ipreversepathfilter"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPReqQFullDoCookies),
+							labels:    []string{"tcpreqqfulldocookies"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPReqQFullDrop),
+							labels:    []string{"tcpreqqfulldrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenActive),
+							labels:    []string{"tcpfastopenactive"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenActiveFail),
+							labels:    []string{"tcpfastopenactivefail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenPassive),
+							labels:    []string{"tcpfastopenpassive"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenPassiveFail),
+							labels:    []string{"tcpfastopenpassivefail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenListenOverflow),
+							labels:    []string{"tcpfastopenlistenoverflow"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenCookieReqd),
+							labels:    []string{"tcpfastopencookiereqd"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSynRetrans),
+							labels:    []string{"tcpsynretrans"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPOrigDataSent),
+							labels:    []string{"tcporigdatasent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PAWSActive),
+							labels:    []string{"pawsactive"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PAWSEstab),
+							labels:    []string{"pawsestab"},
+							timestamp: s.Timestamp,
+						},
+					}
+				},
+			},
+		}...)
+	}
 	if includedMetrics.Has(container.NetworkUdpUsageMetrics) {
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
 			{
@@ -1079,17 +1529,176 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 					}
 				},
 			},
+			{
+				name:        "container_ulimits_soft",
+				help:        "Soft ulimit values for the container root process. Unlimited if -1, except priority and nice",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"ulimit"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Processes.Ulimits))
+					for _, ulimit := range s.Processes.Ulimits {
+						values = append(values, metricValue{
+							value:     float64(ulimit.SoftLimit),
+							labels:    []string{ulimit.Name},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
 		}...)
-
 	}
-
+	if includedMetrics.Has(container.PerfMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:        "container_perf_events_total",
+				help:        "Perf event metric.",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"cpu", "event"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.PerfStats))
+					for _, metric := range s.PerfStats {
+						values = append(values, metricValue{
+							value:     float64(metric.Value),
+							labels:    []string{strconv.Itoa(metric.Cpu), metric.Name},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+			{
+				name:        "container_perf_events_scaling_ratio",
+				help:        "Perf event metric scaling ratio.",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"cpu", "event"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.PerfStats))
+					for _, metric := range s.PerfStats {
+						values = append(values, metricValue{
+							value:     metric.ScalingRatio,
+							labels:    []string{strconv.Itoa(metric.Cpu), metric.Name},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+			{
+				name:        "container_perf_uncore_events_total",
+				help:        "Perf uncore event metric.",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"socket", "event", "pmu"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.PerfUncoreStats))
+					for _, metric := range s.PerfUncoreStats {
+						values = append(values, metricValue{
+							value:     float64(metric.Value),
+							labels:    []string{strconv.Itoa(metric.Socket), metric.Name, metric.PMU},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+			{
+				name:        "container_perf_uncore_events_scaling_ratio",
+				help:        "Perf uncore event metric scaling ratio.",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"socket", "event", "pmu"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.PerfUncoreStats))
+					for _, metric := range s.PerfUncoreStats {
+						values = append(values, metricValue{
+							value:     metric.ScalingRatio,
+							labels:    []string{strconv.Itoa(metric.Socket), metric.Name, metric.PMU},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.ReferencedMemoryMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:      "container_referenced_bytes",
+				help:      "Container referenced bytes during last measurements cycle",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.ReferencedMemory), timestamp: s.Timestamp}}
+				},
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.ResctrlMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:        "container_memory_bandwidth_bytes",
+				help:        "Total memory bandwidth usage statistics for container counted with RDT Memory Bandwidth Monitoring (MBM).",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{prometheusNodeLabelName},
+				getValues: func(s *info.ContainerStats) metricValues {
+					numberOfNUMANodes := len(s.Resctrl.MemoryBandwidth)
+					metrics := make(metricValues, numberOfNUMANodes)
+					for numaNode, stats := range s.Resctrl.MemoryBandwidth {
+						metrics[numaNode] = metricValue{
+							value:     float64(stats.TotalBytes),
+							timestamp: s.Timestamp,
+							labels:    []string{strconv.Itoa(numaNode)},
+						}
+					}
+					return metrics
+				},
+			},
+			{
+				name:        "container_memory_bandwidth_local_bytes",
+				help:        "Local memory bandwidth usage statistics for container counted with RDT Memory Bandwidth Monitoring (MBM).",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{prometheusNodeLabelName},
+				getValues: func(s *info.ContainerStats) metricValues {
+					numberOfNUMANodes := len(s.Resctrl.MemoryBandwidth)
+					metrics := make(metricValues, numberOfNUMANodes)
+					for numaNode, stats := range s.Resctrl.MemoryBandwidth {
+						metrics[numaNode] = metricValue{
+							value:     float64(stats.LocalBytes),
+							timestamp: s.Timestamp,
+							labels:    []string{strconv.Itoa(numaNode)},
+						}
+					}
+					return metrics
+				},
+			},
+			{
+				name:        "container_llc_occupancy_bytes",
+				help:        "Last level cache usage statistics for container counted with RDT Memory Bandwidth Monitoring (MBM).",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{prometheusNodeLabelName},
+				getValues: func(s *info.ContainerStats) metricValues {
+					numberOfNUMANodes := len(s.Resctrl.Cache)
+					metrics := make(metricValues, numberOfNUMANodes)
+					for numaNode, stats := range s.Resctrl.Cache {
+						metrics[numaNode] = metricValue{
+							value:     float64(stats.LLCOccupancy),
+							timestamp: s.Timestamp,
+							labels:    []string{strconv.Itoa(numaNode)},
+						}
+					}
+					return metrics
+				},
+			},
+		}...)
+	}
 	return c
 }
 
 var (
-	versionInfoDesc       = prometheus.NewDesc("cadvisor_version_info", "A metric with a constant '1' value labeled by kernel version, OS version, docker version, cadvisor version & cadvisor revision.", []string{"kernelVersion", "osVersion", "dockerVersion", "cadvisorVersion", "cadvisorRevision"}, nil)
-	machineInfoCoresDesc  = prometheus.NewDesc("machine_cpu_cores", "Number of CPU cores on the machine.", nil, nil)
-	machineInfoMemoryDesc = prometheus.NewDesc("machine_memory_bytes", "Amount of memory installed on the machine.", nil, nil)
+	versionInfoDesc = prometheus.NewDesc("cadvisor_version_info", "A metric with a constant '1' value labeled by kernel version, OS version, docker version, cadvisor version & cadvisor revision.", []string{"kernelVersion", "osVersion", "dockerVersion", "cadvisorVersion", "cadvisorRevision"}, nil)
+	startTimeDesc   = prometheus.NewDesc("container_start_time_seconds", "Start time of the container since unix epoch in seconds.", nil, nil)
+	cpuPeriodDesc   = prometheus.NewDesc("container_spec_cpu_period", "CPU period of the container.", nil, nil)
+	cpuQuotaDesc    = prometheus.NewDesc("container_spec_cpu_quota", "CPU quota of the container.", nil, nil)
+	cpuSharesDesc   = prometheus.NewDesc("container_spec_cpu_shares", "CPU share of the container.", nil, nil)
 )
 
 // Describe describes all the metrics ever exported by cadvisor. It
@@ -1099,16 +1708,17 @@ func (c *PrometheusCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, cm := range c.containerMetrics {
 		ch <- cm.desc([]string{})
 	}
+	ch <- startTimeDesc
+	ch <- cpuPeriodDesc
+	ch <- cpuQuotaDesc
+	ch <- cpuSharesDesc
 	ch <- versionInfoDesc
-	ch <- machineInfoCoresDesc
-	ch <- machineInfoMemoryDesc
 }
 
 // Collect fetches the stats from all containers and delivers them as
 // Prometheus metrics. It implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 	c.errors.Set(0)
-	c.collectMachineInfo(ch)
 	c.collectVersionInfo(ch)
 	c.collectContainersInfo(ch)
 	c.errors.Collect(ch)
@@ -1173,7 +1783,7 @@ func BaseContainerLabels(whiteList []string) func(container *info.ContainerInfo)
 }
 
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
-	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
+	containers, err := c.infoProvider.GetRequestedContainersInfo("/", c.opts)
 	if err != nil {
 		c.errors.Set(1)
 		klog.Warningf("Couldn't get containers: %s", err)
@@ -1246,6 +1856,22 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 				)
 			}
 		}
+		if c.includedMetrics.Has(container.AppMetrics) {
+			for metricLabel, v := range stats.CustomMetrics {
+				for _, metric := range v {
+					clabels := make([]string, len(rawLabels), len(rawLabels)+len(metric.Labels))
+					cvalues := make([]string, len(rawLabels), len(rawLabels)+len(metric.Labels))
+					copy(clabels, labels)
+					copy(cvalues, values)
+					for label, value := range metric.Labels {
+						clabels = append(clabels, sanitizeLabelName("app_"+label))
+						cvalues = append(cvalues, value)
+					}
+					desc := prometheus.NewDesc(metricLabel, "Custom application metric.", clabels, nil)
+					ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(metric.FloatValue), cvalues...)
+				}
+			}
+		}
 	}
 }
 
@@ -1259,17 +1885,6 @@ func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(versionInfoDesc, prometheus.GaugeValue, 1, []string{versionInfo.KernelVersion, versionInfo.ContainerOsVersion, versionInfo.DockerVersion, versionInfo.CadvisorVersion, versionInfo.CadvisorRevision}...)
 }
 
-func (c *PrometheusCollector) collectMachineInfo(ch chan<- prometheus.Metric) {
-	machineInfo, err := c.infoProvider.GetMachineInfo()
-	if err != nil {
-		c.errors.Set(1)
-		klog.Warningf("Couldn't get machine info: %s", err)
-		return
-	}
-	ch <- prometheus.MustNewConstMetric(machineInfoCoresDesc, prometheus.GaugeValue, float64(machineInfo.NumCores))
-	ch <- prometheus.MustNewConstMetric(machineInfoMemoryDesc, prometheus.GaugeValue, float64(machineInfo.MemoryCapacity))
-}
-
 // Size after which we consider memory to be "unlimited". This is not
 // MaxInt64 due to rounding by the kernel.
 const maxMemorySize = uint64(1 << 62)
@@ -1281,10 +1896,10 @@ func specMemoryValue(v uint64) float64 {
 	return float64(v)
 }
 
-var invalidLabelCharRE = regexp.MustCompile(`[^a-zA-Z0-9_]`)
+var invalidNameCharRE = regexp.MustCompile(`[^a-zA-Z0-9_]`)
 
 // sanitizeLabelName replaces anything that doesn't match
 // client_label.LabelNameRE with an underscore.
 func sanitizeLabelName(name string) string {
-	return invalidLabelCharRE.ReplaceAllString(name, "_")
+	return invalidNameCharRE.ReplaceAllString(name, "_")
 }

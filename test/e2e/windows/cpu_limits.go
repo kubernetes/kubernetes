@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Cpu Resources", func() {
+var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
 
 	// The Windows 'BusyBox' image is PowerShell plus a collection of scripts and utilities to mimic common busybox commands
@@ -132,7 +132,7 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}

@@ -24,8 +24,8 @@ import (
 	kubeletresourcemetricsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/prometheus/common/model"
 
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 					"": boundedSample(1, 1e6),
 				}),
 				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeID, gstruct.Elements{
-					"": boundedSample(10*volume.Mb, memoryLimit),
+					"": boundedSample(10*e2evolume.Mb, memoryLimit),
 				}),
 
 				"container_cpu_usage_seconds_total": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
@@ -85,8 +85,8 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				}),
 
 				"container_memory_working_set_bytes": gstruct.MatchAllElements(containerID, gstruct.Elements{
-					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
-					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
 			})
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
@@ -96,8 +96,8 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 		})
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Deleting test pods")
-			f.PodClient().DeleteSync(pod0, &metav1.DeleteOptions{}, 10*time.Minute)
-			f.PodClient().DeleteSync(pod1, &metav1.DeleteOptions{}, 10*time.Minute)
+			f.PodClient().DeleteSync(pod0, metav1.DeleteOptions{}, 10*time.Minute)
+			f.PodClient().DeleteSync(pod1, metav1.DeleteOptions{}, 10*time.Minute)
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
@@ -110,8 +110,8 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 	})
 })
 
-func getV1alpha1ResourceMetrics() (metrics.KubeletMetrics, error) {
-	return metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+kubeletresourcemetricsv1alpha1.Version)
+func getV1alpha1ResourceMetrics() (e2emetrics.KubeletMetrics, error) {
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+kubeletresourcemetricsv1alpha1.Version)
 }
 
 func nodeID(element interface{}) string {

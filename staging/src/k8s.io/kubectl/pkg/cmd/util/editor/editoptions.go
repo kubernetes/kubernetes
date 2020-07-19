@@ -28,13 +28,14 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -72,12 +73,16 @@ type EditOptions struct {
 	ApplyAnnotation bool
 	ChangeCause     string
 
+	managedFields map[types.UID][]metav1.ManagedFieldsEntry
+
 	genericclioptions.IOStreams
 
 	Recorder            genericclioptions.Recorder
 	f                   cmdutil.Factory
 	editPrinterOptions  *editPrinterOptions
 	updatedResultGetter func(data []byte) *resource.Result
+
+	FieldManager string
 }
 
 // NewEditOptions returns an initialized EditOptions instance
@@ -260,6 +265,10 @@ func (o *EditOptions) Run() error {
 			}
 
 			if !containsError {
+				if err := o.extractManagedFields(originalObj); err != nil {
+					return preservedFile(err, results.file, o.ErrOut)
+				}
+
 				if err := o.editPrinterOptions.PrintObj(originalObj, w); err != nil {
 					return preservedFile(err, results.file, o.ErrOut)
 				}
@@ -277,6 +286,7 @@ func (o *EditOptions) Run() error {
 			if err != nil {
 				return preservedFile(err, results.file, o.ErrOut)
 			}
+
 			// If we're retrying the loop because of an error, and no change was made in the file, short-circuit
 			if containsError && bytes.Equal(cmdutil.StripComments(editedDiff), cmdutil.StripComments(edited)) {
 				return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, o.ErrOut)
@@ -332,9 +342,18 @@ func (o *EditOptions) Run() error {
 				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
 				continue
 			}
+
 			// not a syntax error as it turns out...
 			containsError = false
 			updatedVisitor := resource.InfoListVisitor(updatedInfos)
+
+			// we need to add back managedFields to both updated and original object
+			if err := o.restoreManagedFields(updatedInfos); err != nil {
+				return preservedFile(err, file, o.ErrOut)
+			}
+			if err := o.restoreManagedFields(infos); err != nil {
+				return preservedFile(err, file, o.ErrOut)
+			}
 
 			// need to make sure the original namespace wasn't changed while editing
 			if err := updatedVisitor.Visit(resource.RequireNamespace(o.CmdNamespace)); err != nil {
@@ -435,6 +454,49 @@ func (o *EditOptions) Run() error {
 	}
 }
 
+func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
+	o.managedFields = make(map[types.UID][]metav1.ManagedFieldsEntry)
+	if meta.IsListType(obj) {
+		err := meta.EachListItem(obj, func(obj runtime.Object) error {
+			uid, mf, err := clearManagedFields(obj)
+			if err != nil {
+				return err
+			}
+			o.managedFields[uid] = mf
+			return nil
+		})
+		return err
+	}
+	uid, mf, err := clearManagedFields(obj)
+	if err != nil {
+		return err
+	}
+	o.managedFields[uid] = mf
+	return nil
+}
+
+func clearManagedFields(obj runtime.Object) (types.UID, []metav1.ManagedFieldsEntry, error) {
+	metaObjs, err := meta.Accessor(obj)
+	if err != nil {
+		return "", nil, err
+	}
+	mf := metaObjs.GetManagedFields()
+	metaObjs.SetManagedFields(nil)
+	return metaObjs.GetUID(), mf, nil
+}
+
+func (o *EditOptions) restoreManagedFields(infos []*resource.Info) error {
+	for _, info := range infos {
+		metaObjs, err := meta.Accessor(info.Object)
+		if err != nil {
+			return err
+		}
+		mf := o.managedFields[metaObjs.GetUID()]
+		metaObjs.SetManagedFields(mf)
+	}
+	return nil
+}
+
 func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patchVisitor resource.Visitor) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		editObjUID, err := meta.NewAccessor().UID(info.Object)
@@ -498,7 +560,7 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 	if err != nil {
 		return err
 	}
-	helper := resource.NewHelper(client, mapping)
+	helper := resource.NewHelper(client, mapping).WithFieldManager(o.FieldManager)
 	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch, nil)
 	if err != nil {
 		return err
@@ -588,6 +650,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			mergepatch.RequireKeyUnchanged("apiVersion"),
 			mergepatch.RequireKeyUnchanged("kind"),
 			mergepatch.RequireMetadataKeyUnchanged("name"),
+			mergepatch.RequireKeyUnchanged("managedFields"),
 		}
 
 		// Create the versioned struct from the type defined in the mapping
@@ -628,7 +691,9 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch, nil)
+		patched, err := resource.NewHelper(info.Client, info.Mapping).
+			WithFieldManager(o.FieldManager).
+			Patch(info.Namespace, info.Name, patchType, patch, nil)
 		if err != nil {
 			fmt.Fprintln(o.ErrOut, results.addError(err, info))
 			return nil
@@ -645,9 +710,13 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		if err := resource.CreateAndRefresh(info); err != nil {
+		obj, err := resource.NewHelper(info.Client, info.Mapping).
+			WithFieldManager(o.FieldManager).
+			Create(info.Namespace, true, info.Object)
+		if err != nil {
 			return err
 		}
+		info.Refresh(obj, true)
 		printer, err := o.ToPrinter("created")
 		if err != nil {
 			return err

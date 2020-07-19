@@ -87,13 +87,13 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 }
 
 func deleteStorageClassOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.StorageV1().StorageClasses().Delete(context.TODO(), name, nil); err != nil {
+	if err := c.StorageV1().StorageClasses().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete storage class %v: %v", name, err)
 	}
 }
 
 func deletePersistentVolumeClaimOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), name, nil); err != nil {
+	if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete persistent volume claim %v: %v", name, err)
 	}
 }

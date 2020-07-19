@@ -375,13 +375,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			ginkgo.By("Delete the node problem detector")
-			f.PodClient().Delete(context.TODO(), name, metav1.NewDeleteOptions(0))
+			f.PodClient().Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
 			ginkgo.By("Wait for the node problem detector to disappear")
 			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
-			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, nil)
+			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, metav1.DeleteOptions{})
 			ginkgo.By("Clean up the events")
-			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
+			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
 			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
@@ -419,7 +419,7 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 		count += int(event.Count)
 	}
 	if count != num {
-		return fmt.Errorf("expect event number %d, got %d: %v", num, count, events.Items)
+		return fmt.Errorf("expected %d events with reason set to %s and message set to %s\nbut %d actual events occurred. Events : %v", num, reason, message, count, events.Items)
 	}
 	return nil
 }
@@ -435,7 +435,7 @@ func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOption
 		count += int(event.Count)
 	}
 	if count != num {
-		return fmt.Errorf("expect event number %d, got %d: %v", num, count, events.Items)
+		return fmt.Errorf("expected total number of events was %d, actual events counted was %d\nEvents  : %v", num, count, events.Items)
 	}
 	return nil
 }

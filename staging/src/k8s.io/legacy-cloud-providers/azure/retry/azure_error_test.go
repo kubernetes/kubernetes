@@ -29,6 +29,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewError(t *testing.T) {
+	rawErr := fmt.Errorf("HTTP status code (404)")
+	newerr := NewError(true, rawErr)
+	assert.Equal(t, true, newerr.Retriable)
+	assert.Equal(t, rawErr, newerr.RawError)
+}
+
+func TestGetRetriableError(t *testing.T) {
+	rawErr := fmt.Errorf("HTTP status code (404)")
+	newerr := GetRetriableError(rawErr)
+	assert.Equal(t, true, newerr.Retriable)
+	assert.Equal(t, rawErr, newerr.RawError)
+}
+
+func TestGetRateLimitError(t *testing.T) {
+	opType := "write"
+	opName := "opNameTest"
+	rawErr := fmt.Errorf("azure cloud provider rate limited(%s) for operation %q", opType, opName)
+	newerr := GetRateLimitError(true, opName)
+	assert.Equal(t, true, newerr.Retriable)
+	assert.Equal(t, rawErr, newerr.RawError)
+}
+
+func TestGetThrottlingError(t *testing.T) {
+	operation := "operationtest"
+	reason := "reasontest"
+	rawErr := fmt.Errorf("azure cloud provider throttled for operation %s with reason %q", operation, reason)
+	onehourlater := time.Now().Add(time.Hour * 1)
+	newerr := GetThrottlingError(operation, reason, onehourlater)
+	assert.Equal(t, true, newerr.Retriable)
+	assert.Equal(t, rawErr, newerr.RawError)
+	assert.Equal(t, onehourlater, newerr.RetryAfter)
+}
+
 func TestGetError(t *testing.T) {
 	now = func() time.Time {
 		return time.Time{}
@@ -102,6 +136,19 @@ func TestGetError(t *testing.T) {
 		rerr := GetError(resp, test.err)
 		assert.Equal(t, test.expected, rerr)
 	}
+}
+
+func TestGetErrorNil(t *testing.T) {
+	rerr := GetError(nil, nil)
+	assert.Nil(t, rerr)
+
+	// null body
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       nil,
+	}
+	rerr = GetError(resp, nil)
+	assert.Equal(t, fmt.Errorf("empty HTTP response"), rerr.RawError)
 }
 
 func TestGetStatusNotFoundAndForbiddenIgnoredError(t *testing.T) {
@@ -256,6 +303,11 @@ func TestIsSuccessResponse(t *testing.T) {
 	}
 }
 
+func TestIsSuccessResponseNil(t *testing.T) {
+	res := isSuccessHTTPResponse(nil)
+	assert.Equal(t, false, res)
+}
+
 func TestIsThrottled(t *testing.T) {
 	tests := []struct {
 		err      *Error
@@ -289,4 +341,14 @@ func TestIsThrottled(t *testing.T) {
 		real := test.err.IsThrottled()
 		assert.Equal(t, test.expected, real)
 	}
+}
+
+func TestIsErrorRetriable(t *testing.T) {
+	// flase case
+	result := IsErrorRetriable(nil)
+	assert.Equal(t, false, result)
+
+	// true case
+	result = IsErrorRetriable(fmt.Errorf("Retriable: true"))
+	assert.Equal(t, true, result)
 }

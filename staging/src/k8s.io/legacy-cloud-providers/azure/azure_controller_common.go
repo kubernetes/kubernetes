@@ -28,13 +28,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -121,6 +121,11 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	diskEncryptionSetID := ""
 	writeAcceleratorEnabled := false
 
+	vmset, err := c.getNodeVMSet(nodeName, azcache.CacheReadTypeUnsafe)
+	if err != nil {
+		return -1, err
+	}
+
 	if isManagedDisk {
 		diskName := path.Base(diskURI)
 		resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
@@ -136,13 +141,16 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			return -1, rerr.Error()
 		}
 
-		if disk.ManagedBy != nil {
+		if disk.ManagedBy != nil && (disk.MaxShares == nil || *disk.MaxShares <= 1) {
 			attachErr := fmt.Sprintf(
 				"disk(%s) already attached to node(%s), could not be attached to node(%s)",
 				diskURI, *disk.ManagedBy, nodeName)
-			attachedNode := path.Base(*disk.ManagedBy)
+			attachedNode, err := vmset.GetNodeNameByProviderID(*disk.ManagedBy)
+			if err != nil {
+				return -1, err
+			}
 			klog.V(2).Infof("found dangling volume %s attached to node %s", diskURI, attachedNode)
-			danglingErr := volerr.NewDanglingError(attachErr, types.NodeName(attachedNode), "")
+			danglingErr := volerr.NewDanglingError(attachErr, attachedNode, "")
 			return -1, danglingErr
 		}
 
@@ -155,11 +163,6 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 				writeAcceleratorEnabled = true
 			}
 		}
-	}
-
-	vmset, err := c.getNodeVMSet(nodeName, azcache.CacheReadTypeUnsafe)
-	if err != nil {
-		return -1, err
 	}
 
 	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)

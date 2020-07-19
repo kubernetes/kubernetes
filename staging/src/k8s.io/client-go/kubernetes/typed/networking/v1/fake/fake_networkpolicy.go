@@ -103,7 +103,7 @@ func (c *FakeNetworkPolicies) Update(ctx context.Context, networkPolicy *network
 }
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
-func (c *FakeNetworkPolicies) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeNetworkPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(networkpoliciesResource, c.ns, name), &networkingv1.NetworkPolicy{})
 
@@ -111,8 +111,8 @@ func (c *FakeNetworkPolicies) Delete(ctx context.Context, name string, options *
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeNetworkPolicies) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOptions)
+func (c *FakeNetworkPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &networkingv1.NetworkPolicyList{})
 	return err

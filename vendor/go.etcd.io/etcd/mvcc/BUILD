@@ -27,6 +27,7 @@ go_library(
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/github.com/google/btree:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/go.etcd.io/etcd/auth:go_default_library",
         "//vendor/go.etcd.io/etcd/lease:go_default_library",
         "//vendor/go.etcd.io/etcd/mvcc/backend:go_default_library",
         "//vendor/go.etcd.io/etcd/mvcc/mvccpb:go_default_library",

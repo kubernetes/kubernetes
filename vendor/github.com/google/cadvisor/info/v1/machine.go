@@ -14,6 +14,8 @@
 
 package v1
 
+import "time"
+
 type FsInfo struct {
 	// Block device associated with the filesystem.
 	Device string `json:"device"`
@@ -45,9 +47,10 @@ type Node struct {
 }
 
 type Core struct {
-	Id      int     `json:"core_id"`
-	Threads []int   `json:"thread_ids"`
-	Caches  []Cache `json:"caches"`
+	Id       int     `json:"core_id"`
+	Threads  []int   `json:"thread_ids"`
+	Caches   []Cache `json:"caches"`
+	SocketID int     `json:"socket_id"`
 }
 
 type Cache struct {
@@ -59,8 +62,8 @@ type Cache struct {
 	Level int `json:"level"`
 }
 
-func (self *Node) FindCore(id int) (bool, int) {
-	for i, n := range self.Cores {
+func (n *Node) FindCore(id int) (bool, int) {
+	for i, n := range n.Cores {
 		if n.Id == id {
 			return true, i
 		}
@@ -68,30 +71,43 @@ func (self *Node) FindCore(id int) (bool, int) {
 	return false, -1
 }
 
-func (self *Node) AddThread(thread int, core int) {
+// FindCoreByThread returns bool if found Core with same thread as provided and it's index in Node Core array.
+// If it's not found, returns false and -1.
+func (n *Node) FindCoreByThread(thread int) (bool, int) {
+	for i, n := range n.Cores {
+		for _, t := range n.Threads {
+			if t == thread {
+				return true, i
+			}
+		}
+	}
+	return false, -1
+}
+
+func (n *Node) AddThread(thread int, core int) {
 	var coreIdx int
 	if core == -1 {
 		// Assume one hyperthread per core when topology data is missing.
 		core = thread
 	}
-	ok, coreIdx := self.FindCore(core)
+	ok, coreIdx := n.FindCore(core)
 
 	if !ok {
 		// New core
 		core := Core{Id: core}
-		self.Cores = append(self.Cores, core)
-		coreIdx = len(self.Cores) - 1
+		n.Cores = append(n.Cores, core)
+		coreIdx = len(n.Cores) - 1
 	}
-	self.Cores[coreIdx].Threads = append(self.Cores[coreIdx].Threads, thread)
+	n.Cores[coreIdx].Threads = append(n.Cores[coreIdx].Threads, thread)
 }
 
-func (self *Node) AddNodeCache(c Cache) {
-	self.Caches = append(self.Caches, c)
+func (n *Node) AddNodeCache(c Cache) {
+	n.Caches = append(n.Caches, c)
 }
 
-func (self *Node) AddPerCoreCache(c Cache) {
-	for idx := range self.Cores {
-		self.Cores[idx].Caches = append(self.Cores[idx].Caches, c)
+func (n *Node) AddPerCoreCache(c Cache) {
+	for idx := range n.Cores {
+		n.Cores[idx].Caches = append(n.Cores[idx].Caches, c)
 	}
 }
 
@@ -138,17 +154,15 @@ type CloudProvider string
 
 const (
 	GCE             CloudProvider = "GCE"
-	AWS                           = "AWS"
-	Azure                         = "Azure"
-	Baremetal                     = "Baremetal"
-	UnknownProvider               = "Unknown"
+	AWS             CloudProvider = "AWS"
+	Azure           CloudProvider = "Azure"
+	UnknownProvider CloudProvider = "Unknown"
 )
 
 type InstanceType string
 
 const (
-	NoInstance      InstanceType = "None"
-	UnknownInstance              = "Unknown"
+	UnknownInstance = "Unknown"
 )
 
 type InstanceID string
@@ -158,14 +172,28 @@ const (
 )
 
 type MachineInfo struct {
+	// The time of this information point.
+	Timestamp time.Time `json:"timestamp"`
+
 	// The number of cores in this machine.
 	NumCores int `json:"num_cores"`
+
+	// The number of physical cores in this machine.
+	NumPhysicalCores int `json:"num_physical_cores"`
+
+	// The number of cpu sockets in this machine.
+	NumSockets int `json:"num_sockets"`
 
 	// Maximum clock speed for the cores, in KHz.
 	CpuFrequency uint64 `json:"cpu_frequency_khz"`
 
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
+
+	// Memory capacity and number of DIMMs by memory type
+	MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`
+
+	NVMInfo NVMInfo `json:"nvm"`
 
 	// HugePages on this machine.
 	HugePages []HugePagesInfo `json:"hugepages"`
@@ -200,6 +228,64 @@ type MachineInfo struct {
 
 	// ID of cloud instance (e.g. instance-1) given to it by the cloud provider.
 	InstanceID InstanceID `json:"instance_id"`
+}
+
+func (m *MachineInfo) Clone() *MachineInfo {
+	memoryByType := m.MemoryByType
+	if len(m.MemoryByType) > 0 {
+		memoryByType = make(map[string]*MemoryInfo)
+		for memoryType, memoryInfo := range m.MemoryByType {
+			memoryByType[memoryType] = memoryInfo
+		}
+	}
+	diskMap := m.DiskMap
+	if len(m.DiskMap) > 0 {
+		diskMap = make(map[string]DiskInfo)
+		for k, info := range m.DiskMap {
+			diskMap[k] = info
+		}
+	}
+	copy := MachineInfo{
+		Timestamp:        m.Timestamp,
+		NumCores:         m.NumCores,
+		NumPhysicalCores: m.NumPhysicalCores,
+		NumSockets:       m.NumSockets,
+		CpuFrequency:     m.CpuFrequency,
+		MemoryCapacity:   m.MemoryCapacity,
+		MemoryByType:     memoryByType,
+		NVMInfo:          m.NVMInfo,
+		HugePages:        m.HugePages,
+		MachineID:        m.MachineID,
+		SystemUUID:       m.SystemUUID,
+		BootID:           m.BootID,
+		Filesystems:      m.Filesystems,
+		DiskMap:          diskMap,
+		NetworkDevices:   m.NetworkDevices,
+		Topology:         m.Topology,
+		CloudProvider:    m.CloudProvider,
+		InstanceType:     m.InstanceType,
+		InstanceID:       m.InstanceID,
+	}
+	return &copy
+}
+
+type MemoryInfo struct {
+	// The amount of memory (in bytes).
+	Capacity uint64 `json:"capacity"`
+
+	// Number of memory DIMMs.
+	DimmCount uint `json:"dimm_count"`
+}
+
+type NVMInfo struct {
+	// The total NVM capacity in bytes for memory mode.
+	MemoryModeCapacity uint64 `json:"memory_mode_capacity"`
+
+	//The total NVM capacity in bytes for app direct mode.
+	AppDirectModeCapacity uint64 `json:"app direct_mode_capacity"`
+
+	// Average power budget in watts for NVM devices configured in BIOS.
+	AvgPowerBudget uint `json:"avg_power_budget"`
 }
 
 type VersionInfo struct {

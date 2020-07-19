@@ -58,7 +58,7 @@ var _ = SIGDescribe("DNS configMap federations [Feature:Federation]", func() {
 func (t *dnsFederationsConfigMapTest) run() {
 	t.init()
 
-	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
+	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
 	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 	originalConfigMapData := t.fetchDNSConfigMapData()
@@ -74,7 +74,6 @@ func (t *dnsFederationsConfigMapTest) run() {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
-            upstream
             fallthrough in-addr.arpa ip6.arpa
             ttl 30
         }
@@ -91,7 +90,6 @@ func (t *dnsFederationsConfigMapTest) run() {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
-            upstream
             fallthrough in-addr.arpa ip6.arpa
             ttl 30
         }
@@ -221,13 +219,13 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
 	defer t.restoreDNSConfigMap(originalConfigMapData)
 
 	if isIPv6 {
-		t.createDNSServer(map[string]string{
+		t.createDNSServer(t.f.Namespace.Name, map[string]string{
 			"abc.acme.local": "2606:4700:4700::1111",
 			"def.acme.local": "2606:4700:4700::2222",
 			"widget.local":   "2606:4700:4700::3333",
 		})
 	} else {
-		t.createDNSServer(map[string]string{
+		t.createDNSServer(t.f.Namespace.Name, map[string]string{
 			"abc.acme.local": "1.1.1.1",
 			"def.acme.local": "2.2.2.2",
 			"widget.local":   "3.3.3.3",
@@ -242,7 +240,6 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
-           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }
@@ -317,7 +314,7 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
 	originalConfigMapData := t.fetchDNSConfigMapData()
 	defer t.restoreDNSConfigMap(originalConfigMapData)
 
-	t.createDNSServerWithPtrRecord(isIPv6)
+	t.createDNSServerWithPtrRecord(t.f.Namespace.Name, isIPv6)
 	defer t.deleteDNSServerPod()
 
 	// Should still be able to lookup public nameserver without explicit upstream nameserver set.
@@ -342,7 +339,6 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
-           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }
@@ -401,11 +397,11 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 
 	fooHostname := "foo.example.com"
 	if isIPv6 {
-		t.createDNSServer(map[string]string{
+		t.createDNSServer(t.f.Namespace.Name, map[string]string{
 			fooHostname: "2001:db8::29",
 		})
 	} else {
-		t.createDNSServer(map[string]string{
+		t.createDNSServer(t.f.Namespace.Name, map[string]string{
 			fooHostname: "192.0.2.123",
 		})
 	}
@@ -425,8 +421,8 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	defer func() {
 		ginkgo.By("deleting the test externalName service")
 		defer ginkgo.GinkgoRecover()
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, nil)
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameServiceLocal.Name, nil)
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, metav1.DeleteOptions{})
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameServiceLocal.Name, metav1.DeleteOptions{})
 	}()
 
 	if isIPv6 {
@@ -454,7 +450,6 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
-           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }

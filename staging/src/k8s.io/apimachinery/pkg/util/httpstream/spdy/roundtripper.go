@@ -76,19 +76,20 @@ var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
 var _ httpstream.UpgradeRoundTripper = &SpdyRoundTripper{}
 var _ utilnet.Dialer = &SpdyRoundTripper{}
 
-// NewRoundTripper creates a new SpdyRoundTripper that will use
-// the specified tlsConfig.
-func NewRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) httpstream.UpgradeRoundTripper {
-	return NewSpdyRoundTripper(tlsConfig, followRedirects, requireSameHostRedirects)
+// NewRoundTripper creates a new SpdyRoundTripper that will use the specified
+// tlsConfig.
+func NewRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) *SpdyRoundTripper {
+	return NewRoundTripperWithProxy(tlsConfig, followRedirects, requireSameHostRedirects, utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment))
 }
 
-// NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
-// the specified tlsConfig. This function is mostly meant for unit tests.
-func NewSpdyRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) *SpdyRoundTripper {
+// NewRoundTripperWithProxy creates a new SpdyRoundTripper that will use the
+// specified tlsConfig and proxy func.
+func NewRoundTripperWithProxy(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool, proxier func(*http.Request) (*url.URL, error)) *SpdyRoundTripper {
 	return &SpdyRoundTripper{
 		tlsConfig:                tlsConfig,
 		followRedirects:          followRedirects,
 		requireSameHostRedirects: requireSameHostRedirects,
+		proxier:                  proxier,
 	}
 }
 
@@ -116,11 +117,7 @@ func (s *SpdyRoundTripper) Dial(req *http.Request) (net.Conn, error) {
 // dial dials the host specified by req, using TLS if appropriate, optionally
 // using a proxy server if one is configured via environment variables.
 func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
-	proxier := s.proxier
-	if proxier == nil {
-		proxier = utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
-	}
-	proxyURL, err := proxier(req)
+	proxyURL, err := s.proxier(req)
 	if err != nil {
 		return nil, err
 	}

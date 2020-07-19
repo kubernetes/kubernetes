@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 const mb int64 = 1024 * 1024
@@ -32,7 +32,7 @@ func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
 		node              *v1.Node
 		imageExistenceMap map[string]sets.String
-		expected          map[string]*schedulernodeinfo.ImageStateSummary
+		expected          map[string]*framework.ImageStateSummary
 	}{
 		{
 			node: &v1.Node{
@@ -58,7 +58,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
 				"gcr.io/200:v1": sets.NewString("node-0"),
 			},
-			expected: map[string]*schedulernodeinfo.ImageStateSummary{
+			expected: map[string]*framework.ImageStateSummary{
 				"gcr.io/10:v1": {
 					Size:     int64(10 * mb),
 					NumNodes: 2,
@@ -78,7 +78,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				"gcr.io/10:v1":  sets.NewString("node-1"),
 				"gcr.io/200:v1": sets.NewString(),
 			},
-			expected: map[string]*schedulernodeinfo.ImageStateSummary{},
+			expected: map[string]*framework.ImageStateSummary{},
 		},
 	}
 

@@ -47,6 +47,7 @@ type Route struct {
 	Encap      Encap
 	MTU        int
 	AdvMSS     int
+	Hoplimit   int
 }
 
 func (r Route) String() string {
@@ -89,6 +90,7 @@ func (r Route) Equal(x Route) bool {
 		r.Table == x.Table &&
 		r.Type == x.Type &&
 		r.Tos == x.Tos &&
+		r.Hoplimit == x.Hoplimit &&
 		r.Flags == x.Flags &&
 		(r.MPLSDst == x.MPLSDst || (r.MPLSDst != nil && x.MPLSDst != nil && *r.MPLSDst == *x.MPLSDst)) &&
 		(r.NewDst == x.NewDst || (r.NewDst != nil && r.NewDst.Equal(x.NewDst))) &&

@@ -28,28 +28,34 @@
 
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
-# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by
-# default.
+# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by default.
 # This is currently the same with the default in:
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go
-KUBECTL_PRUNE_WHITELIST=(
-  core/v1/ConfigMap
-  core/v1/Endpoints
-  core/v1/Namespace
-  core/v1/PersistentVolumeClaim
-  core/v1/PersistentVolume
-  core/v1/Pod
-  core/v1/ReplicationController
-  core/v1/Secret
-  core/v1/Service
-  batch/v1/Job
-  batch/v1beta1/CronJob
-  apps/v1/DaemonSet
-  apps/v1/Deployment
-  apps/v1/ReplicaSet
-  apps/v1/StatefulSet
-  extensions/v1beta1/Ingress
-)
+# https://github.com/kubernetes/kubectl/blob/master/pkg/cmd/apply/prune.go.
+# To override the default list with other values, set
+# KUBECTL_PRUNE_WHITELIST_OVERRIDE environment variable to space-separated
+# names of resources to whitelist.
+if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
+  KUBECTL_PRUNE_WHITELIST=(
+    core/v1/ConfigMap
+    core/v1/Endpoints
+    core/v1/Namespace
+    core/v1/PersistentVolumeClaim
+    core/v1/PersistentVolume
+    core/v1/Pod
+    core/v1/ReplicationController
+    core/v1/Secret
+    core/v1/Service
+    batch/v1/Job
+    batch/v1beta1/CronJob
+    apps/v1/DaemonSet
+    apps/v1/Deployment
+    apps/v1/ReplicaSet
+    apps/v1/StatefulSet
+    extensions/v1beta1/Ingress
+  )
+else
+  read -ra KUBECTL_PRUNE_WHITELIST <<< "${KUBECTL_PRUNE_WHITELIST_OVERRIDE}"
+fi
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
@@ -210,13 +216,15 @@ function is_leader() {
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}')
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/')
   # If there was any problem with getting the leader election results, var will
   # be empty. Since it's better to have multiple addon managers than no addon
   # managers at all, we're going to assume that we're the leader in such case.
   log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
-  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ||
-     "$HOSTNAME" == "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
+  # KUBE_CONTROLLER_MANAGER_LEADER value is in the form "${HOSTNAME}_*"
+  # Here we verify that the value is either empty or is in the expected form for the leader
+  KUBE_CONTROLLER_MANAGER_LEADER="${KUBE_CONTROLLER_MANAGER_LEADER##${HOSTNAME}_*}"
+  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ]]
 }
 
 # The business logic for whether a given object should be created

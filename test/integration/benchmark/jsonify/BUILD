@@ -5,10 +5,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "k8s.io/kubernetes/test/integration/benchmark/jsonify",
     visibility = ["//visibility:private"],
-    deps = [
-        "//test/e2e/perftype:go_default_library",
-        "//vendor/golang.org/x/tools/benchmark/parse:go_default_library",
-    ],
+    deps = ["//vendor/golang.org/x/tools/benchmark/parse:go_default_library"],
 )
 
 go_binary(

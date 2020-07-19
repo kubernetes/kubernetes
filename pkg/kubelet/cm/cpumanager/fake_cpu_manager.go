@@ -18,8 +18,8 @@ package cpumanager
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -38,6 +38,11 @@ func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 func (m *fakeManager) Policy() Policy {
 	klog.Info("[fake cpumanager] Policy()")
 	return NewNonePolicy()
+}
+
+func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
+	klog.Infof("[fake cpumanager] Allocate (pod: %s, container: %s", pod.Name, container.Name)
+	return nil
 }
 
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {

@@ -19,18 +19,25 @@ package upgrade
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/klog"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 type planFlags struct {
@@ -47,12 +54,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		Use:   "plan [version] [flags]",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter",
 		RunE: func(_ *cobra.Command, args []string) error {
-			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, false)
-			if err != nil {
-				return err
-			}
-
-			return runPlan(flags, userVersion)
+			return runPlan(flags, args)
 		},
 	}
 
@@ -62,166 +64,200 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 }
 
 // runPlan takes care of outputting available versions to upgrade to for the user
-func runPlan(flags *planFlags, userVersion string) error {
+func runPlan(flags *planFlags, args []string) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, userVersion)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, false, false)
 	if err != nil {
 		return err
 	}
-
-	var etcdClient etcdutil.ClusterInterrogator
 
 	// Currently this is the only method we have for distinguishing
 	// external etcd vs static pod etcd
 	isExternalEtcd := cfg.Etcd.External != nil
-	if isExternalEtcd {
-		etcdClient, err = etcdutil.New(
-			cfg.Etcd.External.Endpoints,
-			cfg.Etcd.External.CAFile,
-			cfg.Etcd.External.CertFile,
-			cfg.Etcd.External.KeyFile)
-	} else {
-		// Connects to local/stacked etcd existing in the cluster
-		etcdClient, err = etcdutil.NewFromCluster(client, cfg.CertificatesDir)
-	}
-	if err != nil {
-		return err
-	}
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, cfg.DNS.Type, client)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, cfg.DNS.Type, client, constants.GetStaticPodDirectory())
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
 
-	// Tell the user which upgrades are available
-	printAvailableUpgrades(availUpgrades, os.Stdout, isExternalEtcd)
+	// Fetch the current state of the component configs
+	klog.V(1).Infoln("[upgrade/plan] analysing component config version states")
+	configVersionStates, err := getComponentConfigVersionStates(&cfg.ClusterConfiguration, client, flags.cfgPath)
+	if err != nil {
+		return errors.WithMessage(err, "[upgrade/versions] FATAL")
+	}
+
+	// No upgrades available
+	if len(availUpgrades) == 0 {
+		klog.V(1).Infoln("[upgrade/plan] Awesome, you're up-to-date! Enjoy!")
+		return nil
+	}
+
+	// Generate and print upgrade plans
+	for _, up := range availUpgrades {
+		plan, unstableVersionFlag, err := genUpgradePlan(&up, isExternalEtcd)
+		if err != nil {
+			return err
+		}
+
+		// Actually, this is needed for machine readable output only.
+		// printUpgradePlan won't output the configVersionStates as it will simply print the same table several times
+		// in the human readable output if it did so
+		plan.ConfigVersions = configVersionStates
+
+		printUpgradePlan(&up, plan, unstableVersionFlag, isExternalEtcd, os.Stdout)
+	}
+
+	// Finally, print the component config state table
+	printComponentConfigVersionStates(configVersionStates, os.Stdout)
+
 	return nil
 }
 
-// printAvailableUpgrades prints a UX-friendly overview of what versions are available to upgrade to
-// TODO look into columnize or some other formatter when time permits instead of using the tabwriter
-func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalEtcd bool) {
-
-	// Return quickly if no upgrades can be made
-	if len(upgrades) == 0 {
-		fmt.Fprintln(w, "Awesome, you're up-to-date! Enjoy!")
-		return
+// newComponentUpgradePlan helper creates outputapi.ComponentUpgradePlan object
+func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapi.ComponentUpgradePlan {
+	return outputapi.ComponentUpgradePlan{
+		Name:           name,
+		CurrentVersion: currentVersion,
+		NewVersion:     newVersion,
 	}
+}
+
+// TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
+// https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
+func appendDNSComponent(components []outputapi.ComponentUpgradePlan, up *upgrade.Upgrade, DNSType kubeadmapi.DNSAddOnType, name string) []outputapi.ComponentUpgradePlan {
+	beforeVersion, afterVersion := "", ""
+	if up.Before.DNSType == DNSType {
+		beforeVersion = up.Before.DNSVersion
+	}
+	if up.After.DNSType == DNSType {
+		afterVersion = up.After.DNSVersion
+	}
+
+	if beforeVersion != "" || afterVersion != "" {
+		components = append(components, newComponentUpgradePlan(name, beforeVersion, afterVersion))
+	}
+	return components
+}
+
+// genUpgradePlan generates output-friendly upgrade plan out of upgrade.Upgrade structure
+func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.UpgradePlan, string, error) {
+	newK8sVersion, err := version.ParseSemantic(up.After.KubeVersion)
+	if err != nil {
+		return nil, "", errors.Wrapf(err, "Unable to parse normalized version %q as a semantic version", up.After.KubeVersion)
+	}
+
+	unstableVersionFlag := ""
+	if len(newK8sVersion.PreRelease()) != 0 {
+		if strings.HasPrefix(newK8sVersion.PreRelease(), "rc") {
+			unstableVersionFlag = " --allow-release-candidate-upgrades"
+		} else {
+			unstableVersionFlag = " --allow-experimental-upgrades"
+		}
+	}
+
+	components := []outputapi.ComponentUpgradePlan{}
+
+	if up.CanUpgradeKubelets() {
+		// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
+		// in order to always get the right order. Then the map value is extracted separately
+		for _, oldVersion := range sortedSliceFromStringIntMap(up.Before.KubeletVersions) {
+			nodeCount := up.Before.KubeletVersions[oldVersion]
+			components = append(components, newComponentUpgradePlan(constants.Kubelet, fmt.Sprintf("%d x %s", nodeCount, oldVersion), up.After.KubeVersion))
+		}
+	}
+
+	components = append(components, newComponentUpgradePlan(constants.KubeAPIServer, up.Before.KubeVersion, up.After.KubeVersion))
+	components = append(components, newComponentUpgradePlan(constants.KubeControllerManager, up.Before.KubeVersion, up.After.KubeVersion))
+	components = append(components, newComponentUpgradePlan(constants.KubeScheduler, up.Before.KubeVersion, up.After.KubeVersion))
+	components = append(components, newComponentUpgradePlan(constants.KubeProxy, up.Before.KubeVersion, up.After.KubeVersion))
+
+	components = appendDNSComponent(components, up, kubeadmapi.CoreDNS, constants.CoreDNS)
+	components = appendDNSComponent(components, up, kubeadmapi.KubeDNS, constants.KubeDNS)
+
+	if !isExternalEtcd {
+		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
+	}
+
+	return &outputapi.UpgradePlan{Components: components}, unstableVersionFlag, nil
+}
+
+func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, cfgPath string) ([]outputapi.ComponentConfigVersionState, error) {
+	docmap := kubeadmapi.DocumentMap{}
+
+	if cfgPath != "" {
+		bytes, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to read config file %q", cfgPath)
+		}
+
+		docmap, err = kubeadmutil.SplitYAMLDocuments(bytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return componentconfigs.GetVersionStates(cfg, client, docmap)
+}
+
+// printUpgradePlan prints a UX-friendly overview of what versions are available to upgrade to
+func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstableVersionFlag string, isExternalEtcd bool, w io.Writer) {
 	// The tab writer writes to the "real" writer w
 	tabw := tabwriter.NewWriter(w, 10, 4, 3, ' ', 0)
 
-	// Loop through the upgrade possibilities and output text to the command line
-	for _, upgrade := range upgrades {
-
-		newK8sVersion, err := version.ParseSemantic(upgrade.After.KubeVersion)
-		if err != nil {
-			fmt.Fprintf(w, "Unable to parse normalized version %q as a semantic version\n", upgrade.After.KubeVersion)
-			continue
-		}
-
-		UnstableVersionFlag := ""
-		if len(newK8sVersion.PreRelease()) != 0 {
-			if strings.HasPrefix(newK8sVersion.PreRelease(), "rc") {
-				UnstableVersionFlag = " --allow-release-candidate-upgrades"
-			} else {
-				UnstableVersionFlag = " --allow-experimental-upgrades"
-			}
-		}
-
-		if isExternalEtcd && upgrade.CanUpgradeEtcd() {
-			fmt.Fprintln(w, "External components that should be upgraded manually before you upgrade the control plane with 'kubeadm upgrade apply':")
-			fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
-			fmt.Fprintf(tabw, "Etcd\t%s\t%s\n", upgrade.Before.EtcdVersion, upgrade.After.EtcdVersion)
-
-			// We should flush the writer here at this stage; as the columns will now be of the right size, adjusted to the above content
-			tabw.Flush()
-			fmt.Fprintln(w, "")
-		}
-
-		if upgrade.CanUpgradeKubelets() {
-			fmt.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
-			fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
-			firstPrinted := false
-
-			// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
-			// in order to always get the right order. Then the map value is extracted separately
-			for _, oldVersion := range sortedSliceFromStringIntMap(upgrade.Before.KubeletVersions) {
-				nodeCount := upgrade.Before.KubeletVersions[oldVersion]
-				if !firstPrinted {
-					// Output the Kubelet header only on the first version pair
-					fmt.Fprintf(tabw, "Kubelet\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
-					firstPrinted = true
-					continue
-				}
-				fmt.Fprintf(tabw, "\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
-			}
-			// We should flush the writer here at this stage; as the columns will now be of the right size, adjusted to the above content
-			tabw.Flush()
-			fmt.Fprintln(w, "")
-		}
-
-		fmt.Fprintf(w, "Upgrade to the latest %s:\n", upgrade.Description)
-		fmt.Fprintln(w, "")
-		fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
-		fmt.Fprintf(tabw, "API Server\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		fmt.Fprintf(tabw, "Controller Manager\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		fmt.Fprintf(tabw, "Scheduler\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		fmt.Fprintf(tabw, "Kube Proxy\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-
-		// TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
-		// https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
-		printCoreDNS, printKubeDNS := false, false
-		coreDNSBeforeVersion, coreDNSAfterVersion, kubeDNSBeforeVersion, kubeDNSAfterVersion := "", "", "", ""
-
-		switch upgrade.Before.DNSType {
-		case kubeadmapi.CoreDNS:
-			printCoreDNS = true
-			coreDNSBeforeVersion = upgrade.Before.DNSVersion
-		case kubeadmapi.KubeDNS:
-			printKubeDNS = true
-			kubeDNSBeforeVersion = upgrade.Before.DNSVersion
-		}
-
-		switch upgrade.After.DNSType {
-		case kubeadmapi.CoreDNS:
-			printCoreDNS = true
-			coreDNSAfterVersion = upgrade.After.DNSVersion
-		case kubeadmapi.KubeDNS:
-			printKubeDNS = true
-			kubeDNSAfterVersion = upgrade.After.DNSVersion
-		}
-
-		if printCoreDNS {
-			fmt.Fprintf(tabw, "CoreDNS\t%s\t%s\n", coreDNSBeforeVersion, coreDNSAfterVersion)
-		}
-		if printKubeDNS {
-			fmt.Fprintf(tabw, "Kube DNS\t%s\t%s\n", kubeDNSBeforeVersion, kubeDNSAfterVersion)
-		}
-
-		if !isExternalEtcd {
-			fmt.Fprintf(tabw, "Etcd\t%s\t%s\n", upgrade.Before.EtcdVersion, upgrade.After.EtcdVersion)
-		}
-
-		// The tabwriter should be flushed at this stage as we have now put in all the required content for this time. This is required for the tabs' size to be correct.
+	// endOfTable helper function flashes table writer
+	endOfTable := func() {
 		tabw.Flush()
 		fmt.Fprintln(w, "")
-		fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
-		fmt.Fprintln(w, "")
-		fmt.Fprintf(w, "\tkubeadm upgrade apply %s%s\n", upgrade.After.KubeVersion, UnstableVersionFlag)
-		fmt.Fprintln(w, "")
+	}
 
-		if upgrade.Before.KubeadmVersion != upgrade.After.KubeadmVersion {
-			fmt.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s.\n", upgrade.After.KubeadmVersion)
-			fmt.Fprintln(w, "")
+	printHeader := true
+	printManualUpgradeHeader := true
+	for _, component := range plan.Components {
+		if isExternalEtcd && component.Name == constants.Etcd {
+			// Don't print etcd if it's external
+			continue
+		} else if component.Name == constants.Kubelet {
+			if printManualUpgradeHeader {
+				fmt.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
+				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+				fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
+				printManualUpgradeHeader = false
+			} else {
+				fmt.Fprintf(tabw, "%s\t%s\t%s\n", "", component.CurrentVersion, component.NewVersion)
+			}
+		} else {
+			if printHeader {
+				// End of manual upgrades table
+				endOfTable()
+
+				fmt.Fprintf(w, "Upgrade to the latest %s:\n", up.Description)
+				fmt.Fprintln(w, "")
+				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+				printHeader = false
+			}
+			fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
 		}
+	}
+	// End of control plane table
+	endOfTable()
 
-		fmt.Fprintln(w, "_____________________________________________________________________")
+	//fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
+	fmt.Fprintln(w, "")
+	fmt.Fprintf(w, "\tkubeadm upgrade apply %s%s\n", up.After.KubeVersion, unstableVersionFlag)
+	fmt.Fprintln(w, "")
+
+	if up.Before.KubeadmVersion != up.After.KubeadmVersion {
+		fmt.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s.\n", up.After.KubeadmVersion)
 		fmt.Fprintln(w, "")
 	}
+
+	printLineSeparator(w)
 }
 
 // sortedSliceFromStringIntMap returns a slice of the keys in the map sorted alphabetically
@@ -232,4 +268,53 @@ func sortedSliceFromStringIntMap(strMap map[string]uint16) []string {
 	}
 	sort.Strings(strSlice)
 	return strSlice
+}
+
+func strOrDash(s string) string {
+	if s != "" {
+		return s
+	}
+	return "-"
+}
+
+func yesOrNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
+}
+
+func printLineSeparator(w io.Writer) {
+	fmt.Fprintln(w, "_____________________________________________________________________")
+	fmt.Fprintln(w, "")
+}
+
+func printComponentConfigVersionStates(versionStates []outputapi.ComponentConfigVersionState, w io.Writer) {
+	if len(versionStates) == 0 {
+		fmt.Fprintln(w, "No information available on component configs.")
+		return
+	}
+
+	fmt.Fprintln(w, dedent.Dedent(`
+		The table below shows the current state of component configs as understood by this version of kubeadm.
+		Configs that have a "yes" mark in the "MANUAL UPGRADE REQUIRED" column require manual config upgrade or
+		resetting to kubeadm defaults before a successful upgrade can be performed. The version to manually
+		upgrade to is denoted in the "PREFERRED VERSION" column.
+	`))
+
+	tabw := tabwriter.NewWriter(w, 10, 4, 3, ' ', 0)
+	fmt.Fprintln(tabw, "API GROUP\tCURRENT VERSION\tPREFERRED VERSION\tMANUAL UPGRADE REQUIRED")
+
+	for _, state := range versionStates {
+		fmt.Fprintf(tabw,
+			"%s\t%s\t%s\t%s\n",
+			state.Group,
+			strOrDash(state.CurrentVersion),
+			strOrDash(state.PreferredVersion),
+			yesOrNo(state.ManualUpgradeRequired),
+		)
+	}
+
+	tabw.Flush()
+	printLineSeparator(w)
 }

@@ -20,11 +20,10 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 )
 
@@ -72,13 +71,8 @@ func runKubeletStart(c workflow.RunData) error {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
 
-	kubeletCfg, ok := data.Cfg().ComponentConfigs[componentconfigs.KubeletGroup]
-	if !ok {
-		return errors.New("no kubelet component config found in the active component config set")
-	}
-
 	// Write the kubelet configuration file to disk.
-	if err := kubeletphase.WriteConfigToDisk(kubeletCfg, data.KubeletDir()); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&data.Cfg().ClusterConfiguration, data.KubeletDir()); err != nil {
 		return errors.Wrap(err, "error writing kubelet configuration to disk")
 	}
 

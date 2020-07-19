@@ -21,14 +21,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-base/codec"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	kubeschedulerconfigv1alpha1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1"
-	kubeschedulerconfigv1alpha2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha2"
+	kubeschedulerconfigv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 )
 
 func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
@@ -44,26 +40,7 @@ func loadConfig(data []byte) (*kubeschedulerconfig.KubeSchedulerConfiguration, e
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
 	obj, gvk, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
-		// Try strict decoding first. If that fails decode with a lenient
-		// decoder, which has only v1alpha1 registered, and log a warning.
-		// The lenient path is to be dropped when support for v1alpha1 is dropped.
-		if !runtime.IsStrictDecodingError(err) {
-			return nil, err
-		}
-
-		var lenientErr error
-		_, lenientCodecs, lenientErr := codec.NewLenientSchemeAndCodecs(
-			kubeschedulerconfig.AddToScheme,
-			kubeschedulerconfigv1alpha1.AddToScheme,
-		)
-		if lenientErr != nil {
-			return nil, lenientErr
-		}
-		obj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
-		if lenientErr != nil {
-			return nil, err
-		}
-		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
+		return nil, err
 	}
 	if cfgObj, ok := obj.(*kubeschedulerconfig.KubeSchedulerConfiguration); ok {
 		return cfgObj, nil
@@ -79,7 +56,7 @@ func WriteConfigFile(fileName string, cfg *kubeschedulerconfig.KubeSchedulerConf
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1alpha2.SchemeGroupVersion)
+	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1beta1.SchemeGroupVersion)
 
 	configFile, err := os.Create(fileName)
 	if err != nil {

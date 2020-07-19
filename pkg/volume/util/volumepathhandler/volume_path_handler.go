@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 
@@ -283,7 +283,7 @@ func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string
 	var refs []string
 	files, err := ioutil.ReadDir(mapPath)
 	if err != nil {
-		return nil, fmt.Errorf("directory cannot read %v", err)
+		return nil, err
 	}
 	for _, file := range files {
 		if file.Mode()&os.ModeDevice != os.ModeDevice {

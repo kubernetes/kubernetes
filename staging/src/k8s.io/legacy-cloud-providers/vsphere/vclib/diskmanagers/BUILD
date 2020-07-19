@@ -18,7 +18,7 @@ go_library(
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

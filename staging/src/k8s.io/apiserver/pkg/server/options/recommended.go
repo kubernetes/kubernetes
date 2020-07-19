@@ -48,14 +48,11 @@ type RecommendedOptions struct {
 	// admission plugin initializers to Admission.ApplyTo.
 	ExtraAdmissionInitializers func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error)
 	Admission                  *AdmissionOptions
-	// ProcessInfo is used to identify events created by the server.
-	ProcessInfo *ProcessInfo
-	Webhook     *WebhookOptions
 	// API Server Egress Selector is used to control outbound traffic from the API Server
 	EgressSelector *EgressSelectorOptions
 }
 
-func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *ProcessInfo) *RecommendedOptions {
+func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
 	sso := NewSecureServingOptions()
 
 	// We are composing recommended options for an aggregated api-server,
@@ -78,8 +75,6 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *Proc
 		FeatureGate:                feature.DefaultFeatureGate,
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
-		ProcessInfo:                processInfo,
-		Webhook:                    NewWebhookOptions(),
 		EgressSelector:             NewEgressSelectorOptions(),
 	}
 }
@@ -111,7 +106,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {
 		return err
 	}
-	if err := o.Audit.ApplyTo(&config.Config, config.ClientConfig, config.SharedInformerFactory, o.ProcessInfo, o.Webhook); err != nil {
+	if err := o.Audit.ApplyTo(&config.Config); err != nil {
 		return err
 	}
 	if err := o.Features.ApplyTo(&config.Config); err != nil {

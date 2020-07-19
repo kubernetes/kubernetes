@@ -10,7 +10,6 @@
 package hcsschema
 
 type RegistryChanges struct {
-
 	AddValues []RegistryValue `json:"AddValues,omitempty"`
 
 	DeleteKeys []RegistryKey `json:"DeleteKeys,omitempty"`

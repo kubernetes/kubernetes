@@ -44,7 +44,20 @@ func (r *FakeImageService) SetFakeImages(images []string) {
 
 	r.Images = make(map[string]*runtimeapi.Image)
 	for _, image := range images {
-		r.Images[image] = r.makeFakeImage(image)
+		r.Images[image] = r.makeFakeImage(
+			&runtimeapi.ImageSpec{
+				Image:       image,
+				Annotations: make(map[string]string)})
+	}
+}
+
+func (r *FakeImageService) SetFakeImagesWithAnnotations(imageSpecs []*runtimeapi.ImageSpec) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Images = make(map[string]*runtimeapi.Image)
+	for _, imageSpec := range imageSpecs {
+		r.Images[imageSpec.Image] = r.makeFakeImage(imageSpec)
 	}
 }
 
@@ -70,11 +83,12 @@ func NewFakeImageService() *FakeImageService {
 	}
 }
 
-func (r *FakeImageService) makeFakeImage(image string) *runtimeapi.Image {
+func (r *FakeImageService) makeFakeImage(image *runtimeapi.ImageSpec) *runtimeapi.Image {
 	return &runtimeapi.Image{
-		Id:       image,
+		Id:       image.Image,
 		Size_:    r.FakeImageSize,
-		RepoTags: []string{image},
+		Spec:     image,
+		RepoTags: []string{image.Image},
 	}
 }
 
@@ -157,7 +171,7 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 	// image's name for easily making fake images.
 	imageID := image.Image
 	if _, ok := r.Images[imageID]; !ok {
-		r.Images[imageID] = r.makeFakeImage(image.Image)
+		r.Images[imageID] = r.makeFakeImage(image)
 	}
 
 	return imageID, nil

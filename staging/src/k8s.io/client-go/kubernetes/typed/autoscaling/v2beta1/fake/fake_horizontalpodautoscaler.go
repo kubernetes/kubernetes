@@ -115,7 +115,7 @@ func (c *FakeHorizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizon
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
-func (c *FakeHorizontalPodAutoscalers) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeHorizontalPodAutoscalers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(horizontalpodautoscalersResource, c.ns, name), &v2beta1.HorizontalPodAutoscaler{})
 
@@ -123,8 +123,8 @@ func (c *FakeHorizontalPodAutoscalers) Delete(ctx context.Context, name string, 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(horizontalpodautoscalersResource, c.ns, listOptions)
+func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(horizontalpodautoscalersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2beta1.HorizontalPodAutoscalerList{})
 	return err

@@ -86,29 +86,31 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
-		if endpointutil.ShouldPodBeInEndpoints(pod) {
-			endpointPorts := getEndpointPorts(service, pod)
-			epHash := endpointutil.NewPortMapKey(endpointPorts)
-			if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
-				desiredEndpointsByPortMap[epHash] = endpointSet{}
-			}
+		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
+			continue
+		}
 
-			if _, ok := desiredMetaByPortMap[epHash]; !ok {
-				desiredMetaByPortMap[epHash] = &endpointMeta{
-					AddressType: addressType,
-					Ports:       endpointPorts,
-				}
-			}
+		endpointPorts := getEndpointPorts(service, pod)
+		epHash := endpointutil.NewPortMapKey(endpointPorts)
+		if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
+			desiredEndpointsByPortMap[epHash] = endpointSet{}
+		}
 
-			node, err := r.nodeLister.Get(pod.Spec.NodeName)
-			if err != nil {
-				return err
+		if _, ok := desiredMetaByPortMap[epHash]; !ok {
+			desiredMetaByPortMap[epHash] = &endpointMeta{
+				AddressType: addressType,
+				Ports:       endpointPorts,
 			}
-			endpoint := podToEndpoint(pod, node, service)
-			if len(endpoint.Addresses) > 0 {
-				desiredEndpointsByPortMap[epHash].Insert(&endpoint)
-				numDesiredEndpoints++
-			}
+		}
+
+		node, err := r.nodeLister.Get(pod.Spec.NodeName)
+		if err != nil {
+			return err
+		}
+		endpoint := podToEndpoint(pod, node, service)
+		if len(endpoint.Addresses) > 0 {
+			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
+			numDesiredEndpoints++
 		}
 	}
 
@@ -204,18 +206,23 @@ func (r *reconciler) finalize(
 		}
 	}
 
-	for _, endpointSlice := range slicesToCreate {
-		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		createdSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-		if err != nil {
-			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
-			if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				return nil
+	// Don't create new EndpointSlices if the Service is pending deletion. This
+	// is to avoid a potential race condition with the garbage collector where
+	// it tries to delete EndpointSlices as this controller replaces them.
+	if service.DeletionTimestamp == nil {
+		for _, endpointSlice := range slicesToCreate {
+			addTriggerTimeAnnotation(endpointSlice, triggerTime)
+			createdSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+			if err != nil {
+				// If the namespace is terminating, creates will continue to fail. Simply drop the item.
+				if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+					return nil
+				}
+				errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
+			} else {
+				r.endpointSliceTracker.Update(createdSlice)
+				metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 			}
-			errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
-		} else {
-			r.endpointSliceTracker.Update(createdSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
 
@@ -231,7 +238,7 @@ func (r *reconciler) finalize(
 	}
 
 	for _, endpointSlice := range slicesToDelete {
-		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(context.TODO(), endpointSlice.Name, &metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {

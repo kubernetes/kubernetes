@@ -15,6 +15,7 @@ package procfs
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -24,6 +25,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // IPVSStats holds IPVS statistics, as exposed by the kernel in `/proc/net/ip_vs_stats`.
@@ -64,17 +67,16 @@ type IPVSBackendStatus struct {
 
 // IPVSStats reads the IPVS statistics from the specified `proc` filesystem.
 func (fs FS) IPVSStats() (IPVSStats, error) {
-	file, err := os.Open(fs.proc.Path("net/ip_vs_stats"))
+	data, err := util.ReadFileNoStat(fs.proc.Path("net/ip_vs_stats"))
 	if err != nil {
 		return IPVSStats{}, err
 	}
-	defer file.Close()
 
-	return parseIPVSStats(file)
+	return parseIPVSStats(bytes.NewReader(data))
 }
 
 // parseIPVSStats performs the actual parsing of `ip_vs_stats`.
-func parseIPVSStats(file io.Reader) (IPVSStats, error) {
+func parseIPVSStats(r io.Reader) (IPVSStats, error) {
 	var (
 		statContent []byte
 		statLines   []string
@@ -82,7 +84,7 @@ func parseIPVSStats(file io.Reader) (IPVSStats, error) {
 		stats       IPVSStats
 	)
 
-	statContent, err := ioutil.ReadAll(file)
+	statContent, err := ioutil.ReadAll(r)
 	if err != nil {
 		return IPVSStats{}, err
 	}

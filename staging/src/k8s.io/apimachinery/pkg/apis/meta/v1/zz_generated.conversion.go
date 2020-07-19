@@ -145,6 +145,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*[]string)(nil), (*ResourceVersionMatch)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_v1_ResourceVersionMatch(a.(*[]string), b.(*ResourceVersionMatch), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*[]string)(nil), (*Time)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_Slice_string_To_v1_Time(a.(*[]string), b.(*Time), scope)
 	}); err != nil {
@@ -414,6 +419,13 @@ func autoConvert_url_Values_To_v1_ListOptions(in *url.Values, out *ListOptions, 
 		}
 	} else {
 		out.ResourceVersion = ""
+	}
+	if values, ok := map[string][]string(*in)["resourceVersionMatch"]; ok && len(values) > 0 {
+		if err := Convert_Slice_string_To_v1_ResourceVersionMatch(&values, &out.ResourceVersionMatch, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceVersionMatch = ""
 	}
 	if values, ok := map[string][]string(*in)["timeoutSeconds"]; ok && len(values) > 0 {
 		if err := runtime.Convert_Slice_string_To_Pointer_int64(&values, &out.TimeoutSeconds, s); err != nil {

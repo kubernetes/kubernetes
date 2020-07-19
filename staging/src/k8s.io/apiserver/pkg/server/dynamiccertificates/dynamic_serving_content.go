@@ -26,7 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DynamicCertKeyPairContent provides a CertKeyContentProvider that can dynamically react to new file content
@@ -108,6 +108,7 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 	}
 
 	c.certKeyPair.Store(newCertKey)
+	klog.V(2).Infof("Loaded a new cert/key pair for %q", c.Name())
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()

@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/install"
-	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	"k8s.io/apiserver/pkg/apis/apiserver/v1beta1"
 	"k8s.io/utils/path"
 	"sigs.k8s.io/yaml"
 )
@@ -51,7 +51,7 @@ func ReadEgressSelectorConfiguration(configFilePath string) (*apiserver.EgressSe
 	if err != nil {
 		return nil, fmt.Errorf("unable to read egress selector configuration from %q [%v]", configFilePath, err)
 	}
-	var decodedConfig v1alpha1.EgressSelectorConfiguration
+	var decodedConfig v1beta1.EgressSelectorConfiguration
 	err = yaml.Unmarshal(data, &decodedConfig)
 	if err != nil {
 		// we got an error where the decode wasn't related to a missing type

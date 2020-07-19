@@ -28,7 +28,7 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -173,6 +173,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			return RunListTokens(out, errW, client, printer)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	outputFlags.AddFlags(listCmd)
@@ -226,6 +227,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunGenerateToken(out)
 		},
+		Args: cobra.NoArgs,
 	}
 }
 
@@ -431,7 +433,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 		klog.V(1).Infof("[token] deleting token %q", tokenID)
-		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, nil); err != nil {
+		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, metav1.DeleteOptions{}); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
 		}
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)

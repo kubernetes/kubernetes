@@ -86,6 +86,11 @@ func (in *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
 func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.EnableServer != nil {
+		in, out := &in.EnableServer, &out.EnableServer
+		*out = new(bool)
+		**out = **in
+	}
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
@@ -183,6 +188,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	if in.CPUCFSQuotaPeriod != nil {
 		in, out := &in.CPUCFSQuotaPeriod, &out.CPUCFSQuotaPeriod
 		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.NodeStatusMaxImages != nil {
+		in, out := &in.NodeStatusMaxImages, &out.NodeStatusMaxImages
+		*out = new(int32)
 		**out = **in
 	}
 	if in.KubeAPIQPS != nil {
@@ -284,6 +294,12 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	out.Logging = in.Logging
+	if in.EnableSystemLogHandler != nil {
+		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }

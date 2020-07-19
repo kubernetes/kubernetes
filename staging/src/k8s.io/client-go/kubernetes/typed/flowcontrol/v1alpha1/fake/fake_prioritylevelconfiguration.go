@@ -108,15 +108,15 @@ func (c *FakePriorityLevelConfigurations) UpdateStatus(ctx context.Context, prio
 }
 
 // Delete takes name of the priorityLevelConfiguration and deletes it. Returns an error if one occurs.
-func (c *FakePriorityLevelConfigurations) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakePriorityLevelConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(prioritylevelconfigurationsResource, name), &v1alpha1.PriorityLevelConfiguration{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePriorityLevelConfigurations) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(prioritylevelconfigurationsResource, listOptions)
+func (c *FakePriorityLevelConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(prioritylevelconfigurationsResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.PriorityLevelConfigurationList{})
 	return err

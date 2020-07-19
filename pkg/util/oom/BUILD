@@ -19,11 +19,11 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/kubelet/cm/util:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm/util:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "//conditions:default": [],
     }),

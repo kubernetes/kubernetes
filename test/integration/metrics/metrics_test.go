@@ -95,11 +95,17 @@ func TestApiserverMetrics(t *testing.T) {
 		t.Fatalf("unexpected error getting pods: %v", err)
 	}
 
+	// Make a request to a deprecated API to ensure there's at least one data point
+	if _, err := client.RbacV1beta1().Roles(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Fatalf("unexpected error getting rbac roles: %v", err)
+	}
+
 	metrics, err := scrapeMetrics(s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	checkForExpectedMetrics(t, metrics, []string{
+		"apiserver_requested_deprecated_apis",
 		"apiserver_request_total",
 		"apiserver_request_duration_seconds_sum",
 		"etcd_request_duration_seconds_sum",

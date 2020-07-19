@@ -35,8 +35,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -48,8 +48,8 @@ import (
 )
 
 var (
-	upgradeTarget = config.Flags.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
-	upgradeImage  = config.Flags.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
+	upgradeTarget = e2econfig.Flags.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
+	upgradeImage  = e2econfig.Flags.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 )
 
 var upgradeTests = []upgrades.Test{
@@ -131,7 +131,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, nodeUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.NodeUpgrade, upgradeFunc)
@@ -152,7 +152,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -181,7 +181,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				defer finalizeUpgradeTest(start, clusterDowngradeTest)
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -251,7 +251,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -269,7 +269,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuDowngradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -299,7 +299,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, statefulsetUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -334,7 +334,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
+				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -360,7 +360,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				defer finalizeUpgradeTest(start, kubeProxyDowngradeTest)
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
+				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -408,7 +408,7 @@ func finalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
 	}
 
 	switch r := r.(type) {
-	case ginkgowrapper.FailurePanic:
+	case e2eginkgowrapper.FailurePanic:
 		tc.Failures = []*junit.Failure{
 			{
 				Message: r.Message,
@@ -602,6 +602,116 @@ func checkNodesVersions(cs clientset.Interface, want string) error {
 			return fmt.Errorf("node %s had kube-proxy version %s which does not start with %s",
 				n.ObjectMeta.Name, kpv, want)
 		}
+	}
+	return nil
+}
+
+// nodeUpgrade upgrades nodes on GCE/GKE.
+func nodeUpgrade(f *framework.Framework, v string, img string) error {
+	// Perform the upgrade.
+	var err error
+	switch framework.TestContext.Provider {
+	case "gce":
+		err = nodeUpgradeGCE(v, img, false)
+	case "gke":
+		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
+	default:
+		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+	}
+	if err != nil {
+		return err
+	}
+	return waitForNodesReadyAfterUpgrade(f)
+}
+
+// nodeUpgradeGCEWithKubeProxyDaemonSet upgrades nodes on GCE with enabling/disabling the daemon set of kube-proxy.
+// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
+func nodeUpgradeGCEWithKubeProxyDaemonSet(f *framework.Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
+	// Perform the upgrade.
+	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
+		return err
+	}
+	return waitForNodesReadyAfterUpgrade(f)
+}
+
+// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
+func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
+	v := "v" + rawV
+	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
+	if img != "" {
+		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
+		_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", "-o", v)
+		return err
+	}
+	_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", v)
+	return err
+}
+
+func nodeUpgradeGKE(namespace string, v string, img string) error {
+	framework.Logf("Upgrading nodes to version %q and image %q", v, img)
+	nps, err := nodePoolsGKE()
+	if err != nil {
+		return err
+	}
+	framework.Logf("Found node pools %v", nps)
+	for _, np := range nps {
+		args := []string{
+			"container",
+			"clusters",
+			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
+			framework.LocationParamGKE(),
+			"upgrade",
+			framework.TestContext.CloudConfig.Cluster,
+			fmt.Sprintf("--node-pool=%s", np),
+			fmt.Sprintf("--cluster-version=%s", v),
+			"--quiet",
+		}
+		if len(img) > 0 {
+			args = append(args, fmt.Sprintf("--image-type=%s", img))
+		}
+		_, _, err = framework.RunCmd("gcloud", framework.AppendContainerCommandGroupIfNeeded(args)...)
+
+		if err != nil {
+			return err
+		}
+
+		framework.WaitForSSHTunnels(namespace)
+	}
+	return nil
+}
+
+func nodePoolsGKE() ([]string, error) {
+	args := []string{
+		"container",
+		"node-pools",
+		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
+		framework.LocationParamGKE(),
+		"list",
+		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
+		"--format=get(name)",
+	}
+	stdout, _, err := framework.RunCmd("gcloud", framework.AppendContainerCommandGroupIfNeeded(args)...)
+	if err != nil {
+		return nil, err
+	}
+	if len(strings.TrimSpace(stdout)) == 0 {
+		return []string{}, nil
+	}
+	return strings.Fields(stdout), nil
+}
+
+func waitForNodesReadyAfterUpgrade(f *framework.Framework) error {
+	// Wait for it to complete and validate nodes are healthy.
+	//
+	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
+	// GKE; the operation shouldn't return until they all are.
+	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+	if err != nil {
+		return fmt.Errorf("couldn't detect number of nodes")
+	}
+	framework.Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", framework.RestartNodeReadyAgainTimeout, numNodes)
+	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout); err != nil {
+		return err
 	}
 	return nil
 }

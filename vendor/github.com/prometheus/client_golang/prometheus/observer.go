@@ -50,3 +50,15 @@ type ObserverVec interface {
 
 	Collector
 }
+
+// ExemplarObserver is implemented by Observers that offer the option of
+// observing a value together with an exemplar. Its ObserveWithExemplar method
+// works like the Observe method of an Observer but also replaces the currently
+// saved exemplar (if any) with a new one, created from the provided value, the
+// current time as timestamp, and the provided Labels. Empty Labels will lead to
+// a valid (label-less) exemplar. But if Labels is nil, the current exemplar is
+// left in place. ObserveWithExemplar panics if any of the provided labels are
+// invalid or if the provided labels contain more than 64 runes in total.
+type ExemplarObserver interface {
+	ObserveWithExemplar(value float64, exemplar Labels)
+}

@@ -29,7 +29,7 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 
 	systemdutil "github.com/coreos/go-systemd/util"
 	"github.com/onsi/ginkgo"
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
-			fsCapacityBounds := bounded(100*volume.Mb, 10*volume.Tb)
+			fsCapacityBounds := bounded(100*e2evolume.Mb, 10*e2evolume.Tb)
 			// Expectations for system containers.
 			sysContExpectations := func() types.GomegaMatcher {
 				return gstruct.MatchAllFields(gstruct.Fields{
@@ -97,10 +97,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time": recent(maxStatsAge),
 						// We don't limit system container memory.
 						"AvailableBytes":  gomega.BeNil(),
-						"UsageBytes":      bounded(1*volume.Mb, memoryLimit),
-						"WorkingSetBytes": bounded(1*volume.Mb, memoryLimit),
+						"UsageBytes":      bounded(1*e2evolume.Mb, memoryLimit),
+						"WorkingSetBytes": bounded(1*e2evolume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
-						"RSSBytes":        bounded(1*volume.Mb, memoryLimit),
+						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -114,10 +114,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
 				"Time": recent(maxStatsAge),
 				// Pods are limited by Node Allocatable
-				"AvailableBytes":  bounded(1*volume.Kb, memoryLimit),
-				"UsageBytes":      bounded(10*volume.Kb, memoryLimit),
-				"WorkingSetBytes": bounded(10*volume.Kb, memoryLimit),
-				"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
+				"AvailableBytes":  bounded(1*e2evolume.Kb, memoryLimit),
+				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
+				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
+				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 				"PageFaults":      bounded(0, 1000000),
 				"MajorPageFaults": bounded(0, 10),
 			})
@@ -159,9 +159,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time": recent(maxStatsAge),
 					// We don't limit system container memory.
 					"AvailableBytes":  gomega.BeNil(),
-					"UsageBytes":      bounded(100*volume.Kb, memoryLimit),
-					"WorkingSetBytes": bounded(100*volume.Kb, memoryLimit),
-					"RSSBytes":        bounded(100*volume.Kb, memoryLimit),
+					"UsageBytes":      bounded(100*e2evolume.Kb, memoryLimit),
+					"WorkingSetBytes": bounded(100*e2evolume.Kb, memoryLimit),
+					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 100000),
 				})
@@ -182,10 +182,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
-							"AvailableBytes":  bounded(1*volume.Kb, 80*volume.Mb),
-							"UsageBytes":      bounded(10*volume.Kb, 80*volume.Mb),
-							"WorkingSetBytes": bounded(10*volume.Kb, 80*volume.Mb),
-							"RSSBytes":        bounded(1*volume.Kb, 80*volume.Mb),
+							"AvailableBytes":  bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
+							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
+							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
+							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 							"PageFaults":      bounded(100, 1000000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
+							"UsedBytes":      bounded(e2evolume.Kb, 10*e2evolume.Mb),
 							"InodesFree":     bounded(1e4, 1e8),
 							"Inodes":         bounded(1e4, 1e8),
 							"InodesUsed":     bounded(0, 1e8),
@@ -203,7 +203,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
+							"UsedBytes":      bounded(e2evolume.Kb, 10*e2evolume.Mb),
 							"InodesFree":     bounded(1e4, 1e8),
 							"Inodes":         bounded(1e4, 1e8),
 							"InodesUsed":     bounded(0, 1e8),
@@ -215,9 +215,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time": recent(maxStatsAge),
 					"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
 						"Name":     gomega.Equal("eth0"),
-						"RxBytes":  bounded(10, 10*volume.Mb),
+						"RxBytes":  bounded(10, 10*e2evolume.Mb),
 						"RxErrors": bounded(0, 1000),
-						"TxBytes":  bounded(10, 10*volume.Mb),
+						"TxBytes":  bounded(10, 10*e2evolume.Mb),
 						"TxErrors": bounded(0, 1000),
 					}),
 					"Interfaces": gomega.Not(gomega.BeNil()),
@@ -229,10 +229,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
 					"Time":            recent(maxStatsAge),
-					"AvailableBytes":  bounded(1*volume.Kb, 80*volume.Mb),
-					"UsageBytes":      bounded(10*volume.Kb, 80*volume.Mb),
-					"WorkingSetBytes": bounded(10*volume.Kb, 80*volume.Mb),
-					"RSSBytes":        bounded(1*volume.Kb, 80*volume.Mb),
+					"AvailableBytes":  bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
+					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
+					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
+					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 					"PageFaults":      bounded(0, 1000000),
 					"MajorPageFaults": bounded(0, 10),
 				}),
@@ -244,7 +244,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(volume.Kb, 1*volume.Mb),
+							"UsedBytes":      bounded(e2evolume.Kb, 1*e2evolume.Mb),
 							"InodesFree":     bounded(1e4, 1e8),
 							"Inodes":         bounded(1e4, 1e8),
 							"InodesUsed":     bounded(0, 1e8),
@@ -255,10 +255,13 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time":           recent(maxStatsAge),
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      bounded(volume.Kb, 21*volume.Mb),
+					"UsedBytes":      bounded(e2evolume.Kb, 21*e2evolume.Mb),
 					"InodesFree":     bounded(1e4, 1e8),
 					"Inodes":         bounded(1e4, 1e8),
 					"InodesUsed":     bounded(0, 1e8),
+				}),
+				"ProcessStats": ptrMatchAllFields(gstruct.Fields{
+					"ProcessCount": bounded(0, 1e8),
 				}),
 			})
 
@@ -274,11 +277,11 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
 						"Time":            recent(maxStatsAge),
-						"AvailableBytes":  bounded(100*volume.Mb, memoryLimit),
-						"UsageBytes":      bounded(10*volume.Mb, memoryLimit),
-						"WorkingSetBytes": bounded(10*volume.Mb, memoryLimit),
+						"AvailableBytes":  bounded(100*e2evolume.Mb, memoryLimit),
+						"UsageBytes":      bounded(10*e2evolume.Mb, memoryLimit),
+						"WorkingSetBytes": bounded(10*e2evolume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
-						"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
+						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -287,9 +290,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time": recent(maxStatsAge),
 						"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Name":     gomega.Or(gomega.BeEmpty(), gomega.Equal("eth0")),
-							"RxBytes":  gomega.Or(gomega.BeNil(), bounded(1*volume.Mb, 100*volume.Gb)),
+							"RxBytes":  gomega.Or(gomega.BeNil(), bounded(1*e2evolume.Mb, 100*e2evolume.Gb)),
 							"RxErrors": gomega.Or(gomega.BeNil(), bounded(0, 100000)),
-							"TxBytes":  gomega.Or(gomega.BeNil(), bounded(10*volume.Kb, 10*volume.Gb)),
+							"TxBytes":  gomega.Or(gomega.BeNil(), bounded(10*e2evolume.Kb, 10*e2evolume.Gb)),
 							"TxErrors": gomega.Or(gomega.BeNil(), bounded(0, 100000)),
 						}),
 						"Interfaces": gomega.Not(gomega.BeNil()),
@@ -299,7 +302,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
 						// we assume we are not running tests on machines < 10tb of disk
-						"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
+						"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 						"InodesFree": bounded(1e4, 1e8),
 						"Inodes":     bounded(1e4, 1e8),
 						"InodesUsed": bounded(0, 1e8),
@@ -310,7 +313,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							// we assume we are not running tests on machines < 10tb of disk
-							"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
+							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 							"InodesFree": bounded(1e4, 1e8),
 							"Inodes":     bounded(1e4, 1e8),
 							"InodesUsed": bounded(0, 1e8),
@@ -432,7 +435,11 @@ func recordSystemCgroupProcesses() {
 			continue
 		}
 
-		pids, err := ioutil.ReadFile(fmt.Sprintf("/sys/fs/cgroup/cpu/%s/cgroup.procs", cgroup))
+		filePattern := "/sys/fs/cgroup/cpu/%s/cgroup.procs"
+		if IsCgroup2UnifiedMode() {
+			filePattern = "/sys/fs/cgroup/%s/cgroup.procs"
+		}
+		pids, err := ioutil.ReadFile(fmt.Sprintf(filePattern, cgroup))
 		if err != nil {
 			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue

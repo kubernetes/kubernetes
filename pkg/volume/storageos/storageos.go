@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -299,7 +299,6 @@ type storageos struct {
 	pvName       string
 	volName      string
 	volNamespace string
-	secretName   string
 	readOnly     bool
 	description  string
 	pool         string
@@ -431,7 +430,7 @@ func (b *storageosMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	}
 	klog.V(4).Infof("StorageOS volume setup complete on %s", dir)
 	return nil

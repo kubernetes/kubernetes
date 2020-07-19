@@ -39,8 +39,6 @@ import (
 )
 
 func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
-	var err error
-
 	ginkgo.By("Creating testing namespaces")
 	wg := &sync.WaitGroup{}
 	wg.Add(totalNS)
@@ -49,7 +47,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()
 			ns := fmt.Sprintf("nslifetest-%v", n)
-			_, err = f.CreateNamespace(ns, nil)
+			_, err := f.CreateNamespace(ns, nil)
 			framework.ExpectNoError(err, "failed to create namespace: %s", ns)
 		}(n)
 	}
@@ -117,7 +115,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 	ginkgo.By("Deleting the namespace")
-	err = f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, nil)
+	err = f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
 
 	ginkgo.By("Waiting for the namespace to be removed.")
@@ -174,7 +172,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	framework.ExpectNoError(err, "failed to create service %s in namespace %s", serviceName, namespace.Name)
 
 	ginkgo.By("Deleting the namespace")
-	err = f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, nil)
+	err = f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
 
 	ginkgo.By("Waiting for the namespace to be removed.")

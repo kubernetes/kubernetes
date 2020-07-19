@@ -22,6 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -53,7 +55,7 @@ func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState
 	// prioritizes based on the minimum of the average of the fraction of requested to capacity.
 	//
 	// Details:
-	// (cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity))/2
+	// (cpu((capacity-sum(requested))*MaxNodeScore/capacity) + memory((capacity-sum(requested))*MaxNodeScore/capacity))/weightSum
 	return la.score(pod, nodeInfo)
 }
 
@@ -63,29 +65,45 @@ func (la *LeastAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewLeastAllocated initializes a new plugin and returns it.
-func NewLeastAllocated(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func NewLeastAllocated(laArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
+	args, ok := laArgs.(*config.NodeResourcesLeastAllocatedArgs)
+	if !ok {
+		return nil, fmt.Errorf("want args to be of type NodeResourcesLeastAllocatedArgs, got %T", laArgs)
+	}
+
+	if err := validation.ValidateNodeResourcesLeastAllocatedArgs(args); err != nil {
+		return nil, err
+	}
+
+	resToWeightMap := make(resourceToWeightMap)
+	for _, resource := range (*args).Resources {
+		resToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
+	}
+
 	return &LeastAllocated{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			LeastAllocatedName,
-			leastResourceScorer,
-			defaultRequestedRatioResources,
+			Name:                LeastAllocatedName,
+			scorer:              leastResourceScorer(resToWeightMap),
+			resourceToWeightMap: resToWeightMap,
 		},
 	}, nil
 }
 
-func leastResourceScorer(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-	var nodeScore, weightSum int64
-	for resource, weight := range defaultRequestedRatioResources {
-		resourceScore := leastRequestedScore(requested[resource], allocable[resource])
-		nodeScore += resourceScore * weight
-		weightSum += weight
+func leastResourceScorer(resToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
+	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+		var nodeScore, weightSum int64
+		for resource, weight := range resToWeightMap {
+			resourceScore := leastRequestedScore(requested[resource], allocable[resource])
+			nodeScore += resourceScore * weight
+			weightSum += weight
+		}
+		return nodeScore / weightSum
 	}
-	return nodeScore / weightSum
 }
 
-// The unused capacity is calculated on a scale of 0-10
-// 0 being the lowest priority and 10 being the highest.
+// The unused capacity is calculated on a scale of 0-MaxNodeScore
+// 0 being the lowest priority and `MaxNodeScore` being the highest.
 // The more unused resources the higher the score is.
 func leastRequestedScore(requested, capacity int64) int64 {
 	if capacity == 0 {

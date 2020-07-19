@@ -33,7 +33,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ConfigMapCAController provies a CAContentProvider that can dynamically react to configmap changes
@@ -97,10 +97,7 @@ func NewDynamicCAFromConfigMapController(purpose, namespace, name, key string, k
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicConfigMapCABundle-%s", purpose)),
 		preRunCaches: []cache.InformerSynced{uncastConfigmapInformer.HasSynced},
 	}
-	if err := c.loadCABundle(); err != nil {
-		// don't fail, but do print out a message
-		klog.Warningf("unable to load initial CA bundle for: %q due to: %s", c.name, err)
-	}
+
 	uncastConfigmapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
 			if cast, ok := obj.(*corev1.ConfigMap); ok {

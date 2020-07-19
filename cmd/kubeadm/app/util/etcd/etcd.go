@@ -34,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -42,21 +42,20 @@ import (
 
 const etcdTimeout = 2 * time.Second
 
-// Exponential backoff for etcd operations
+// Exponential backoff for etcd operations (up to ~200 seconds)
 var etcdBackoff = wait.Backoff{
-	Steps:    11,
-	Duration: 50 * time.Millisecond,
-	Factor:   2.0,
+	Steps:    18,
+	Duration: 100 * time.Millisecond,
+	Factor:   1.5,
 	Jitter:   0.1,
 }
 
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
 	CheckClusterHealth() error
-	GetClusterVersions() (map[string]string, error)
-	GetVersion() (string, error)
 	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
 	Sync() error
+	ListMembers() ([]Member, error)
 	AddMember(name string, peerAddrs string) ([]Member, error)
 	GetMemberID(peerURL string) (uint64, error)
 	RemoveMember(id uint64) ([]Member, error)
@@ -115,7 +114,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	// synchronizes client's endpoints with the known endpoints from the etcd membership.
 	err = etcdClient.Sync()
 	if err != nil {
-		return nil, errors.Wrap(err, "error syncing endpoints with etc")
+		return nil, errors.Wrap(err, "error syncing endpoints with etcd")
 	}
 	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 
@@ -211,29 +210,27 @@ func getRawEtcdEndpointsFromClusterStatus(client clientset.Interface) ([]string,
 	return etcdEndpoints, nil
 }
 
-// dialTimeout is the timeout for failing to establish a connection.
-// It is set to >20 seconds as times shorter than that will cause TLS connections to fail
-// on heavily loaded arm64 CPUs (issue #64649)
-const dialTimeout = 40 * time.Second
-
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
 func (c *Client) Sync() error {
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
-	if err != nil {
-		return err
-	}
-	defer cli.Close()
-
 	// Syncs the list of endpoints
+	var cli *clientv3.Client
 	var lastError error
-	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		var err error
+		cli, err = clientv3.New(clientv3.Config{
+			Endpoints:   c.Endpoints,
+			DialTimeout: etcdTimeout,
+			DialOptions: []grpc.DialOption{
+				grpc.WithBlock(), // block until the underlying connection is up
+			},
+			TLS: c.TLS,
+		})
+		if err != nil {
+			lastError = err
+			return false, nil
+		}
+		defer cli.Close()
+
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		err = cli.Sync(ctx)
 		cancel()
@@ -260,25 +257,25 @@ type Member struct {
 	PeerURL string
 }
 
-// GetMemberID returns the member ID of the given peer URL
-func (c *Client) GetMemberID(peerURL string) (uint64, error) {
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
-	if err != nil {
-		return 0, err
-	}
-	defer cli.Close()
-
+func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
 	// Gets the member list
 	var lastError error
 	var resp *clientv3.MemberListResponse
-	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   c.Endpoints,
+			DialTimeout: etcdTimeout,
+			DialOptions: []grpc.DialOption{
+				grpc.WithBlock(), // block until the underlying connection is up
+			},
+			TLS: c.TLS,
+		})
+		if err != nil {
+			lastError = err
+			return false, nil
+		}
+		defer cli.Close()
+
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		resp, err = cli.MemberList(ctx)
 		cancel()
@@ -290,7 +287,16 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 		return false, nil
 	})
 	if err != nil {
-		return 0, lastError
+		return nil, lastError
+	}
+	return resp, nil
+}
+
+// GetMemberID returns the member ID of the given peer URL
+func (c *Client) GetMemberID(peerURL string) (uint64, error) {
+	resp, err := c.listMembers()
+	if err != nil {
+		return 0, err
 	}
 
 	for _, member := range resp.Members {
@@ -301,25 +307,40 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 	return 0, nil
 }
 
-// RemoveMember notifies an etcd cluster to remove an existing member
-func (c *Client) RemoveMember(id uint64) ([]Member, error) {
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
+// ListMembers returns the member list.
+func (c *Client) ListMembers() ([]Member, error) {
+	resp, err := c.listMembers()
 	if err != nil {
 		return nil, err
 	}
-	defer cli.Close()
 
+	ret := make([]Member, 0, len(resp.Members))
+	for _, m := range resp.Members {
+		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	}
+	return ret, nil
+}
+
+// RemoveMember notifies an etcd cluster to remove an existing member
+func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	// Remove an existing member from the cluster
 	var lastError error
 	var resp *clientv3.MemberRemoveResponse
-	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   c.Endpoints,
+			DialTimeout: etcdTimeout,
+			DialOptions: []grpc.DialOption{
+				grpc.WithBlock(), // block until the underlying connection is up
+			},
+			TLS: c.TLS,
+		})
+		if err != nil {
+			lastError = err
+			return false, nil
+		}
+		defer cli.Close()
+
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		resp, err = cli.MemberRemove(ctx, id)
 		cancel()
@@ -353,23 +374,24 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 		return nil, errors.Wrapf(err, "error parsing peer address %s", peerAddrs)
 	}
 
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer cli.Close()
-
 	// Adds a new member to the cluster
 	var lastError error
 	var resp *clientv3.MemberAddResponse
 	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   c.Endpoints,
+			DialTimeout: etcdTimeout,
+			DialOptions: []grpc.DialOption{
+				grpc.WithBlock(), // block until the underlying connection is up
+			},
+			TLS: c.TLS,
+		})
+		if err != nil {
+			lastError = err
+			return false, nil
+		}
+		defer cli.Close()
+
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
 		cancel()
@@ -409,41 +431,6 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	return ret, nil
 }
 
-// GetVersion returns the etcd version of the cluster.
-// An error is returned if the version of all endpoints do not match
-func (c *Client) GetVersion() (string, error) {
-	var clusterVersion string
-
-	versions, err := c.GetClusterVersions()
-	if err != nil {
-		return "", err
-	}
-	for _, v := range versions {
-		if clusterVersion != "" && clusterVersion != v {
-			return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
-		}
-		clusterVersion = v
-	}
-	if clusterVersion == "" {
-		return "", errors.New("could not determine cluster etcd version")
-	}
-	return clusterVersion, nil
-}
-
-// GetClusterVersions returns a map of the endpoints and their associated versions
-func (c *Client) GetClusterVersions() (map[string]string, error) {
-	versions := make(map[string]string)
-	statuses, err := c.getClusterStatus()
-	if err != nil {
-		return versions, err
-	}
-
-	for ep, status := range statuses {
-		versions[ep] = status.Version
-	}
-	return versions, nil
-}
-
 // CheckClusterHealth returns nil for status Up or error for status Down
 func (c *Client) CheckClusterHealth() error {
 	_, err := c.getClusterStatus()
@@ -452,25 +439,26 @@ func (c *Client) CheckClusterHealth() error {
 
 // getClusterStatus returns nil for status Up (along with endpoint status response map) or error for status Down
 func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error) {
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer cli.Close()
-
 	clusterStatus := make(map[string]*clientv3.StatusResponse)
 	for _, ep := range c.Endpoints {
 		// Gets the member status
 		var lastError error
 		var resp *clientv3.StatusResponse
-		err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+			cli, err := clientv3.New(clientv3.Config{
+				Endpoints:   c.Endpoints,
+				DialTimeout: etcdTimeout,
+				DialOptions: []grpc.DialOption{
+					grpc.WithBlock(), // block until the underlying connection is up
+				},
+				TLS: c.TLS,
+			})
+			if err != nil {
+				lastError = err
+				return false, nil
+			}
+			defer cli.Close()
+
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			resp, err = cli.Status(ctx, ep)
 			cancel()

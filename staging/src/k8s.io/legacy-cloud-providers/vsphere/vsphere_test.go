@@ -19,9 +19,11 @@ limitations under the License.
 package vsphere
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"flag"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -44,8 +46,10 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	vmwaretypes "github.com/vmware/govmomi/vim25/types"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog/v2"
 
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
@@ -831,6 +835,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 		testName                 string
 		conf                     string
 		expectedIsSecretProvided bool
+		expectedSecretNotManaged bool
 		expectedUsername         string
 		expectedPassword         string
 		expectedError            error
@@ -986,6 +991,24 @@ func TestSecretVSphereConfig(t *testing.T) {
 			expectedError:            nil,
 		},
 		{
+			testName: "SecretName and SecretNamespace with new configuration, but non-managed",
+			conf: `[Global]
+			server = 0.0.0.0
+			secret-name = "vccreds"
+			secret-namespace = "kube-system"
+			secret-not-managed = true
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedSecretNotManaged: true,
+			expectedIsSecretProvided: true,
+			expectedError:            nil,
+		},
+		{
 			testName: "SecretName and SecretNamespace with Username missing in new configuration",
 			conf: `[Global]
 			server = 0.0.0.0
@@ -1098,6 +1121,11 @@ func TestSecretVSphereConfig(t *testing.T) {
 				}
 			}
 		}
+		if testcase.expectedSecretNotManaged && vs.isSecretManaged {
+			t.Fatalf("Expected secret being non-managed but vs.isSecretManaged: %v", vs.isSecretManaged)
+		} else if !testcase.expectedSecretNotManaged && !vs.isSecretManaged {
+			t.Fatalf("Expected secret being managed but vs.isSecretManaged: %v", vs.isSecretManaged)
+		}
 		// Check, if all the expected thumbprints are configured
 		for instanceName, expectedThumbprint := range testcase.expectedThumbprints {
 			instanceConfig, ok := vs.vsphereInstanceMap[instanceName]
@@ -1122,5 +1150,107 @@ func TestSecretVSphereConfig(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func fakeSecret(name, namespace, datacenter, user, password string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"vcenter." + datacenter + ".password": []byte(user),
+			"vcenter." + datacenter + ".username": []byte(password),
+		},
+	}
+}
+
+func TestSecretUpdated(t *testing.T) {
+	datacenter := "0.0.0.0"
+	secretName := "vccreds"
+	secretNamespace := "kube-system"
+	username := "test-username"
+	password := "test-password"
+	basicSecret := fakeSecret(secretName, secretNamespace, datacenter, username, password)
+
+	cfg, cleanup := configFromSim()
+	defer cleanup()
+
+	cfg.Global.User = username
+	cfg.Global.Password = password
+	cfg.Global.Datacenter = datacenter
+	cfg.Global.SecretName = secretName
+	cfg.Global.SecretNamespace = secretNamespace
+
+	vsphere, err := buildVSphereFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	klog.Flush()
+
+	klog.InitFlags(nil)
+	flag.Set("logtostderr", "false")
+	flag.Set("alsologtostderr", "false")
+	flag.Set("v", "9")
+	flag.Parse()
+
+	testcases := []struct {
+		name            string
+		oldSecret       *v1.Secret
+		secret          *v1.Secret
+		expectOutput    bool
+		expectErrOutput bool
+	}{
+		{
+			name:         "Secrets are equal",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       basicSecret.DeepCopy(),
+			expectOutput: false,
+		},
+		{
+			name:         "Secret with a different name",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       fakeSecret("different", secretNamespace, datacenter, username, password),
+			expectOutput: false,
+		},
+		{
+			name:         "Secret with a different data",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       fakeSecret(secretName, secretNamespace, datacenter, "...", "..."),
+			expectOutput: true,
+		},
+		{
+			name:            "Secret being nil",
+			oldSecret:       basicSecret.DeepCopy(),
+			secret:          nil,
+			expectOutput:    true,
+			expectErrOutput: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			errBuf := new(bytes.Buffer)
+
+			klog.SetOutputBySeverity("INFO", buf)
+			klog.SetOutputBySeverity("WARNING", errBuf)
+
+			vsphere.SecretUpdated(testcase.oldSecret, testcase.secret)
+
+			klog.Flush()
+			if testcase.expectOutput && len(buf.String()) == 0 {
+				t.Fatalf("Expected log secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
+			} else if !testcase.expectOutput && len(buf.String()) > 0 {
+				t.Fatalf("Unexpected log messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, buf.String())
+			}
+
+			if testcase.expectErrOutput && len(errBuf.String()) == 0 {
+				t.Fatalf("Expected log error output on secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
+			} else if !testcase.expectErrOutput && len(errBuf.String()) > 0 {
+				t.Fatalf("Unexpected log error messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, errBuf.String())
+			}
+		})
 	}
 }

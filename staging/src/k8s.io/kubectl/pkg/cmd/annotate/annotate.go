@@ -23,10 +23,11 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -52,9 +53,11 @@ type AnnotateOptions struct {
 
 	// Common user flags
 	overwrite       bool
+	list            bool
 	local           bool
 	dryRunStrategy  cmdutil.DryRunStrategy
 	dryRunVerifier  *resource.DryRunVerifier
+	fieldManager    string
 	all             bool
 	resourceVersion string
 	selector        string
@@ -142,6 +145,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the annotations for a given resource.")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, annotation will NOT contact api-server but run locally.")
 	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
 	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
@@ -150,6 +154,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-annotate")
 
 	return cmd
 }
@@ -186,6 +191,10 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 	o.PrintObj = func(obj runtime.Object, out io.Writer) error {
 		return printer.PrintObj(obj, out)
+	}
+
+	if o.list && len(o.outputFormat) > 0 {
+		return fmt.Errorf("--list and --output may not be specified together")
 	}
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
@@ -233,7 +242,7 @@ func (o AnnotateOptions) Validate() error {
 			return fmt.Errorf("one or more files must be specified as -f rsrc.yaml or --filename=rsrc.json")
 		}
 	}
-	if len(o.newAnnotations) < 1 && len(o.removeAnnotations) < 1 {
+	if len(o.newAnnotations) < 1 && len(o.removeAnnotations) < 1 && !o.list {
 		return fmt.Errorf("at least one annotation update is required")
 	}
 	return validateAnnotations(o.removeAnnotations, o.newAnnotations)
@@ -280,7 +289,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 		var outputObj runtime.Object
 		obj := info.Object
 
-		if o.dryRunStrategy == cmdutil.DryRunClient || o.local {
+		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
@@ -329,7 +338,8 @@ func (o AnnotateOptions) RunAnnotate() error {
 			}
 			helper := resource.
 				NewHelper(client, mapping).
-				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
+				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+				WithFieldManager(o.fieldManager)
 
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
@@ -339,6 +349,28 @@ func (o AnnotateOptions) RunAnnotate() error {
 			if err != nil {
 				return err
 			}
+		}
+
+		if o.list {
+			accessor, err := meta.Accessor(outputObj)
+			if err != nil {
+				return err
+			}
+
+			indent := ""
+			if !singleItemImpliedResource {
+				indent = " "
+				gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(info.Object)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(o.Out, "Listing annotations for %s.%s/%s:\n", gvks[0].Kind, gvks[0].Group, info.Name)
+			}
+			for k, v := range accessor.GetAnnotations() {
+				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)
+			}
+
+			return nil
 		}
 
 		return o.PrintObj(outputObj, o.Out)

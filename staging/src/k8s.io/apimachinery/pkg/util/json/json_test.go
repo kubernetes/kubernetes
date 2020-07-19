@@ -19,6 +19,8 @@ limitations under the License.
 package json
 
 import (
+	gojson "encoding/json"
+
 	"fmt"
 	"math"
 	"reflect"
@@ -278,42 +280,139 @@ func TestEvaluateTypes(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		inputJSON := fmt.Sprintf(`{"data":%s}`, tc.In)
-		expectedJSON := fmt.Sprintf(`{"data":%s}`, tc.Out)
-		m := map[string]interface{}{}
-		err := Unmarshal([]byte(inputJSON), &m)
-		if tc.Err && err != nil {
-			// Expected error
-			continue
-		}
-		if err != nil {
-			t.Errorf("%s: error decoding: %v", tc.In, err)
-			continue
-		}
-		if tc.Err {
-			t.Errorf("%s: expected error, got none", tc.In)
-			continue
-		}
-		data, ok := m["data"]
-		if !ok {
-			t.Errorf("%s: decoded object missing data key: %#v", tc.In, m)
-			continue
-		}
-		if !reflect.DeepEqual(tc.Data, data) {
-			t.Errorf("%s: expected\n\t%#v (%v), got\n\t%#v (%v)", tc.In, tc.Data, reflect.TypeOf(tc.Data), data, reflect.TypeOf(data))
-			continue
-		}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d_map", i), func(t *testing.T) {
+			// decode the input as a map item
+			inputJSON := fmt.Sprintf(`{"data":%s}`, tc.In)
+			expectedJSON := fmt.Sprintf(`{"data":%s}`, tc.Out)
+			m := map[string]interface{}{}
+			err := Unmarshal([]byte(inputJSON), &m)
+			if tc.Err && err != nil {
+				// Expected error
+				return
+			}
+			if err != nil {
+				t.Fatalf("%s: error decoding: %v", tc.In, err)
+			}
+			if tc.Err {
+				t.Fatalf("%s: expected error, got none", tc.In)
+			}
+			data, ok := m["data"]
+			if !ok {
+				t.Fatalf("%s: decoded object missing data key: %#v", tc.In, m)
+			}
+			if !reflect.DeepEqual(tc.Data, data) {
+				t.Fatalf("%s: expected\n\t%#v (%v), got\n\t%#v (%v)", tc.In, tc.Data, reflect.TypeOf(tc.Data), data, reflect.TypeOf(data))
+			}
 
-		outputJSON, err := Marshal(m)
-		if err != nil {
-			t.Errorf("%s: error encoding: %v", tc.In, err)
-			continue
-		}
+			outputJSON, err := Marshal(m)
+			if err != nil {
+				t.Fatalf("%s: error encoding: %v", tc.In, err)
+			}
 
-		if expectedJSON != string(outputJSON) {
-			t.Errorf("%s: expected\n\t%s, got\n\t%s", tc.In, expectedJSON, string(outputJSON))
-			continue
+			if expectedJSON != string(outputJSON) {
+				t.Fatalf("%s: expected\n\t%s, got\n\t%s", tc.In, expectedJSON, string(outputJSON))
+			}
+		})
+
+		t.Run(fmt.Sprintf("%d_slice", i), func(t *testing.T) {
+			// decode the input as an array item
+			inputJSON := fmt.Sprintf(`[0,%s]`, tc.In)
+			expectedJSON := fmt.Sprintf(`[0,%s]`, tc.Out)
+			m := []interface{}{}
+			err := Unmarshal([]byte(inputJSON), &m)
+			if tc.Err && err != nil {
+				// Expected error
+				return
+			}
+			if err != nil {
+				t.Fatalf("%s: error decoding: %v", tc.In, err)
+			}
+			if tc.Err {
+				t.Fatalf("%s: expected error, got none", tc.In)
+			}
+			if len(m) != 2 {
+				t.Fatalf("%s: decoded object wasn't the right length: %#v", tc.In, m)
+			}
+			data := m[1]
+			if !reflect.DeepEqual(tc.Data, data) {
+				t.Fatalf("%s: expected\n\t%#v (%v), got\n\t%#v (%v)", tc.In, tc.Data, reflect.TypeOf(tc.Data), data, reflect.TypeOf(data))
+			}
+
+			outputJSON, err := Marshal(m)
+			if err != nil {
+				t.Fatalf("%s: error encoding: %v", tc.In, err)
+			}
+
+			if expectedJSON != string(outputJSON) {
+				t.Fatalf("%s: expected\n\t%s, got\n\t%s", tc.In, expectedJSON, string(outputJSON))
+			}
+		})
+
+		t.Run(fmt.Sprintf("%d_raw", i), func(t *testing.T) {
+			// decode the input as a standalone object
+			inputJSON := fmt.Sprintf(`%s`, tc.In)
+			expectedJSON := fmt.Sprintf(`%s`, tc.Out)
+			var m interface{}
+			err := Unmarshal([]byte(inputJSON), &m)
+			if tc.Err && err != nil {
+				// Expected error
+				return
+			}
+			if err != nil {
+				t.Fatalf("%s: error decoding: %v", tc.In, err)
+			}
+			if tc.Err {
+				t.Fatalf("%s: expected error, got none", tc.In)
+			}
+			data := m
+			if !reflect.DeepEqual(tc.Data, data) {
+				t.Fatalf("%s: expected\n\t%#v (%v), got\n\t%#v (%v)", tc.In, tc.Data, reflect.TypeOf(tc.Data), data, reflect.TypeOf(data))
+			}
+
+			outputJSON, err := Marshal(m)
+			if err != nil {
+				t.Fatalf("%s: error encoding: %v", tc.In, err)
+			}
+
+			if expectedJSON != string(outputJSON) {
+				t.Fatalf("%s: expected\n\t%s, got\n\t%s", tc.In, expectedJSON, string(outputJSON))
+			}
+		})
+	}
+}
+
+func TestUnmarshalNil(t *testing.T) {
+	{
+		var v *interface{}
+		err := Unmarshal([]byte(`0`), v)
+		goerr := gojson.Unmarshal([]byte(`0`), v)
+		if err == nil || goerr == nil || err.Error() != goerr.Error() {
+			t.Fatalf("expected error matching stdlib, got %v, %v", err, goerr)
+		} else {
+			t.Log(err)
+		}
+	}
+
+	{
+		var v *[]interface{}
+		err := Unmarshal([]byte(`[]`), v)
+		goerr := gojson.Unmarshal([]byte(`[]`), v)
+		if err == nil || goerr == nil || err.Error() != goerr.Error() {
+			t.Fatalf("expected error matching stdlib, got %v, %v", err, goerr)
+		} else {
+			t.Log(err)
+		}
+	}
+
+	{
+		var v *map[string]interface{}
+		err := Unmarshal([]byte(`{}`), v)
+		goerr := gojson.Unmarshal([]byte(`{}`), v)
+		if err == nil || goerr == nil || err.Error() != goerr.Error() {
+			t.Fatalf("expected error matching stdlib, got %v, %v", err, goerr)
+		} else {
+			t.Log(err)
 		}
 	}
 }

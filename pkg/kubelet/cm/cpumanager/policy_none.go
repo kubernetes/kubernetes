@@ -18,7 +18,7 @@ package cpumanager
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
@@ -44,7 +44,7 @@ func (p *nonePolicy) Start(s state.State) error {
 	return nil
 }
 
-func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *nonePolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 

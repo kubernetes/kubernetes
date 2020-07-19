@@ -41,8 +41,8 @@ type TestTypeInterface interface {
 	Create(ctx context.Context, testType *example.TestType, opts v1.CreateOptions) (*example.TestType, error)
 	Update(ctx context.Context, testType *example.TestType, opts v1.UpdateOptions) (*example.TestType, error)
 	UpdateStatus(ctx context.Context, testType *example.TestType, opts v1.UpdateOptions) (*example.TestType, error)
-	Delete(ctx context.Context, name string, opts *v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts *v1.DeleteOptions, listOpts v1.ListOptions) error
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*example.TestType, error)
 	List(ctx context.Context, opts v1.ListOptions) (*example.TestTypeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
@@ -153,28 +153,28 @@ func (c *testTypes) UpdateStatus(ctx context.Context, testType *example.TestType
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *testTypes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *testTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *testTypes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *testTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }

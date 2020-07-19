@@ -23,7 +23,7 @@ go_library(
         "//vendor/github.com/hashicorp/golang-lru:go_default_library",
         "//vendor/golang.org/x/crypto/cryptobyte:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
