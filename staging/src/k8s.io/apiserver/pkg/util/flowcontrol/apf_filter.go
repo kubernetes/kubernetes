@@ -45,6 +45,7 @@ type Interface interface {
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
 		noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
+		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
 
@@ -72,6 +73,7 @@ func New(
 		flowcontrolClient,
 		serverConcurrencyLimit,
 		requestWaitLimit,
+		metrics.PriorityLevelConcurrencyObserverPairGenerator,
 		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
 	)
 }
@@ -82,15 +84,17 @@ func NewTestable(
 	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
+	obsPairGenerator metrics.TimedObserverPairGenerator,
 	queueSetFactory fq.QueueSetFactory,
 ) Interface {
-	return newTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, queueSetFactory)
+	return newTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, obsPairGenerator, queueSetFactory)
 }
 
-func (cfgCtl *configController) Handle(ctx context.Context, requestDigest RequestDigest,
+func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
 	noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
+	queueNoteFn fq.QueueNoteFn,
 	execFn func()) {
-	fs, pl, isExempt, req, startWaitingTime := cfgCtl.startRequest(ctx, requestDigest)
+	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
 	queued := startWaitingTime != time.Time{}
 	noteFn(fs, pl)
 	if req == nil {
@@ -117,6 +121,6 @@ func (cfgCtl *configController) Handle(ctx context.Context, requestDigest Reques
 	}
 	klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v, Finish() => idle=%v", requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued, idle)
 	if idle {
-		cfgCtl.maybeReap(pl.Name)
+		cfgCtlr.maybeReap(pl.Name)
 	}
 }

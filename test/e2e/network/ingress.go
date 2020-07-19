@@ -623,10 +623,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			if jig.Ingress == nil {
 				ginkgo.By("No ingress created, no cleanup necessary")
-			} else {
-				ginkgo.By("Deleting ingress")
-				jig.TryDeleteIngress()
+				return
 			}
+			ginkgo.By("Deleting ingress")
+			jig.TryDeleteIngress()
 
 			ginkgo.By("Cleaning up cloud resources")
 			err := gceController.CleanupIngressController()

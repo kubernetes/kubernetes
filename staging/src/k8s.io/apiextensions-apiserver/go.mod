@@ -18,7 +18,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	go.etcd.io/etcd v0.5.0-alpha.5.0.20200520232829-54ba9589114f
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200716221620-18dfb9cca345
 	google.golang.org/grpc v1.27.0
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.0.0

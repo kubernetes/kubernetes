@@ -69,6 +69,14 @@ var args = []string{
 	"--cluster-name=k8s",
 	"--cluster-signing-cert-file=/cluster-signing-cert",
 	"--cluster-signing-key-file=/cluster-signing-key",
+	"--cluster-signing-kubelet-serving-cert-file=/cluster-signing-kubelet-serving/cert-file",
+	"--cluster-signing-kubelet-serving-key-file=/cluster-signing-kubelet-serving/key-file",
+	"--cluster-signing-kubelet-client-cert-file=/cluster-signing-kubelet-client/cert-file",
+	"--cluster-signing-kubelet-client-key-file=/cluster-signing-kubelet-client/key-file",
+	"--cluster-signing-kube-apiserver-client-cert-file=/cluster-signing-kube-apiserver-client/cert-file",
+	"--cluster-signing-kube-apiserver-client-key-file=/cluster-signing-kube-apiserver-client/key-file",
+	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
+	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
@@ -219,6 +227,22 @@ func TestAddFlags(t *testing.T) {
 				ClusterSigningCertFile: "/cluster-signing-cert",
 				ClusterSigningKeyFile:  "/cluster-signing-key",
 				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+				KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-serving/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+				},
+				KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-client/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-client/key-file",
+				},
+				KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+					KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+				},
+				LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-legacy-unknown/cert-file",
+					KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+				},
 			},
 		},
 		DaemonSetController: &DaemonSetControllerOptions{
@@ -470,6 +494,22 @@ func TestApplyTo(t *testing.T) {
 				ClusterSigningCertFile: "/cluster-signing-cert",
 				ClusterSigningKeyFile:  "/cluster-signing-key",
 				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+				KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-serving/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+				},
+				KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kubelet-client/cert-file",
+					KeyFile:  "/cluster-signing-kubelet-client/key-file",
+				},
+				KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+					KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+				},
+				LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+					CertFile: "/cluster-signing-legacy-unknown/cert-file",
+					KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+				},
 			},
 			DaemonSetController: daemonconfig.DaemonSetControllerConfiguration{
 				ConcurrentDaemonSetSyncs: 2,

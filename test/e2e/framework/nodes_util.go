@@ -34,7 +34,7 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
-const etcdImage = "3.4.7-0"
+const etcdImage = "3.4.9-1"
 
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {

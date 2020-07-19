@@ -821,7 +821,7 @@ func (ss *scaleSet) getConfigForScaleSetByIPFamily(config *compute.VirtualMachin
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find a  IPconfiguration(IPv6=%v) for the scale set VM %q", IPv6, nodeName)
+	return nil, fmt.Errorf("failed to find a IPconfiguration(IPv6=%v) for the scale set VM %q", IPv6, nodeName)
 }
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
@@ -865,6 +865,9 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 			return "", "", "", nil, err
 		}
 	} else {
+		// For IPv6 or dualstack service, we need to pick the right IP configuration based on the cluster ip family
+		// IPv6 configuration is only supported as non-primary, so we need to fetch the ip configuration where the
+		// privateIPAddressVersion matches the clusterIP family
 		primaryIPConfiguration, err = ss.getConfigForScaleSetByIPFamily(primaryNetworkInterfaceConfiguration, vmName, ipv6)
 		if err != nil {
 			return "", "", "", nil, err
@@ -998,10 +1001,22 @@ func (ss *scaleSet) ensureVMSSInPool(service *v1.Service, nodes []*v1.Node, back
 		if err != nil {
 			return err
 		}
-		primaryIPConfig, err := getPrimaryIPConfigFromVMSSNetworkConfig(primaryNIC)
-		if err != nil {
-			return err
+		var primaryIPConfig *compute.VirtualMachineScaleSetIPConfiguration
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		// Find primary network interface configuration.
+		if !ss.Cloud.ipv6DualStackEnabled && !ipv6 {
+			// Find primary IP configuration.
+			primaryIPConfig, err = getPrimaryIPConfigFromVMSSNetworkConfig(primaryNIC)
+			if err != nil {
+				return err
+			}
+		} else {
+			primaryIPConfig, err = ss.getConfigForScaleSetByIPFamily(primaryNIC, "", ipv6)
+			if err != nil {
+				return err
+			}
 		}
+
 		loadBalancerBackendAddressPools := []compute.SubResource{}
 		if primaryIPConfig.LoadBalancerBackendAddressPools != nil {
 			loadBalancerBackendAddressPools = *primaryIPConfig.LoadBalancerBackendAddressPools

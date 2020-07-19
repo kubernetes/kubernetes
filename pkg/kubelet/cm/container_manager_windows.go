@@ -36,6 +36,7 @@ import (
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -52,6 +53,10 @@ type containerManagerImpl struct {
 	cadvisorInterface cadvisor.Interface
 	// Config of this node.
 	nodeConfig NodeConfig
+	// Interface for exporting and allocating devices reported by device plugins.
+	deviceManager devicemanager.Manager
+	// Interface for Topology resource co-ordination
+	topologyManager topologymanager.Manager
 }
 
 type noopWindowsResourceAllocator struct{}
@@ -79,6 +84,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 	}
 
+	// Starts device manager.
+	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -93,11 +103,23 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
 
-	return &containerManagerImpl{
+	cm := &containerManagerImpl{
 		capacity:          capacity,
 		nodeConfig:        nodeConfig,
 		cadvisorInterface: cadvisorInterface,
-	}, nil
+	}
+
+	klog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
+	if devicePluginEnabled {
+		cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
+	} else {
+		cm.deviceManager, err = devicemanager.NewManagerStub()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return cm, nil
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
@@ -150,11 +172,11 @@ func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 }
 
 func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {
-	return nil
+	return cm.deviceManager.GetWatcherHandler()
 }
 
 func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
-	return nil, nil, []string{}
+	return cm.deviceManager.GetCapacity()
 }
 
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
@@ -162,11 +184,24 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 }
 
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
-	return &kubecontainer.RunContainerOptions{}, nil
+	opts := &kubecontainer.RunContainerOptions{}
+	// Allocate should already be called during predicateAdmitHandler.Admit(),
+	// just try to fetch device runtime information from cached state here
+	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
+	if err != nil {
+		return nil, err
+	} else if devOpts == nil {
+		return opts, nil
+	}
+	opts.Devices = append(opts.Devices, devOpts.Devices...)
+	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
+	opts.Envs = append(opts.Envs, devOpts.Envs...)
+	opts.Annotations = append(opts.Annotations, devOpts.Annotations...)
+	return opts, nil
 }
 
-func (cm *containerManagerImpl) UpdatePluginResources(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error {
-	return nil
+func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
@@ -177,12 +212,12 @@ func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
 }
 
-func (cm *containerManagerImpl) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
-	return nil
+func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
+	return cm.deviceManager.GetDevices(podUID, containerName)
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	return false
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {

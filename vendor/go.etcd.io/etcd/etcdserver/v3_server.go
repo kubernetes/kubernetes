@@ -428,9 +428,10 @@ func (s *EtcdServer) Authenticate(ctx context.Context, r *pb.AuthenticateRequest
 			return nil, err
 		}
 
+		// internalReq doesn't need to have Password because the above s.AuthStore().CheckPassword() already did it.
+		// In addition, it will let a WAL entry not record password as a plain text.
 		internalReq := &pb.InternalAuthenticateRequest{
 			Name:        r.Name,
-			Password:    r.Password,
 			SimpleToken: st,
 		}
 
