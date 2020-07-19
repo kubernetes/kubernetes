@@ -18,6 +18,8 @@ package apimachinery
 
 import (
 	"context"
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -89,6 +91,10 @@ var _ = SIGDescribe("Discovery", func() {
 		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
 
 		for _, group := range list.Groups {
+			if strings.HasSuffix(group.Name, ".example.com") {
+				// ignore known example dynamic API groups that are added/removed during the e2e test run
+				continue
+			}
 			framework.Logf("Checking APIGroup: %v", group.Name)
 
 			// locate APIGroup endpoint
