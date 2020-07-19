@@ -280,7 +280,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profil
 
 	if len(pod.Spec.NodeName) > 0 {
 		nodeInfo, err := g.nodeInfoSnapshot.NodeInfos().Get(pod.Spec.NodeName)
-		if err != nil {
+		if err != nil || nodeInfo == nil {
 			return nil, filteredNodesStatuses, err
 		}
 		return []*v1.Node{nodeInfo.Node()}, filteredNodesStatuses, nil
