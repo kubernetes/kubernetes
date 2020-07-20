@@ -19,8 +19,15 @@ repo_infra_repositories()
 
 load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_infra_go_repositories = "go_repositories")
 
+# IMPORTANT: Only one go version may be specified at a time
+#            'go_version':          used to specify a published upstream go version
+#            'override_go_version': used to specify an alternate go version provided
+#                                   by kubernetes/repo-infra
 repo_infra_configure(
-    go_version = "1.14.6",
+    # TODO(go1.15): Uncomment once we've published a repo-infra release that supports go1.15
+    #go_version = "1.15.0",
+    # TODO(go1.15): Comment out once we've published a repo-infra release that supports go1.15
+    override_go_version = "1.15.0-rc.1",
     minimum_bazel_version = "2.2.0",
 )
 
