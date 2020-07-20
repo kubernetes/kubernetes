@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"strings"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
-	genericapiserver "k8s.io/apiserver/pkg/server"
-
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	"github.com/openshift/library-go/pkg/apiserver/httprequest"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/kubernetes/openshift-kube-apiserver/handlers/metricsforwarding"
 )
 
 // TODO switch back to taking a kubeapiserver config.  For now make it obviously safe for 3.11
@@ -26,6 +26,9 @@ func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string) (func(
 	return func(apiHandler http.Handler, genericConfig *genericapiserver.Config) http.Handler {
 			// well-known comes after the normal handling chain. This shows where to connect for oauth information
 			handler := withOAuthInfo(apiHandler, oAuthMetadata)
+
+			// /debug/openshift/check-endpoints-metrics comes after the normal handling chain. This shows metrics for check-endpoints
+			handler = metricsforwarding.WithCheckEndpointsMetricsForwarding(apiHandler)
 
 			// this is the normal kube handler chain
 			handler = genericapiserver.DefaultBuildHandlerChain(handler, genericConfig)
