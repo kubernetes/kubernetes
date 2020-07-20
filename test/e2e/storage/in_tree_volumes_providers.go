@@ -1,5 +1,7 @@
+// +build !providerless
+
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,28 +26,17 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() testsuites.TestDriver{
-	drivers.InitNFSDriver,
-	drivers.InitGlusterFSDriver,
-	drivers.InitISCSIDriver,
-	drivers.InitRbdDriver,
-	drivers.InitCephFSDriver,
-	drivers.InitHostPathDriver,
-	drivers.InitHostPathSymlinkDriver,
-	drivers.InitEmptydirDriver,
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLinkBindMounted),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeTmpfs),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlock),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlockFS),
-	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeGCELocalSSD),
+var testDriversProviders = []func() testsuites.TestDriver{
+	drivers.InitCinderDriver,
+	drivers.InitGcePdDriver,
+	drivers.InitVSphereDriver,
+	drivers.InitAzureDiskDriver,
+	drivers.InitAwsDriver,
 }
 
 // This executes testSuites for in-tree volumes.
-var _ = utils.SIGDescribe("In-tree Volumes", func() {
-	for _, initDriver := range testDrivers {
+var _ = utils.SIGDescribe("In-tree Volumes for Cloud Providers", func() {
+	for _, initDriver := range testDriversProviders {
 		curDriver := initDriver()
 
 		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {

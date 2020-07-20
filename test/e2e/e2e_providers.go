@@ -1,7 +1,7 @@
 // +build !providerless
 
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,9 +16,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloud
+package e2e
 
 import (
-	// ensure these packages are scanned by ginkgo for e2e tests
-	_ "k8s.io/kubernetes/test/e2e/cloud/gcp"
+	// ensure auth plugins are loaded
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
+	// ensure that cloud providers are loaded
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/aws"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
 )
