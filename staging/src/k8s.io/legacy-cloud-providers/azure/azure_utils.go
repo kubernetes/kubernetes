@@ -110,7 +110,8 @@ func ConvertTagsToMap(tags string) (map[string]string, error) {
 func convertMaptoMapPointer(origin map[string]string) map[string]*string {
 	newly := make(map[string]*string)
 	for k, v := range origin {
-		newly[k] = &v
+		value := v
+		newly[k] = &value
 	}
 	return newly
 }
