@@ -91,18 +91,18 @@ func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecret
 }
 
 func (sip *serialImagePuller) processImagePullRequests() {
-	// Set environment variables to identify the namespace that needs to be pulled first
+	// Set environment variables to identify the namespace that needs to be pulled first.
 	priorityNamespace := env.GetEnvAsStringOrFallback("PRIORITY_NAMESPACES", "kube-system")
 	for request := range sip.pullRequests {
 
 		// Wait for a while for as many requests as possible to enter the channel, Avoid first-come request
-		// not being sorted and processed directly
+		// not being sorted and processed directly.
 		time.Sleep(1 * time.Second)
 		pullRequestQ := make([]*imagePullRequest, 0)
 		pullRequestQ = append(pullRequestQ, request)
 
 		// Use a loop to fetch the requests in the channel at the current time and
-		// store them in a slice to wait for sorting
+		// store them in a slice to wait for sorting.
 	Loop:
 		for {
 			select {
@@ -113,7 +113,7 @@ func (sip *serialImagePuller) processImagePullRequests() {
 			}
 		}
 
-		// Prioritize requests in the slice by PriorityClassName and Namespace
+		// Prioritize requests in the slice by PriorityClassName and Namespace.
 		sort.SliceStable(pullRequestQ, func(i, j int) bool {
 			if pullRequestQ[i].pod.Spec.PriorityClassName == scheduling.SystemNodeCritical &&
 				pullRequestQ[j].pod.Spec.PriorityClassName != scheduling.SystemNodeCritical {
@@ -139,7 +139,7 @@ func (sip *serialImagePuller) processImagePullRequests() {
 			return false
 		})
 
-		// Handle the requests one by one
+		// Handle the requests one by one.
 		for _, pr := range pullRequestQ {
 			imageRef, err := sip.imageService.PullImage(pr.spec, pr.pullSecrets, pr.podSandboxConfig)
 			pr.pullChan <- pullResult{
