@@ -4259,7 +4259,7 @@ func generatePemWithCNAndGroupTemplate(commonName string, group string) []byte {
 	// form the the certificate request template using the CN and org/group name
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
-			CommonName: commonName,
+			CommonName:   commonName,
 			Organization: []string{group},
 		},
 	}
@@ -4275,7 +4275,7 @@ func generatePemWithCNAndGroupTemplate(commonName string, group string) []byte {
 	}
 
 	csrPemBlk := &pem.Block{
-		Type: "CERTIFICATE REQUEST",
+		Type:  "CERTIFICATE REQUEST",
 		Bytes: csr,
 	}
 
@@ -4287,30 +4287,31 @@ func generatePemWithCNAndGroupTemplate(commonName string, group string) []byte {
 	return pemKey
 }
 
-func TestV1beta1DescribeCertificateSigningRequest(t *testing.T) {
+func TestDescribeCertificateSigningRequest(t *testing.T) {
 	commonName := "system:master:user1"
 	groupName := "system:master"
 	csrRequest := generatePemWithCNAndGroupTemplate(commonName, groupName)
 	signerv1beta1 := certificatesv1beta1.KubeAPIServerClientSignerName
 	signerv1 := certificatesv1.KubeAPIServerClientSignerName
 
-	tests := [] struct {
-		expectedOutput		string
-		csr					*fake.Clientset
+	tests := []struct {
+		expectedOutput string
+		csr            *fake.Clientset
 	}{
 		{
-			expectedOutput: `Name:               user1
-Labels:             <none>
-Annotations:        <none>
-CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
-Requesting User:    sample-userv1beta1
-Signer:             kubernetes.io/kube-apiserver-client
-Status:             Pending
-Subject:
-         Common Name:    "system:master:user1"
-         Serial Number:  ""
-         Organization:   "system:master"
-Events:  <none>` + "\n",
+			expectedOutput: `
+				Name:               user1
+				Labels:             <none>
+				Annotations:        <none>
+				CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
+				Requesting User:    sample-userv1beta1
+				Signer:             kubernetes.io/kube-apiserver-client
+				Status:             Pending
+				Subject:
+						Common Name:    "system:master:user1"
+						Serial Number:  ""
+						Organization:   "system:master"
+				Events:  <none>` + "\n",
 			csr: fake.NewSimpleClientset(&certificatesv1beta1.CertificateSigningRequest{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "certificates.k8s.io/v1beta1",
@@ -4327,19 +4328,20 @@ Events:  <none>` + "\n",
 			}),
 		},
 		{
-			expectedOutput: `Name:               user1
-Labels:             <none>
-Annotations:        <none>
-CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
-Requesting User:    sample-userv1
-Signer:             kubernetes.io/kube-apiserver-client
-Status:             Pending
-Subject:
-         Common Name:    "system:master:user1"
-         Serial Number:  ""
-         Organization:   "system:master"
-Events:  <none>` + "\n",
-			csr : fake.NewSimpleClientset(&certificatesv1.CertificateSigningRequest{
+			expectedOutput: `
+				Name:               user1
+				Labels:             <none>
+				Annotations:        <none>
+				CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
+				Requesting User:    sample-userv1
+				Signer:             kubernetes.io/kube-apiserver-client
+				Status:             Pending
+				Subject:
+						Common Name:    "system:master:user1"
+						Serial Number:  ""
+						Organization:   "system:master"
+				Events:  <none>` + "\n",
+			csr: fake.NewSimpleClientset(&certificatesv1.CertificateSigningRequest{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "certificates.k8s.io/v1",
 					Kind:       "CertificateSigningRequest",
