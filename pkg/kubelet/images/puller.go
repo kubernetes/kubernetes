@@ -101,7 +101,7 @@ func (sip *serialImagePuller) processImagePullRequests() {
 		pullRequestQ := make([]*imagePullRequest, 0)
 		pullRequestQ = append(pullRequestQ, request)
 
-		// Use a loop to fetch the requests in the channel at the current time and
+		// Use a loop to fetch the requests in the channel at the current time and 
 		// store them in a slice to wait for sorting.
 	Loop:
 		for {
