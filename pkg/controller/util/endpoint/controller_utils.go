@@ -32,8 +32,10 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/hash"
+	utilnet "k8s.io/utils/net"
 )
 
 // ServiceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls to AsSelectorPreValidated (see #73527)
@@ -106,9 +108,6 @@ func (sc *ServiceSelectorCache) GetPodServiceMemberships(serviceLister v1listers
 	return set, nil
 }
 
-// EndpointsMatch is a type of function that returns true if pod endpoints match.
-type EndpointsMatch func(*v1.Pod, *v1.Pod) bool
-
 // PortMapKey is used to uniquely identify groups of endpoint ports.
 type PortMapKey string
 
@@ -153,9 +152,10 @@ func ShouldSetHostname(pod *v1.Pod, svc *v1.Service) bool {
 	return len(pod.Spec.Hostname) > 0 && pod.Spec.Subdomain == svc.Name && svc.Namespace == pod.Namespace
 }
 
-// PodChanged returns two boolean values, the first returns true if the pod.
-// has changed, the second value returns true if the pod labels have changed.
-func PodChanged(oldPod, newPod *v1.Pod, endpointChanged EndpointsMatch) (bool, bool) {
+// podEndpointsChanged returns two boolean values. The first is true if the pod has
+// changed in a way that may change existing endpoints. The second value is true if the
+// pod has changed in a way that may affect which Services it matches.
+func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	// Check if the pod labels have changed, indicating a possible
 	// change in the service membership
 	labelsChanged := false
@@ -175,16 +175,27 @@ func PodChanged(oldPod, newPod *v1.Pod, endpointChanged EndpointsMatch) (bool, b
 	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(newPod) {
 		return true, labelsChanged
 	}
-	// Convert the pod to an Endpoint, clear inert fields,
-	// and see if they are the same.
-	// TODO: Add a watcher for node changes separate from this
-	// We don't want to trigger multiple syncs at a pod level when a node changes
-	return endpointChanged(newPod, oldPod), labelsChanged
+
+	// Check if the pod IPs have changed
+	if len(oldPod.Status.PodIPs) != len(newPod.Status.PodIPs) {
+		return true, labelsChanged
+	}
+	for i := range oldPod.Status.PodIPs {
+		if oldPod.Status.PodIPs[i].IP != newPod.Status.PodIPs[i].IP {
+			return true, labelsChanged
+		}
+	}
+
+	// Endpoints may also reference a pod's Name, Namespace, UID, and NodeName, but
+	// the first three are immutable, and NodeName is immutable once initially set,
+	// which happens before the pod gets an IP.
+
+	return false, labelsChanged
 }
 
 // GetServicesToUpdateOnPodChange returns a set of Service keys for Services
 // that have potentially been affected by a change to this pod.
-func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selectorCache *ServiceSelectorCache, old, cur interface{}, endpointChanged EndpointsMatch) sets.String {
+func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selectorCache *ServiceSelectorCache, old, cur interface{}) sets.String {
 	newPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
@@ -193,7 +204,7 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selec
 		return sets.String{}
 	}
 
-	podChanged, labelsChanged := PodChanged(oldPod, newPod, endpointChanged)
+	podChanged, labelsChanged := podEndpointsChanged(oldPod, newPod)
 
 	// If both the pod and labels are unchanged, no update is needed
 	if !podChanged && !labelsChanged {
@@ -265,4 +276,19 @@ func (sl portsInOrder) Less(i, j int) bool {
 	h1 := DeepHashObjectToString(sl[i])
 	h2 := DeepHashObjectToString(sl[j])
 	return h1 < h2
+}
+
+// IsIPv6Service checks if svc should have IPv6 endpoints
+func IsIPv6Service(svc *v1.Service) bool {
+	if helper.IsServiceIPSet(svc) {
+		return utilnet.IsIPv6String(svc.Spec.ClusterIP)
+	} else if svc.Spec.IPFamily != nil {
+		return *svc.Spec.IPFamily == v1.IPv6Protocol
+	} else {
+		// FIXME: for legacy headless Services with no IPFamily, the current
+		// thinking is that we should use the cluster default. Unfortunately
+		// the endpoint controller doesn't know the cluster default. For now,
+		// assume it's IPv4.
+		return false
+	}
 }
