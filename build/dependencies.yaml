@@ -68,7 +68,7 @@ dependencies:
     - path: cluster/images/etcd/migrate/options.go
 
   - name: "golang"
-    version: 1.14.5
+    version: 1.14.6
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -133,7 +133,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.14.5-1
+    version: v1.14.6-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
@@ -198,7 +198,7 @@ dependencies:
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
 
   - name: "repo-infra"
-    version: 0.0.7
+    version: 0.0.8
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"

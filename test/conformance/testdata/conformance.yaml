@@ -1504,6 +1504,21 @@
     the replicaset to 2. Number of running instances of the Pod MUST be 2.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
+- testname: New Event resource lifecycle, testing a list of events
+  codename: '[sig-instrumentation] Events API should delete a collection of events
+    [Conformance]'
+  description: Create a list of events, the events MUST exist. The events are deleted
+    and MUST NOT show up when listing all events.
+  release: v1.19
+  file: test/e2e/instrumentation/events.go
+- testname: New Event resource lifecycle, testing a single event
+  codename: '[sig-instrumentation] Events API should ensure that an event can be fetched,
+    patched, deleted, and listed [Conformance]'
+  description: Create an event, the event MUST exist. The event is patched with a
+    new note, the check MUST have the update note. The event is deleted and MUST NOT
+    show up when listing all events.
+  release: v1.19
+  file: test/e2e/instrumentation/events.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly]
     [Conformance]'

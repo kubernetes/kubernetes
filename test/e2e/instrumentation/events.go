@@ -86,12 +86,12 @@ var _ = common.SIGDescribe("Events API", func() {
 
 	/*
 		Release : v1.19
-		Testname: Event resource lifecycle
+		Testname: New Event resource lifecycle, testing a single event
 		Description: Create an event, the event MUST exist.
 		The event is patched with a new note, the check MUST have the update note.
 		The event is deleted and MUST NOT show up when listing all events.
 	*/
-	ginkgo.It("should ensure that an event can be fetched, patched, deleted, and listed", func() {
+	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func() {
 		eventName := "event-test"
 
 		ginkgo.By("creating a test event")
@@ -160,7 +160,13 @@ var _ = common.SIGDescribe("Events API", func() {
 		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
 	})
 
-	ginkgo.It("should delete a collection of events", func() {
+	/*
+		Release : v1.19
+		Testname: New Event resource lifecycle, testing a list of events
+		Description: Create a list of events, the events MUST exist.
+		The events are deleted and MUST NOT show up when listing all events.
+	*/
+	framework.ConformanceIt("should delete a collection of events", func() {
 		eventNames := []string{"test-event-1", "test-event-2", "test-event-3"}
 
 		ginkgo.By("Create set of events")

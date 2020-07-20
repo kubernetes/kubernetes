@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -60,4 +61,17 @@ func (ho *HandlerOpts) toPromhttpHandlerOpts() promhttp.HandlerOpts {
 // kind of instrumentation as it is used by the Handler function.
 func HandlerFor(reg Gatherer, opts HandlerOpts) http.Handler {
 	return promhttp.HandlerFor(reg, opts.toPromhttpHandlerOpts())
+}
+
+// HandlerWithReset return an http.Handler with Reset
+func HandlerWithReset(reg KubeRegistry, opts HandlerOpts) http.Handler {
+	defaultHandler := promhttp.HandlerFor(reg, opts.toPromhttpHandlerOpts())
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			reg.Reset()
+			io.WriteString(w, "metrics reset\n")
+			return
+		}
+		defaultHandler.ServeHTTP(w, r)
+	})
 }
