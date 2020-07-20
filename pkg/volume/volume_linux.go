@@ -23,6 +23,7 @@ import (
 	"syscall"
 
 	"os"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,7 +47,10 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 
 	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
 
-	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
+	timer := time.AfterFunc(30*time.Second, func() {
+		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
+	})
+	defer timer.Stop()
 
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
 	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
