@@ -160,6 +160,7 @@ func TestAddFlags(t *testing.T) {
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,
 				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
+				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
