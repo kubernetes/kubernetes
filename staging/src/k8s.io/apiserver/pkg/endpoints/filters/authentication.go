@@ -47,7 +47,6 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
-		traceFilterStep(req.Context(), "Authenticate check done")
 		defer recordAuthMetrics(resp, ok, err, apiAuds, authenticationStart)
 		if err != nil || !ok {
 			if err != nil {

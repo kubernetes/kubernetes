@@ -32,7 +32,6 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
@@ -182,7 +181,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	ctx, trace := genericapirequest.WithTrace(ctx, "Call validating webhook",
+	trace := utiltrace.New("Call validating webhook",
 		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
 		utiltrace.Field{"webhook", h.Name},
 		utiltrace.Field{"resource", attr.GetResource()},

@@ -35,7 +35,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -605,7 +604,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 		return c.storage.GetToList(ctx, key, opts, listObj)
 	}
 
-	ctx, trace := genericapirequest.WithTrace(ctx, "cacher list", utiltrace.Field{"type", c.objectType.String()})
+	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -679,7 +678,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 		return c.storage.List(ctx, key, opts, listObj)
 	}
 
-	ctx, trace := genericapirequest.WithTrace(ctx, "cacher list", utiltrace.Field{"type", c.objectType.String()})
+	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
