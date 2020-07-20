@@ -17,6 +17,10 @@ limitations under the License.
 package images
 
 import (
+	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/util/env"
+	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -31,7 +35,7 @@ type pullResult struct {
 }
 
 type imagePuller interface {
-	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig)
+	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig, *v1.Pod)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -44,7 +48,7 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 	return &parallelImagePuller{imageService}
 }
 
-func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, pod *v1.Pod) {
 	go func() {
 		imageRef, err := pip.imageService.PullImage(spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
@@ -70,14 +74,16 @@ func newSerialImagePuller(imageService kubecontainer.ImageService) imagePuller {
 
 type imagePullRequest struct {
 	spec             kubecontainer.ImageSpec
+	pod              *v1.Pod
 	pullSecrets      []v1.Secret
 	pullChan         chan<- pullResult
 	podSandboxConfig *runtimeapi.PodSandboxConfig
 }
 
-func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, pod *v1.Pod) {
 	sip.pullRequests <- &imagePullRequest{
 		spec:             spec,
+		pod:              pod,
 		pullSecrets:      pullSecrets,
 		pullChan:         pullChan,
 		podSandboxConfig: podSandboxConfig,
@@ -85,11 +91,61 @@ func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecret
 }
 
 func (sip *serialImagePuller) processImagePullRequests() {
-	for pullRequest := range sip.pullRequests {
-		imageRef, err := sip.imageService.PullImage(pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
-		pullRequest.pullChan <- pullResult{
-			imageRef: imageRef,
-			err:      err,
+	// Set environment variables to identify the namespace that needs to be pulled first.
+	priorityNamespace := env.GetEnvAsStringOrFallback("PRIORITY_NAMESPACES", "kube-system")
+	for request := range sip.pullRequests {
+
+		// Wait for a while for as many requests as possible to enter the channel, Avoid first-come request
+		// not being sorted and processed directly.
+		time.Sleep(1 * time.Second)
+		pullRequestQ := make([]*imagePullRequest, 0)
+		pullRequestQ = append(pullRequestQ, request)
+
+		// Use a loop to fetch the requests in the channel at the current time and
+		// store them in a slice to wait for sorting.
+	Loop:
+		for {
+			select {
+			case request := <-sip.pullRequests:
+				pullRequestQ = append(pullRequestQ, request)
+			default:
+				break Loop
+			}
+		}
+
+		// Prioritize requests in the slice by PriorityClassName and Namespace.
+		sort.SliceStable(pullRequestQ, func(i, j int) bool {
+			if pullRequestQ[i].pod.Spec.PriorityClassName == scheduling.SystemNodeCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName != scheduling.SystemNodeCritical {
+				return true
+			} else if pullRequestQ[i].pod.Spec.PriorityClassName != scheduling.SystemNodeCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName == scheduling.SystemNodeCritical {
+				return false
+			}
+			if pullRequestQ[i].pod.Spec.PriorityClassName == scheduling.SystemClusterCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName != scheduling.SystemClusterCritical {
+				return true
+			} else if pullRequestQ[i].pod.Spec.PriorityClassName != scheduling.SystemClusterCritical &&
+				pullRequestQ[j].pod.Spec.PriorityClassName == scheduling.SystemClusterCritical {
+				return false
+			}
+			if strings.Contains(priorityNamespace, pullRequestQ[i].pod.Namespace) &&
+				!strings.Contains(priorityNamespace, pullRequestQ[j].pod.Namespace) {
+				return true
+			} else if !strings.Contains(priorityNamespace, pullRequestQ[i].pod.Namespace) &&
+				strings.Contains(priorityNamespace, pullRequestQ[j].pod.Namespace) {
+				return false
+			}
+			return false
+		})
+
+		// Handle the requests one by one.
+		for _, pr := range pullRequestQ {
+			imageRef, err := sip.imageService.PullImage(pr.spec, pr.pullSecrets, pr.podSandboxConfig)
+			pr.pullChan <- pullResult{
+				imageRef: imageRef,
+				err:      err,
+			}
 		}
 	}
 }
