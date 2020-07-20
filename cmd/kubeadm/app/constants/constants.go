@@ -351,7 +351,8 @@ const (
 	ControlPlaneNumCPU = 2
 
 	// ControlPlaneMem is the number of megabytes of memory required on the control-plane
-	ControlPlaneMem = 2 * 1024
+	// Below that amount of RAM running a stable control plane would be difficult.
+	ControlPlaneMem = 1700
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"

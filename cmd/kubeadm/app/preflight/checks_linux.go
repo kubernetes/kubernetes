@@ -19,6 +19,8 @@ limitations under the License.
 package preflight
 
 import (
+	"syscall"
+
 	"github.com/pkg/errors"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/utils/exec"
@@ -39,4 +41,20 @@ func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
 		return []error{err}, nil
 	}
 	return nil, nil
+}
+
+// Check number of memory required by kubeadm
+func (mc MemCheck) Check() (warnings, errorList []error) {
+	info := syscall.Sysinfo_t{}
+	err := syscall.Sysinfo(&info)
+	if err != nil {
+		errorList = append(errorList, errors.Wrapf(err, "failed to get system info"))
+	}
+
+	// Totalram returns bytes; convert to MB
+	actual := uint64(info.Totalram) / 1024 / 1024
+	if actual < mc.Mem {
+		errorList = append(errorList, errors.Errorf("the system RAM (%d MB) is less than the minimum %d MB", actual, mc.Mem))
+	}
+	return warnings, errorList
 }
