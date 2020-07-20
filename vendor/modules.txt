@@ -1959,7 +1959,7 @@ k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/system-validators v1.1.2 => k8s.io/system-validators v1.1.2
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20200619165400-6e3d28b6ed19 => k8s.io/utils v0.0.0-20200619165400-6e3d28b6ed19
+# k8s.io/utils v0.0.0-20200720150651-0bdb4ca86cbc => k8s.io/utils v0.0.0-20200720150651-0bdb4ca86cbc
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec
