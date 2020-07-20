@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/purell"
+	"github.com/pbnjay/memory"
 	"github.com/pkg/errors"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -869,6 +870,25 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
+// MemCheck checks if the number of megabytes of memory is not less than required
+type MemCheck struct {
+	Mem uint64
+}
+
+// Name returns the label for memory
+func (MemCheck) Name() string {
+	return "Mem"
+}
+
+// Check number of memory required by kubeadm
+func (mc MemCheck) Check() (warnings, errorList []error) {
+	actual := memory.TotalMemory() / 1024 / 1024 // TotalMemory returns bytes; convert to MB
+	if actual < mc.Mem {
+		errorList = append(errorList, errors.Errorf("the system RAM (%d MB) is less than the minimum %d MB", actual, mc.Mem))
+	}
+	return warnings, errorList
+}
+
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
 // The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
@@ -884,6 +904,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
+		MemCheck{Mem: kubeadmconstants.ControlPlaneMem},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), kubeadmconstants.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
