@@ -71,9 +71,11 @@ dependencies:
       match: const etcdImage
 
   - name: "golang"
-    version: 1.13.9
+    version: 1.13.14
     refPaths:
     - path: build/build-image/cross/VERSION
+    - path: build/root/WORKSPACE
+      match: go_version = "\d+\.\d+\.\d+"
     - path: test/images/Makefile
       match: GOLANG_VERSION
 
@@ -124,8 +126,16 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.13.9-5
+    version: v1.13.14-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/kube-cross:v\d+\.\d+\.\d+-\d+
+
+  - name: "repo-infra"
+    version: 0.0.8
+    refPaths:
+    - path: build/root/WORKSPACE
+      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
+    - path: build/root/WORKSPACE
+      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
