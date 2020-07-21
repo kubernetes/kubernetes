@@ -38,8 +38,8 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-// Manager is an interface for adding and removing hostport for a given pod sandbox.
-type Manager interface {
+// HostPortManager is an interface for adding and removing hostport for a given pod sandbox.
+type HostPortManager interface {
 	// Add implements port mappings.
 	// id should be a unique identifier for a pod, e.g. podSandboxID.
 	// podPortMapping is the associated port mapping information for the pod.
@@ -59,7 +59,7 @@ type hostportManager struct {
 	mu             sync.Mutex
 }
 
-func NewHostportManager(iptables utiliptables.Interface) Manager {
+func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
 	h := &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
 		execer:      exec.New(),

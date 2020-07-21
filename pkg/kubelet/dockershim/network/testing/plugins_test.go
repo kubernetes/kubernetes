@@ -35,7 +35,7 @@ import (
 )
 
 func TestSelectDefaultPlugin(t *testing.T) {
-	allPlugins := []network.Plugin{}
+	allPlugins := []network.NetworkPlugin{}
 	plug, err := network.InitNetworkPlugin(allPlugins, "", NewFakeHost(nil), kubeletconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 	if err != nil {
 		t.Fatalf("Unexpected error in selecting default plugin: %v", err)

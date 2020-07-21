@@ -36,8 +36,8 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-// Syncer takes a list of PodPortMappings and implements hostport all at once
-type Syncer interface {
+// HostportSyncer takes a list of PodPortMappings and implements hostport all at once
+type HostportSyncer interface {
 	// SyncHostports gathers all hostports on node and setup iptables rules to enable them.
 	// On each invocation existing ports are synced and stale rules are deleted.
 	SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error
@@ -53,7 +53,7 @@ type hostportSyncer struct {
 	portOpener  hostportOpener
 }
 
-func NewHostportSyncer(iptables utiliptables.Interface) Syncer {
+func NewHostportSyncer(iptables utiliptables.Interface) HostportSyncer {
 	return &hostportSyncer{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptables,

@@ -44,7 +44,7 @@ import (
 )
 
 // test it fulfills the NetworkPlugin interface
-var _ network.Plugin = &kubenetNetworkPlugin{}
+var _ network.NetworkPlugin = &kubenetNetworkPlugin{}
 
 func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]utilsets.String, execer exec.Interface, host network.Host) *kubenetNetworkPlugin {
 	return &kubenetNetworkPlugin{

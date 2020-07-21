@@ -50,8 +50,8 @@ const (
 	NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
 )
 
-// Plugin is an interface to network plugins for the kubelet
-type Plugin interface {
+// NetworkPlugin is an interface to network plugins for the kubelet
+type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
 	Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
@@ -131,7 +131,7 @@ type PortMappingGetter interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []Plugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (Plugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
@@ -142,7 +142,7 @@ func InitNetworkPlugin(plugins []Plugin, networkPluginName string, host Host, ha
 		return plug, nil
 	}
 
-	pluginMap := map[string]Plugin{}
+	pluginMap := map[string]NetworkPlugin{}
 
 	allErrs := []error{}
 	for _, plugin := range plugins {
@@ -304,14 +304,14 @@ func (*NoopPortMappingGetter) GetPodPortMappings(containerID string) ([]*hostpor
 // proceed in parallel.
 type PluginManager struct {
 	// Network plugin being wrapped
-	plugin Plugin
+	plugin NetworkPlugin
 
 	// Pod list and lock
 	podsLock sync.Mutex
 	pods     map[string]*podLock
 }
 
-func NewPluginManager(plugin Plugin) *PluginManager {
+func NewPluginManager(plugin NetworkPlugin) *PluginManager {
 	metrics.Register()
 	return &PluginManager{
 		plugin: plugin,
