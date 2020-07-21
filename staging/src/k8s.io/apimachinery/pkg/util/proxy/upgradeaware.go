@@ -267,6 +267,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	)
 
 	location := *h.Location
+	location.RawQuery = req.URL.RawQuery
 	if h.UseRequestLocation {
 		location = *req.URL
 		location.Scheme = h.Location.Scheme
