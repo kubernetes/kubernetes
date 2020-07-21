@@ -1228,7 +1228,6 @@ func (kl *Kubelet) StartGarbageCollection() {
 func (kl *Kubelet) initializeModules() error {
 	// Prometheus metrics.
 	metrics.Register(
-		kl.runtimeCache,
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
