@@ -245,6 +245,22 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
 		_, err = f.ClientSet.AppsV1().Deployments(testNamespaceName).Patch(context.TODO(), testDeploymentName, types.StrategicMergePatchType, []byte(deploymentPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Deployment")
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Modified:
+				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+					found := deployment.ObjectMeta.Name == testDeployment.Name &&
+						deployment.Labels["test-deployment-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
+			}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
 
 		ginkgo.By("waiting for Replicas to scale")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
@@ -254,7 +270,8 @@ var _ = SIGDescribe("Deployment", func() {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.Labels["test-deployment-static"] == "true" &&
 					deployment.Status.AvailableReplicas == testDeploymentMinimumReplicas &&
-					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas
+					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
+					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage
 				return found, nil
 			}
 			return false, nil
@@ -268,16 +285,14 @@ var _ = SIGDescribe("Deployment", func() {
 		for _, deploymentItem := range deploymentsList.Items {
 			if deploymentItem.ObjectMeta.Name == testDeploymentName &&
 				deploymentItem.ObjectMeta.Namespace == testNamespaceName &&
-				deploymentItem.ObjectMeta.Labels["test-deployment-static"] == "true" &&
-				*deploymentItem.Spec.Replicas == testDeploymentMinimumReplicas &&
-				deploymentItem.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage {
+				deploymentItem.ObjectMeta.Labels["test-deployment-static"] == "true" {
 				foundDeployment = true
 				break
 			}
 		}
 		framework.ExpectEqual(foundDeployment, true, "unable to find the Deployment in list", deploymentsList)
 
-		ginkgo.By("updating the DeploymentStatus")
+		ginkgo.By("updating the Deployment")
 		testDeploymentUpdate := testDeployment
 		testDeploymentUpdate.ObjectMeta.Labels["test-deployment"] = "updated"
 		testDeploymentUpdate.Spec.Template.Spec.Containers[0].Image = testDeploymentUpdateImage
