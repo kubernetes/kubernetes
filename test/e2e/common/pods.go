@@ -878,12 +878,21 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	ginkgo.It("should run through the lifecycle of Pods and PodStatus", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-		testNs := f.Namespace.Name
+		testNamespaceName := f.Namespace.Name
 		testPodName := "pod-test"
 		testPodImage := "nginx"
 		testPodImage2 := "httpd"
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
+
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = testPodLabelsFlat
+				return f.ClientSet.CoreV1().Pods(testNamespaceName).Watch(context.TODO(), options)
+			},
+		}
+		podsList, err := f.ClientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{LabelSelector: testPodLabelsFlat})
+		framework.ExpectNoError(err, "failed to list Pods")
 
 		testPod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -900,24 +909,40 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		ginkgo.By("creating a Pod with a static label")
-		_, err := f.ClientSet.CoreV1().Pods(testNs).Create(context.TODO(), &testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Pod %s in namespace %s", testPodName, testNs)
+		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Create(context.TODO(), &testPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Pod %s in namespace %s", testPodName, testNamespaceName)
 
-		ginkgo.By("setting up a watch for the Pod")
-		podWatchTimeoutSeconds := int64(180)
-		podWatch, err := f.ClientSet.CoreV1().Pods(testNs).Watch(context.TODO(), metav1.ListOptions{LabelSelector: testPodLabelsFlat, TimeoutSeconds: &podWatchTimeoutSeconds})
-		framework.ExpectNoError(err, "failed to set up watch for Pod %s in namespace %s", testPodName, testNs)
-
-		podWatchChan := podWatch.ResultChan()
-		ginkgo.By("watching for Pod to be ready")
-		eventFound := false
-		for watchEvent := range podWatchChan {
-			if podWatchEvent, ok := watchEvent.Object.(*v1.Pod); ok && podWatchEvent.Status.Phase == v1.PodRunning {
-				eventFound = true
-				break
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Added:
+				if pod, ok := event.Object.(*v1.Pod); ok {
+					found := pod.ObjectMeta.Name == pod.Name &&
+						pod.Labels["test-pod-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
 			}
-		}
-		framework.ExpectEqual(eventFound, true, "failed to find running Pod %s in namespace %s", testPodName, testNs)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
+
+		ginkgo.By("watching for Pod to be ready")
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+				if pod, ok := event.Object.(*v1.Pod); ok {
+					found := pod.ObjectMeta.Name == testPod.ObjectMeta.Name &&
+						pod.ObjectMeta.Namespace == testNamespaceName &&
+						pod.Labels["test-pod-static"] == "true" &&
+						pod.Status.Phase == v1.PodRunning
+					return found, nil
+				}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see Pod %v in namespace %v running", testPod.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		podPatch, err := json.Marshal(v1.Pod{
@@ -932,18 +957,34 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch for Pod")
-		_, err = f.ClientSet.CoreV1().Pods(testNs).Patch(context.TODO(), testPodName, types.StrategicMergePatchType, []byte(podPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch Pod %s in namespace %s", testPodName, testNs)
+		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Patch(context.TODO(), testPodName, types.StrategicMergePatchType, []byte(podPatch), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch Pod %s in namespace %s", testPodName, testNamespaceName)
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Modified:
+				if pod, ok := event.Object.(*v1.Pod); ok {
+					found := pod.ObjectMeta.Name == pod.Name &&
+						pod.Labels["test-pod-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
+			}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
 
 		ginkgo.By("getting the Pod and ensuring that it's patched")
-		pod, err := f.ClientSet.CoreV1().Pods(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNs)
+		pod, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNamespaceName)
 		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod"], "patched", "failed to patch Pod - missing label")
 		framework.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
 
 		ginkgo.By("getting the PodStatus")
-		podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err, "failed to fetch PodStatus of Pod %s in namespace %s", testPodName, testNs)
+		podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err, "failed to fetch PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
 		podStatusBytes, err := json.Marshal(podStatusUnstructured)
 		framework.ExpectNoError(err, "failed to marshal unstructured response")
 		var podStatus v1.Pod
@@ -961,8 +1002,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			}
 		}
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
-		podStatusUpdate, err := f.ClientSet.CoreV1().Pods(testNs).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update PodStatus of Pod %s in namespace %s", testPodName, testNs)
+		podStatusUpdate, err := f.ClientSet.CoreV1().Pods(testNamespaceName).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to update PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
 
 		ginkgo.By("check the Pod again to ensure its Ready conditions are False")
 		podStatusFieldPatchCount = 0
@@ -975,18 +1016,26 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
-		err = f.ClientSet.CoreV1().Pods(testNs).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
+		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")
-		eventFound = false
-		for watchEvent := range podWatchChan {
-			if watchEvent.Type == watch.Deleted {
-				eventFound = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Deleted:
+				if pod, ok := event.Object.(*v1.Pod); ok {
+					found := pod.ObjectMeta.Name == pod.Name &&
+						pod.Labels["test-pod-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
 			}
-		}
-		framework.ExpectEqual(eventFound, true, "failed to find Pod %v event", watch.Deleted)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
 	})
 })
 
