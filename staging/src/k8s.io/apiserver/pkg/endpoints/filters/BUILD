@@ -55,7 +55,6 @@ go_library(
         "impersonation.go",
         "metrics.go",
         "requestinfo.go",
-        "trace.go",
         "warning.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/filters",
@@ -77,14 +76,12 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/endpoints/internal:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/httplog:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/warning:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
 

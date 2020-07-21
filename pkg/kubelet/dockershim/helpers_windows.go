@@ -43,6 +43,12 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 	return nil, nil
 }
 
+func (ds *dockerService) getSandBoxSecurityOpts(separator rune) []string {
+	// Currently, Windows container does not support privileged mode, so no no-new-privileges flag can be returned directly like Linux
+	// If the future Windows container has new support for privileged mode, we can adjust it here
+	return nil
+}
+
 // applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
 func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 	if kubeletapis.ShouldIsolatedByHyperV(annotations) {

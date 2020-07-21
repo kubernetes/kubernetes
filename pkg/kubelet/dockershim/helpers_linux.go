@@ -48,6 +48,12 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 	return seccompSecurityOpts, nil
 }
 
+func (ds *dockerService) getSandBoxSecurityOpts(separator rune) []string {
+	// run sandbox with no-new-privileges and using runtime/default
+	// sending no "seccomp=" means docker will use default profile
+	return []string{"no-new-privileges"}
+}
+
 func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 	if seccompProfile == "" || seccompProfile == v1.SeccompProfileNameUnconfined {
 		// return early the default

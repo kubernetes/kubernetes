@@ -18,7 +18,6 @@ package endpointslice
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,19 +35,7 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-// podEndpointChanged returns true if the results of podToEndpoint are different
-// for the pods passed to this function.
-func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
-	endpoint1 := podToEndpoint(pod1, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
-	endpoint2 := podToEndpoint(pod2, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
-
-	endpoint1.TargetRef.ResourceVersion = ""
-	endpoint2.TargetRef.ResourceVersion = ""
-
-	return !reflect.DeepEqual(endpoint1, endpoint2)
-}
-
-// podToEndpoint returns an Endpoint object generated from a Pod and Node.
+// podToEndpoint returns an Endpoint object generated from pod, node, and service.
 func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) discovery.Endpoint {
 	// Build out topology information. This is currently limited to hostname,
 	// zone, and region, but this will be expanded in the future.
@@ -133,18 +120,12 @@ func getEndpointAddresses(podStatus corev1.PodStatus, service *corev1.Service) [
 
 	for _, podIP := range podStatus.PodIPs {
 		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
-		if isIPv6PodIP == isIPv6Service(service) {
+		if isIPv6PodIP == endpointutil.IsIPv6Service(service) {
 			addresses = append(addresses, podIP.IP)
 		}
 	}
 
 	return addresses
-}
-
-// isIPv6Service returns true if the Service uses IPv6 addresses.
-func isIPv6Service(service *corev1.Service) bool {
-	// IPFamily is not guaranteed to be set, even in an IPv6 only cluster.
-	return (service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol) || utilnet.IsIPv6String(service.Spec.ClusterIP)
 }
 
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes

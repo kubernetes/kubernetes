@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 	utiltrace "k8s.io/utils/trace"
@@ -260,7 +259,7 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		return out, nil
 	}
 
-	ctx, trace := genericapirequest.WithTrace(context.TODO(), "Call conversion webhook",
+	trace := utiltrace.New("Call conversion webhook",
 		utiltrace.Field{"custom-resource-definition", c.name},
 		utiltrace.Field{"desired-api-version", desiredAPIVersion},
 		utiltrace.Field{"object-count", objCount},
@@ -270,6 +269,8 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	// the conversion request on the apiserver side (~4ms per object).
 	defer trace.LogIfLong(time.Duration(50+8*objCount) * time.Millisecond)
 
+	// TODO: Figure out if adding one second timeout make sense here.
+	ctx := context.TODO()
 	r := c.restClient.Post().Body(request).Do(ctx)
 	if err := r.Into(response); err != nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
