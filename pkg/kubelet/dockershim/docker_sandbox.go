@@ -666,12 +666,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	return createConfig, nil
 }
 
-func (ds *dockerService) getSandBoxSecurityOpts(separator rune) []string {
-	// run sandbox with no-new-privileges and using runtime/default
-	// sending no "seccomp=" means docker will use default profile
-	return []string{"no-new-privileges"}
-}
-
 // networkNamespaceMode returns the network runtimeapi.NamespaceMode for this container.
 // Supports: POD, NODE
 func networkNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {
