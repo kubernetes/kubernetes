@@ -55,6 +55,10 @@ func evalPath(path string) (linkedPath string, err error) {
 		return "", err
 	}
 	linkedPath = strings.TrimSpace(string(output))
+	if linkedPath == "" {
+		klog.V(4).Infof("Path '%s' has no target. Consiering it as evaluated.", path)
+		return path, nil
+	}
 	if isVolumePrefix(linkedPath) {
 		return path, err
 	}
