@@ -224,15 +224,26 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
+
+	if !o.Local {
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return err
+		}
+		discoveryClient, err := f.ToDiscoveryClient()
+		if err != nil {
+			return err
+		}
+		o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+		o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+		o.clientset, err = f.KubernetesClientSet()
+		if err != nil {
+			return err
+		}
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -240,15 +251,6 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	o.PrintObj = printer.PrintObj
-
-	o.clientset, err = f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
 	o.builder = f.NewBuilder
 
 	return nil

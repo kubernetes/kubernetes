@@ -44,7 +44,6 @@ type SetImageOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	Infos          []*resource.Info
 	Selector       string
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
@@ -57,6 +56,9 @@ type SetImageOptions struct {
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
+	namespace              string
+	enforceNamespace       bool
+	builder                *resource.Builder
 	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
 	ContainerImages        map[string]string
@@ -145,15 +147,23 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
+
+	if !o.Local {
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return err
+		}
+		discoveryClient, err := f.ToDiscoveryClient()
+		if err != nil {
+			return err
+		}
+		o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+		o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = resolveImageFunc
 
@@ -165,41 +175,19 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.PrintObj = printer.PrintObj
 
-	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
 	o.Resources, o.ContainerImages, err = getResourcesAndImages(args)
 	if err != nil {
 		return err
 	}
 
-	builder := f.NewBuilder().
-		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-		LocalParam(o.Local).
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		Flatten()
-
-	if !o.Local {
-		builder.LabelSelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, o.Resources...).
-			Latest()
-	} else {
-		// if a --local flag was provided, and a resource was specified in the form
-		// <resource>/<name>, fail immediately as --local cannot query the api server
-		// for the specified resource.
-		if len(o.Resources) > 0 {
-			return resource.LocalResourceError
-		}
+	// if a --local flag was provided, and a resource was specified in the form
+	// <resource>/<name>, fail immediately as --local cannot query the api server
+	// for the specified resource.
+	if o.Local && len(o.Resources) > 0 {
+		return resource.LocalResourceError
 	}
 
-	o.Infos, err = builder.Do().Infos()
-	if err != nil {
-		return err
-	}
+	o.builder = f.NewBuilder()
 
 	return nil
 }
@@ -226,9 +214,27 @@ func (o *SetImageOptions) Validate() error {
 
 // Run performs the execution of 'set image' sub command
 func (o *SetImageOptions) Run() error {
-	allErrs := []error{}
+	builder := o.builder.
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		LocalParam(o.Local).
+		ContinueOnError().
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		Flatten()
 
-	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
+	if !o.Local {
+		builder.LabelSelectorParam(o.Selector).
+			ResourceTypeOrNameArgs(o.All, o.Resources...).
+			Latest()
+	}
+
+	rssInfos, err := builder.Do().Infos()
+	if err != nil {
+		return err
+	}
+
+	allErrs := []error{}
+	patches := CalculatePatches(rssInfos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		_, err := o.UpdatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			for name, image := range o.ContainerImages {
 				resolvedImageName, err := o.ResolveImage(image)

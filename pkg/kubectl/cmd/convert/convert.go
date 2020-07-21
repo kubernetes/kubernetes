@@ -118,9 +118,11 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 	}
 	o.builder = f.NewBuilder
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
+	if !o.local {
+		o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
 	}
 
 	o.validator = func() (validation.Schema, error) {

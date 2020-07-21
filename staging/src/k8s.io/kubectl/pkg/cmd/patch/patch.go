@@ -154,22 +154,25 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return o.PrintFlags.ToPrinter()
 	}
 
-	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
 	o.args = args
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
+
+	if !o.Local {
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return err
+		}
+		discoveryClient, err := f.ToDiscoveryClient()
+		if err != nil {
+			return err
+		}
+		o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+		o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	return nil
 }
