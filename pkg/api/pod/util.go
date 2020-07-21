@@ -304,6 +304,13 @@ func DropDisabledTemplateFields(podTemplate, oldPodTemplate *api.PodTemplateSpec
 	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
 }
 
+// AddDisabledTemplateFieldsTo the provided set of resetFields
+// This should be called with the resetFields for all resources containing a PodTemplate
+// To add the fields at the right location, pass a prefixed fieldset
+func AddDisabledTemplateFieldsTo(resetFields *fieldpath.Set) {
+	addDisabledFieldsTo(resetFields)
+}
+
 // DropDisabledPodFields removes disabled fields from the pod metadata and spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a Pod
 func DropDisabledPodFields(pod, oldPod *api.Pod) {
