@@ -1,4 +1,4 @@
-// This is a generated file. Do not edit directly.
+// This is a generated file. Do not edit directlyxxxxxxx
 // Ensure you've carefully read
 // https://git.k8s.io/community/contributors/devel/sig-architecture/vendor.md
 // Run hack/pin-dependency.sh to change pinned dependency versions.
