@@ -292,7 +292,7 @@ func (o *DrainCmdOptions) drainNode(
 	drainResultMutex *sync.Mutex,
 	drainWG *sync.WaitGroup,
 	drainedNodes *sets.String,
-	drainErrors []error,
+	drainErrors *[]error,
 	printObj printers.ResourcePrinterFunc,
 ) {
 	err := o.deleteOrEvictPodsSimple(nodeInfo)
@@ -305,7 +305,7 @@ func (o *DrainCmdOptions) drainNode(
 		printObj(nodeInfo.Object, o.Out)
 	} else {
 		fmt.Fprintf(o.ErrOut, "error: unable to drain node %q\n\n", nodeInfo.Name)
-		drainErrors = append(drainErrors, err)
+		*drainErrors = append(*drainErrors, err)
 	}
 }
 
@@ -328,9 +328,9 @@ func (o *DrainCmdOptions) RunDrain() error {
 
 	for _, info := range o.nodeInfos {
 		if o.drainer.ParallelizeNodes {
-			go o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, drainErrors, printObj)
+			go o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, &drainErrors, printObj)
 		} else {
-			o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, drainErrors, printObj)
+			o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, &drainErrors, printObj)
 		}
 	}
 
