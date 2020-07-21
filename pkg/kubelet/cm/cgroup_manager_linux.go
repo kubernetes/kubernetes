@@ -534,18 +534,18 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.Memory != nil {
 		resources.Memory = *resourceConfig.Memory
 	}
-	if resourceConfig.CpuShares != nil {
+	if resourceConfig.CPUShares != nil {
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			resources.CpuWeight = getCpuWeight(resourceConfig.CpuShares)
+			resources.CpuWeight = getCpuWeight(resourceConfig.CPUShares)
 		} else {
-			resources.CpuShares = *resourceConfig.CpuShares
+			resources.CpuShares = *resourceConfig.CPUShares
 		}
 	}
-	if resourceConfig.CpuQuota != nil {
-		resources.CpuQuota = *resourceConfig.CpuQuota
+	if resourceConfig.CPUQuota != nil {
+		resources.CpuQuota = *resourceConfig.CPUQuota
 	}
-	if resourceConfig.CpuPeriod != nil {
-		resources.CpuPeriod = *resourceConfig.CpuPeriod
+	if resourceConfig.CPUPeriod != nil {
+		resources.CpuPeriod = *resourceConfig.CPUPeriod
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		if resourceConfig.PidsLimit != nil {
@@ -729,10 +729,10 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 
 // ReduceCPULimits reduces the cgroup's cpu shares to the lowest possible value
 func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
-	// Set lowest possible CpuShares value for the cgroup
+	// Set lowest possible CPUShares value for the cgroup
 	minimumCPUShares := uint64(MinShares)
 	resources := &ResourceConfig{
-		CpuShares: &minimumCPUShares,
+		CPUShares: &minimumCPUShares,
 	}
 	containerConfig := &CgroupConfig{
 		Name:               cgroupName,

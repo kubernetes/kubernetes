@@ -99,7 +99,6 @@ pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/cm
 pkg/kubelet/container
 pkg/kubelet/container/testing
-pkg/kubelet/cri/remote
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
