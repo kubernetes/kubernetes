@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
@@ -240,7 +239,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
-	ctx, trace := genericapirequest.WithTrace(ctx, "GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
+	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	v, err := conversion.EnforcePtr(out)
@@ -383,7 +382,7 @@ func (s *store) GetToList(ctx context.Context, key string, listOpts storage.List
 	resourceVersion := listOpts.ResourceVersion
 	match := listOpts.ResourceVersionMatch
 	pred := listOpts.Predicate
-	ctx, trace := genericapirequest.WithTrace(ctx, "GetToList etcd3",
+	trace := utiltrace.New("GetToList etcd3",
 		utiltrace.Field{"key", key},
 		utiltrace.Field{"resourceVersion", resourceVersion},
 		utiltrace.Field{"resourceVersionMatch", match},
@@ -527,7 +526,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
-	ctx, trace := genericapirequest.WithTrace(ctx, "List etcd3",
+	trace := utiltrace.New("List etcd3",
 		utiltrace.Field{"key", key},
 		utiltrace.Field{"resourceVersion", resourceVersion},
 		utiltrace.Field{"resourceVersionMatch", match},

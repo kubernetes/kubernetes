@@ -47,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -445,11 +444,4 @@ func isTooLargeError(err error) bool {
 		}
 	}
 	return false
-}
-
-// requestWithTrace returns a new trace using the provided msg and fields, nested within any trace already in the
-//context of the provided req. Also returns a request with the new trace in the context.
-func requestWithTrace(req *http.Request, msg string, fields ...utiltrace.Field) (*http.Request, *utiltrace.Trace) {
-	ctx, trace := request.WithTrace(req.Context(), msg, fields...)
-	return req.Clone(ctx), trace
 }
