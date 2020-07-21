@@ -164,7 +164,7 @@ var _ = SIGDescribe("Deployment", func() {
 			},
 		}
 		deploymentsList, err := f.ClientSet.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
-		framework.ExpectNoError(err, "failed to list Endpoints")
+		framework.ExpectNoError(err, "failed to list Deployments")
 
 		ginkgo.By("creating a Deployment")
 		testDeployment := appsv1.Deployment{
