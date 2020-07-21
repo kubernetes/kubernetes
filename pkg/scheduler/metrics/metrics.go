@@ -126,7 +126,7 @@ var (
 	PreemptionVictims = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "pod_preemption_victims",
+			Name:      "preemption_victims",
 			Help:      "Number of selected preemption victims",
 			// we think #victims>50 is pretty rare, therefore [50, +Inf) is considered a single bucket.
 			Buckets:        metrics.LinearBuckets(5, 5, 10),
