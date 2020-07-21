@@ -89,6 +89,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		Testname: New Event resource lifecycle, testing a single event
 		Description: Create an event, the event MUST exist.
 		The event is patched with a new note, the check MUST have the update note.
+		The event is updated with a new series, the check MUST have the update series.
 		The event is deleted and MUST NOT show up when listing all events.
 	*/
 	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func() {
@@ -145,6 +146,24 @@ var _ = common.SIGDescribe("Events API", func() {
 		testEvent.Note = eventPatchNote
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
 			framework.Failf("test event wasn't properly patched: %v", diff.ObjectReflectDiff(testEvent, event))
+		}
+
+		ginkgo.By("updating the test event")
+		testEvent.Series = &eventsv1.EventSeries{
+			Count:            100,
+			LastObservedTime: metav1.MicroTime{Time: time.Unix(1505828956, 0)},
+		}
+		_, err = client.Update(context.TODO(), testEvent, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to update the test event")
+
+		ginkgo.By("getting the test event")
+		event, err = client.Get(context.TODO(), eventName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get test event")
+		// clear ResourceVersion and ManagedFields which are set by control-plane
+		event.ObjectMeta.ResourceVersion = ""
+		event.ObjectMeta.ManagedFields = nil
+		if !apiequality.Semantic.DeepEqual(testEvent, event) {
+			framework.Failf("test event wasn't properly updated: %v", diff.ObjectReflectDiff(testEvent, event))
 		}
 
 		ginkgo.By("deleting the test event")
