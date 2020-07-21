@@ -922,7 +922,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		podPatch, err := json.Marshal(v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{"podtemplate": "patched"},
+				Labels: map[string]string{"test-pod": "patched"},
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{
@@ -938,7 +938,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		ginkgo.By("getting the Pod and ensuring that it's patched")
 		pod, err := f.ClientSet.CoreV1().Pods(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNs)
-		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod-static"], "true", "failed to patch Pod - missing label")
+		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod"], "patched", "failed to patch Pod - missing label")
 		framework.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
 
 		ginkgo.By("getting the PodStatus")
