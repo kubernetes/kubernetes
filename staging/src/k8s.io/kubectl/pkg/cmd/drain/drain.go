@@ -287,6 +287,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	})
 }
 
+// drainNode is expected to be thread-safe to support parallel node drain
 func (o *DrainCmdOptions) drainNode(
 	nodeInfo *resource.Info,
 	drainResultMutex *sync.Mutex,
@@ -353,6 +354,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 	return utilerrors.NewAggregate(drainErrors)
 }
 
+// deleteOrEvictPodsSimple is expected to be thread-safe to support parallel node drain
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
 	list, errs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
 	if errs != nil {
