@@ -20,7 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// IsControlledBy checks if the  object has a controllerRef set to the given owner
+// IsControlledBy checks if the object has a controllerRef set to the given
+// owner.
 func IsControlledBy(obj Object, owner Object) bool {
 	ref := GetControllerOfNoCopy(obj)
 	if ref == nil {
@@ -29,7 +30,8 @@ func IsControlledBy(obj Object, owner Object) bool {
 	return ref.UID == owner.GetUID()
 }
 
-// GetControllerOf returns a pointer to a copy of the controllerRef if controllee has a controller
+// GetControllerOf returns a pointer to a copy of the controllerRef if
+// controllee has a controller.
 func GetControllerOf(controllee Object) *OwnerReference {
 	ref := GetControllerOfNoCopy(controllee)
 	if ref == nil {
@@ -39,7 +41,8 @@ func GetControllerOf(controllee Object) *OwnerReference {
 	return &cp
 }
 
-// GetControllerOf returns a pointer to the controllerRef if controllee has a controller
+// GetControllerOfNoCopy returns a pointer to the controllerRef if controllee
+// has a controller.
 func GetControllerOfNoCopy(controllee Object) *OwnerReference {
 	refs := controllee.GetOwnerReferences()
 	for i := range refs {
