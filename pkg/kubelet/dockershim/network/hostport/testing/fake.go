@@ -26,7 +26,8 @@ import (
 
 type fakeSyncer struct{}
 
-func NewFakeHostportSyncer() hostport.HostportSyncer {
+// NewFakeHostportSyncer creates a fakeSyncer
+func NewFakeHostportSyncer() hostport.Syncer {
 	return &fakeSyncer{}
 }
 

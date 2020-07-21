@@ -50,8 +50,8 @@ const (
 	NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
 )
 
-// NetworkPlugin is an interface to network plugins for the kubelet
-type NetworkPlugin interface {
+// Plugin is an interface to network plugins for the kubelet
+type Plugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
 	Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
@@ -131,7 +131,7 @@ type PortMappingGetter interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []Plugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (Plugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
@@ -142,7 +142,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 		return plug, nil
 	}
 
-	pluginMap := map[string]NetworkPlugin{}
+	pluginMap := map[string]Plugin{}
 
 	allErrs := []error{}
 	for _, plugin := range plugins {
@@ -256,7 +256,7 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	return ip, nil
 }
 
-// GetPodIP gets the IP of the pod by inspecting the network info inside the pod's network namespace.
+// GetPodIPs gets the IP of the pod by inspecting the network info inside the pod's network namespace.
 // TODO (khenidak). The "primary ip" in dual stack world does not really exist. For now
 // we are defaulting to v4 as primary
 func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) ([]net.IP, error) {
@@ -304,14 +304,14 @@ func (*NoopPortMappingGetter) GetPodPortMappings(containerID string) ([]*hostpor
 // proceed in parallel.
 type PluginManager struct {
 	// Network plugin being wrapped
-	plugin NetworkPlugin
+	plugin Plugin
 
 	// Pod list and lock
 	podsLock sync.Mutex
 	pods     map[string]*podLock
 }
 
-func NewPluginManager(plugin NetworkPlugin) *PluginManager {
+func NewPluginManager(plugin Plugin) *PluginManager {
 	metrics.Register()
 	return &PluginManager{
 		plugin: plugin,

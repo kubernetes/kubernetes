@@ -116,7 +116,7 @@ func TestOpenCloseHostports(t *testing.T) {
 		countSctp := 0
 		for _, pm := range tc.podPortMapping.PortMappings {
 			if pm.Protocol == v1.ProtocolSCTP {
-				countSctp += 1
+				countSctp++
 			}
 		}
 		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings)-countSctp)

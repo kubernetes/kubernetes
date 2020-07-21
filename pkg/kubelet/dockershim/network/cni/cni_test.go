@@ -192,7 +192,7 @@ func TestCNIPlugin(t *testing.T) {
 		},
 	}
 
-	mockLoCNI := &mock_cni.MockCNI{}
+	mockLoCNI := &mockcni.MockCNI{}
 	// TODO mock for the test plugin too
 
 	tmpDir := utiltesting.MkTmpdirOrDie("cni-test")

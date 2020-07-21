@@ -16,9 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// mock_cni is a mock of the `libcni.CNI` interface. It's a handwritten mock
+// Package mockcni is a mock of the `libcni.CNI` interface. It's a handwritten mock
 // because there are only two functions to deal with.
-package mock_cni
+package mockcni
 
 import (
 	"context"

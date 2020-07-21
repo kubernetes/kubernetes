@@ -29,8 +29,9 @@ import (
 )
 
 const (
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	// MinimumDockerAPIVersion is minimum docker API version,
 	// docker version should be at least 1.13.1
+	// https://docs.docker.com/engine/reference/api/docker_remote_api/
 	MinimumDockerAPIVersion = "1.26.0"
 
 	// Status of a container returned by ListContainers.
@@ -38,7 +39,7 @@ const (
 	StatusCreatedPrefix = "Created"
 	StatusExitedPrefix  = "Exited"
 
-	// Fake docker endpoint
+	// FakeDockerEndpoint is a fake docker endpoint
 	FakeDockerEndpoint = "fake://"
 )
 

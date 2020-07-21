@@ -130,7 +130,7 @@ func SplitDirs(dirs string) []string {
 }
 
 // ProbeNetworkPlugins : get the network plugin based on cni conf file and bin file
-func ProbeNetworkPlugins(confDir, cacheDir string, binDirs []string) []network.NetworkPlugin {
+func ProbeNetworkPlugins(confDir, cacheDir string, binDirs []string) []network.Plugin {
 	old := binDirs
 	binDirs = make([]string, 0, len(binDirs))
 	for _, dir := range old {
@@ -150,7 +150,7 @@ func ProbeNetworkPlugins(confDir, cacheDir string, binDirs []string) []network.N
 
 	// sync NetworkConfig in best effort during probing.
 	plugin.syncNetworkConfig()
-	return []network.NetworkPlugin{plugin}
+	return []network.Plugin{plugin}
 }
 
 func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error) {

@@ -47,8 +47,8 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 	return nil
 }
 
-func (nh *fakeNetworkHost) SupportsLegacyFeatures() bool {
-	return nh.Legacy
+func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {
+	return fnh.Legacy
 }
 
 type fakeNamespaceGetter struct {

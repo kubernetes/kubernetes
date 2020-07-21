@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 
-// Mock of NetworkPlugin interface
+// MockNetworkPlugin is mock of NetworkPlugin interface
 type MockNetworkPlugin struct {
 	ctrl     *gomock.Controller
 	recorder *_MockNetworkPluginRecorder
