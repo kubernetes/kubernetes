@@ -18,11 +18,18 @@ package apiserver
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
+
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -114,6 +121,7 @@ type APIAggregator struct {
 	proxyTransport             *http.Transport
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
+	proxyHandlersLock sync.Mutex // low-volume read/write, just by event handlers and post-start hook
 	proxyHandlers map[string]*proxyHandler
 	// handledGroups are the groups that already have routes
 	handledGroups sets.String
@@ -263,6 +271,34 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		go availableController.Run(5, context.StopCh)
 		return nil
 	})
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-wait-for-first-sync", func(context genericapiserver.PostStartHookContext) error {
+		// when the aggregator first starts, it should make sure that it has proxy handlers for all the known good API services at this time
+		// we only need to do this once.
+		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+			apiservices, err := s.lister.List(labels.Everything())
+			if err != nil {
+				return false, err
+			}
+			expected := sets.NewString()
+			for _, apiservice := range apiservices {
+				if v1helper.IsAPIServiceConditionTrue(apiservice, v1.Available) {
+					expected.Insert(apiservice.Name)
+				}
+			}
+
+			s.proxyHandlersLock.Lock()
+			handled := sets.StringKeySet(s.proxyHandlers)
+			s.proxyHandlersLock.Unlock()
+
+			missing := expected.Difference(handled)
+			if len(missing) == 0 {
+				return true, nil
+			}
+			klog.Infof("still waiting on handling APIServices: %v", strings.Join(missing.List(), ","))
+
+			return false, nil
+		}, context.StopCh)
+	})
 
 	return s, nil
 }
@@ -305,6 +341,9 @@ func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
 func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
+	s.proxyHandlersLock.Lock()
+	defer s.proxyHandlersLock.Unlock()
+
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
@@ -331,9 +370,16 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {
-		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
+		// this is calling a controller.  It should already handle being async.
+		go func() {
+			defer utilruntime.HandleCrash()
+			s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
+		}()
 	}
-	s.proxyHandlers[apiService.Name] = proxyHandler
+	// we want to update the registration bit last after all the pieces are wired together
+	defer func() {
+		s.proxyHandlers[apiService.Name] = proxyHandler
+	}()
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
 
@@ -377,6 +423,9 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	if s.openAPIAggregationController != nil {
 		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
 	}
+
+	s.proxyHandlersLock.Lock()
+	defer s.proxyHandlersLock.Unlock()
 	delete(s.proxyHandlers, apiServiceName)
 
 	// TODO unregister group level discovery when there are no more versions for the group
