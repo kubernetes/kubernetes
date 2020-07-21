@@ -105,6 +105,8 @@ func (f *FakeRuntimeCache) GetPods() ([]*kubecontainer.Pod, error) {
 	return f.getter.GetPods(false)
 }
 
+func (f *FakeRuntimeCache) Invalidate() {}
+
 func (f *FakeRuntimeCache) ForceUpdateIfOlder(time.Time) error {
 	return nil
 }

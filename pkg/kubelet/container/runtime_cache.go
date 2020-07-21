@@ -30,6 +30,7 @@ var (
 type RuntimeCache interface {
 	GetPods() ([]*Pod, error)
 	ForceUpdateIfOlder(time.Time) error
+	Invalidate()
 }
 
 type podsGetter interface {
@@ -62,12 +63,19 @@ type runtimeCache struct {
 func (r *runtimeCache) GetPods() ([]*Pod, error) {
 	r.Lock()
 	defer r.Unlock()
-	if time.Since(r.cacheTime) > defaultCachePeriod {
+	if r.cacheTime.IsZero() || time.Since(r.cacheTime) > defaultCachePeriod {
 		if err := r.updateCache(); err != nil {
 			return nil, err
 		}
 	}
 	return r.pods, nil
+}
+
+// Invalidate causes the next GetPods() call to refresh the cache
+func (r *runtimeCache) Invalidate() {
+	r.Lock()
+	r.cacheTime = time.Time{}
+	r.Unlock()
 }
 
 func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {

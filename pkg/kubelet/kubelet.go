@@ -1839,6 +1839,17 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		kl.sourcesReady.AddSource(u.Source)
 
 	case e := <-plegCh:
+		if e.Type == pleg.ContainerStarted {
+			// Invalidate the runtimeCache so that the next GetPods() fetches up-to-date
+			// pod and container information from the runtime.  This avoids a situation
+			// where a REMOVE can come in immediately after the Pod status is updated to
+			// be ready in the API server (typical e2e pattern).  If HandlePodRemoves gets
+			// stale data from the runtimeCache, it can result in the Pod appearing to
+			// have no containers and proceeding directly to Pod teardown, which will
+			// ungracefully terminate any containers, ignoring terminationGracePeriodSeconds
+			kl.runtimeCache.Invalidate()
+		}
+
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
 			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {
