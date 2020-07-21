@@ -21,8 +21,8 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/apis/apiserverinternal"
-	"k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
+	"k8s.io/kubernetes/pkg/apis/apiserverinternal/v1alpha1"
 )
 
 // Install registers the API group and adds types to a scheme

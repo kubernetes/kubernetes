@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/apis/apiserverinternal"
+	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 )
 
 // ValidateStorageVersion validate the storage version object.
