@@ -4310,7 +4310,7 @@ Subject:
          Common Name:    "system:master:user1"
          Serial Number:  ""
          Organization:   "system:master"
-Events:  <none>`+"\n",
+Events:  <none>` + "\n",
 			csr: fake.NewSimpleClientset(&certificatesv1beta1.CertificateSigningRequest{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "certificates.k8s.io/v1beta1",
@@ -4338,7 +4338,7 @@ Subject:
          Common Name:    "system:master:user1"
          Serial Number:  ""
          Organization:   "system:master"
-Events:  <none>`+"\n",
+Events:  <none>` + "\n",
 			csr: fake.NewSimpleClientset(&certificatesv1.CertificateSigningRequest{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "certificates.k8s.io/v1",
