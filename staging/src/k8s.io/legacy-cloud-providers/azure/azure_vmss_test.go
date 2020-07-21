@@ -21,7 +21,9 @@ package azure
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -547,6 +549,99 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
 
 		nodeName, err := ss.getNodeNameByIPConfigurationID(test.ipConfigurationID)
+		if test.expectError {
+			assert.Error(t, err, test.description)
+			continue
+		}
+
+		assert.NoError(t, err, test.description)
+		assert.Equal(t, test.expected, nodeName, test.description)
+	}
+}
+
+func TestGetVMSSNodeNameByProviderID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testCases := []struct {
+		description      string
+		scaleSet         string
+		vmList           []string
+		providerID       string
+		expectError      bool
+		hasOutdatedCache bool
+		expected         types.NodeName
+	}{
+		{
+			description: "GetNodeNameByProviderID should get node's Name when the VMSS VM is existing",
+			providerID:  "azure:///subscriptions/subsid/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/scaleset1/virtualMachines/0",
+			scaleSet:    "scaleset1",
+			vmList:      []string{"scaleset1000000", "scaleset1000001"},
+			expected:    "scaleset1000000",
+		},
+		{
+			description:      "GetNodeNameByProviderID should get node's Name when the VMSS VM cache is outdated",
+			providerID:       "azure:///subscriptions/subsid/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/scaleset1/virtualMachines/0",
+			scaleSet:         "scaleset1",
+			hasOutdatedCache: true,
+			vmList:           []string{"scaleset1000000", "scaleset1000001"},
+			expected:         "scaleset1000000",
+		},
+		{
+			description: "GetNodeNameByProviderID should report error when the VMSS VM doesn't exist",
+			scaleSet:    "scaleset2",
+			providerID:  "azure:///subscriptions/subsid/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/scaleset2/virtualMachines/2",
+			vmList:      []string{"scaleset1000000", "scaleset1000001"},
+			expectError: true,
+		},
+		{
+			description: "GetNodeNameByProviderID should report error when the providerID is in wrong format",
+			scaleSet:    "scaleset2",
+			providerID:  "azure:///subscriptions/subsid/resourceGroups/rg/providers/Microsoft.Compute/0",
+			vmList:      []string{"scaleset1000000", "scaleset1000001"},
+			expectError: true,
+		},
+	}
+
+	for _, test := range testCases {
+		ss, err := newTestScaleSet(ctrl)
+		assert.NoError(t, err, test.description)
+
+		mockVMSSClient := mockvmssclient.NewMockInterface(ctrl)
+		mockVMSSVMClient := mockvmssvmclient.NewMockInterface(ctrl)
+		ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
+		ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
+
+		expectedScaleSet := compute.VirtualMachineScaleSet{
+			Name: &test.scaleSet,
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
+		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
+
+		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "", false)
+		mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
+
+		if test.hasOutdatedCache {
+			cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, azcache.CacheReadTypeDefault)
+			assert.NoError(t, err, test.description)
+			virtualMachines := cached.(*sync.Map)
+			virtualMachines.Store(string(test.expected), &vmssVirtualMachinesEntry{
+				resourceGroup:  "rg",
+				vmssName:       test.scaleSet,
+				instanceID:     "0",
+				virtualMachine: nil,
+				lastUpdate:     time.Now().Add(-1 * time.Hour),
+			})
+			ss.vmssVMCache.Store.Add(&azcache.AzureCacheEntry{
+				Key:       vmssVirtualMachinesKey,
+				Data:      virtualMachines,
+				CreatedOn: time.Now().Add(-1 * time.Hour),
+			})
+		}
+
+		nodeName, err := ss.GetNodeNameByProviderID(test.providerID)
 		if test.expectError {
 			assert.Error(t, err, test.description)
 			continue

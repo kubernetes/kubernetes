@@ -205,6 +205,11 @@ type Config struct {
 	VmssCacheTTLInSeconds int `json:"vmssCacheTTLInSeconds,omitempty" yaml:"vmssCacheTTLInSeconds,omitempty"`
 	// VmssVirtualMachinesCacheTTLInSeconds sets the cache TTL for vmssVirtualMachines
 	VmssVirtualMachinesCacheTTLInSeconds int `json:"vmssVirtualMachinesCacheTTLInSeconds,omitempty" yaml:"vmssVirtualMachinesCacheTTLInSeconds,omitempty"`
+	// VmssDeletedVirtualMachinesCacheTTLInSeconds sets the cache TTL for deleted vmssVirtualMachines.
+	// It is used to avoid throttling when large number of VirtualMachins are deleted all together and
+	// its value should be bigger than vmssVirtualMachinesCacheTTLInSeconds. Caches for deleted vmssVirtualMachines
+	// would be disabled if the value is set to -1. Default value is 900 seconds (15 minutes).
+	VmssDeletedVirtualMachinesCacheTTLInSeconds int `json:"vmssDeletedVirtualMachinesCacheTTLInSeconds,omitempty" yaml:"vmssDeletedVirtualMachinesCacheTTLInSeconds,omitempty"`
 	// VmCacheTTLInSeconds sets the cache TTL for vm
 	VMCacheTTLInSeconds int `json:"vmCacheTTLInSeconds,omitempty" yaml:"vmCacheTTLInSeconds,omitempty"`
 	// LoadBalancerCacheTTLInSeconds sets the cache TTL for load balancer
