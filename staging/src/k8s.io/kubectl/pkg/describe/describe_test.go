@@ -4299,19 +4299,18 @@ func TestDescribeCertificateSigningRequest(t *testing.T) {
 		csr            *fake.Clientset
 	}{
 		{
-			expectedOutput: `
-				Name:               user1
-				Labels:             <none>
-				Annotations:        <none>
-				CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
-				Requesting User:    sample-userv1beta1
-				Signer:             kubernetes.io/kube-apiserver-client
-				Status:             Pending
-				Subject:
-						Common Name:    "system:master:user1"
-						Serial Number:  ""
-						Organization:   "system:master"
-				Events:  <none>` + "\n",
+			expectedOutput: `Name:               user1
+Labels:             <none>
+Annotations:        <none>
+CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
+Requesting User:    sample-userv1beta1
+Signer:             kubernetes.io/kube-apiserver-client
+Status:             Pending
+Subject:
+         Common Name:    "system:master:user1"
+         Serial Number:  ""
+         Organization:   "system:master"
+Events:  <none>`+"\n",
 			csr: fake.NewSimpleClientset(&certificatesv1beta1.CertificateSigningRequest{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "certificates.k8s.io/v1beta1",
@@ -4328,19 +4327,18 @@ func TestDescribeCertificateSigningRequest(t *testing.T) {
 			}),
 		},
 		{
-			expectedOutput: `
-				Name:               user1
-				Labels:             <none>
-				Annotations:        <none>
-				CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
-				Requesting User:    sample-userv1
-				Signer:             kubernetes.io/kube-apiserver-client
-				Status:             Pending
-				Subject:
-						Common Name:    "system:master:user1"
-						Serial Number:  ""
-						Organization:   "system:master"
-				Events:  <none>` + "\n",
+			expectedOutput: `Name:               user1
+Labels:             <none>
+Annotations:        <none>
+CreationTimestamp:  Mon, 01 Jan 0001 00:00:00 +0000
+Requesting User:    sample-userv1
+Signer:             kubernetes.io/kube-apiserver-client
+Status:             Pending
+Subject:
+         Common Name:    "system:master:user1"
+         Serial Number:  ""
+         Organization:   "system:master"
+Events:  <none>`+"\n",
 			csr: fake.NewSimpleClientset(&certificatesv1.CertificateSigningRequest{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "certificates.k8s.io/v1",
@@ -4368,8 +4366,8 @@ func TestDescribeCertificateSigningRequest(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(out, test.expectedOutput) {
-			t.Errorf("actual out:%s", out)
-			t.Errorf("Expected is : %s", test.expectedOutput)
+			t.Errorf("actual out:%#v", out)
+			t.Errorf("Expected is : %#v", test.expectedOutput)
 		}
 	}
 }
