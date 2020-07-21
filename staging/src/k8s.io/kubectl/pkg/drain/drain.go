@@ -44,7 +44,8 @@ const (
 	podSkipMsgTemplate  = "pod %q has DeletionTimestamp older than %v seconds, skipping\n"
 )
 
-// Helper contains the parameters to control the behaviour of drainer
+// Helper contains the parameters to control the behaviour of drainer. Methods on
+// Helper are expected to be thread-safe to support parallel node drain
 type Helper struct {
 	Ctx                 context.Context
 	Client              kubernetes.Interface
