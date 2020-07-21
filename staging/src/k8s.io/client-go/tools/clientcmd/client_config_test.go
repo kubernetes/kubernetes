@@ -287,7 +287,7 @@ func TestModifyContext(t *testing.T) {
 
 	// there should now be two contexts
 	if len(startingConfig.Contexts) != len(expectedCtx) {
-		t.Fatalf("unexpected nuber of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
+		t.Fatalf("unexpected number of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
 	}
 
 	for key := range startingConfig.Contexts {
