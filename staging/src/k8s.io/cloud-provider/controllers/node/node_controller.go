@@ -155,7 +155,12 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) {
 	}
 
 	for i := range nodes.Items {
-		cnc.updateNodeAddress(ctx, &nodes.Items[i])
+		instanceMetadata, err := cnc.getInstanceNodeAddresses(ctx, &nodes.Items[i])
+		if err != nil {
+			klog.Errorf("Error getting instance metadata for node addresses: %v", err)
+			continue
+		}
+		cnc.updateNodeAddress(ctx, &nodes.Items[i], instanceMetadata)
 	}
 
 	for _, node := range nodes.Items {
@@ -217,7 +222,7 @@ func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
 }
 
 // UpdateNodeAddress updates the nodeAddress of a single node
-func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.Node) {
+func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.Node, instanceMetadata *cloudprovider.InstanceMetadata) {
 	// Do not process nodes that are still tainted
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint != nil {
@@ -225,34 +230,7 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 		return
 	}
 
-	instanceMetadataGetter := func(providerID string, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
-		if instancesV2, ok := cnc.cloud.InstancesV2(); instancesV2 != nil && ok {
-			return instancesV2.InstanceMetadata(ctx, node)
-		}
-
-		// If InstancesV2 not implement, use Instances.
-		instances, ok := cnc.cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, node.Spec.ProviderID, node.Name)
-		if err != nil {
-			klog.Errorf("Error getting node addresses for node %q: %v", node.Name, err)
-			return nil, err
-		}
-		return &cloudprovider.InstanceMetadata{
-			NodeAddresses: nodeAddresses,
-		}, nil
-	}
-
-	instanceMeta, err := instanceMetadataGetter(node.Spec.ProviderID, node)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-
-	nodeAddresses := instanceMeta.NodeAddresses
+	nodeAddresses := instanceMetadata.NodeAddresses
 	if len(nodeAddresses) == 0 {
 		klog.V(5).Infof("Skipping node address update for node %q since cloud provider did not return any", node.Name)
 		return
@@ -363,9 +341,19 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 		return
 	}
 
-	// TODO: getNodeModifiersFromCloudProvider and updateNodeAddress both call cloud api to get instanceMetadata,
-	// get instanceMetadata and pass it to getNodeModifiersFromCloudProvider and updateNodeAddress which reduces api calls.
-	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, curNode)
+	providerID, err := cnc.getProviderID(ctx, curNode)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to get provider ID for node %s at cloudprovider: %v", node.Name, err))
+		return
+	}
+
+	instanceMetadata, err := cnc.getInstanceMetadata(ctx, providerID, curNode)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to get instance metadata for node %s: %v", node.Name, err))
+		return
+	}
+
+	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, providerID, curNode, instanceMetadata)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to initialize node %s at cloudprovider: %v", node.Name, err))
 		return
@@ -392,7 +380,7 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
-		cnc.updateNodeAddress(ctx, curNode)
+		cnc.updateNodeAddress(ctx, curNode, instanceMetadata)
 
 		klog.Infof("Successfully initialized node %s with cloud provider", node.Name)
 		return nil
@@ -407,86 +395,16 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 // a node object with provider-specific information.
 // All of the returned functions are idempotent, because they are used in a retry-if-conflict
 // loop, meaning they could get called multiple times.
-func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Context, node *v1.Node) ([]nodeModifier, error) {
-	var (
-		nodeModifiers []nodeModifier
-		providerID    string
-		err           error
-	)
+func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
+	ctx context.Context,
+	providerID string,
+	node *v1.Node,
+	instanceMeta *cloudprovider.InstanceMetadata,
+) ([]nodeModifier, error) {
 
-	if node.Spec.ProviderID == "" {
-		providerID, err = cloudprovider.GetInstanceProviderID(ctx, cnc.cloud, types.NodeName(node.Name))
-		if err == nil {
-			nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
-				if n.Spec.ProviderID == "" {
-					n.Spec.ProviderID = providerID
-				}
-			})
-		} else if err == cloudprovider.NotImplemented {
-			// if the cloud provider being used does not support provider IDs,
-			// we can safely continue since we will attempt to set node
-			// addresses given the node name in getNodeAddressesByProviderIDOrName
-			klog.Warningf("cloud provider does not set node provider ID, using node name to discover node %s", node.Name)
-		} else {
-			// if the cloud provider being used supports provider IDs, we want
-			// to propagate the error so that we re-try in the future; if we
-			// do not, the taint will be removed, and this will not be retried
-			return nil, err
-		}
-	} else {
-		providerID = node.Spec.ProviderID
-	}
-
-	instanceMetadataGetter := func(providerID string, nodeName string, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
-		if instancesV2, ok := cnc.cloud.InstancesV2(); instancesV2 != nil && ok {
-			return instancesV2.InstanceMetadata(ctx, node)
-		}
-
-		// If InstancesV2 not implement, use Instances.
-		instances, ok := cnc.cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, providerID, nodeName)
-		if err != nil {
-			return nil, err
-		}
-
-		instanceType, err := getInstanceTypeByProviderIDOrName(ctx, instances, providerID, nodeName)
-		if err != nil {
-			return nil, err
-		}
-
-		instanceMetadata := &cloudprovider.InstanceMetadata{
-			InstanceType:  instanceType,
-			NodeAddresses: nodeAddresses,
-		}
-
-		zones, ok := cnc.cloud.Zones()
-		if !ok {
-			return instanceMetadata, nil
-		}
-
-		zone, err := getZoneByProviderIDOrName(ctx, zones, providerID, node.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
-		}
-
-		if zone.FailureDomain != "" {
-			instanceMetadata.Zone = zone.FailureDomain
-		}
-
-		if zone.Region != "" {
-			instanceMetadata.Region = zone.Region
-		}
-
-		return instanceMetadata, nil
-	}
-
-	instanceMeta, err := instanceMetadataGetter(providerID, node.Name, node)
-	if err != nil {
-		return nil, err
+	var nodeModifiers []nodeModifier
+	if node.Spec.ProviderID == "" && providerID != "" {
+		nodeModifiers = append(nodeModifiers, func(n *v1.Node) { n.Spec.ProviderID = providerID })
 	}
 
 	// If user provided an IP address, ensure that IP address is found
@@ -531,6 +449,94 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 	}
 
 	return nodeModifiers, nil
+}
+
+func (cnc *CloudNodeController) getProviderID(ctx context.Context, node *v1.Node) (string, error) {
+	if node.Spec.ProviderID != "" {
+		return node.Spec.ProviderID, nil
+	}
+
+	providerID, err := cloudprovider.GetInstanceProviderID(ctx, cnc.cloud, types.NodeName(node.Name))
+	if err == cloudprovider.NotImplemented {
+		// if the cloud provider being used does not support provider IDs,
+		// we can safely continue since we will attempt to set node
+		// addresses given the node name in getNodeAddressesByProviderIDOrName
+		klog.Warningf("cloud provider does not set node provider ID, using node name to discover node %s", node.Name)
+		return "", nil
+	}
+
+	// if the cloud provider being used supports provider IDs, we want
+	// to propagate the error so that we re-try in the future; if we
+	// do not, the taint will be removed, and this will not be retried
+	return providerID, err
+}
+
+// getInstanceMetadata get instance type and nodeAddresses, use Instances if InstancesV2 is off.
+func (cnc *CloudNodeController) getInstanceMetadata(ctx context.Context, providerID string, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	if instancesV2, ok := cnc.cloud.InstancesV2(); instancesV2 != nil && ok {
+		return instancesV2.InstanceMetadata(ctx, node)
+	}
+
+	// If InstancesV2 not implement, use Instances.
+	instances, ok := cnc.cloud.Instances()
+	if !ok {
+		return nil, fmt.Errorf("failed to get instances from cloud provider")
+	}
+	nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, providerID, node.Name)
+	if err != nil {
+		return nil, err
+	}
+	instanceType, err := getInstanceTypeByProviderIDOrName(ctx, instances, providerID, node.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	instanceMetadata := &cloudprovider.InstanceMetadata{
+		InstanceType:  instanceType,
+		NodeAddresses: nodeAddresses,
+	}
+
+	zones, ok := cnc.cloud.Zones()
+	if !ok {
+		return instanceMetadata, nil
+	}
+
+	zone, err := getZoneByProviderIDOrName(ctx, zones, providerID, node.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
+	}
+
+	if zone.FailureDomain != "" {
+		instanceMetadata.Zone = zone.FailureDomain
+	}
+
+	if zone.Region != "" {
+		instanceMetadata.Region = zone.Region
+	}
+
+	return instanceMetadata, nil
+}
+
+// getInstanceAddresses returns InstanceMetadata.NodeAddresses. If InstancesV2 not supported, it won't get instanceType
+// which avoid an api call compared with getInstanceMetadata.
+func (cnc *CloudNodeController) getInstanceNodeAddresses(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	if instancesV2, ok := cnc.cloud.InstancesV2(); instancesV2 != nil && ok {
+		return instancesV2.InstanceMetadata(ctx, node)
+	}
+
+	// If InstancesV2 not implement, use Instances.
+	instances, ok := cnc.cloud.Instances()
+	if !ok {
+		return nil, fmt.Errorf("failed to get instances from cloud provider")
+	}
+	nodeAddresses, err := getNodeAddressesByProviderIDOrName(ctx, instances, node.Spec.ProviderID, node.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		NodeAddresses: nodeAddresses,
+	}, nil
 }
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
