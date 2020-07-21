@@ -96,7 +96,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		}
 	}()
 	// wait for it
-	err := <-errs
+	err = <-errs
 	if err != nil {
 		t.Fatal(err)
 	}
