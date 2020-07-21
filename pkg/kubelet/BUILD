@@ -29,6 +29,7 @@ go_library(
         "reason_cache.go",
         "runonce.go",
         "runtime.go",
+        "time_cache.go",
         "util.go",
         "volume_host.go",
     ],
@@ -179,6 +180,7 @@ go_test(
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
+        "time_cache_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -251,6 +253,7 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
+        "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
