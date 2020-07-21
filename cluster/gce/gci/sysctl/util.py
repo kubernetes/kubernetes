@@ -50,7 +50,7 @@ def eval_expressions(sysctls):
   Returns:
     Sysctls with evaluated values.
   """
-  for key, value in sysctls.iteritems():
+  for key, value in sysctls.items():
     # pylint: disable=eval-used
     fields = map(lambda x: str(eval(
       x, {'__builtins__': None}, EVAL_LOCALS_DICT)), value.split(' '))

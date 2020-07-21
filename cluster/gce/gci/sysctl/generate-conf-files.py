@@ -37,7 +37,7 @@ def main(sysctl_defaults, sysctl_overrides, output_defaults, output_overrides):
   overrides = util.parse_sysctl_overrides(sysctl_overrides)
   if overrides:
     output = []
-    for k, v in overrides.iteritems():
+    for k, v in overrides.items():
       output.append('%s=%s' % (k, v))
     dump_to_file(output, output_overrides)
 

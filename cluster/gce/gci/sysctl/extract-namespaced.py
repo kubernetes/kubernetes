@@ -54,7 +54,7 @@ def print_sysctls(sysctls):
   result = []
   for k in sorted(sysctls):
     result.append('%s=%s' % (k, sysctls[k]))
-  print ','.join(result)
+  print(','.join(result))
 
 
 def main(sysctl_defaults, sysctl_overrides, namespaced_sysctl_names):
@@ -67,7 +67,7 @@ def main(sysctl_defaults, sysctl_overrides, namespaced_sysctl_names):
   overrides = util.parse_sysctl_overrides(sysctl_overrides)
 
   # Apply the overrides on top of the defaults.
-  for k, v in overrides.iteritems():
+  for k, v in overrides.items():
     defaults[k] = v
 
   # Load the namespaced sysctl names.
@@ -75,7 +75,7 @@ def main(sysctl_defaults, sysctl_overrides, namespaced_sysctl_names):
 
   # Extract the namespaced sysctls.
   namespaced_sysctls = {}
-  for k, v in defaults.iteritems():
+  for k, v in defaults.items():
     if k in names:
       namespaced_sysctls[k] = v
   print_sysctls(namespaced_sysctls)
