@@ -157,6 +157,14 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentLabelSelectors := metav1.LabelSelector{
 			MatchLabels: testDeploymentLabels,
 		}
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = testDeploymentLabelsFlat
+				return f.ClientSet.AppsV1().Deployments(testNamespaceName).Watch(context.TODO(), options)
+			},
+		}
+		deploymentsList, err := f.ClientSet.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
+		framework.ExpectNoError(err, "failed to list Endpoints")
 
 		ginkgo.By("creating a Deployment")
 		testDeployment := appsv1.Deployment{
@@ -180,36 +188,41 @@ var _ = SIGDescribe("Deployment", func() {
 				},
 			},
 		}
-		_, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Create(context.TODO(), &testDeployment, metav1.CreateOptions{})
+		_, err = f.ClientSet.AppsV1().Deployments(testNamespaceName).Create(context.TODO(), &testDeployment, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
 
-		ginkgo.By("watching for the Deployment to be added")
-		dplmtWatchTimeoutSeconds := int64(180)
-		dplmtWatch, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat, TimeoutSeconds: &dplmtWatchTimeoutSeconds})
-		framework.ExpectNoError(err, "Failed to setup watch on newly created Deployment")
-
-		foundEvent := false
-		dplmtWatchChan := dplmtWatch.ResultChan()
-		for event := range dplmtWatchChan {
-			if event.Type == watch.Added {
-				foundEvent = true
-				break
+		ginkgo.By("waiting for Deployment to be created")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Added:
+				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+					found := deployment.ObjectMeta.Name == testDeployment.Name &&
+						deployment.Labels["test-deployment-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to find watch event %v", watch.Added)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
 
 		ginkgo.By("waiting for all Replicas to be Ready")
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			deployment, ok := event.Object.(*appsv1.Deployment)
-			framework.ExpectEqual(ok, true, "unable to convert event.Object type")
-			if deployment.Status.AvailableReplicas == testDeploymentDefaultReplicas &&
-				deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas {
-				foundEvent = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+				found := deployment.ObjectMeta.Name == testDeployment.Name &&
+					deployment.Labels["test-deployment-static"] == "true" &&
+					deployment.Status.AvailableReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas
+				return found, nil
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to see scale of replicas")
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("patching the Deployment")
 		deploymentPatch, err := json.Marshal(map[string]interface{}{
@@ -233,30 +246,23 @@ var _ = SIGDescribe("Deployment", func() {
 		_, err = f.ClientSet.AppsV1().Deployments(testNamespaceName).Patch(context.TODO(), testDeploymentName, types.StrategicMergePatchType, []byte(deploymentPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Deployment")
 
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			if event.Type == watch.Modified {
-				foundEvent = true
-				break
-			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to see scale of replicas")
-
 		ginkgo.By("waiting for Replicas to scale")
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			deployment, ok := event.Object.(*appsv1.Deployment)
-			framework.ExpectEqual(ok, true, "unable to convert event.Object type")
-			if deployment.Status.AvailableReplicas == testDeploymentMinimumReplicas &&
-				deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas {
-				foundEvent = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+				found := deployment.ObjectMeta.Name == testDeployment.Name &&
+					deployment.Labels["test-deployment-static"] == "true" &&
+					deployment.Status.AvailableReplicas == testDeploymentMinimumReplicas &&
+					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas
+				return found, nil
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to see scale of replicas")
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentMinimumReplicas)
 
 		ginkgo.By("listing Deployments")
-		deploymentsList, err := f.ClientSet.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
+		deploymentsList, err = f.ClientSet.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
 		framework.ExpectNoError(err, "failed to list Deployments")
 		foundDeployment := false
 		for _, deploymentItem := range deploymentsList.Items {
@@ -285,14 +291,22 @@ var _ = SIGDescribe("Deployment", func() {
 		// currently this hasn't been able to hit the endpoint replaceAppsV1NamespacedDeploymentStatus
 		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Update(context.TODO(), &testDeploymentUpdateUnstructured, metav1.UpdateOptions{}) //, "status")
 		framework.ExpectNoError(err, "failed to update the DeploymentStatus")
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			if event.Type == watch.Modified {
-				foundEvent = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Modified:
+				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+					found := deployment.ObjectMeta.Name == testDeployment.Name &&
+						deployment.Labels["test-deployment-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to find watch event %v", watch.Modified)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
 
 		ginkgo.By("fetching the DeploymentStatus")
 		deploymentGetUnstructured, err := dc.Resource(deploymentResource).Namespace(testNamespaceName).Get(context.TODO(), testDeploymentName, metav1.GetOptions{}, "status")
@@ -302,25 +316,20 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
 		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
 		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			if event.Type == watch.Modified {
-				foundEvent = true
-				break
-			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to find watch event %v", watch.Modified)
 
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			deployment, ok := event.Object.(*appsv1.Deployment)
-			framework.ExpectEqual(ok, true, "unable to convert event.Object type")
-			if deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas {
-				foundEvent = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+				found := deployment.ObjectMeta.Name == testDeployment.Name &&
+					deployment.Labels["test-deployment-static"] == "true" &&
+					deployment.Status.AvailableReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas
+				return found, nil
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to see scale of replicas")
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("patching the DeploymentStatus")
 		deploymentStatusPatch, err := json.Marshal(map[string]interface{}{
@@ -333,6 +342,22 @@ var _ = SIGDescribe("Deployment", func() {
 		})
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
 		dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(context.TODO(), testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Modified:
+				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+					found := deployment.ObjectMeta.Name == testDeployment.Name &&
+						deployment.Labels["test-deployment-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
+			}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
 
 		ginkgo.By("fetching the DeploymentStatus")
 		deploymentGetUnstructured, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Get(context.TODO(), testDeploymentName, metav1.GetOptions{}, "status")
@@ -342,36 +367,41 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
 		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
 		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			if event.Type == watch.Modified {
-				foundEvent = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+				found := deployment.ObjectMeta.Name == testDeployment.Name &&
+					deployment.Labels["test-deployment-static"] == "true" &&
+					deployment.Status.AvailableReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas &&
+					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentUpdateImage
+				return found, nil
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to find watch event %v", watch.Modified)
-		for event := range dplmtWatchChan {
-			deployment, ok := event.Object.(*appsv1.Deployment)
-			framework.ExpectEqual(ok, true, "unable to convert event.Object type")
-			if deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas {
-				break
-			}
-		}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("deleting the Deployment")
 		err = f.ClientSet.AppsV1().Deployments(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Deployment via collection")
 
-		foundEvent = false
-		for event := range dplmtWatchChan {
-			deployment, ok := event.Object.(*appsv1.Deployment)
-			framework.ExpectEqual(ok, true, "unable to convert event.Object type")
-			if event.Type == watch.Deleted && deployment.ObjectMeta.Name == testDeploymentName {
-				foundEvent = true
-				break
+		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Deleted:
+				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
+					found := deployment.ObjectMeta.Name == testDeployment.Name &&
+						deployment.Labels["test-deployment-static"] == "true"
+					return found, nil
+				}
+			default:
+				framework.Logf("observed event type %v", event.Type)
 			}
-		}
-		framework.ExpectEqual(foundEvent, true, "failed to find watch event %v", watch.Deleted)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
 	})
 })
 
