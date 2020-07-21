@@ -27,7 +27,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// Mock of FileInfo interface
+// MockFileInfo is mock of FileInfo interface
 type MockFileInfo struct {
 	ctrl     *gomock.Controller
 	recorder *_MockFileInfoRecorder

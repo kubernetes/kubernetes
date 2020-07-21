@@ -50,13 +50,14 @@ const (
 	RECONCILE
 
 	// These constants identify the sources of pods
-	// Updates from a file
+
+	// FileSource updates from a file
 	FileSource = "file"
-	// Updates from querying a web page
+	// HTTPSource updates from querying a web page
 	HTTPSource = "http"
-	// Updates from Kubernetes API Server
+	// ApiserverSource updates from Kubernetes API Server
 	ApiserverSource = "api"
-	// Updates from all sources
+	// AllSource updates from all sources
 	AllSource = "*"
 
 	NamespaceDefault = metav1.NamespaceDefault
@@ -77,7 +78,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// Gets all validated sources from the specified sources.
+// GetValidatedSources gets all validated sources from the specified sources.
 func GetValidatedSources(sources []string) ([]string, error) {
 	validated := make([]string, 0, len(sources))
 	for _, source := range sources {

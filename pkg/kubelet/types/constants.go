@@ -17,7 +17,7 @@ limitations under the License.
 package types
 
 const (
-	// system default DNS resolver configuration
+	// ResolvConfDefault is the system default DNS resolver configuration
 	ResolvConfDefault = "/etc/resolv.conf"
 
 	// different container runtimes

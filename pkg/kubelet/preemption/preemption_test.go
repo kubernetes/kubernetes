@@ -495,7 +495,7 @@ func parseCPUToInt64(res string) int64 {
 	return (&r).MilliValue()
 }
 
-func parseNonCpuResourceToInt64(res string) int64 {
+func parseNonCPUResourceToInt64(res string) int64 {
 	r := resource.MustParse(res)
 	return (&r).Value()
 }
@@ -511,7 +511,7 @@ func getAdmissionRequirementList(cpu, memory, pods int) admissionRequirementList
 	if memory > 0 {
 		reqs = append(reqs, &admissionRequirement{
 			resourceName: v1.ResourceMemory,
-			quantity:     parseNonCpuResourceToInt64(fmt.Sprintf("%dMi", memory)),
+			quantity:     parseNonCPUResourceToInt64(fmt.Sprintf("%dMi", memory)),
 		})
 	}
 	if pods > 0 {

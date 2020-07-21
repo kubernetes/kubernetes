@@ -34,6 +34,8 @@ type FakeRuntimeHelper struct {
 	Err             error
 }
 
+// GenerateRunContainerOptions on fake runtime helper generates fake RunContainerOptions.
+// It is not used by docker runtime.
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
@@ -42,10 +44,14 @@ func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *
 	return &opts, nil, nil
 }
 
+// GetPodCgroupParent on fake runtime helper returns fake pod cgroup parent.
+// It is not used by docker runtime.
 func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
 	return ""
 }
 
+// GetPodDNS on fake runtime helper returns fake DNS settings for pod.
+// It is not used by docker runtime.
 func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	return &runtimeapi.DNSConfig{
 		Servers:  f.DNSServers,
@@ -53,15 +59,21 @@ func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error
 		Options:  f.DNSOptions}, f.Err
 }
 
-// This is not used by docker runtime.
+// GeneratePodHostNameAndDomain on fake runtime helper returns fake hostname and domain.
+// It is not used by docker runtime.
 func (f *FakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	return f.HostName, f.HostDomain, f.Err
 }
 
+// GetPodDir on fake runtime helper returns fake path to the per-pod data directory for the
+// specified pod. It is not used by docker runtime.
 func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 	return "/poddir/" + string(podUID)
 }
 
+// GetExtraSupplementalGroupsForPod on fake runtime helper returns a
+// fake list of extra supplemental groups for pod.
+// It is not used by docker runtime.
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return nil
 }
