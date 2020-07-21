@@ -393,20 +393,22 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					if err != nil {
 						t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
 					}
+					defer l.Close()
 
 					proxyCalledWithHost = "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 
 					go func() {
-						for {
 							conn, err := l.Accept()
 							if err != nil {
 								t.Fatalf(err.Error())
 								return
 							}
-							if err := proxyHandler.ServeConn(conn); err != nil {
-								t.Fatalf("ServeConn error: %s", err.Error())
-							}
-						}
+							go func() {
+								if err := proxyHandler.ServeConn(conn); err != nil {
+									t.Fatalf("ServeConn error: %s", err.Error())
+									return
+								}
+							}()
 					}()
 
 					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
