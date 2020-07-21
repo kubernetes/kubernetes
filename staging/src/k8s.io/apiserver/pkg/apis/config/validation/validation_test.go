@@ -296,7 +296,7 @@ func TestKMSEndpoint(t *testing.T) {
 			desc: "invalid url",
 			in:   &config.KMSConfiguration{Endpoint: "unix:///foo\n.socket"},
 			want: field.ErrorList{
-				field.Invalid(endpointField, "unix:///foo\n.socket", fmt.Sprintf(invalidURLErrFmt, `"unix:///foo\n.socket"`)),
+				field.Invalid(endpointField, "unix:///foo\n.socket", fmt.Sprintf(invalidURLErrFmt, "unix:///foo\n.socket")),
 			},
 		},
 	}
