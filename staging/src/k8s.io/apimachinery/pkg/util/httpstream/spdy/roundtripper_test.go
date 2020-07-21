@@ -17,6 +17,7 @@ limitations under the License.
 package spdy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -37,6 +38,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
+type Interceptor struct {
+	Authorization socks5.AuthContext
+}
+
+func (i *Interceptor) Rewrite(ctx context.Context, req *socks5.Request) (context.Context, *socks5.AddrSpec) {
+	i.Authorization = socks5.AuthContext(*req.AuthContext)
+	return ctx, req.DestAddr
+}
+
+func (i *Interceptor) GetAuthContext() (int, map[string]string) {
+	return int(i.Authorization.Method), i.Authorization.Payload
+}
+
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripAndNewConnection(t *testing.T) {
 	for _, redirect := range []bool{false, true} {
@@ -46,38 +60,40 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				t.Errorf("error setting up localhostCert pool")
 			}
 
-			// httpsServerInvalidHostname := func(h http.Handler) *httptest.Server {
-			// 	cert, err := tls.X509KeyPair(exampleCert, exampleKey)
-			// 	if err != nil {
-			// 		t.Errorf("https (invalid hostname): proxy_test: %v", err)
-			// 	}
-			// 	ts := httptest.NewUnstartedServer(h)
-			// 	ts.TLS = &tls.Config{
-			// 		Certificates: []tls.Certificate{cert},
-			// 	}
-			// 	ts.StartTLS()
-			// 	return ts
-			// }
+			httpsServerInvalidHostname := func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(exampleCert, exampleKey)
+				if err != nil {
+					t.Errorf("https (invalid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			}
 
-			// httpsServerValidHostname := func(h http.Handler) *httptest.Server {
-			// 	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
-			// 	if err != nil {
-			// 		t.Errorf("https (valid hostname): proxy_test: %v", err)
-			// 	}
-			// 	ts := httptest.NewUnstartedServer(h)
-			// 	ts.TLS = &tls.Config{
-			// 		Certificates: []tls.Certificate{cert},
-			// 	}
-			// 	ts.StartTLS()
-			// 	return ts
-			// }
+			httpsServerValidHostname := func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+				if err != nil {
+					t.Errorf("https (valid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			}
 
+			interceptor := &Interceptor{}
 			socks5Server := func(creds *socks5.StaticCredentials) *socks5.Server {
 				var conf *socks5.Config
 				if creds != nil {
 					cator := socks5.UserPassAuthenticator{Credentials: creds}
 					conf = &socks5.Config{
 						AuthMethods: []socks5.Authenticator{cator},
+						Rewriter:    interceptor,
 					}
 				} else {
 					conf = &socks5.Config{}
@@ -101,167 +117,167 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				serverStatusCode       int
 				shouldError            bool
 			}{
-				// "no headers": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	serverConnectionHeader: "",
-				// 	serverUpgradeHeader:    "",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            true,
-				// },
-				// "no upgrade header": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            true,
-				// },
-				// "no connection header": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	serverConnectionHeader: "",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            true,
-				// },
-				// "no switching protocol status code": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusForbidden,
-				// 	shouldError:            true,
-				// },
-				// "http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "https (invalid hostname + InsecureSkipVerify)": {
-				// 	serverFunc:             httpsServerInvalidHostname,
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: true},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "https (invalid hostname + hostname verification)": {
-				// 	serverFunc:             httpsServerInvalidHostname,
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: false},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            true,
-				// },
-				// "https (valid hostname + RootCAs)": {
-				// 	serverFunc:             httpsServerValidHostname,
-				// 	clientTLS:              &tls.Config{RootCAs: localhostPool},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied http->http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	proxyServerFunc:        httptest.NewServer,
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied https (invalid hostname + InsecureSkipVerify) -> http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	proxyServerFunc:        httpsServerInvalidHostname,
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: true},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied https with auth (invalid hostname + InsecureSkipVerify) -> http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	proxyServerFunc:        httpsServerInvalidHostname,
-				// 	proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: true},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied https (invalid hostname + hostname verification) -> http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	proxyServerFunc:        httpsServerInvalidHostname,
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: false},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            true, // fails because the client doesn't trust the proxy
-				// },
-				// "proxied https (valid hostname + RootCAs) -> http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	proxyServerFunc:        httpsServerValidHostname,
-				// 	clientTLS:              &tls.Config{RootCAs: localhostPool},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied https with auth (valid hostname + RootCAs) -> http": {
-				// 	serverFunc:             httptest.NewServer,
-				// 	proxyServerFunc:        httpsServerValidHostname,
-				// 	proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
-				// 	clientTLS:              &tls.Config{RootCAs: localhostPool},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied https (invalid hostname + InsecureSkipVerify) -> https (invalid hostname)": {
-				// 	serverFunc:             httpsServerInvalidHostname,
-				// 	proxyServerFunc:        httpsServerInvalidHostname,
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: true},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false, // works because the test proxy ignores TLS errors
-				// },
-				// "proxied https with auth (invalid hostname + InsecureSkipVerify) -> https (invalid hostname)": {
-				// 	serverFunc:             httpsServerInvalidHostname,
-				// 	proxyServerFunc:        httpsServerInvalidHostname,
-				// 	proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: true},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false, // works because the test proxy ignores TLS errors
-				// },
-				// "proxied https (invalid hostname + hostname verification) -> https (invalid hostname)": {
-				// 	serverFunc:             httpsServerInvalidHostname,
-				// 	proxyServerFunc:        httpsServerInvalidHostname,
-				// 	clientTLS:              &tls.Config{InsecureSkipVerify: false},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            true, // fails because the client doesn't trust the proxy
-				// },
-				// "proxied https (valid hostname + RootCAs) -> https (valid hostname + RootCAs)": {
-				// 	serverFunc:             httpsServerValidHostname,
-				// 	proxyServerFunc:        httpsServerValidHostname,
-				// 	clientTLS:              &tls.Config{RootCAs: localhostPool},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
-				// "proxied https with auth (valid hostname + RootCAs) -> https (valid hostname + RootCAs)": {
-				// 	serverFunc:             httpsServerValidHostname,
-				// 	proxyServerFunc:        httpsServerValidHostname,
-				// 	proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
-				// 	clientTLS:              &tls.Config{RootCAs: localhostPool},
-				// 	serverConnectionHeader: "Upgrade",
-				// 	serverUpgradeHeader:    "SPDY/3.1",
-				// 	serverStatusCode:       http.StatusSwitchingProtocols,
-				// 	shouldError:            false,
-				// },
+				"no headers": {
+					serverFunc:             httptest.NewServer,
+					serverConnectionHeader: "",
+					serverUpgradeHeader:    "",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true,
+				},
+				"no upgrade header": {
+					serverFunc:             httptest.NewServer,
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true,
+				},
+				"no connection header": {
+					serverFunc:             httptest.NewServer,
+					serverConnectionHeader: "",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true,
+				},
+				"no switching protocol status code": {
+					serverFunc:             httptest.NewServer,
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusForbidden,
+					shouldError:            true,
+				},
+				"http": {
+					serverFunc:             httptest.NewServer,
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"https (invalid hostname + InsecureSkipVerify)": {
+					serverFunc:             httpsServerInvalidHostname,
+					clientTLS:              &tls.Config{InsecureSkipVerify: true},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"https (invalid hostname + hostname verification)": {
+					serverFunc:             httpsServerInvalidHostname,
+					clientTLS:              &tls.Config{InsecureSkipVerify: false},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true,
+				},
+				"https (valid hostname + RootCAs)": {
+					serverFunc:             httpsServerValidHostname,
+					clientTLS:              &tls.Config{RootCAs: localhostPool},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied http->http": {
+					serverFunc:             httptest.NewServer,
+					proxyServerFunc:        httptest.NewServer,
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied https (invalid hostname + InsecureSkipVerify) -> http": {
+					serverFunc:             httptest.NewServer,
+					proxyServerFunc:        httpsServerInvalidHostname,
+					clientTLS:              &tls.Config{InsecureSkipVerify: true},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied https with auth (invalid hostname + InsecureSkipVerify) -> http": {
+					serverFunc:             httptest.NewServer,
+					proxyServerFunc:        httpsServerInvalidHostname,
+					proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
+					clientTLS:              &tls.Config{InsecureSkipVerify: true},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied https (invalid hostname + hostname verification) -> http": {
+					serverFunc:             httptest.NewServer,
+					proxyServerFunc:        httpsServerInvalidHostname,
+					clientTLS:              &tls.Config{InsecureSkipVerify: false},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true, // fails because the client doesn't trust the proxy
+				},
+				"proxied https (valid hostname + RootCAs) -> http": {
+					serverFunc:             httptest.NewServer,
+					proxyServerFunc:        httpsServerValidHostname,
+					clientTLS:              &tls.Config{RootCAs: localhostPool},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied https with auth (valid hostname + RootCAs) -> http": {
+					serverFunc:             httptest.NewServer,
+					proxyServerFunc:        httpsServerValidHostname,
+					proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
+					clientTLS:              &tls.Config{RootCAs: localhostPool},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied https (invalid hostname + InsecureSkipVerify) -> https (invalid hostname)": {
+					serverFunc:             httpsServerInvalidHostname,
+					proxyServerFunc:        httpsServerInvalidHostname,
+					clientTLS:              &tls.Config{InsecureSkipVerify: true},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false, // works because the test proxy ignores TLS errors
+				},
+				"proxied https with auth (invalid hostname + InsecureSkipVerify) -> https (invalid hostname)": {
+					serverFunc:             httpsServerInvalidHostname,
+					proxyServerFunc:        httpsServerInvalidHostname,
+					proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
+					clientTLS:              &tls.Config{InsecureSkipVerify: true},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false, // works because the test proxy ignores TLS errors
+				},
+				"proxied https (invalid hostname + hostname verification) -> https (invalid hostname)": {
+					serverFunc:             httpsServerInvalidHostname,
+					proxyServerFunc:        httpsServerInvalidHostname,
+					clientTLS:              &tls.Config{InsecureSkipVerify: false},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true, // fails because the client doesn't trust the proxy
+				},
+				"proxied https (valid hostname + RootCAs) -> https (valid hostname + RootCAs)": {
+					serverFunc:             httpsServerValidHostname,
+					proxyServerFunc:        httpsServerValidHostname,
+					clientTLS:              &tls.Config{RootCAs: localhostPool},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied https with auth (valid hostname + RootCAs) -> https (valid hostname + RootCAs)": {
+					serverFunc:             httpsServerValidHostname,
+					proxyServerFunc:        httpsServerValidHostname,
+					proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
+					clientTLS:              &tls.Config{RootCAs: localhostPool},
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
 				"proxied tcp->tcp via SOCKS5": {
 					serverFunc:             httptest.NewServer,
 					socks5ProxyServerFunc:  socks5Server,
@@ -362,24 +378,21 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					defer proxy.Close()
 				}
 
-				var l net.Listener
 				if testCase.socks5ProxyServerFunc != nil {
+					var l net.Listener
 					var proxyHandler *socks5.Server
 					if testCase.proxyAuth != nil {
-						proxyHandler = socks5Server(&socks5.StaticCredentials{
+						proxyHandler = testCase.socks5ProxyServerFunc(&socks5.StaticCredentials{
 							"proxyuser": "proxypasswd",
 						})
-						proxyCalledWithAuth = true
 					} else {
 						proxyHandler = socks5Server(nil)
-						proxyCalledWithAuth = false
 					}
 
 					l, err = net.Listen("tcp", "127.0.0.1:0")
 					if err != nil {
 						t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
 					}
-					defer l.Close()
 
 					proxyCalledWithHost = "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 
@@ -390,28 +403,20 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 								t.Fatalf(err.Error())
 								return
 							}
-							go func() {
-								if err := proxyHandler.ServeConn(conn); err != nil {
-									t.Fatalf("ServeConn error: %s", err.Error())
-								}
-							}()
+							if err := proxyHandler.ServeConn(conn); err != nil {
+								t.Fatalf("ServeConn error: %s", err.Error())
+							}
 						}
 					}()
 
-					proxy := &url.URL{
-						Scheme: "socks5",
-						Host:   proxyCalledWithHost,
-						User:   testCase.proxyAuth,
-					}
-
 					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
 						proxierCalled = true
-						proxyURL, err := url.Parse(proxy.Host)
+						proxyURL, err := url.Parse(proxyCalledWithHost)
 						if err != nil {
 							return nil, err
 						}
-						proxyURL.User = proxy.User
-						proxyURL.Scheme = proxy.Scheme
+						proxyURL.User = testCase.proxyAuth
+						proxyURL.Scheme = "socks5"
 						return proxyURL, nil
 					}
 				}
@@ -471,19 +476,31 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				}
 
 				var expectedProxyAuth string
-				t.Log("testCase.proxyAuth")
-				t.Log(testCase.proxyAuth)
 				if testCase.proxyAuth != nil {
 					encodedCredentials := base64.StdEncoding.EncodeToString([]byte(testCase.proxyAuth.String()))
 					expectedProxyAuth = "Basic " + encodedCredentials
 				}
-				t.Log("expectedProxyAuth")
-				t.Log(expectedProxyAuth)
-				if len(expectedProxyAuth) == 0 && proxyCalledWithAuth {
-					t.Fatalf("%s: Proxy authorization unexpected, got %q", k, proxyCalledWithAuthHeader)
-				}
-				if proxyCalledWithAuthHeader != expectedProxyAuth {
-					t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
+
+				if testCase.socks5ProxyServerFunc != nil && testCase.proxyAuth != nil {
+					expectedSocks5AuthMethod := 2
+					expectedSocks5AuthUser := "proxyuser"
+					authMethod, authUser := interceptor.GetAuthContext()
+
+					if expectedSocks5AuthMethod != authMethod {
+						t.Fatalf("%s: Socks5 Proxy authorization unexpected, got %d, expected %d", k, authMethod, expectedSocks5AuthMethod)
+					}
+
+					if expectedSocks5AuthUser != authUser["Username"] {
+						t.Fatalf("%s: Socks5 Proxy authorization user unexpected, got %q, expected %q", k, authUser["Username"], expectedSocks5AuthUser)
+					}
+
+				} else {
+					if len(expectedProxyAuth) == 0 && proxyCalledWithAuth {
+						t.Fatalf("%s: Proxy authorization unexpected, got %q", k, proxyCalledWithAuthHeader)
+					}
+					if proxyCalledWithAuthHeader != expectedProxyAuth {
+						t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
+					}
 				}
 			}
 		})
