@@ -35,6 +35,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/autoscaling:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",

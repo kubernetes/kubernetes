@@ -2,18 +2,25 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["kubectl_utils.go","kubectl_builder.go"],
+    srcs = [
+        "kubectl_builder.go",
+        "kubectl_utils.go",
+    ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/kubectl",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

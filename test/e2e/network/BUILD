@@ -76,6 +76,7 @@ go_library(
         "//test/e2e/framework/endpoints:go_default_library",
         "//test/e2e/framework/endpointslice:go_default_library",
         "//test/e2e/framework/ingress:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/kubesystem:go_default_library",
         "//test/e2e/framework/network:go_default_library",
         "//test/e2e/framework/node:go_default_library",

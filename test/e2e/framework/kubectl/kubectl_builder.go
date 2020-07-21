@@ -325,3 +325,24 @@ func MasterUpgradeGKE(namespace string, v string) error {
 
 	return nil
 }
+<<<<<<< HEAD
+=======
+
+// MasterUpgrade upgrades master node on GCE/GKE.
+func MasterUpgrade(f *framework.Framework, v string) error {
+	switch framework.TestContext.Provider {
+	case "gce":
+		return framework.MasterUpgradeGCE(v, false)
+	case "gke":
+		return MasterUpgradeGKE(f.Namespace.Name, v)
+	default:
+		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+	}
+}
+
+// MasterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
+// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
+func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
+	return framework.MasterUpgradeGCE(v, enableKubeProxyDaemonSet)
+}
+>>>>>>> Update bazel build

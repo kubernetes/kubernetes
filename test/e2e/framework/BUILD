@@ -60,7 +60,6 @@ go_library(
         "//staging/src/k8s.io/kubelet/pkg/apis/stats/v1alpha1:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
-        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
@@ -73,7 +72,6 @@ go_library(
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
