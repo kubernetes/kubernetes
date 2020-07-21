@@ -98,7 +98,7 @@ func TestAttachDiskWithVMSS(t *testing.T) {
 		assert.NoError(t, err, test.desc)
 		testCloud := ss.cloud
 		testCloud.PrimaryScaleSetName = scaleSetName
-		expectedVMSS := buildTestVMSS(scaleSetName, []string{testLBBackendpoolID0}, false)
+		expectedVMSS := buildTestVMSSWithLB(scaleSetName, "vmss00-vm-", []string{testLBBackendpoolID0}, false)
 		mockVMSSClient := testCloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, scaleSetName).Return(expectedVMSS, nil).MaxTimes(1)
@@ -194,7 +194,7 @@ func TestDetachDiskWithVMSS(t *testing.T) {
 		assert.NoError(t, err, test.desc)
 		testCloud := ss.cloud
 		testCloud.PrimaryScaleSetName = scaleSetName
-		expectedVMSS := buildTestVMSS(scaleSetName, []string{testLBBackendpoolID0}, false)
+		expectedVMSS := buildTestVMSSWithLB(scaleSetName, "vmss00-vm-", []string{testLBBackendpoolID0}, false)
 		mockVMSSClient := testCloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, scaleSetName).Return(expectedVMSS, nil).MaxTimes(1)
@@ -297,7 +297,7 @@ func TestGetDataDisksWithVMSS(t *testing.T) {
 		assert.NoError(t, err, test.desc)
 		testCloud := ss.cloud
 		testCloud.PrimaryScaleSetName = scaleSetName
-		expectedVMSS := buildTestVMSS(scaleSetName, []string{testLBBackendpoolID0}, false)
+		expectedVMSS := buildTestVMSSWithLB(scaleSetName, "vmss00-vm-", []string{testLBBackendpoolID0}, false)
 		mockVMSSClient := testCloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, scaleSetName).Return(expectedVMSS, nil).MaxTimes(1)
