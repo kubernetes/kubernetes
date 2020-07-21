@@ -27,6 +27,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	admissionregistration "k8s.io/client-go/informers/admissionregistration"
+	apiserverinternal "k8s.io/client-go/informers/apiserverinternal"
 	apps "k8s.io/client-go/informers/apps"
 	autoscaling "k8s.io/client-go/informers/autoscaling"
 	batch "k8s.io/client-go/informers/batch"
@@ -190,6 +191,7 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	Admissionregistration() admissionregistration.Interface
+	Internal() apiserverinternal.Interface
 	Apps() apps.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
@@ -211,6 +213,10 @@ type SharedInformerFactory interface {
 
 func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
 	return admissionregistration.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Internal() apiserverinternal.Interface {
+	return apiserverinternal.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
