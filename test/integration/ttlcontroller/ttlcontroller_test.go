@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -61,7 +61,7 @@ func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 				},
 			}
 			if _, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to create node: %v", err)
+				t.Errorf("Failed to create node: %v", err)
 			}
 		}(i)
 	}
@@ -76,7 +76,7 @@ func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 			defer wg.Done()
 			name := fmt.Sprintf("node-%d", idx)
 			if err := client.CoreV1().Nodes().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
-				t.Fatalf("Failed to delete node: %v", err)
+				t.Errorf("Failed to delete node: %v", err)
 			}
 		}(i)
 	}
