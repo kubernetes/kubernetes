@@ -256,6 +256,13 @@ func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceI
 	if found && vm != nil {
 		return vm, nil
 	}
+	if found && vm == nil {
+		klog.V(2).Infof("Couldn't find VMSS VM with scaleSetName %q and instanceID %q, refreshing the cache if it is expired", scaleSetName, instanceID)
+		vm, found, err = getter(cacheReadTypeDefault)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if !found || vm == nil {
 		return nil, cloudprovider.InstanceNotFound
 	}
