@@ -37,8 +37,6 @@ type RegistryList struct {
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
-	// TODO: The last consumer of this has been removed and it should be deprecated
-	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 	K8sCSI                  string `yaml:"k8sCSI"`
@@ -78,8 +76,6 @@ func initReg() RegistryList {
 		InvalidRegistry:         "invalid.com/invalid",
 		GcRegistry:              "k8s.gcr.io",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
-		// TODO: The last consumer of this has been removed and it should be deleted
-		GoogleContainerRegistry: "gcr.io/google-containers",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		K8sCSI:                  "gcr.io/k8s-staging-csi",
