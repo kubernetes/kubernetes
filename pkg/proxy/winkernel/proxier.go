@@ -279,6 +279,9 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 
 		klog.V(3).Infof("Updating existing service port %q at %s:%d/%s", svcPortName, svcInfo.ClusterIP(), svcInfo.Port(), svcInfo.Protocol())
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName])
+		// Delete the endpoint map entry for this service, since the
+		// endpoints are already cleanedup
+		delete(proxier.endpointsMap, *svcPortName)
 	}
 }
 
