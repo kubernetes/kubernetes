@@ -38,6 +38,7 @@ import (
 const (
 	serviceName = "svc-udp"
 	podClient   = "pod-client"
+	podBackend  = "pod-server"
 	podBackend1 = "pod-server-1"
 	podBackend2 = "pod-server-2"
 	srcPort     = 12345
@@ -146,53 +147,42 @@ var _ = SIGDescribe("Conntrack", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Pod client logs: %s", logs)
 
-		// Add a backend pod to the service in the other node
-		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
-		serverPod1 := newAgnhostPod(podBackend1, "netexec", fmt.Sprintf("--udp-port=%d", 80))
-		serverPod1.Labels = udpJig.Labels
-		serverPod1.Spec.NodeName = serverNodeInfo.name
-		fr.PodClient().CreateSync(serverPod1)
+		limit := 10
+		for i, backendPod2 := 0, ""; i < limit; i++ {
+			backendPod1 := fmt.Sprintf("%s-%d", podBackend, i)
 
-		// Waiting for service to expose endpoint.
-		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
-		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+			// Add a backend pod to the service in the other node
+			ginkgo.By("creating a backend pod " + backendPod1 + " for the service " + serviceName)
+			serverPod1 := newAgnhostPod(backendPod1, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+			serverPod1.Labels = udpJig.Labels
+			serverPod1.Spec.NodeName = serverNodeInfo.name
+			fr.PodClient().CreateSync(serverPod1)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
-		// that iptables (or whatever else is used) was already programmed.
-		// Additionally take into account that UDP conntract entries timeout is
-		// 30 seconds by default.
-		// Based on the above check if the pod receives the traffic.
-		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend1)); err != nil {
-			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend 1")
-		}
+			// and delete the previous pod (if it already exists)
+			if backendPod2 != "" {
+				framework.Logf("Cleaning up %s pod", backendPod2)
+				fr.PodClient().DeleteSync(backendPod2, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			}
 
-		// Create a second pod
-		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
-		serverPod2 := newAgnhostPod(podBackend2, "netexec", fmt.Sprintf("--udp-port=%d", 80))
-		serverPod2.Labels = udpJig.Labels
-		serverPod2.Spec.NodeName = serverNodeInfo.name
-		fr.PodClient().CreateSync(serverPod2)
+			// Waiting for service to expose endpoint.
+			err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{backendPod1: {80}})
+			framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		// and delete the first pod
-		framework.Logf("Cleaning up %s pod", podBackend1)
-		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			// Note that the fact that Endpoints object already exists, does NOT mean
+			// that iptables (or whatever else is used) was already programmed.
+			// Additionally take into account that UDP conntract entries timeout is
+			// 30 seconds by default.
+			// Based on the above check if the pod receives the traffic.
+			ginkgo.By("checking client pod connected to the backend " + fmt.Sprintf("%d", i) + " on Node IP " + serverNodeInfo.nodeIP)
+			if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(backendPod1)); err != nil {
+				logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+				framework.ExpectNoError(err)
+				framework.Logf("Pod client logs: %s", logs)
+				framework.Failf("Failed to connect to backend %d", i)
+			}
 
-		// Waiting for service to expose endpoint.
-		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
-		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
-
-		// Check that the second pod keeps receiving traffic
-		// UDP conntrack entries timeout is 30 sec by default
-		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
-		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend2)); err != nil {
-			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend 2")
+			// rotate pods
+			backendPod2 = backendPod1
 		}
 	})
 
