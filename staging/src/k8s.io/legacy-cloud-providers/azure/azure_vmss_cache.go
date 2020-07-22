@@ -154,6 +154,11 @@ func (ss *scaleSet) gcVMSSVMCache() error {
 
 // newVMSSVirtualMachinesCache instanciates a new VMs cache for VMs belonging to the provided VMSS.
 func (ss *scaleSet) newVMSSVirtualMachinesCache(resourceGroupName, vmssName, cacheKey string) (*azcache.TimedCache, error) {
+	if ss.Config.VmssVirtualMachinesCacheTTLInSeconds == 0 {
+		ss.Config.VmssVirtualMachinesCacheTTLInSeconds = vmssVirtualMachinesCacheTTLDefaultInSeconds
+	}
+	vmssVirtualMachinesCacheTTL := time.Duration(ss.Config.VmssVirtualMachinesCacheTTLInSeconds) * time.Second
+
 	getter := func(key string) (interface{}, error) {
 		localCache := &sync.Map{} // [nodeName]*vmssVirtualMachinesEntry
 
@@ -212,9 +217,9 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache(resourceGroupName, vmssName, cac
 		// add old missing cache data with nil entries to prevent aggressive
 		// ARM calls during cache invalidation
 		for name, vmEntry := range oldCache {
-			// if the nil cache entry has existed for 15 minutes in the cache
+			// if the nil cache entry has existed for vmssVirtualMachinesCacheTTL in the cache
 			// then it should not be added back to the cache
-			if vmEntry.virtualMachine == nil && time.Since(vmEntry.lastUpdate) > 15*time.Minute {
+			if vmEntry.virtualMachine == nil && time.Since(vmEntry.lastUpdate) > vmssVirtualMachinesCacheTTL {
 				klog.V(5).Infof("ignoring expired entries from old cache for %s", name)
 				continue
 			}
@@ -238,10 +243,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache(resourceGroupName, vmssName, cac
 		return localCache, nil
 	}
 
-	if ss.Config.VmssVirtualMachinesCacheTTLInSeconds == 0 {
-		ss.Config.VmssVirtualMachinesCacheTTLInSeconds = vmssVirtualMachinesCacheTTLDefaultInSeconds
-	}
-	return azcache.NewTimedcache(time.Duration(ss.Config.VmssVirtualMachinesCacheTTLInSeconds)*time.Second, getter)
+	return azcache.NewTimedcache(vmssVirtualMachinesCacheTTL, getter)
 }
 
 func (ss *scaleSet) deleteCacheForNode(nodeName string) error {
