@@ -242,7 +242,7 @@ run_deployment_tests() {
   kube::test::get_object_assert 'deploy nginx-with-env-vars' "{{${container_env_var_name:?}}}" 'FOO'
   kube::test::get_object_assert 'deploy nginx-with-env-vars' "{{${container_env_var_value:?}}}" 'bar'
   # Clean up
-  kubectl delete deployment nginx-with-command "${kube_flags[@]:?}"
+  kubectl delete deployment nginx-with-env-vars "${kube_flags[@]:?}"
 
   ### Test kubectl create deployment should not fail validation
   # Pre-Condition: No deployment exists.
