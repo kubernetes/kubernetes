@@ -1515,7 +1515,8 @@
   codename: '[sig-instrumentation] Events API should ensure that an event can be fetched,
     patched, deleted, and listed [Conformance]'
   description: Create an event, the event MUST exist. The event is patched with a
-    new note, the check MUST have the update note. The event is deleted and MUST NOT
+    new note, the check MUST have the update note. The event is updated with a new
+    series, the check MUST have the update series. The event is deleted and MUST NOT
     show up when listing all events.
   release: v1.19
   file: test/e2e/instrumentation/events.go
