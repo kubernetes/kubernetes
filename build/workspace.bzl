@@ -125,7 +125,7 @@ def image_dependencies():
             name = "go-runner-linux-" + arch,
             architecture = arch,
             digest = _digest(_GO_RUNNER_DIGEST, arch),
-            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
+            registry = "k8s.gcr.io/build-image",
             repository = "go-runner",
             tag = "v0.1.1",  # ignored, but kept here for documentation
         )
@@ -134,7 +134,7 @@ def image_dependencies():
             name = "debian-base-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
-            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
+            registry = "k8s.gcr.io/build-image",
             repository = "debian-base",
             # Ensure the digests above are updated to match a new tag
             tag = "v2.1.0",  # ignored, but kept here for documentation
@@ -144,7 +144,7 @@ def image_dependencies():
             name = "debian-iptables-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
-            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
+            registry = "k8s.gcr.io/build-image",
             repository = "debian-iptables",
             # Ensure the digests above are updated to match a new tag
             tag = "v12.1.0",  # ignored, but kept here for documentation
