@@ -921,6 +921,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 					pod.ObjectMeta.Namespace == testNamespaceName &&
 					pod.Labels["test-pod-static"] == "true" &&
 					pod.Status.Phase == v1.PodRunning
+				if !found {
+					framework.Logf("observed Pod %v in namespace %v in phase %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase)
+				}
 				return found, nil
 			}
 			return false, nil
