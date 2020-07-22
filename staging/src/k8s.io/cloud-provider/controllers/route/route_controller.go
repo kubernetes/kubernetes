@@ -45,9 +45,8 @@ import (
 )
 
 const (
-	// Maximal number of concurrent CreateRoute API calls.
-	// TODO: This should be per-provider.
-	maxConcurrentRouteCreations int = 200
+	// Default maximal number of concurrent CreateRoute API calls.
+	defaultMaxConcurrentRouteCreations int = 200
 )
 
 var updateNetworkConditionBackoff = wait.Backoff{
@@ -57,6 +56,8 @@ var updateNetworkConditionBackoff = wait.Backoff{
 }
 
 type RouteController struct {
+	MaxConcurrentRouteCreations int
+
 	routes           cloudprovider.Routes
 	kubeClient       clientset.Interface
 	clusterName      string
@@ -81,14 +82,15 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
-		routes:           routes,
-		kubeClient:       kubeClient,
-		clusterName:      clusterName,
-		clusterCIDRs:     clusterCIDRs,
-		nodeLister:       nodeInformer.Lister(),
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		broadcaster:      eventBroadcaster,
-		recorder:         recorder,
+		routes:                      routes,
+		kubeClient:                  kubeClient,
+		clusterName:                 clusterName,
+		clusterCIDRs:                clusterCIDRs,
+		nodeLister:                  nodeInformer.Lister(),
+		nodeListerSynced:            nodeInformer.Informer().HasSynced,
+		broadcaster:                 eventBroadcaster,
+		recorder:                    recorder,
+		MaxConcurrentRouteCreations: defaultMaxConcurrentRouteCreations,
 	}
 
 	return rc
@@ -147,7 +149,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	}
 
 	wg := sync.WaitGroup{}
-	rateLimiter := make(chan struct{}, maxConcurrentRouteCreations)
+	rateLimiter := make(chan struct{}, rc.MaxConcurrentRouteCreations)
 	// searches existing routes by node for a matching route
 
 	for _, node := range nodes {
