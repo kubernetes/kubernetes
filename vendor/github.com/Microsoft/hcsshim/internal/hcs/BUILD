@@ -6,6 +6,7 @@ go_library(
         "callback.go",
         "errors.go",
         "process.go",
+        "service.go",
         "syscall.go",
         "system.go",
         "utils.go",

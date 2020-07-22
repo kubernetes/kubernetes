@@ -1059,6 +1059,9 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 }
 
 func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, error) {
+	if containerIndex > len(pod.Spec.Containers)-1 {
+		return "", fmt.Errorf("container not found in pod: index %d", containerIndex)
+	}
 	var shell string
 	var option string
 	if framework.NodeOSDistroIs("windows") {

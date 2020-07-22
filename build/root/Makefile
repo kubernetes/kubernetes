@@ -210,35 +210,19 @@ define TEST_E2E_NODE_HELP_INFO
 # Args:
 #  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
 #  SKIP: Regexp that matches the tests that needs to be skipped.  Defaults
-#    to "".
+#    to "\[Flaky\]|\[Slow\]|\[Serial\]".
+#  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
+#    Defaults to "".
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
 #    repeatedly until they fail.  Defaults to false.
 #  REMOTE: If true, run the tests on a remote host instance on GCE.  Defaults
 #    to false.
-#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
-#    remote hosts to run tests against.  Defaults to a recent image.
+#  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
+#    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
+#    Defaults to "/tmp/_artifacts".
 #  LIST_IMAGES: If true, don't run tests.  Just output the list of available
 #    images for testing.  Defaults to false.
-#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
-#    run tests against.  Defaults to "".
-#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
-#    part of this test run.  Defaults to false.
-#  PREEMPTIBLE_INSTANCES: For REMOTE=true only.  Mark created gce instances
-#    as preemptible.  Defaults to false.
-#  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
-#    from the remote hosts.  Defaults to "/tmp/_artifacts".
-#  REPORT: For REMOTE=false only.  Local directory to write juntil xml results
-#    to.  Defaults to "/tmp/".
-#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
-#    test files on remote hosts.  Defaults to true.
-#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#  IMAGES.  Defaults to "kubernetes-node-e2e-images".
-#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
-#    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
-#  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
-#  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
-#	 Defaults to false.
-#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
+#  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, remote).
 #    Defaults to "docker".
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
@@ -251,6 +235,23 @@ define TEST_E2E_NODE_HELP_INFO
 #    test/e2e_node/system/specs/. For example, "SYSTEM_SPEC_NAME=gke" will use
 #    the spec at test/e2e_node/system/specs/gke.yaml. If unspecified, the
 #    default built-in spec (system.DefaultSpec) will be used.
+#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
+#    remote hosts to run tests against.  Defaults to a recent image.
+#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
+#    run tests against.  Defaults to "".
+#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
+#    part of this test run.  Defaults to false.
+#  PREEMPTIBLE_INSTANCES: For REMOTE=true only.  Mark created gce instances
+#    as preemptible.  Defaults to false.
+#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
+#    test files on remote hosts.  Defaults to true.
+#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
+#  IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
+#    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
+#  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
+#  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
+#	 Defaults to false.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
@@ -277,7 +278,7 @@ define TEST_E2E_KUBEADM_HELP_INFO
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
 #    repeatedly until they fail. Defaults to false.
 #  ARTIFACTS: Local directory to save test artifacts into. Defaults to "/tmp/_artifacts".
-#  PARALLELISM: The number of gingko nodes to run.  If empty ginkgo default 
+#  PARALLELISM: The number of ginkgo nodes to run.  If empty ginkgo default
 #    parallelism (cores - 1) is used
 #  BUILD: Build kubeadm end-to-end tests. Defaults to true.
 #

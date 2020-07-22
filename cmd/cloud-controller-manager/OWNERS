@@ -16,4 +16,5 @@ emeritus_approvers:
 - wlan0
 labels:
 - sig/api-machinery
+- triage/needs-information
 - sig/cloud-provider

@@ -18,3 +18,4 @@ emeritus_approvers:
 labels:
 - sig/cluster-lifecycle
 - sig/api-machinery
+- triage/needs-information
