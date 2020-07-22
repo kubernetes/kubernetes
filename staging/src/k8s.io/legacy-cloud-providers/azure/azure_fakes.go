@@ -765,6 +765,10 @@ func (fDC *fakeDisksClient) ListByResourceGroup(ctx context.Context, resourceGro
 	return []compute.Disk{}, nil
 }
 
+func (fDC *fakeDisksClient) Update(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.DiskUpdate) *retry.Error {
+	return nil
+}
+
 // GetTestCloud returns a fake azure cloud for unit tests in Azure related CSI drivers
 func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 	az = &Cloud{
