@@ -53,6 +53,9 @@ func (i *Interceptor) GetAuthContext() (int, map[string]string) {
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripAndNewConnection(t *testing.T) {
+	// ensure socks5 goroutines do not fire t.Fatal after test returns
+	testsCompleted := false
+
 	for _, redirect := range []bool{false, true} {
 		t.Run(fmt.Sprintf("redirect = %t", redirect), func(t *testing.T) {
 			localhostPool := x509.NewCertPool()
@@ -389,26 +392,36 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 						proxyHandler = socks5Server(nil)
 					}
 
+					// break out of listener loop when deferred close is called
+					closed := false
 					l, err = net.Listen("tcp", "127.0.0.1:0")
 					if err != nil {
 						t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
 					}
-					defer l.Close()
+					defer func() {
+						closed = true
+						l.Close()
+					}()
 
 					proxyCalledWithHost = "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 
 					go func() {
+						for {
 							conn, err := l.Accept()
 							if err != nil {
-								t.Fatalf(err.Error())
-								return
-							}
-							go func() {
-								if err := proxyHandler.ServeConn(conn); err != nil {
-									t.Fatalf("ServeConn error: %s", err.Error())
-									return
+								if closed {
+									break
 								}
-							}()
+								if testsCompleted != true {
+									t.Fatal(err.Error())
+								}
+							}
+							if err := proxyHandler.ServeConn(conn); err != nil {
+								if testsCompleted != true {
+									t.Logf("ServeConn error: %s", err)
+								}
+							}
+						}
 					}()
 
 					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
@@ -507,6 +520,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			}
 		})
 	}
+	testsCompleted = true
 }
 
 func TestRoundTripRedirects(t *testing.T) {
