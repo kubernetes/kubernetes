@@ -474,15 +474,7 @@ func (r *Request) URL() *url.URL {
 		p = path.Join(p, strings.ToLower(r.resource))
 	}
 	// Join trims trailing slashes, so preserve r.pathPrefix's trailing slash for backwards compatibility if nothing was changed
-	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
-		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
-		// Since Join trims trailing slashes,
-		// if r.subresource is "proxy" and r.subpath is "/",
-		// we need to preserve the trailing slash to keep the original path.
-		if strings.HasSuffix(r.subpath, "/") {
-			p += "/"
-		}
-	}
+	p = net.JoinPreservingTrailingSlash(p, r.resourceName, r.subresource, r.subpath)
 
 	finalURL := &url.URL{}
 	if r.c.base != nil {
