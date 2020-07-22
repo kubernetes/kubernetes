@@ -910,27 +910,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 		ginkgo.By("creating a Pod with a static label")
 		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Create(context.TODO(), &testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Pod %s in namespace %s", testPodName, testNamespaceName)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-			switch event.Type {
-			case watch.Added:
-				if pod, ok := event.Object.(*v1.Pod); ok {
-					found := pod.ObjectMeta.Name == pod.Name &&
-						pod.Labels["test-pod-static"] == "true"
-					return found, nil
-				}
-			default:
-				framework.Logf("observed event type %v", event.Type)
-			}
-			return false, nil
-		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
 
 		ginkgo.By("watching for Pod to be ready")
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 				if pod, ok := event.Object.(*v1.Pod); ok {
