@@ -207,7 +207,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 				storageutils.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
-			defer StopPod(f.ClientSet, pod2)
+			defer StopPodAndDependents(f.ClientSet, pod2)
 			return nil
 		}
 
@@ -302,7 +302,7 @@ func (t EphemeralTest) TestEphemeral() {
 	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, volumes, t.ReadOnly, t.Node)
 	defer func() {
 		// pod might be nil now.
-		StopPod(client, pod)
+		StopPodAndDependents(client, pod)
 	}()
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(client, pod.Name, pod.Namespace), "waiting for pod with inline volume")
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -315,7 +315,7 @@ func (t EphemeralTest) TestEphemeral() {
 		runningPodData = t.RunningPodCheck(pod)
 	}
 
-	StopPod(client, pod)
+	StopPodAndDependents(client, pod)
 	pod = nil // Don't stop twice.
 
 	// There should be no dangling PVCs in the namespace now. There might be for
@@ -446,7 +446,7 @@ func VolumeSourceEnabled(c clientset.Interface, ns string, volume v1.VolumeSourc
 	switch {
 	case err == nil:
 		// Pod was created, feature supported.
-		StopPod(c, pod)
+		StopPodAndDependents(c, pod)
 		return true, nil
 	case apierrors.IsInvalid(err):
 		// "Invalid" because it uses a feature that isn't supported.
