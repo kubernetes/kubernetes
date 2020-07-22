@@ -372,6 +372,8 @@ func TestCreateBackoffManager(t *testing.T) {
 
 }
 
+type clientCreator func(config *Config) (*RESTClient, error)
+
 func TestNotFollowRedirect(t *testing.T) {
 	testServer := httptest.NewServer(&utiltesting.FakeHandler{
 		StatusCode: 301,
@@ -382,14 +384,40 @@ func TestNotFollowRedirect(t *testing.T) {
 	})
 	defer testServer.Close()
 
-	c, err := restClient(testServer)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	config := &Config{
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &v1.SchemeGroupVersion,
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		},
+		Username: "user",
+		Password: "pass",
 	}
-
-	result := c.Get().Do(context.Background())
-	if result.statusCode != 301 {
-		t.Errorf("Unexpected status code: %d", result.statusCode)
+	testCases := []struct {
+		name string
+		fn   clientCreator
+	}{
+		{
+			name: "Versioned_NotFollowRedirect",
+			fn:   RESTClientFor,
+		},
+		{
+			name: "Unversioned_NotFollowRedirect",
+			fn:   UnversionedRESTClientFor,
+		},
+	}
+	for _, testCase := range testCases {
+		tc := testCase
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := tc.fn(config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			result := c.Get().Do(context.Background())
+			if result.statusCode != 301 {
+				t.Errorf("Unexpected status code: %d", result.statusCode)
+			}
+		})
 	}
 }
 
@@ -406,7 +434,7 @@ func TestFollowRedirect(t *testing.T) {
 	})
 	defer server2.Close()
 
-	c, err := RESTClientFor(&Config{
+	config := &Config{
 		Host: server2.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &v1.SchemeGroupVersion,
@@ -415,17 +443,36 @@ func TestFollowRedirect(t *testing.T) {
 		FollowRedirect: true,
 		Username:       "user",
 		Password:       "pass",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result := c.Get().Do(context.Background())
-	if result.Error() != nil {
-		t.Fatalf("Unexpected error: %v", result.Error())
+	testCases := []struct {
+		name string
+		fn   clientCreator
+	}{
+		{
+			name: "Versioned_FollowRedirect",
+			fn:   RESTClientFor,
+		},
+		{
+			name: "Unversioned_FollowRedirect",
+			fn:   UnversionedRESTClientFor,
+		},
 	}
-	if result.statusCode != 200 {
-		t.Errorf("Unexpected status code: %d", result.statusCode)
+	for _, testCase := range testCases {
+		tc := testCase
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := tc.fn(config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			result := c.Get().Do(context.Background())
+			if result.Error() != nil {
+				t.Fatalf("Unexpected error: %v", result.Error())
+			}
+			if result.statusCode != 200 {
+				t.Errorf("Unexpected status code: %d", result.statusCode)
+			}
+		})
 	}
 }
 
