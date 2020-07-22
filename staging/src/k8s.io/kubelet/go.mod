@@ -2,11 +2,11 @@
 
 module k8s.io/kubelet
 
-go 1.13
+go 1.15
 
 require (
 	github.com/gogo/protobuf v1.3.1
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344
 	google.golang.org/grpc v1.27.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
