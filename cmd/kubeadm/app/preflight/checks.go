@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/PuerkitoBio/purell"
@@ -674,6 +675,31 @@ type etcdVersionResponse struct {
 	Etcdcluster string `json:"etcdcluster"`
 }
 
+// KubeletFSTypeCheck warns if wrong filesystem mounted on kubelet run directly
+type KubeletFSTypeCheck struct{}
+
+// Name will return "KubeletFSType" as name for KubeletFSTypeCheck
+func (KubeletFSTypeCheck) Name() string {
+	return "KubeletFSType"
+}
+
+// Check validates that kubelet is not running on a unsupported filesystem
+func (kfc KubeletFSTypeCheck) Check() (warnings, errorList []error) {
+	var stat syscall.Statfs_t
+	klog.V(1).Infoln("validating filesystem for kubelet run directly")
+	err := syscall.Statfs(kubeadmconstants.KubeletRunDirectory, &stat)
+	if err != nil {
+		return nil, []error{errors.Wrap(err, "error checking filesystem type for "+kubeadmconstants.KubeletRunDirectory)}
+	}
+
+	// OverlayFS
+	if stat.Type == 2035054128 {
+		return nil, []error{errors.New("running kubelet on overlayfs is not supported. Consider mounting tmpfs on " + kubeadmconstants.KubeletRunDirectory)}
+	}
+
+	return nil, nil
+}
+
 // ExternalEtcdVersionCheck checks if version of external etcd meets the demand of kubeadm
 type ExternalEtcdVersionCheck struct {
 	Etcd kubeadmapi.Etcd
@@ -1018,6 +1044,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
+			KubeletFSTypeCheck{},
 			InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
