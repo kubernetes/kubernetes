@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -90,7 +91,8 @@ func TestRotateLogs(t *testing.T) {
 			MaxSize:  testMaxSize,
 			MaxFiles: testMaxFiles,
 		},
-		clock: clock.NewFakeClock(now),
+		osInterface: container.RealOS{},
+		clock:       clock.NewFakeClock(now),
 	}
 	testLogs := []string{
 		"test-log-1",
@@ -159,6 +161,77 @@ func TestRotateLogs(t *testing.T) {
 	assert.Equal(t, testLogs[3], logs[4].Name())
 }
 
+func TestClean(t *testing.T) {
+	dir, err := ioutil.TempDir("", "test-clean")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	const (
+		testMaxFiles = 3
+		testMaxSize  = 10
+	)
+	now := time.Now()
+	f := critest.NewFakeRuntimeService()
+	c := &containerLogManager{
+		runtimeService: f,
+		policy: LogRotatePolicy{
+			MaxSize:  testMaxSize,
+			MaxFiles: testMaxFiles,
+		},
+		osInterface: container.RealOS{},
+		clock:       clock.NewFakeClock(now),
+	}
+	testLogs := []string{
+		"test-log-1",
+		"test-log-2",
+		"test-log-3",
+		"test-log-2.00000000-000000.gz",
+		"test-log-2.00000000-000001",
+		"test-log-3.00000000-000000.gz",
+		"test-log-3.00000000-000001",
+	}
+	for i := range testLogs {
+		f, err := os.Create(filepath.Join(dir, testLogs[i]))
+		require.NoError(t, err)
+		f.Close()
+	}
+	testContainers := []*critest.FakeContainer{
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "container-1",
+				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath: filepath.Join(dir, testLogs[0]),
+			},
+		},
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "container-2",
+				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath: filepath.Join(dir, testLogs[1]),
+			},
+		},
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "container-3",
+				State:   runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath: filepath.Join(dir, testLogs[2]),
+			},
+		},
+	}
+	f.SetFakeContainers(testContainers)
+
+	err = c.Clean("container-3")
+	require.NoError(t, err)
+
+	logs, err := ioutil.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, logs, 4)
+	assert.Equal(t, testLogs[0], logs[0].Name())
+	assert.Equal(t, testLogs[1], logs[1].Name())
+	assert.Equal(t, testLogs[3], logs[2].Name())
+	assert.Equal(t, testLogs[4], logs[3].Name())
+}
+
 func TestCleanupUnusedLog(t *testing.T) {
 	dir, err := ioutil.TempDir("", "test-cleanup-unused-log")
 	require.NoError(t, err)
@@ -178,7 +251,9 @@ func TestCleanupUnusedLog(t *testing.T) {
 		f.Close()
 	}
 
-	c := &containerLogManager{}
+	c := &containerLogManager{
+		osInterface: container.RealOS{},
+	}
 	got, err := c.cleanupUnusedLogs(testLogs)
 	require.NoError(t, err)
 	assert.Len(t, got, 2)
@@ -223,7 +298,10 @@ func TestRemoveExcessLog(t *testing.T) {
 			f.Close()
 		}
 
-		c := &containerLogManager{policy: LogRotatePolicy{MaxFiles: test.max}}
+		c := &containerLogManager{
+			policy:      LogRotatePolicy{MaxFiles: test.max},
+			osInterface: container.RealOS{},
+		}
 		got, err := c.removeExcessLogs(testLogs)
 		require.NoError(t, err)
 		require.Len(t, got, len(test.expect))
@@ -253,7 +331,7 @@ func TestCompressLog(t *testing.T) {
 	require.NoError(t, err)
 
 	testLog := testFile.Name()
-	c := &containerLogManager{}
+	c := &containerLogManager{osInterface: container.RealOS{}}
 	require.NoError(t, c.compressLog(testLog))
 	_, err = os.Stat(testLog + compressSuffix)
 	assert.NoError(t, err, "log should be compressed")
@@ -303,6 +381,7 @@ func TestRotateLatestLog(t *testing.T) {
 		c := &containerLogManager{
 			runtimeService: f,
 			policy:         LogRotatePolicy{MaxFiles: test.maxFiles},
+			osInterface:    container.RealOS{},
 			clock:          clock.NewFakeClock(now),
 		}
 		if test.runtimeError != nil {
