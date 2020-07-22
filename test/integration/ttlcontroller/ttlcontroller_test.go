@@ -51,6 +51,7 @@ func createClientAndInformers(t *testing.T, server *httptest.Server) (*clientset
 
 func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex int) {
 	var wg sync.WaitGroup
+	errs := make(chan error, 1)
 	for i := startIndex; i < endIndex; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -61,24 +62,33 @@ func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 				},
 			}
 			if _, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
-				t.Errorf("Failed to create node: %v", err)
+				errs <- err
 			}
 		}(i)
+	}
+	err := <-errs
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
 	}
 	wg.Wait()
 }
 
 func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex int) {
 	var wg sync.WaitGroup
+	errs := make(chan error, 1)
 	for i := startIndex; i < endIndex; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("node-%d", idx)
 			if err := client.CoreV1().Nodes().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
-				t.Errorf("Failed to delete node: %v", err)
+				errs <- err
 			}
 		}(i)
+	}
+	err := <-errs
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
 	}
 	wg.Wait()
 }
