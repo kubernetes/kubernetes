@@ -1229,7 +1229,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err := proxier.serviceHealthServer.SyncServices(serviceUpdateResult.HCServiceNodePorts); err != nil {
 		klog.Errorf("Error syncing healthcheck services: %v", err)
 	}
-	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
+	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize, serviceUpdateResult.NoHealthCheck); err != nil {
 		klog.Errorf("Error syncing healthcheck endpoints: %v", err)
 	}
 
