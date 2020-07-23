@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/klog/v2"
 )
 
 func Test_NodesDeleted(t *testing.T) {
@@ -512,17 +513,14 @@ func Test_NodesDeleted(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			eventBroadcaster := record.NewBroadcaster()
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
 				kubeClient:        clientset,
 				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				recorder:          &record.FakeRecorder{},
 				nodeMonitorPeriod: 1 * time.Second,
 			}
 
-			w := eventBroadcaster.StartLogging(klog.Infof)
-			defer w.Stop()
 			cloudNodeLifecycleController.MonitorNodes()
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
