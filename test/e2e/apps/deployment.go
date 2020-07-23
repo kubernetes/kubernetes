@@ -55,6 +55,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutil "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -146,9 +147,9 @@ var _ = SIGDescribe("Deployment", func() {
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
 		testDeploymentName := "test-deployment"
-		testDeploymentInitialImage := "nginx"
-		testDeploymentPatchImage := "alpine"
-		testDeploymentUpdateImage := "httpd"
+		testDeploymentInitialImage := imageutils.GetE2EImage(imageutils.Agnhost)
+		testDeploymentPatchImage := imageutils.GetE2EImage(imageutils.Pause)
+		testDeploymentUpdateImage := imageutils.GetE2EImage(imageutils.Httpd)
 		testDeploymentDefaultReplicas := int32(3)
 		testDeploymentMinimumReplicas := int32(1)
 		testDeploymentNoReplicas := int32(0)
