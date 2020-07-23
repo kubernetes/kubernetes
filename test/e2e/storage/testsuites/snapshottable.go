@@ -224,7 +224,10 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 
 				// Check SnapshotContent properties
 				ginkgo.By("checking the SnapshotContent")
-				framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
+				// PreprovisionedCreatedSnapshot do not need to set volume snapshot class name
+				if pattern.SnapshotType != testpatterns.PreprovisionedCreatedSnapshot {
+					framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
+				}
 				framework.ExpectEqual(volumeSnapshotRef["name"], vs.GetName())
 				framework.ExpectEqual(volumeSnapshotRef["namespace"], vs.GetNamespace())
 
@@ -451,7 +454,7 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a snapshot content with the snapshot handle")
-		r.Vscontent = getPreProvisionedSnapshotContent(getPreProvisionedSnapshotName(snapshotHandle), pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName, r.Vsclass.GetName())
+		r.Vscontent = getPreProvisionedSnapshotContent(getPreProvisionedSnapshotName(snapshotHandle), pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 		r.Vscontent, err = dc.Resource(SnapshotContentGVR).Create(context.TODO(), r.Vscontent, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
