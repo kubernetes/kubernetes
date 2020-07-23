@@ -880,8 +880,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		testNamespaceName := f.Namespace.Name
 		testPodName := "pod-test"
-		testPodImage := "nginx"
-		testPodImage2 := "httpd"
+		testPodImage := imageutils.GetE2EImage(imageutils.Agnhost)
+		testPodImage2 := imageutils.GetE2EImage(imageutils.Httpd)
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
 
