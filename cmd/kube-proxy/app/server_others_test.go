@@ -151,6 +151,14 @@ func Test_getProxyMode(t *testing.T) {
 			expected:      proxyModeIPVS,
 			scheduler:     "sed",
 		},
+		{ // flag says ipvs, ipset version ok, non-existent scheduler
+			flag:          "ipvs",
+			kmods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_sed"},
+			kernelVersion: "4.19",
+			ipsetVersion:  ipvs.MinIPSetCheckVersion,
+			expected:      proxyModeIPVS,
+			scheduler:     "foobar",
+		},
 	}
 	for i, c := range cases {
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
