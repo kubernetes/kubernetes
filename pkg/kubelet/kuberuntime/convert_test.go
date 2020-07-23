@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,6 +93,12 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 
 	for _, test := range testCases {
 		actual := toKubeContainerImageSpec(test.input)
+		sort.Slice(test.expected.Annotations, func(i, j int) bool {
+			return test.expected.Annotations[i].Name < test.expected.Annotations[j].Name
+		})
+		sort.Slice(actual.Annotations, func(i, j int) bool {
+			return actual.Annotations[i].Name < actual.Annotations[j].Name
+		})
 		assert.Equal(t, test.expected, actual)
 	}
 }
