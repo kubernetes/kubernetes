@@ -17,6 +17,7 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -149,21 +150,24 @@ func IsRsGracefulTerminationNeeded(proto string) bool {
 }
 
 // GetRequiredSchedulerModules returns the required ipvs scheduler module for configured scheduler
-func GetRequiredSchedulerModules(scheduler string) string {
+func GetRequiredSchedulerModules(scheduler string) (string, error) {
 	switch s := scheduler; s {
 	case "rr":
-		return KernelModuleIPVSRR
+		return KernelModuleIPVSRR, nil
 	case "lc":
-		return KernelModuleIPVSLC
+		return KernelModuleIPVSLC, nil
 	case "nq":
-		return KernelModuleIPVSNQ
+		return KernelModuleIPVSNQ, nil
 	case "dh":
-		return KernelModuleIPVSDH
+		return KernelModuleIPVSDH, nil
 	case "sh":
-		return KernelModuleIPVSSH
+		return KernelModuleIPVSSH, nil
 	case "sed":
-		return KernelModuleIPVSSED
+		return KernelModuleIPVSSED, nil
+	case "":
+		return KernelModuleIPVSRR, nil
 	default:
-		return KernelModuleIPVSRR
+		notFound := fmt.Errorf("ip_vs_%s is not a supported IPVS scheduler algorithm, falling back to round-robin", scheduler)
+		return KernelModuleIPVSRR, notFound
 	}
 }
