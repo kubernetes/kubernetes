@@ -591,7 +591,7 @@ func getPreProvisionedSnapshot(snapshotContentName, ns, snapshotHandle string) *
 
 	return snapshot
 }
-func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName, volumeSnapshotClassName string) *unstructured.Unstructured {
+func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
 	snapshotContent := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "VolumeSnapshotContent",
@@ -607,9 +607,8 @@ func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotH
 					"name":      snapshotName,
 					"namespace": snapshotNamespace,
 				},
-				"driver":                  csiDriverName,
-				"deletionPolicy":          deletionPolicy,
-				"volumeSnapshotClassName": volumeSnapshotClassName,
+				"driver":         csiDriverName,
+				"deletionPolicy": deletionPolicy,
 			},
 		},
 	}
