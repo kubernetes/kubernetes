@@ -138,7 +138,6 @@ func TestCreateDeploymentWithEnvironmentVariables(t *testing.T) {
 			"SingleEnvVar",
 			[]string{
 				"FOO=bar",
-				"FIZZ=buzz",
 			},
 		},
 		{
