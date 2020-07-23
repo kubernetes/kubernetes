@@ -393,7 +393,33 @@ func TestListOptions(t *testing.T) {
 				for _, continueToken := range continueTokens {
 					for _, rv := range rvs {
 						for _, rvMatch := range rvMatches {
-							name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueToken, rv, rvMatch)
+							rvName := ""
+							switch rv {
+							case "":
+								rvName = "empty"
+							case "0":
+								rvName = "0"
+							case compactedRv:
+								rvName = "compacted"
+							case invalidResourceVersion:
+								rvName = "invalid"
+							default:
+								rvName = "unknown"
+							}
+
+							continueName := ""
+							switch continueToken {
+							case "":
+								continueName = "empty"
+							case validContinueToken:
+								continueName = "valid"
+							case invalidContinueToken:
+								continueName = "invalid"
+							default:
+								continueName = "unknown"
+							}
+
+							name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueName, rvName, rvMatch)
 							t.Run(name, func(t *testing.T) {
 								opts := metav1.ListOptions{
 									ResourceVersion:      rv,
