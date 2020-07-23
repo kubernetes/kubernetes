@@ -37,7 +37,7 @@ func (s *CloudProviderOptions) Validate() []error {
 	return allErrors
 }
 
-// AddFlags returns flags of cloud provider for a APIServer
+// AddFlags returns flags of cloud provider for a API Server
 func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")
