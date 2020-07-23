@@ -205,7 +205,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 
 	// wait until healthz endpoint returns ok
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
 		select {
 		case err := <-errCh:
 			return false, err
