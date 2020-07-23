@@ -137,7 +137,7 @@ run_kubectl_apply_deployments_tests() {
 
   # cleanup
   # need to explicitly remove replicasets and pods because we changed the deployment selector and orphaned things
-  kubectl delete deployments,rs,pods --all --cascade=false --grace-period=0
+  kubectl delete deployments,rs,pods --all --cascade=orphan --grace-period=0
   # Post-Condition: no Deployments, ReplicaSets, Pods exist
   kube::test::wait_object_assert deployments "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kube::test::wait_object_assert replicasets "{{range.items}}{{${id_field:?}}}:{{end}}" ''
@@ -246,10 +246,11 @@ run_deployment_tests() {
   # Wait for rs to come up.
   kube::test::wait_object_assert rs "{{range.items}}{{${rs_replicas_field:?}}}{{end}}" '3'
   # Deleting the deployment should delete the rs.
-  kubectl delete deployment nginx-deployment "${kube_flags[@]:?}"
+  # using empty value in cascade flag to make sure the backward compatibility.
+  kubectl delete deployment nginx-deployment "${kube_flags[@]:?}" --cascade
   kube::test::wait_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
-  ## Test that rs is not deleted when deployment is deleted with cascade set to false.
+  ## Test that rs is not deleted when deployment is deleted with cascading strategy set to orphan.
   # Pre-condition: no deployment and rs exist
   kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
@@ -257,8 +258,8 @@ run_deployment_tests() {
   kubectl create deployment nginx-deployment --image=k8s.gcr.io/nginx:test-cmd
   # Wait for rs to come up.
   kube::test::wait_object_assert rs "{{range.items}}{{${rs_replicas_field:?}}}{{end}}" '1'
-  # Delete the deployment with cascade set to false.
-  kubectl delete deployment nginx-deployment "${kube_flags[@]:?}" --cascade=false
+  # Delete the deployment with cascading strategy set to orphan.
+  kubectl delete deployment nginx-deployment "${kube_flags[@]:?}" --cascade=orphan
   # Wait for the deployment to be deleted and then verify that rs is not
   # deleted.
   kube::test::wait_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" ''
@@ -545,7 +546,7 @@ run_rs_tests() {
   # Post-condition: no pods from frontend replica set
   kube::test::wait_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
-  ### Create and then delete a replica set with cascade=false, make sure it doesn't delete pods.
+  ### Create and then delete a replica set with cascading strategy set to orphan, make sure it doesn't delete pods.
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
@@ -553,7 +554,7 @@ run_rs_tests() {
   # wait for all 3 pods to be set up
   kube::test::wait_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{${pod_container_name_field:?}}}:{{end}}" 'php-redis:php-redis:php-redis:'
   kube::log::status "Deleting rs"
-  kubectl delete rs frontend "${kube_flags[@]:?}" --cascade=false
+  kubectl delete rs frontend "${kube_flags[@]:?}" --cascade=orphan
   # Wait for the rs to be deleted.
   kube::test::wait_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Post-condition: All 3 pods still remain from frontend replica set

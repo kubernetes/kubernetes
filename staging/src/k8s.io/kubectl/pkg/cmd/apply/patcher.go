@@ -25,6 +25,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,10 +58,10 @@ type Patcher struct {
 	Overwrite bool
 	BackOff   clockwork.Clock
 
-	Force       bool
-	Cascade     bool
-	Timeout     time.Duration
-	GracePeriod int
+	Force             bool
+	CascadingStrategy metav1.DeletionPropagation
+	Timeout           time.Duration
+	GracePeriod       int
 
 	// If set, forces the patch against a specific resourceVersion
 	ResourceVersion *string
@@ -78,21 +79,21 @@ func newPatcher(o *ApplyOptions, info *resource.Info, helper *resource.Helper) (
 	}
 
 	return &Patcher{
-		Mapping:       info.Mapping,
-		Helper:        helper,
-		Overwrite:     o.Overwrite,
-		BackOff:       clockwork.NewRealClock(),
-		Force:         o.DeleteOptions.ForceDeletion,
-		Cascade:       o.DeleteOptions.Cascade,
-		Timeout:       o.DeleteOptions.Timeout,
-		GracePeriod:   o.DeleteOptions.GracePeriod,
-		OpenapiSchema: openapiSchema,
-		Retries:       maxPatchRetry,
+		Mapping:           info.Mapping,
+		Helper:            helper,
+		Overwrite:         o.Overwrite,
+		BackOff:           clockwork.NewRealClock(),
+		Force:             o.DeleteOptions.ForceDeletion,
+		CascadingStrategy: o.DeleteOptions.CascadingStrategy,
+		Timeout:           o.DeleteOptions.Timeout,
+		GracePeriod:       o.DeleteOptions.GracePeriod,
+		OpenapiSchema:     openapiSchema,
+		Retries:           maxPatchRetry,
 	}, nil
 }
 
 func (p *Patcher) delete(namespace, name string) error {
-	options := asDeleteOptions(p.Cascade, p.GracePeriod)
+	options := asDeleteOptions(p.CascadingStrategy, p.GracePeriod)
 	_, err := p.Helper.DeleteWithOptions(namespace, name, &options)
 	return err
 }

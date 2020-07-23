@@ -90,7 +90,7 @@ run_multi_resources_tests() {
     fi
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
-    kubectl replace -f "${replace_file}" --force --cascade "${kube_flags[@]}"
+    kubectl replace -f "${replace_file}" --force --cascade=background "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field:?}.status}}" 'replaced'
