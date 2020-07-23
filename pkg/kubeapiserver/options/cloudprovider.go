@@ -26,7 +26,7 @@ type CloudProviderOptions struct {
 	CloudProvider   string
 }
 
-// NewCloudProviderOptions create a default CloudProviderOptions
+// NewCloudProviderOptions creates a default CloudProviderOptions
 func NewCloudProviderOptions() *CloudProviderOptions {
 	return &CloudProviderOptions{}
 }

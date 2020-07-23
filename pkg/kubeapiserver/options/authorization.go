@@ -29,7 +29,7 @@ import (
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
-// BuiltInAuthorizationOptions contains all build-in authorization options for APIServer
+// BuiltInAuthorizationOptions contains all build-in authorization options for API Server
 type BuiltInAuthorizationOptions struct {
 	Modes                       []string
 	PolicyFile                  string
@@ -92,7 +92,7 @@ func (s *BuiltInAuthorizationOptions) Validate() []error {
 	return allErrors
 }
 
-// AddFlags returns flags of authorization for a APIServer
+// AddFlags returns flags of authorization for a API Server
 func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.Modes, "authorization-mode", s.Modes, ""+
 		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
