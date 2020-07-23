@@ -58,7 +58,7 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 		"ExecutingRequests", // 6
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
-	endline(tabWriter)
+	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
@@ -69,7 +69,7 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 				"<none>",        // 5
 				"<none>",        // 6
 			))
-			endline(tabWriter)
+			endLine(tabWriter)
 			continue
 		}
 		queueSetDigest := plState.queues.Dump(false)
@@ -88,7 +88,7 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 			queueSetDigest.Waiting,   // 5
 			queueSetDigest.Executing, // 6
 		))
-		endline(tabWriter)
+		endLine(tabWriter)
 	}
 	runtime.HandleError(tabWriter.Flush())
 }
@@ -105,7 +105,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 		"VirtualStart",      // 5
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
-	endline(tabWriter)
+	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
@@ -115,7 +115,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 				"<none>",        // 4
 				"<none>",        // 5
 			))
-			endline(tabWriter)
+			endLine(tabWriter)
 			continue
 		}
 		queueSetDigest := plState.queues.Dump(false)
@@ -127,7 +127,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 				q.ExecutingRequests, // 4
 				q.VirtualStart,      // 5
 			))
-			endline(tabWriter)
+			endLine(tabWriter)
 		}
 	}
 	runtime.HandleError(tabWriter.Flush())
@@ -149,6 +149,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 		"ArriveTime",          // 6
 	}))
 	if includeRequestDetails {
+		continueLine(tabWriter)
 		tabPrint(tabWriter, rowForHeaders([]string{
 			"UserName",    // 7
 			"Verb",        // 8
@@ -160,7 +161,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 			"SubResource", // 14
 		}))
 	}
-	endline(tabWriter)
+	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
@@ -172,6 +173,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 				"<none>",        // 6
 			))
 			if includeRequestDetails {
+				continueLine(tabWriter)
 				tabPrint(tabWriter, row(
 					"<none>", // 7
 					"<none>", // 8
@@ -183,7 +185,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 					"<none>", // 14
 				))
 			}
-			endline(tabWriter)
+			endLine(tabWriter)
 			continue
 		}
 		queueSetDigest := plState.queues.Dump(includeRequestDetails)
@@ -198,6 +200,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 					r.ArriveTime,        // 6
 				))
 				if includeRequestDetails {
+					continueLine(tabWriter)
 					tabPrint(tabWriter, rowForRequestDetails(
 						r.UserName,              // 7
 						r.RequestInfo.Verb,      // 8
@@ -212,7 +215,7 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 						r.RequestInfo.Subresource, // 14
 					))
 				}
-				endline(tabWriter)
+				endLine(tabWriter)
 			}
 		}
 	}
@@ -223,7 +226,12 @@ func tabPrint(w io.Writer, row string) {
 	_, err := fmt.Fprint(w, row)
 	runtime.HandleError(err)
 }
-func endline(w io.Writer) {
+
+func continueLine(w io.Writer) {
+	_, err := fmt.Fprint(w, ",\t")
+	runtime.HandleError(err)
+}
+func endLine(w io.Writer) {
 	_, err := fmt.Fprint(w, "\n")
 	runtime.HandleError(err)
 }
@@ -269,9 +277,14 @@ func rowForRequestDetails(username, verb, path, namespace, name, apiVersion, res
 		username,
 		verb,
 		path,
+		namespace,
+		name,
+		apiVersion,
+		resource,
+		subResource,
 	)
 }
 
 func row(columns ...string) string {
-	return strings.Join(columns, ",\t") + ",\t"
+	return strings.Join(columns, ",\t")
 }
