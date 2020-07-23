@@ -920,7 +920,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid create of my node with forbidden labels",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `is not allowed to set the following labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 		{
