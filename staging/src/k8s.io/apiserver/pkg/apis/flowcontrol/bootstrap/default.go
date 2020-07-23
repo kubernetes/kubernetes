@@ -70,6 +70,7 @@ var (
 		SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
 		SuggestedFlowSchemaServiceAccounts,           // references "workload-low" priority-level
+		SuggestedFlowSchemaHealthForStrangers,        // references "exempt" priority-level
 		SuggestedFlowSchemaGlobalDefault,             // references "global-default" priority-level
 	}
 )
@@ -373,6 +374,18 @@ var (
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
 					[]string{flowcontrol.NonResourceAll}),
+			},
+		},
+	)
+	SuggestedFlowSchemaHealthForStrangers = newFlowSchema(
+		"health-for-strangers", "exempt", 1000,
+		"",
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.AllUnauthenticated),
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+				nonResourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{"/healthz", "/livez", "/readyz"}),
 			},
 		},
 	)
