@@ -67,12 +67,12 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		}
 		if mode == authzmodes.ModeABAC {
 			if o.PolicyFile == "" {
-				allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC'o authorization policy file not passed"))
+				allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC's authorization policy file not passed"))
 			}
 		}
 		if mode == authzmodes.ModeWebhook {
 			if o.WebhookConfigFile == "" {
-				allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook'o authorization config file not passed"))
+				allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook's authorization config file not passed"))
 			}
 		}
 	}
@@ -103,7 +103,7 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.WebhookConfigFile, "authorization-webhook-config-file", o.WebhookConfigFile, ""+
 		"File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. "+
-		"The API server will query the remote service to determine access on the API server'o secure port.")
+		"The API server will query the remote service to determine access on the API server's secure port.")
 
 	fs.StringVar(&o.WebhookVersion, "authorization-webhook-version", o.WebhookVersion, ""+
 		"The API version of the authorization.k8s.io SubjectAccessReview to send to and expect from the webhook.")

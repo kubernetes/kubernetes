@@ -257,8 +257,8 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set.")
 
 		fs.StringVar(&o.OIDC.CAFile, "oidc-ca-file", o.OIDC.CAFile, ""+
-			"If set, the OpenID server'o certificate will be verified by one of the authorities "+
-			"in the oidc-ca-file, otherwise the host'o root CA set will be used.")
+			"If set, the OpenID server's certificate will be verified by one of the authorities "+
+			"in the oidc-ca-file, otherwise the host's root CA set will be used.")
 
 		fs.StringVar(&o.OIDC.UsernameClaim, "oidc-username-claim", "sub", ""+
 			"The OpenID claim to use as the user name. Note that claims other than the default ('sub') "+
@@ -319,7 +319,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
 			"/.well-known/openid-configuration. This flag is useful if the discovery doc"+
 			"and key set are served to relying parties from a URL other than the "+
-			"API server'o external (as auto-detected or overridden with external-hostname). "+
+			"API server's external (as auto-detected or overridden with external-hostname). "+
 			"Only valid if the ServiceAccountIssuerDiscovery feature gate is enabled.")
 
 		// Deprecated in 1.13
@@ -422,10 +422,10 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 		if len(o.WebHook.ConfigFile) > 0 && o.WebHook.CacheTTL > 0 {
 			if o.TokenSuccessCacheTTL > 0 && o.WebHook.CacheTTL < o.TokenSuccessCacheTTL {
-				klog.Warningf("the webhook cache ttl of %o is shorter than the overall cache ttl of %o for successful token authentication attempts.", o.WebHook.CacheTTL, o.TokenSuccessCacheTTL)
+				klog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for successful token authentication attempts.", o.WebHook.CacheTTL, o.TokenSuccessCacheTTL)
 			}
 			if o.TokenFailureCacheTTL > 0 && o.WebHook.CacheTTL < o.TokenFailureCacheTTL {
-				klog.Warningf("the webhook cache ttl of %o is shorter than the overall cache ttl of %o for failed token authentication attempts.", o.WebHook.CacheTTL, o.TokenFailureCacheTTL)
+				klog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for failed token authentication attempts.", o.WebHook.CacheTTL, o.TokenFailureCacheTTL)
 			}
 		}
 	}
