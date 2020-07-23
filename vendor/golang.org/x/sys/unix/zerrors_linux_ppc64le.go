@@ -77,6 +77,7 @@ const (
 	FS_IOC_GET_ENCRYPTION_NONCE      = 0x4010661b
 	FS_IOC_GET_ENCRYPTION_POLICY     = 0x800c6615
 	FS_IOC_GET_ENCRYPTION_PWSALT     = 0x80106614
+	FS_IOC_SETFLAGS                  = 0x80086602
 	FS_IOC_SET_ENCRYPTION_POLICY     = 0x400c6613
 	F_GETLK                          = 0x5
 	F_GETLK64                        = 0xc

@@ -17,9 +17,10 @@ go_library(
     deps = [
         "//vendor/golang.org/x/tools/go/gcexportdata:go_default_library",
         "//vendor/golang.org/x/tools/go/internal/packagesdriver:go_default_library",
-        "//vendor/golang.org/x/tools/internal/gopathwalk:go_default_library",
-        "//vendor/golang.org/x/tools/internal/semver:go_default_library",
-        "//vendor/golang.org/x/tools/internal/span:go_default_library",
+        "//vendor/golang.org/x/tools/internal/gocommand:go_default_library",
+        "//vendor/golang.org/x/tools/internal/packagesinternal:go_default_library",
+        "//vendor/golang.org/x/tools/internal/typesinternal:go_default_library",
+        "//vendor/golang.org/x/xerrors:go_default_library",
     ],
 )
 
