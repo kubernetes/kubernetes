@@ -835,6 +835,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 	ginkgo.It("should delete a collection of pods", func() {
 		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
 
+		zero := int64(0)
+
 		ginkgo.By("Create set of pods")
 		// create a set of pods in test namespace
 		for _, podTestName := range podTestNames {
@@ -845,6 +847,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 						"type": "Testing"},
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{{
 						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Name:  "token-test",
@@ -861,7 +864,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "3 pods not found")
 
 		// delete Collection of pods with a label in the current namespace
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
 		framework.ExpectNoError(err, "failed to delete collection of pods")
 
