@@ -19,9 +19,9 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
     name = "io_k8s_repo_infra",
-    commit = "4dba9c47667e6907bb6f869dc686bdae246369c4",
+    commit = "8bf157a06c1aabe3b1586e9a250584b640881e59",
     remote = "https://github.com/justaugustus/repo-infra",
-    shallow_since = "1595525054 -0400",
+    shallow_since = "1595544263 -0400",
 )
 
 load("@io_k8s_repo_infra//:load.bzl", repo_infra_repositories = "repositories")
@@ -31,14 +31,14 @@ repo_infra_repositories()
 load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_infra_go_repositories = "go_repositories")
 
 # IMPORTANT: Only one go version may be specified at a time
-#            'go_version':    used to specify a published upstream go version
-#            'extra_version': used to specify an alternate go version provided
-#                             by kubernetes/repo-infra
+#            'go_version':          used to specify a published upstream go version
+#            'override_go_version': used to specify an alternate go version provided
+#                                   by kubernetes/repo-infra
 repo_infra_configure(
     # TODO(go1.15): Uncomment once we've published a repo-infra release that supports go1.15
     #go_version = "1.15.0",
     # TODO(go1.15): Comment out once we've published a repo-infra release that supports go1.15
-    #extra_version = "1.15.0-beta.1",
+    override_go_version = "1.15.0-beta.1",
     minimum_bazel_version = "2.2.0",
 )
 

@@ -87,7 +87,7 @@ dependencies:
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
-      match: (go|extra)_version = "((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"
+      match: (override_)?go_version = "((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"
 
   - name: "golang: upstream container image"
     version: 1.15beta1
