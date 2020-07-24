@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -613,7 +614,7 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 	if p.Attempts >= 15 {
 		return "15+"
 	}
-	return string(p.Attempts)
+	return strconv.Itoa(p.Attempts)
 }
 
 func (sched *Scheduler) profileForPod(pod *v1.Pod) (*profile.Profile, error) {
