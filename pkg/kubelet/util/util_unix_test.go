@@ -151,12 +151,20 @@ func TestGetAddressAndDialer(t *testing.T) {
 			expectedAddr: "/tmp/f6.sock",
 		},
 		{
-			endpoint:    "tco:/localhost:9090",
+			endpoint:    "tcp://localhost:9090",
 			expectError: true,
 		},
 		{
 			// The misspelling is intentional to make it error
 			endpoint:    "htta://free-test.com",
+			expectError: true,
+		},
+		{
+			endpoint:    "https://www.youtube.com/",
+			expectError: true,
+		},
+		{
+			endpoint:    "http://www.baidu.com/",
 			expectError: true,
 		},
 	}
