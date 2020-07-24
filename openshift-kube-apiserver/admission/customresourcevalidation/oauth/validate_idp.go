@@ -72,10 +72,10 @@ func validateOAuthSpec(spec configv1.OAuthSpec) field.ErrorList {
 	}
 
 	// TODO move to ValidateTokenConfig
-	timeout := spec.TokenConfig.AccessTokenInactivityTimeoutSeconds
-	if timeout > 0 && timeout < MinimumInactivityTimeoutSeconds {
+	timeout := spec.TokenConfig.AccessTokenInactivityTimeout
+	if timeout != nil && timeout.Seconds() < MinimumInactivityTimeoutSeconds {
 		errs = append(errs, field.Invalid(
-			specPath.Child("tokenConfig", "accessTokenInactivityTimeoutSeconds"), timeout,
+			specPath.Child("tokenConfig", "accessTokenInactivityTimeout"), timeout,
 			fmt.Sprintf("the minimum acceptable token timeout value is %d seconds",
 				MinimumInactivityTimeoutSeconds)))
 	}

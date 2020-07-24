@@ -54,18 +54,22 @@ func AddOAuthServerAuthenticatorIfNeeded(tokenAuthenticators []authenticator.Tok
 		panic(err)
 	}
 
-	// add our oauth token validator
-	validators := []oauth.OAuthTokenValidator{oauth.NewExpirationValidator(), oauth.NewUIDValidator()}
+	// Tokens are valid for their lifetime unless this value is overridden.
+	tokenTimeout := int32(0)
 	if enablement.OpenshiftConfig().OAuthConfig != nil {
-		if inactivityTimeout := enablement.OpenshiftConfig().OAuthConfig.TokenConfig.AccessTokenInactivityTimeoutSeconds; inactivityTimeout != nil {
-			timeoutValidator := oauth.NewTimeoutValidator(oauthClient.OauthV1().OAuthAccessTokens(), oauthInformer.Oauth().V1().OAuthClients().Lister(), *inactivityTimeout, oauthvalidation.MinimumInactivityTimeoutSeconds)
-			validators = append(validators, timeoutValidator)
-			enablement.AddPostStartHookOrDie("openshift.io-TokenTimeoutUpdater", func(context genericapiserver.PostStartHookContext) error {
-				go timeoutValidator.Run(context.StopCh)
-				return nil
-			})
+		if inactivityTimeout := enablement.OpenshiftConfig().OAuthConfig.TokenConfig.AccessTokenInactivityTimeout; inactivityTimeout != nil {
+			tokenTimeout = int32(inactivityTimeout.Seconds())
 		}
 	}
+
+	timeoutValidator := oauth.NewTimeoutValidator(oauthClient.OauthV1().OAuthAccessTokens(), oauthInformer.Oauth().V1().OAuthClients().Lister(), tokenTimeout, oauthvalidation.MinimumInactivityTimeoutSeconds)
+	// add our oauth token validator
+	validators := []oauth.OAuthTokenValidator{oauth.NewExpirationValidator(), oauth.NewUIDValidator(), timeoutValidator}
+	enablement.AddPostStartHookOrDie("openshift.io-TokenTimeoutUpdater", func(context genericapiserver.PostStartHookContext) error {
+		go timeoutValidator.Run(context.StopCh)
+		return nil
+	})
+
 	enablement.AddPostStartHookOrDie("openshift.io-StartOAuthInformers", func(context genericapiserver.PostStartHookContext) error {
 		go oauthInformer.Start(context.StopCh)
 		go userInformer.Start(context.StopCh)
