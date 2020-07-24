@@ -447,6 +447,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 type gcePDCSIDriver struct {
 	driverInfo    testsuites.DriverInfo
 	cleanupHandle framework.CleanupActionHandle
+	diskType      string
 }
 
 var _ testsuites.TestDriver = &gcePDCSIDriver{}
@@ -492,7 +493,14 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				NumRestarts: 10,
 			},
 		},
+		diskType: "pd-standard",
 	}
+}
+
+// InitGceBalancedPDCSIDriver returns gcePDCSIDriver that implements TestDriver interface and which tests balanced PDs.
+func InitGceBalancedPDCSIDriver() testsuites.TestDriver {
+	driver := InitGcePDCSIDriver();
+	driver.diskType: "pd-balanced";
 }
 
 func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
@@ -514,7 +522,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerT
 	provisioner := g.driverInfo.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
-	parameters := map[string]string{"type": "pd-standard"}
+	parameters := map[string]string{"type": g.diskType}
 	if fsType != "" {
 		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
