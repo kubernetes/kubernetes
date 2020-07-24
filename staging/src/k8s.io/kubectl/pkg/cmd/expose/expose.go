@@ -17,6 +17,7 @@ limitations under the License.
 package expose
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -98,6 +99,7 @@ type ExposeServiceOptions struct {
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
 	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
+	Type                      string
 
 	Namespace string
 	Mapper    meta.RESTMapper
@@ -136,6 +138,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example:               exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunExpose(cmd, args))
 		},
 		ValidArgs: validArgs,
@@ -204,6 +207,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
 	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
+	o.Type = cmdutil.GetFlagString(cmd, "type")
 
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
@@ -216,6 +220,18 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	}
 
 	return err
+}
+
+// Validate checks to the ExposeServiceOptions to see if there is sufficient information run the command.
+func (o *ExposeServiceOptions) Validate() error {
+	if len(o.Type) > 0 {
+		// Valid options for type are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+		if o.Type != "ExternalName" && o.Type != "ClusterIP" && o.Type != "NodePort" && o.Type != "LoadBalancer" {
+			return fmt.Errorf(`invalid type: "%s" provided. supported values: "ClusterIP", "ExternalName", "LoadBalancer", "NodePort"`,
+				o.Type)
+		}
+	}
+	return nil
 }
 
 func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
