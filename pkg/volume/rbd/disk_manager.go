@@ -111,7 +111,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 	}
 	if notMnt {
 		klog.V(3).Infof("volume path %s is not a mountpoint, deleting", volPath)
-		return os.Remove(volPath)
+		return os.RemoveAll(volPath)
 	}
 
 	// Unmount the bind-mount inside this pod.
@@ -126,7 +126,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 		return mntErr
 	}
 	if notMnt {
-		if err := os.Remove(volPath); err != nil {
+		if err := os.RemoveAll(volPath); err != nil {
 			klog.V(2).Infof("Error removing mountpoint %s: %v", volPath, err)
 			return err
 		}
