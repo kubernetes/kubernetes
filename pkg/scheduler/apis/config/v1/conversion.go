@@ -22,7 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
-func Convert_v1_LegacyExtender_To_config_Extender(in *v1.LegacyExtender, out *config.Extender, s conversion.Scope) error {
+// ConvertV1LegacyExtenderToConfigExtender converts v1 legacy extender to config extender.
+func ConvertV1LegacyExtenderToConfigExtender(in *v1.LegacyExtender, out *config.Extender, s conversion.Scope) error {
 	out.URLPrefix = in.URLPrefix
 	out.FilterVerb = in.FilterVerb
 	out.PreemptVerb = in.PreemptVerb
@@ -58,7 +59,8 @@ func Convert_v1_LegacyExtender_To_config_Extender(in *v1.LegacyExtender, out *co
 	return nil
 }
 
-func Convert_config_Extender_To_v1_LegacyExtender(in *config.Extender, out *v1.LegacyExtender, s conversion.Scope) error {
+// ConvertConfigExtenderToV1LegacyExtender convert config extender to v1 legacy extender.
+func ConvertConfigExtenderToV1LegacyExtender(in *config.Extender, out *v1.LegacyExtender, s conversion.Scope) error {
 	out.URLPrefix = in.URLPrefix
 	out.FilterVerb = in.FilterVerb
 	out.PreemptVerb = in.PreemptVerb

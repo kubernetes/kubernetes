@@ -148,7 +148,7 @@ func TestV1LegacyExtenderToConfigExtenderConversion(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := Convert_v1_LegacyExtender_To_config_Extender(&tc.in, &tc.out, nil); err != nil {
+			if err := ConvertV1LegacyExtenderToConfigExtender(&tc.in, &tc.out, nil); err != nil {
 				t.Errorf("failed to convert: %+v", err)
 			}
 			if diff := cmp.Diff(tc.want, tc.out); diff != "" {
@@ -280,7 +280,7 @@ func TestConfigExtenderToV1LegacyExtenderConversion(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := Convert_config_Extender_To_v1_LegacyExtender(&tc.in, &tc.out, nil); err != nil {
+			if err := ConvertConfigExtenderToV1LegacyExtender(&tc.in, &tc.out, nil); err != nil {
 				t.Errorf("failed to convert: %+v", err)
 			}
 			if diff := cmp.Diff(tc.want, tc.out); diff != "" {
