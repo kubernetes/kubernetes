@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -355,7 +356,7 @@ func newTestPods(count int) []*v1.Pod {
 				HostNetwork: true,
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				UID:  types.UID(10000 + i),
+				UID:  types.UID(strconv.Itoa(10000 + i)),
 				Name: fmt.Sprintf("pod%d", i),
 			},
 		}
