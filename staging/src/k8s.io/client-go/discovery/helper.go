@@ -114,7 +114,7 @@ func (fn ResourcePredicateFunc) Match(groupVersion string, r *metav1.APIResource
 	return fn(groupVersion, r)
 }
 
-// SupportsAllVerbs is a predicate matching a resource iff all given verbs are supported.
+// SupportsAllVerbs is a predicate matching a resource if all given verbs are supported.
 type SupportsAllVerbs struct {
 	Verbs []string
 }
