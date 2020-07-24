@@ -55,4 +55,3 @@ reviewers:
 - wojtek-t
 labels:
 - sig/api-machinery
-- triage/needs-information
