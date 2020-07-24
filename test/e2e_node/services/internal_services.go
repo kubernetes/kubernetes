@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // e2eService manages e2e services in current process.

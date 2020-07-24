@@ -143,19 +143,24 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error
 }
 
 func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
+	options := asDeleteOptions(cascade, gracePeriod)
+	if serverDryRun {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
+}
+
+func asDeleteOptions(cascade bool, gracePeriod int) metav1.DeleteOptions {
 	options := metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
 		options = *metav1.NewDeleteOptions(int64(gracePeriod))
-	}
-	if serverDryRun {
-		options.DryRun = []string{metav1.DryRunAll}
 	}
 	policy := metav1.DeletePropagationForeground
 	if !cascade {
 		policy = metav1.DeletePropagationOrphan
 	}
 	options.PropagationPolicy = &policy
-	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
+	return options
 }
 
 type pruneResource struct {

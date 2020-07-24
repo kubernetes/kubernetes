@@ -75,6 +75,17 @@ type Cluster struct {
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
 	// +optional
 	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
+	// ProxyURL is the URL to the proxy to be used for all requests made by this
+	// client. URLs with "http", "https", and "socks5" schemes are supported.  If
+	// this configuration is not provided or the empty string, the client
+	// attempts to construct a proxy configuration from http_proxy and
+	// https_proxy environment variables. If these environment variables are not
+	// set, the client does not attempt to proxy requests.
+	//
+	// socks5 proxying does not currently support spdy streaming endpoints (exec,
+	// attach, port forward).
+	// +optional
+	ProxyURL string `json:"proxy-url,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
@@ -181,7 +192,7 @@ type AuthProviderConfig struct {
 // ExecConfig specifies a command to provide client credentials. The command is exec'd
 // and outputs structured stdout holding credentials.
 //
-// See the client.authentiction.k8s.io API group for specifications of the exact input
+// See the client.authentication.k8s.io API group for specifications of the exact input
 // and output format
 type ExecConfig struct {
 	// Command to execute.
@@ -198,6 +209,11 @@ type ExecConfig struct {
 	// Preferred input version of the ExecInfo. The returned ExecCredentials MUST use
 	// the same encoding version as the input.
 	APIVersion string `json:"apiVersion,omitempty"`
+
+	// This text is shown to the user when the executable doesn't seem to be
+	// present. For example, `brew install foo-cli` might be a good InstallHint for
+	// foo-cli on Mac OS systems.
+	InstallHint string `json:"installHint,omitempty"`
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based

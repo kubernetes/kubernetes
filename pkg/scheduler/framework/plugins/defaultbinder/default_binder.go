@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -37,7 +37,7 @@ type DefaultBinder struct {
 var _ framework.BindPlugin = &DefaultBinder{}
 
 // New creates a DefaultBinder.
-func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	return &DefaultBinder{handle: handle}, nil
 }
 
@@ -53,7 +53,7 @@ func (b DefaultBinder) Bind(ctx context.Context, state *framework.CycleState, p 
 		ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID},
 		Target:     v1.ObjectReference{Kind: "Node", Name: nodeName},
 	}
-	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(context.TODO(), binding, metav1.CreateOptions{})
+	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}

@@ -40,6 +40,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -140,7 +141,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 
 				err := checkGCEPD(volume, "pd-standard")
 				framework.ExpectNoError(err, "checkGCEPD")
-				zones, err := framework.GetClusterZones(c)
+				zones, err := e2enode.GetClusterZones(c)
 				framework.ExpectNoError(err, "GetClusterZones")
 				err = verifyZonesInPV(volume, zones, false /* match */)
 				framework.ExpectNoError(err, "verifyZonesInPV")
@@ -209,7 +210,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}),
 			"Error deleting claim %s.", pvc.Name)
 		if pvc.Spec.VolumeName != "" {
-			err = framework.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
+			err = e2epv.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
 			if err != nil {
 				framework.Logf("WARNING: PV %s is not yet deleted, and subsequent tests may be affected.", pvc.Spec.VolumeName)
 			}
@@ -547,7 +548,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 }
 
 func getTwoRandomZones(c clientset.Interface) []string {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	gomega.Expect(zones.Len()).To(gomega.BeNumerically(">=", 2),
 		"The test should only be run in multizone clusters.")

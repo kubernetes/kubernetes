@@ -50,7 +50,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DeletionTimeout sets maximum time from the moment a pod is added to DisruptedPods in PDB.Status
@@ -689,7 +689,6 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 }
 
 func countHealthyPods(pods []*v1.Pod, disruptedPods map[string]metav1.Time, currentTime time.Time) (currentHealthy int32) {
-Pod:
 	for _, pod := range pods {
 		// Pod is being deleted.
 		if pod.DeletionTimestamp != nil {
@@ -701,7 +700,6 @@ Pod:
 		}
 		if podutil.IsPodReady(pod) {
 			currentHealthy++
-			continue Pod
 		}
 	}
 

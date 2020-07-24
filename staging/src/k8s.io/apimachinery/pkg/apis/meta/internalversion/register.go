@@ -76,6 +76,9 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 		&metav1.UpdateOptions{})
 
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	if err := metav1beta1.RegisterConversions(scheme); err != nil {
+		return err
+	}
 	return nil
 }
 

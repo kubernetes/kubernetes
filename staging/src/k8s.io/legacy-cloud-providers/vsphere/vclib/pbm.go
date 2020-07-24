@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/vmware/govmomi/pbm"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	pbmtypes "github.com/vmware/govmomi/pbm/types"
 	"github.com/vmware/govmomi/vim25"

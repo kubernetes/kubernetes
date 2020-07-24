@@ -123,7 +123,7 @@ func (g *gauge) Sub(val float64) {
 
 func (g *gauge) Write(out *dto.Metric) error {
 	val := math.Float64frombits(atomic.LoadUint64(&g.valBits))
-	return populateMetric(GaugeValue, val, g.labelPairs, out)
+	return populateMetric(GaugeValue, val, g.labelPairs, nil, out)
 }
 
 // GaugeVec is a Collector that bundles a set of Gauges that all share the same
@@ -273,9 +273,12 @@ type GaugeFunc interface {
 // NewGaugeFunc creates a new GaugeFunc based on the provided GaugeOpts. The
 // value reported is determined by calling the given function from within the
 // Write method. Take into account that metric collection may happen
-// concurrently. If that results in concurrent calls to Write, like in the case
-// where a GaugeFunc is directly registered with Prometheus, the provided
-// function must be concurrency-safe.
+// concurrently. Therefore, it must be safe to call the provided function
+// concurrently.
+//
+// NewGaugeFunc is a good way to create an “info” style metric with a constant
+// value of 1. Example:
+// https://github.com/prometheus/common/blob/8558a5b7db3c84fa38b4766966059a7bd5bfa2ee/version/info.go#L36-L56
 func NewGaugeFunc(opts GaugeOpts, function func() float64) GaugeFunc {
 	return newValueFunc(NewDesc(
 		BuildFQName(opts.Namespace, opts.Subsystem, opts.Name),

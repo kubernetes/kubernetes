@@ -10,8 +10,6 @@ go_library(
     srcs = ["config.go"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/authorizer",
     deps = [
-        "//openshift-kube-apiserver/authorization/browsersafe:go_default_library",
-        "//openshift-kube-apiserver/authorization/scopeauthorizer:go_default_library",
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
@@ -19,7 +17,6 @@ go_library(
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:go_default_library",

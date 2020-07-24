@@ -49,7 +49,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers"
@@ -560,6 +560,11 @@ func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
 	return vs, true
 }
 
+// InstancesV2 returns an implementation of InstancesV2 for vSphere.
+func (vs *VSphere) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 func getLocalIP() ([]v1.NodeAddress, error) {
 	// hashtable with VMware-allocated OUIs for MAC filtering
 	// List of official OUIs: http://standards-oui.ieee.org/oui.txt
@@ -653,17 +658,25 @@ func (vs *VSphere) getVMFromNodeName(ctx context.Context, nodeName k8stypes.Node
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
-	// Get local IP addresses if node is local node
 	if vs.hostName == convertToString(nodeName) {
-		addrs, err := getLocalIP()
-		if err != nil {
-			return nil, err
-		}
-		// add the hostname address
-		nodehelpers.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
-		return addrs, nil
+		return vs.getNodeAddressesFromLocalIP()
 	}
+	return vs.getNodeAddressesFromVM(ctx, nodeName)
+}
 
+// getNodeAddressesFromLocalIP get local IP addresses if node is local node.
+func (vs *VSphere) getNodeAddressesFromLocalIP() ([]v1.NodeAddress, error) {
+	addrs, err := getLocalIP()
+	if err != nil {
+		return nil, err
+	}
+	// add the hostname address
+	nodehelpers.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
+	return addrs, nil
+}
+
+// getNodeAddressesFromVM get vm IP addresses if node is vm.
+func (vs *VSphere) getNodeAddressesFromVM(ctx context.Context, nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
 	if vs.cfg == nil {
 		return nil, cloudprovider.InstanceNotFound
 	}
@@ -782,6 +795,41 @@ func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID 
 		return false, err
 	}
 	return !isActive, nil
+}
+
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (vs *VSphere) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	if providerID == "" {
+		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
+	}
+
+	// TODO dropped get nodeName by GetNodeNameFromProviderID here. If it not behave as expected,
+	// get nodeName by vm.GetNodeNameFromProviderID.
+	return vs.instanceMetadataByNodeName(ctx, convertToK8sType(providerID))
+}
+
+func (vs *VSphere) instanceMetadataByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (*cloudprovider.InstanceMetadata, error) {
+	if vs.hostName == convertToString(nodeName) {
+		addresses, err := vs.getNodeAddressesFromLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		return &cloudprovider.InstanceMetadata{
+			ProviderID:    vs.vmUUID,
+			Type:          "",
+			NodeAddresses: addresses,
+		}, nil
+	}
+
+	addresses, err := vs.getNodeAddressesFromVM(ctx, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    vs.vmUUID,
+		Type:          "",
+		NodeAddresses: addresses,
+	}, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
@@ -1085,11 +1133,11 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 				dcNodes[VC_DC] = append(dcNodes[VC_DC], nodeName)
 			}
 
-			for _, nodes := range dcNodes {
+			for _, nodeNames := range dcNodes {
 				localAttachedMap := make(map[string]map[string]bool)
 				localAttachedMaps = append(localAttachedMaps, localAttachedMap)
 				// Start go routines per VC-DC to check disks are attached
-				go func() {
+				go func(nodes []k8stypes.NodeName) {
 					nodesToRetryLocal, err := vs.checkDiskAttached(ctx, nodes, nodeVolumes, localAttachedMap, retry)
 					if err != nil {
 						if !vclib.IsManagedObjectNotFoundError(err) {
@@ -1103,7 +1151,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 					nodesToRetry = append(nodesToRetry, nodesToRetryLocal...)
 					nodesToRetryMutex.Unlock()
 					wg.Done()
-				}()
+				}(nodeNames)
 				wg.Add(1)
 			}
 			wg.Wait()

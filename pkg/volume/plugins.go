@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 
@@ -114,6 +114,9 @@ type NodeResizeOptions struct {
 	// is attachable - this would be global mount path otherwise
 	// it would be location where volume was mounted for the pod
 	DeviceMountPath string
+
+	// DeviceStagingPath stores location where the volume is staged
+	DeviceStagePath string
 
 	NewSize resource.Quantity
 	OldSize resource.Quantity
@@ -706,7 +709,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
+		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
 	}
 	if len(matches) > 1 {
 		matchedPluginNames := []string{}

@@ -24,6 +24,9 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.4
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,StorageClass
 
 // StorageClass describes the parameters for a class of storage for
 // which PersistentVolumes can be dynamically provisioned.
@@ -75,6 +78,9 @@ type StorageClass struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.4
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,StorageClassList
 
 // StorageClassList is a collection of storage classes.
 type StorageClassList struct {
@@ -106,6 +112,9 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachment
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
@@ -131,6 +140,9 @@ type VolumeAttachment struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttachmentList
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
@@ -220,6 +232,9 @@ type VolumeError struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIDriver
 
 // CSIDriver captures information about a Container Storage Interface (CSI)
 // volume driver deployed on the cluster.
@@ -247,6 +262,9 @@ type CSIDriver struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIDriverList
 
 // CSIDriverList is a collection of CSIDriver objects.
 type CSIDriverList struct {
@@ -317,7 +335,61 @@ type CSIDriverSpec struct {
 	// more modes may be added in the future.
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
+
+	// If set to true, storageCapacity indicates that the CSI
+	// volume driver wants pod scheduling to consider the storage
+	// capacity that the driver deployment will report by creating
+	// CSIStorageCapacity objects with capacity information.
+	//
+	//
+	// The check can be enabled immediately when deploying a driver.
+	// In that case, provisioning new volumes with late binding
+	// will pause until the driver deployment has published
+	// some suitable CSIStorageCapacity object.
+	//
+	// Alternatively, the driver can be deployed with the field
+	// unset or false and it can be flipped later when storage
+	// capacity information has been published.
+	//
+	// This is an alpha field and only available when the CSIStorageCapacity
+	// feature is enabled. The default is false.
+	//
+	// +optional
+	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
+
+	// Defines if the underlying volume supports changing ownership and
+	// permission of the volume before being mounted.
+	// Refer to the specific FSGroupPolicy values for additional details.
+	// This field is alpha-level, and is only honored by servers
+	// that enable the CSIVolumeFSGroupPolicy feature gate.
+	// +optional
+	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 }
+
+// FSGroupPolicy specifies if a CSI Driver supports modifying
+// volume ownership and permissions of the volume to be mounted.
+// More modes may be added in the future.
+type FSGroupPolicy string
+
+const (
+	// ReadWriteOnceWithFSTypeFSGroupPolicy indicates that each volume will be examined
+	// to determine if the volume ownership and permissions
+	// should be modified. If a fstype is defined and the volume's access mode
+	// contains ReadWriteOnce, then the defined fsGroup will be applied.
+	// This is the default behavior if no other FSGroupPolicy is defined.
+	ReadWriteOnceWithFSTypeFSGroupPolicy FSGroupPolicy = "ReadWriteOnceWithFSType"
+
+	// FileFSGroupPolicy indicates that CSI driver supports volume ownership
+	// and permission change via fsGroup, and Kubernetes may use fsGroup
+	// to change permissions and ownership of the volume to match user requested fsGroup in
+	// the pod's SecurityPolicy regardless of fstype or access mode.
+	FileFSGroupPolicy FSGroupPolicy = "File"
+
+	// None indicates that volumes will be mounted without performing
+	// any ownership or permission modifications, as the CSIDriver does not support
+	// these operations.
+	NoneFSGroupPolicy FSGroupPolicy = "None"
+)
 
 // VolumeLifecycleMode is an enumeration of possible usage modes for a volume
 // provided by a CSI driver. More modes may be added in the future.
@@ -347,6 +419,10 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.17
+// +k8s:prerelease-lifecycle-gen:removed=1.22
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSINode
 
 // DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
 // See the release notes for more information.
@@ -425,6 +501,10 @@ type VolumeNodeResources struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.17
+// +k8s:prerelease-lifecycle-gen:removed=1.22
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSINode
 
 // CSINodeList is a collection of CSINode objects.
 type CSINodeList struct {

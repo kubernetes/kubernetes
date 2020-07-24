@@ -144,7 +144,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		var err error
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		_, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
@@ -232,7 +232,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			},
 		})
 		ginkgo.By("Wait the pod becomes running")
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
@@ -314,14 +314,14 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		for i := 0; i < 10; i++ {
 			testTaint := addRandomTaintToNode(cs, nodeName)
 			tolerations = append(tolerations, v1.Toleration{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect})
-			defer framework.RemoveTaintOffNode(cs, nodeName, *testTaint)
+			defer e2enode.RemoveTaintOffNode(cs, nodeName, *testTaint)
 		}
 		ginkgo.By("Adding 10 intolerable taints to all other nodes")
 		for i := 1; i < len(nodeList.Items); i++ {
 			node := nodeList.Items[i]
 			for i := 0; i < 10; i++ {
 				testTaint := addRandomTaintToNode(cs, node.Name)
-				defer framework.RemoveTaintOffNode(cs, node.Name, *testTaint)
+				defer e2enode.RemoveTaintOffNode(cs, node.Name, *testTaint)
 			}
 		}
 
@@ -331,7 +331,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			Name:        tolerationPodName,
 			Tolerations: tolerations,
 		})
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
@@ -594,7 +594,7 @@ func addRandomTaintToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 		Value:  fmt.Sprintf("testing-taint-value-%s", string(uuid.NewUUID())),
 		Effect: v1.TaintEffectPreferNoSchedule,
 	}
-	framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+	e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 	return &testTaint
 }

@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 const cassandraManifestPath = "test/e2e/testing-manifests/statefulset/cassandra"
@@ -60,7 +60,11 @@ func (CassandraUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func cassandraKubectlCreate(ns, file string) {
-	input := string(testfiles.ReadOrDie(filepath.Join(cassandraManifestPath, file)))
+	data, err := e2etestfiles.Read(filepath.Join(cassandraManifestPath, file))
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	input := string(data)
 	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
@@ -78,7 +82,7 @@ func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
 	cassandraKubectlCreate(ns, "pdb.yaml")
 
 	ginkgo.By("Creating a Cassandra StatefulSet")
-	e2esset.CreateStatefulSet(f.ClientSet, cassandraManifestPath, ns)
+	e2estatefulset.CreateStatefulSet(f.ClientSet, cassandraManifestPath, ns)
 
 	ginkgo.By("Creating a cassandra-test-server deployment")
 	cassandraKubectlCreate(ns, "tester.yaml")

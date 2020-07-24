@@ -34,7 +34,6 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )

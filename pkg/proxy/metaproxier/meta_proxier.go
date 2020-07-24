@@ -19,10 +19,11 @@ package metaproxier
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 
 	utilnet "k8s.io/utils/net"
 
@@ -62,33 +63,41 @@ func (proxier *metaProxier) SyncLoop() {
 
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
-		proxier.ipv4Proxier.OnServiceAdd(service)
+	if utilproxy.ShouldSkipService(service) {
 		return
 	}
-	proxier.ipv6Proxier.OnServiceAdd(service)
+	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+		proxier.ipv6Proxier.OnServiceAdd(service)
+	} else {
+		proxier.ipv4Proxier.OnServiceAdd(service)
+	}
 }
 
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
 func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
-	// IPFamily is immutable, hence we only need to check on the new service
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
-		proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
+	if utilproxy.ShouldSkipService(service) {
 		return
 	}
-
-	proxier.ipv6Proxier.OnServiceUpdate(oldService, service)
+	// IPFamily is immutable, hence we only need to check on the new service
+	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+		proxier.ipv6Proxier.OnServiceUpdate(oldService, service)
+	} else {
+		proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
+	}
 }
 
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
 func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
-	if *(service.Spec.IPFamily) == v1.IPv4Protocol {
-		proxier.ipv4Proxier.OnServiceDelete(service)
+	if utilproxy.ShouldSkipService(service) {
 		return
 	}
-	proxier.ipv6Proxier.OnServiceDelete(service)
+	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+		proxier.ipv6Proxier.OnServiceDelete(service)
+	} else {
+		proxier.ipv4Proxier.OnServiceDelete(service)
+	}
 }
 
 // OnServiceSynced is called once all the initial event handlers were

@@ -54,7 +54,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/slice:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/storage:go_default_library",
         "//vendor/github.com/fatih/camelcase:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -80,6 +80,7 @@ go_test(
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
+        "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",

@@ -1,6 +1,7 @@
 package nl
 
 import (
+	"encoding/binary"
 	"unsafe"
 )
 
@@ -65,6 +66,15 @@ const (
 )
 
 const (
+	TCA_STATS_UNSPEC = iota
+	TCA_STATS_BASIC
+	TCA_STATS_RATE_EST
+	TCA_STATS_QUEUE
+	TCA_STATS_APP
+	TCA_STATS_MAX = TCA_STATS_APP
+)
+
+const (
 	SizeofTcMsg          = 0x14
 	SizeofTcActionMsg    = 0x04
 	SizeofTcPrioMap      = 0x14
@@ -79,7 +89,10 @@ const (
 	SizeofTcU32Key       = 0x10
 	SizeofTcU32Sel       = 0x10 // without keys
 	SizeofTcGen          = 0x14
+	SizeofTcConnmark     = SizeofTcGen + 0x04
 	SizeofTcMirred       = SizeofTcGen + 0x08
+	SizeofTcTunnelKey    = SizeofTcGen + 0x04
+	SizeofTcSkbEdit      = SizeofTcGen
 	SizeofTcPolice       = 2*SizeofTcRateSpec + 0x20
 )
 
@@ -412,6 +425,57 @@ func (x *TcHtbGlob) Serialize() []byte {
 	return (*(*[SizeofTcHtbGlob]byte)(unsafe.Pointer(x)))[:]
 }
 
+// HFSC
+
+type Curve struct {
+	m1 uint32
+	d  uint32
+	m2 uint32
+}
+
+type HfscCopt struct {
+	Rsc Curve
+	Fsc Curve
+	Usc Curve
+}
+
+func (c *Curve) Attrs() (uint32, uint32, uint32) {
+	return c.m1, c.d, c.m2
+}
+
+func (c *Curve) Set(m1 uint32, d uint32, m2 uint32) {
+	c.m1 = m1
+	c.d = d
+	c.m2 = m2
+}
+
+func DeserializeHfscCurve(b []byte) *Curve {
+	return &Curve{
+		m1: binary.LittleEndian.Uint32(b[0:4]),
+		d:  binary.LittleEndian.Uint32(b[4:8]),
+		m2: binary.LittleEndian.Uint32(b[8:12]),
+	}
+}
+
+func SerializeHfscCurve(c *Curve) (b []byte) {
+	t := make([]byte, binary.MaxVarintLen32)
+	binary.LittleEndian.PutUint32(t, c.m1)
+	b = append(b, t[:4]...)
+	binary.LittleEndian.PutUint32(t, c.d)
+	b = append(b, t[:4]...)
+	binary.LittleEndian.PutUint32(t, c.m2)
+	b = append(b, t[:4]...)
+	return b
+}
+
+type TcHfscOpt struct {
+	Defcls uint16
+}
+
+func (x *TcHfscOpt) Serialize() []byte {
+	return (*(*[2]byte)(unsafe.Pointer(x)))[:]
+}
+
 const (
 	TCA_U32_UNSPEC = iota
 	TCA_U32_CLASSID
@@ -586,10 +650,46 @@ const (
 	TCA_BPF_FD
 	TCA_BPF_NAME
 	TCA_BPF_FLAGS
-	TCA_BPF_MAX = TCA_BPF_FLAGS
+	TCA_BPF_FLAGS_GEN
+	TCA_BPF_TAG
+	TCA_BPF_ID
+	TCA_BPF_MAX = TCA_BPF_ID
 )
 
 type TcBpf TcGen
+
+const (
+	TCA_ACT_CONNMARK = 14
+)
+
+const (
+	TCA_CONNMARK_UNSPEC = iota
+	TCA_CONNMARK_PARMS
+	TCA_CONNMARK_TM
+	TCA_CONNMARK_MAX = TCA_CONNMARK_TM
+)
+
+// struct tc_connmark {
+//   tc_gen;
+//   __u16 zone;
+// };
+
+type TcConnmark struct {
+	TcGen
+	Zone uint16
+}
+
+func (msg *TcConnmark) Len() int {
+	return SizeofTcConnmark
+}
+
+func DeserializeTcConnmark(b []byte) *TcConnmark {
+	return (*TcConnmark)(unsafe.Pointer(&b[0:SizeofTcConnmark][0]))
+}
+
+func (x *TcConnmark) Serialize() []byte {
+	return (*(*[SizeofTcConnmark]byte)(unsafe.Pointer(x)))[:]
+}
 
 const (
 	TCA_ACT_MIRRED = 8
@@ -624,6 +724,63 @@ func DeserializeTcMirred(b []byte) *TcMirred {
 
 func (x *TcMirred) Serialize() []byte {
 	return (*(*[SizeofTcMirred]byte)(unsafe.Pointer(x)))[:]
+}
+
+const (
+	TCA_TUNNEL_KEY_UNSPEC = iota
+	TCA_TUNNEL_KEY_TM
+	TCA_TUNNEL_KEY_PARMS
+	TCA_TUNNEL_KEY_ENC_IPV4_SRC
+	TCA_TUNNEL_KEY_ENC_IPV4_DST
+	TCA_TUNNEL_KEY_ENC_IPV6_SRC
+	TCA_TUNNEL_KEY_ENC_IPV6_DST
+	TCA_TUNNEL_KEY_ENC_KEY_ID
+	TCA_TUNNEL_KEY_MAX = TCA_TUNNEL_KEY_ENC_KEY_ID
+)
+
+type TcTunnelKey struct {
+	TcGen
+	Action int32
+}
+
+func (x *TcTunnelKey) Len() int {
+	return SizeofTcTunnelKey
+}
+
+func DeserializeTunnelKey(b []byte) *TcTunnelKey {
+	return (*TcTunnelKey)(unsafe.Pointer(&b[0:SizeofTcTunnelKey][0]))
+}
+
+func (x *TcTunnelKey) Serialize() []byte {
+	return (*(*[SizeofTcTunnelKey]byte)(unsafe.Pointer(x)))[:]
+}
+
+const (
+	TCA_SKBEDIT_UNSPEC = iota
+	TCA_SKBEDIT_TM
+	TCA_SKBEDIT_PARMS
+	TCA_SKBEDIT_PRIORITY
+	TCA_SKBEDIT_QUEUE_MAPPING
+	TCA_SKBEDIT_MARK
+	TCA_SKBEDIT_PAD
+	TCA_SKBEDIT_PTYPE
+	TCA_SKBEDIT_MAX = TCA_SKBEDIT_MARK
+)
+
+type TcSkbEdit struct {
+	TcGen
+}
+
+func (x *TcSkbEdit) Len() int {
+	return SizeofTcSkbEdit
+}
+
+func DeserializeSkbEdit(b []byte) *TcSkbEdit {
+	return (*TcSkbEdit)(unsafe.Pointer(&b[0:SizeofTcSkbEdit][0]))
+}
+
+func (x *TcSkbEdit) Serialize() []byte {
+	return (*(*[SizeofTcSkbEdit]byte)(unsafe.Pointer(x)))[:]
 }
 
 // struct tc_police {
@@ -707,4 +864,11 @@ const (
 	TCA_FQ_CODEL_CE_THRESHOLD
 	TCA_FQ_CODEL_DROP_BATCH_SIZE
 	TCA_FQ_CODEL_MEMORY_LIMIT
+)
+
+const (
+	TCA_HFSC_UNSPEC = iota
+	TCA_HFSC_RSC
+	TCA_HFSC_FSC
+	TCA_HFSC_USC
 )

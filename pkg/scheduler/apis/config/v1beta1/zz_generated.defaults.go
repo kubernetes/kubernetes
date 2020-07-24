@@ -29,12 +29,48 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v1beta1.InterPodAffinityArgs{}, func(obj interface{}) { SetObjectDefaults_InterPodAffinityArgs(obj.(*v1beta1.InterPodAffinityArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.KubeSchedulerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1beta1.KubeSchedulerConfiguration))
 	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.NodeResourcesLeastAllocatedArgs{}, func(obj interface{}) {
+		SetObjectDefaults_NodeResourcesLeastAllocatedArgs(obj.(*v1beta1.NodeResourcesLeastAllocatedArgs))
+	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.NodeResourcesMostAllocatedArgs{}, func(obj interface{}) {
+		SetObjectDefaults_NodeResourcesMostAllocatedArgs(obj.(*v1beta1.NodeResourcesMostAllocatedArgs))
+	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*v1beta1.PodTopologySpreadArgs)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.RequestedToCapacityRatioArgs{}, func(obj interface{}) {
+		SetObjectDefaults_RequestedToCapacityRatioArgs(obj.(*v1beta1.RequestedToCapacityRatioArgs))
+	})
+	scheme.AddTypeDefaultingFunc(&v1beta1.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*v1beta1.VolumeBindingArgs)) })
 	return nil
+}
+
+func SetObjectDefaults_InterPodAffinityArgs(in *v1beta1.InterPodAffinityArgs) {
+	SetDefaults_InterPodAffinityArgs(in)
 }
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration) {
 	SetDefaults_KubeSchedulerConfiguration(in)
+}
+
+func SetObjectDefaults_NodeResourcesLeastAllocatedArgs(in *v1beta1.NodeResourcesLeastAllocatedArgs) {
+	SetDefaults_NodeResourcesLeastAllocatedArgs(in)
+}
+
+func SetObjectDefaults_NodeResourcesMostAllocatedArgs(in *v1beta1.NodeResourcesMostAllocatedArgs) {
+	SetDefaults_NodeResourcesMostAllocatedArgs(in)
+}
+
+func SetObjectDefaults_PodTopologySpreadArgs(in *v1beta1.PodTopologySpreadArgs) {
+	SetDefaults_PodTopologySpreadArgs(in)
+}
+
+func SetObjectDefaults_RequestedToCapacityRatioArgs(in *v1beta1.RequestedToCapacityRatioArgs) {
+	SetDefaults_RequestedToCapacityRatioArgs(in)
+}
+
+func SetObjectDefaults_VolumeBindingArgs(in *v1beta1.VolumeBindingArgs) {
+	SetDefaults_VolumeBindingArgs(in)
 }

@@ -17,10 +17,14 @@ limitations under the License.
 package v1beta1
 
 import (
+	"bytes"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1 "k8s.io/kube-scheduler/config/v1"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -41,7 +45,7 @@ type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// LeaderElection defines the configuration of leader election client.
-	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
+	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:"leaderElection"`
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
@@ -57,10 +61,7 @@ type KubeSchedulerConfiguration struct {
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
 	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
 
-	// DisablePreemption disables the pod preemption feature.
-	DisablePreemption *bool `json:"disablePreemption,omitempty"`
-
-	// PercentageOfNodeToScore is the percentage of all nodes that once found feasible
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
 	// for running a pod, the scheduler stops its search for more feasible nodes in
 	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
 	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
@@ -70,20 +71,15 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
-	// Duration to wait for a binding operation to complete before timing out
-	// Value must be non-negative integer. The value zero indicates no waiting.
-	// If this value is nil, the default value will be used.
-	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds"`
-
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
-	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds"`
+	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds,omitempty"`
 
 	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
 	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
 	// the default value (10s) will be used.
-	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds"`
+	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds,omitempty"`
 
 	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
 	// choose to be scheduled under a particular profile by setting its associated
@@ -91,12 +87,40 @@ type KubeSchedulerConfiguration struct {
 	// with the "default-scheduler" profile, if present here.
 	// +listType=map
 	// +listMapKey=schedulerName
-	Profiles []KubeSchedulerProfile `json:"profiles"`
+	Profiles []KubeSchedulerProfile `json:"profiles,omitempty"`
 
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	// +listType=set
-	Extenders []v1.Extender `json:"extenders"`
+	Extenders []Extender `json:"extenders,omitempty"`
+}
+
+// DecodeNestedObjects decodes plugin args for known types.
+func (c *KubeSchedulerConfiguration) DecodeNestedObjects(d runtime.Decoder) error {
+	for i := range c.Profiles {
+		prof := &c.Profiles[i]
+		for j := range prof.PluginConfig {
+			err := prof.PluginConfig[j].decodeNestedObjects(d)
+			if err != nil {
+				return fmt.Errorf("decoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+			}
+		}
+	}
+	return nil
+}
+
+// EncodeNestedObjects encodes plugin args.
+func (c *KubeSchedulerConfiguration) EncodeNestedObjects(e runtime.Encoder) error {
+	for i := range c.Profiles {
+		prof := &c.Profiles[i]
+		for j := range prof.PluginConfig {
+			err := prof.PluginConfig[j].encodeNestedObjects(e)
+			if err != nil {
+				return fmt.Errorf("encoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+			}
+		}
+	}
+	return nil
 }
 
 // KubeSchedulerProfile is a scheduling profile.
@@ -124,12 +148,6 @@ type KubeSchedulerProfile struct {
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
 }
 
-// KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
-// to include scheduler specific configuration.
-type KubeSchedulerLeaderElectionConfiguration struct {
-	componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
-}
-
 // Plugins include multiple extension points. When specified, the list of plugins for
 // a particular extension point are the only ones enabled. If an extension point is
 // omitted from the config, then the default set of plugins is used for that extension point.
@@ -145,13 +163,17 @@ type Plugins struct {
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
 	Filter *PluginSet `json:"filter,omitempty"`
 
+	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
+	PostFilter *PluginSet `json:"postFilter,omitempty"`
+
 	// PreScore is a list of plugins that are invoked before scoring.
 	PreScore *PluginSet `json:"preScore,omitempty"`
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet `json:"score,omitempty"`
 
-	// Reserve is a list of plugins invoked when reserving a node to run the pod.
+	// Reserve is a list of plugins invoked when reserving/unreserving resources
+	// after a node is assigned to run the pod.
 	Reserve *PluginSet `json:"reserve,omitempty"`
 
 	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
@@ -166,9 +188,6 @@ type Plugins struct {
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
 	PostBind *PluginSet `json:"postBind,omitempty"`
-
-	// Unreserve is a list of plugins invoked when a pod that was previously reserved is rejected in a later phase.
-	Unreserve *PluginSet `json:"unreserve,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -200,5 +219,88 @@ type PluginConfig struct {
 	// Name defines the name of plugin being configured
 	Name string `json:"name"`
 	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
-	Args runtime.Unknown `json:"args,omitempty"`
+	Args runtime.RawExtension `json:"args,omitempty"`
+}
+
+func (c *PluginConfig) decodeNestedObjects(d runtime.Decoder) error {
+	gvk := SchemeGroupVersion.WithKind(c.Name + "Args")
+	// dry-run to detect and skip out-of-tree plugin args.
+	if _, _, err := d.Decode(nil, &gvk, nil); runtime.IsNotRegisteredError(err) {
+		return nil
+	}
+
+	obj, parsedGvk, err := d.Decode(c.Args.Raw, &gvk, nil)
+	if err != nil {
+		return fmt.Errorf("decoding args for plugin %s: %w", c.Name, err)
+	}
+	if parsedGvk.GroupKind() != gvk.GroupKind() {
+		return fmt.Errorf("args for plugin %s were not of type %s, got %s", c.Name, gvk.GroupKind(), parsedGvk.GroupKind())
+	}
+	c.Args.Object = obj
+	return nil
+}
+
+func (c *PluginConfig) encodeNestedObjects(e runtime.Encoder) error {
+	if c.Args.Object == nil {
+		return nil
+	}
+	var buf bytes.Buffer
+	err := e.Encode(c.Args.Object, &buf)
+	if err != nil {
+		return err
+	}
+	// The <e> encoder might be a YAML encoder, but the parent encoder expects
+	// JSON output, so we convert YAML back to JSON.
+	// This is a no-op if <e> produces JSON.
+	json, err := yaml.YAMLToJSON(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	c.Args.Raw = json
+	return nil
+}
+
+// Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// it is assumed that the extender chose not to provide that extension.
+type Extender struct {
+	// URLPrefix at which the extender is available
+	URLPrefix string `json:"urlPrefix"`
+	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
+	FilterVerb string `json:"filterVerb,omitempty"`
+	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	PreemptVerb string `json:"preemptVerb,omitempty"`
+	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
+	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
+	// The numeric multiplier for the node scores that the prioritize call generates.
+	// The weight should be a positive integer
+	Weight int64 `json:"weight,omitempty"`
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
+	// can implement this function.
+	BindVerb string `json:"bindVerb,omitempty"`
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool `json:"enableHTTPS,omitempty"`
+	// TLSConfig specifies the transport layer security config
+	TLSConfig *v1.ExtenderTLSConfig `json:"tlsConfig,omitempty"`
+	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
+	// timeout is ignored, k8s/other extenders priorities are used to select the node.
+	HTTPTimeout metav1.Duration `json:"httpTimeout,omitempty"`
+	// NodeCacheCapable specifies that the extender is capable of caching node information,
+	// so the scheduler should only send minimal information about the eligible nodes
+	// assuming that the extender already cached full details of all nodes in the cluster
+	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	// +listType=atomic
+	ManagedResources []v1.ExtenderManagedResource `json:"managedResources,omitempty"`
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool `json:"ignorable,omitempty"`
 }

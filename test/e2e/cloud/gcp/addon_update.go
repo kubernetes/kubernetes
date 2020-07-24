@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -344,7 +345,7 @@ var _ = SIGDescribe("Addon update", func() {
 })
 
 func waitForServiceInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
-	framework.ExpectNoError(framework.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+	framework.ExpectNoError(e2enetwork.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {

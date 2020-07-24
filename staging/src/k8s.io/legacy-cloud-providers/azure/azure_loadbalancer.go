@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
@@ -102,6 +102,8 @@ const (
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
 	clusterNameKey = "kubernetes-cluster-name"
+
+	defaultLoadBalancerSourceRanges = "0.0.0.0/0"
 )
 
 // GetLoadBalancer returns whether the specified load balancer and its components exist, and
@@ -265,26 +267,24 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	}
 
 	// check if the service already has a load balancer
-	if existingLBs != nil {
-		for i := range existingLBs {
-			existingLB := existingLBs[i]
-			if strings.EqualFold(*existingLB.Name, defaultLBName) {
-				defaultLB = &existingLB
-			}
-			if isInternalLoadBalancer(&existingLB) != isInternal {
-				continue
-			}
-			status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
-			if err != nil {
-				return nil, nil, false, err
-			}
-			if status == nil {
-				// service is not on this load balancer
-				continue
-			}
-
-			return &existingLB, status, true, nil
+	for i := range existingLBs {
+		existingLB := existingLBs[i]
+		if strings.EqualFold(*existingLB.Name, defaultLBName) {
+			defaultLB = &existingLB
 		}
+		if isInternalLoadBalancer(&existingLB) != isInternal {
+			continue
+		}
+		status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if status == nil {
+			// service is not on this load balancer
+			continue
+		}
+
+		return &existingLB, status, true, nil
 	}
 
 	hasMode, _, _ := getServiceLoadBalancerMode(service)
@@ -1082,14 +1082,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					BackendPort:         to.Int32Ptr(port.Port),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 					EnableTCPReset:      enableTCPReset,
+					EnableFloatingIP:    to.BoolPtr(true),
 				},
-			}
-			// LB does not support floating IPs for IPV6 rules
-			if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-				expectedRule.BackendPort = to.Int32Ptr(port.NodePort)
-				expectedRule.EnableFloatingIP = to.BoolPtr(false)
-			} else {
-				expectedRule.EnableFloatingIP = to.BoolPtr(true)
 			}
 
 			if protocol == v1.ProtocolTCP {
@@ -1138,6 +1132,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if lbIP != nil {
 		destinationIPAddress = *lbIP
 	}
+
 	if destinationIPAddress == "" {
 		destinationIPAddress = "*"
 	}
@@ -1147,6 +1142,12 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	serviceTags := getServiceTags(service)
+	if len(serviceTags) != 0 {
+		if _, ok := sourceRanges[defaultLoadBalancerSourceRanges]; ok {
+			delete(sourceRanges, defaultLoadBalancerSourceRanges)
+		}
+	}
+
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
@@ -1733,7 +1734,7 @@ func subnet(service *v1.Service) *string {
 
 // getServiceLoadBalancerMode parses the mode value.
 // if the value is __auto__ it returns isAuto = TRUE.
-// if anything else it returns the unique VM set names after triming spaces.
+// if anything else it returns the unique VM set names after trimming spaces.
 func getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, vmSetNames []string) {
 	mode, hasMode := service.Annotations[ServiceAnnotationLoadBalancerMode]
 	mode = strings.TrimSpace(mode)

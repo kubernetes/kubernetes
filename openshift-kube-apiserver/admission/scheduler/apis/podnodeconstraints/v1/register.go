@@ -11,13 +11,13 @@ func (obj *PodNodeConstraintsConfig) GetObjectKind() schema.ObjectKind { return 
 var GroupVersion = schema.GroupVersion{Group: "scheduling.openshift.io", Version: "v1"}
 
 var (
-	schemeBuilder = runtime.NewSchemeBuilder(
+	localSchemeBuilder = runtime.NewSchemeBuilder(
 		addKnownTypes,
 		podnodeconstraints.Install,
 
 		addDefaultingFuncs,
 	)
-	Install = schemeBuilder.AddToScheme
+	Install = localSchemeBuilder.AddToScheme
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {

@@ -160,7 +160,14 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 						pvcs = append(pvcs, l.resource.Pvc)
 					}
 					ginkgo.By("Creating a pod with pvc")
-					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
+					podConfig := e2epod.Config{
+						NS:                  l.ns.Name,
+						PVCs:                pvcs,
+						InlineVolumeSources: inlineSources,
+						SeLinuxLabel:        e2epv.SELinuxLabel,
+						NodeSelection:       l.config.ClientNodeSelection,
+					}
+					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, framework.PodStartTimeout)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 					if pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil {

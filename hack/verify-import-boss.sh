@@ -30,11 +30,17 @@ kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=vendor/k8s.io/code-generator/cmd/import-boss
 
-packages=("k8s.io/kubernetes/pkg/..." "k8s.io/kubernetes/cmd/..." "k8s.io/kubernetes/plugin/..." "k8s.io/kubernetes/test/e2e/framework/...")
+packages=(
+  "k8s.io/kubernetes/pkg/..."
+  "k8s.io/kubernetes/cmd/..."
+  "k8s.io/kubernetes/plugin/..."
+  "k8s.io/kubernetes/test/e2e/framework/..."
+  "k8s.io/kubernetes/test/integration/..."
+)
 for d in staging/src/k8s.io/*/; do
   if [ -d "$d" ]; then
     packages+=("./vendor/${d#"staging/src/"}...")
   fi
 done
 
-$(kube::util::find-binary "import-boss") --verify-only "$@" --input-dirs "$(IFS=, ; echo "${packages[*]}")"
+$(kube::util::find-binary "import-boss") --include-test-files=true --verify-only --input-dirs "$(IFS=, ; echo "${packages[*]}")"

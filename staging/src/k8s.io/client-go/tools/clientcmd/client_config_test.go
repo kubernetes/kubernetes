@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/imdario/mergo"
-
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/imdario/mergo"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -330,6 +330,84 @@ func TestCertificateData(t *testing.T) {
 	matchByteArg(keyData, clientConfig.TLSClientConfig.KeyData, t)
 }
 
+func TestProxyURL(t *testing.T) {
+	tests := []struct {
+		desc      string
+		proxyURL  string
+		expectErr bool
+	}{
+		{
+			desc: "no proxy-url",
+		},
+		{
+			desc:     "socks5 proxy-url",
+			proxyURL: "socks5://example.com",
+		},
+		{
+			desc:     "https proxy-url",
+			proxyURL: "https://example.com",
+		},
+		{
+			desc:     "http proxy-url",
+			proxyURL: "http://example.com",
+		},
+		{
+			desc:      "bad scheme proxy-url",
+			proxyURL:  "socks6://example.com",
+			expectErr: true,
+		},
+		{
+			desc:      "no scheme proxy-url",
+			proxyURL:  "example.com",
+			expectErr: true,
+		},
+		{
+			desc:      "not a url proxy-url",
+			proxyURL:  "chewbacca@example.com",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.proxyURL, func(t *testing.T) {
+
+			config := clientcmdapi.NewConfig()
+			config.Clusters["clean"] = &clientcmdapi.Cluster{
+				Server:   "https://localhost:8443",
+				ProxyURL: test.proxyURL,
+			}
+			config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{}
+			config.Contexts["clean"] = &clientcmdapi.Context{
+				Cluster:  "clean",
+				AuthInfo: "clean",
+			}
+			config.CurrentContext = "clean"
+
+			clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)
+
+			clientConfig, err := clientBuilder.ClientConfig()
+			if test.expectErr {
+				if err == nil {
+					t.Fatal("Expected error constructing config")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error constructing config: %v", err)
+			}
+
+			if test.proxyURL == "" {
+				return
+			}
+			gotURL, err := clientConfig.Proxy(nil)
+			if err != nil {
+				t.Fatalf("Unexpected error from proxier: %v", err)
+			}
+			matchStringArg(test.proxyURL, gotURL.String(), t)
+		})
+	}
+}
+
 func TestBasicAuthData(t *testing.T) {
 	username := "myuser"
 	password := "mypass" // Fake value for testing.
@@ -544,6 +622,26 @@ func TestCreateMissingContext(t *testing.T) {
 	if !strings.Contains(err.Error(), expectedErrorContains) {
 		t.Fatalf("Expected error: %v, but got %v", expectedErrorContains, err)
 	}
+}
+
+func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		AuthInfo: clientcmdapi.AuthInfo{
+			Exec: &clientcmdapi.ExecConfig{
+				APIVersion:  "client.authentication.k8s.io/v1alpha1",
+				Command:     "some-command",
+				InstallHint: "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+			},
+		},
+	}, nil)
+	cleanedInstallHint := "some install hint with U+001B[1mcontrol charsU+001B[0m\nand a newline"
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	matchStringArg(cleanedInstallHint, clientConfig.ExecProvider.InstallHint, t)
 }
 
 func TestInClusterClientConfigPrecedence(t *testing.T) {
@@ -771,4 +869,71 @@ users:
 		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
 	}
 
+}
+
+func TestCleanANSIEscapeCodes(t *testing.T) {
+	tests := []struct {
+		name    string
+		in, out string
+	}{
+		{
+			name: "DenyBoldCharacters",
+			in:   "\x1b[1mbold tuna\x1b[0m, fish, \x1b[1mbold marlin\x1b[0m",
+			out:  "U+001B[1mbold tunaU+001B[0m, fish, U+001B[1mbold marlinU+001B[0m",
+		},
+		{
+			name: "DenyCursorNavigation",
+			in:   "\x1b[2Aup up, \x1b[2Cright right",
+			out:  "U+001B[2Aup up, U+001B[2Cright right",
+		},
+		{
+			name: "DenyClearScreen",
+			in:   "clear: \x1b[2J",
+			out:  "clear: U+001B[2J",
+		},
+		{
+			name: "AllowSpaceCharactersUnchanged",
+			in:   "tuna\nfish\r\nmarlin\t\r\ntuna\vfish\fmarlin",
+		},
+		{
+			name: "AllowLetters",
+			in:   "alpha: \u03b1, beta: \u03b2, gamma: \u03b3",
+		},
+		{
+			name: "AllowMarks",
+			in: "tu\u0301na with a mark over the u, fi\u0302sh with a mark over the i," +
+				" ma\u030Arlin with a mark over the a",
+		},
+		{
+			name: "AllowNumbers",
+			in:   "t1na, f2sh, m3rlin, t12a, f34h, m56lin, t123, f456, m567n",
+		},
+		{
+			name: "AllowPunctuation",
+			in:   "\"here's a sentence; with! some...punctuation ;)\"",
+		},
+		{
+			name: "AllowSymbols",
+			in: "the integral of f(x) from 0 to n approximately equals the sum of f(x)" +
+				" from a = 0 to n, where a and n are natural numbers:" +
+				"\u222b\u2081\u207F f(x) dx \u2248 \u2211\u2090\u208C\u2081\u207F f(x)," +
+				" a \u2208 \u2115, n \u2208 \u2115",
+		},
+		{
+			name: "AllowSepatators",
+			in: "here is a paragraph separator\u2029and here\u2003are\u2003some" +
+				"\u2003em\u2003spaces",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if len(test.out) == 0 {
+				test.out = test.in
+			}
+
+			if actualOut := cleanANSIEscapeCodes(test.in); test.out != actualOut {
+				t.Errorf("expected %q, actual %q", test.out, actualOut)
+			}
+		})
+	}
 }

@@ -28,11 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const nsTimeFmt = "2006-01-02 15:04:05.000000000"
@@ -48,6 +49,7 @@ type queueSetFactory struct {
 // the fields `factory` and `theSet` is non-nil.
 type queueSetCompleter struct {
 	factory *queueSetFactory
+	obsPair metrics.TimedObserverPair
 	theSet  *queueSet
 	qCfg    fq.QueuingConfig
 	dealer  *shufflesharding.Dealer
@@ -66,6 +68,7 @@ type queueSet struct {
 	clock                clock.PassiveClock
 	counter              counter.GoRoutineCounter
 	estimatedServiceTime float64
+	obsPair              metrics.TimedObserverPair
 
 	lock sync.Mutex
 
@@ -115,13 +118,14 @@ func NewQueueSetFactory(c clock.PassiveClock, counter counter.GoRoutineCounter) 
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, obsPair metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
 	}
 	return &queueSetCompleter{
 		factory: qsf,
+		obsPair: obsPair,
 		qCfg:    qCfg,
 		dealer:  dealer}, nil
 }
@@ -147,6 +151,7 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 			clock:                qsc.factory.clock,
 			counter:              qsc.factory.counter,
 			estimatedServiceTime: 60,
+			obsPair:              qsc.obsPair,
 			qCfg:                 qsc.qCfg,
 			virtualTime:          0,
 			lastRealTime:         qsc.factory.clock.Now(),
@@ -202,6 +207,12 @@ func (qs *queueSet) setConfiguration(qCfg fq.QueuingConfig, dealer *shuffleshard
 	qs.qCfg = qCfg
 	qs.dCfg = dCfg
 	qs.dealer = dealer
+	qll := qCfg.QueueLengthLimit
+	if qll < 1 {
+		qll = 1
+	}
+	qs.obsPair.RequestsWaiting.SetX1(float64(qll))
+	qs.obsPair.RequestsExecuting.SetX1(float64(dCfg.ConcurrencyLimit))
 
 	qs.dispatchAsMuchAsPossibleLocked()
 }
@@ -221,7 +232,7 @@ const (
 // executing at each point where there is a change in that quantity,
 // because the metrics --- and only the metrics --- track that
 // quantity per FlowSchema.
-func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
+func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (fq.Request, bool) {
 	qs.lockAndSyncTime()
 	defer qs.lock.Unlock()
 	var req *request
@@ -235,7 +246,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName s
 			metrics.AddReject(qs.qCfg.Name, fsName, "concurrency-limit")
 			return nil, qs.isIdleLocked()
 		}
-		req = qs.dispatchSansQueueLocked(ctx, fsName, descr1, descr2)
+		req = qs.dispatchSansQueueLocked(ctx, flowDistinguisher, fsName, descr1, descr2)
 		return req, false
 	}
 
@@ -246,7 +257,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName s
 	// 3) Reject current request if there is not enough concurrency shares and
 	// we are at max queue length
 	// 4) If not rejected, create a request and enqueue
-	req = qs.timeoutOldRequestsAndRejectOrEnqueueLocked(ctx, hashValue, fsName, descr1, descr2)
+	req = qs.timeoutOldRequestsAndRejectOrEnqueueLocked(ctx, hashValue, flowDistinguisher, fsName, descr1, descr2, queueNoteFn)
 	// req == nil means that the request was rejected - no remaining
 	// concurrency shares and at max queue length already
 	if req == nil {
@@ -292,6 +303,12 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, fsName s
 		}()
 	}
 	return req, false
+}
+
+func (req *request) NoteQueued(inQueue bool) {
+	if req.queueNoteFn != nil {
+		req.queueNoteFn(inQueue)
+	}
 }
 
 func (req *request) Finish(execFn func()) bool {
@@ -398,7 +415,7 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 // returns the enqueud request on a successful enqueue
 // returns nil in the case that there is no available concurrency or
 // the queuelengthlimit has been reached
-func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) *request {
+func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) *request {
 	//	Start with the shuffle sharding, to pick a queue.
 	queueIdx := qs.chooseQueueIndexLocked(hashValue, descr1, descr2)
 	queue := qs.queues[queueIdx]
@@ -410,14 +427,16 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 
 	// Create a request and enqueue
 	req := &request{
-		qs:          qs,
-		fsName:      fsName,
-		ctx:         ctx,
-		decision:    lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
-		arrivalTime: qs.clock.Now(),
-		queue:       queue,
-		descr1:      descr1,
-		descr2:      descr2,
+		qs:                qs,
+		fsName:            fsName,
+		flowDistinguisher: flowDistinguisher,
+		ctx:               ctx,
+		decision:          lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
+		arrivalTime:       qs.clock.Now(),
+		queue:             queue,
+		descr1:            descr1,
+		descr2:            descr2,
+		queueNoteFn:       queueNoteFn,
 	}
 	if ok := qs.rejectOrEnqueueLocked(req); !ok {
 		return nil
@@ -439,7 +458,7 @@ func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 inte
 			bestQueueIdx, bestQueueLen = queueIdx, thisLen
 		}
 	})
-	klog.V(6).Infof("QS(%s): For request %#+v %#+v chose queue %d, had %d waiting & %d executing", qs.qCfg.Name, descr1, descr2, bestQueueIdx, bestQueueLen, qs.queues[bestQueueIdx].requestsExecuting)
+	klog.V(6).Infof("QS(%s) at r=%s v=%.9fs: For request %#+v %#+v chose queue %d, had %d waiting & %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, bestQueueLen, qs.queues[bestQueueIdx].requestsExecuting)
 	return bestQueueIdx
 }
 
@@ -461,6 +480,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 			// get index for timed out requests
 			timeoutIdx = i
 			metrics.AddRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
+			req.NoteQueued(false)
 		} else {
 			break
 		}
@@ -473,6 +493,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 		queue.requests = reqs[removeIdx:]
 		// decrement the # of requestsEnqueued
 		qs.totRequestsWaiting -= removeIdx
+		qs.obsPair.RequestsWaiting.Add(float64(-removeIdx))
 	}
 }
 
@@ -496,16 +517,19 @@ func (qs *queueSet) rejectOrEnqueueLocked(request *request) bool {
 // enqueues a request into its queue.
 func (qs *queueSet) enqueueLocked(request *request) {
 	queue := request.queue
+	now := qs.clock.Now()
 	if len(queue.requests) == 0 && queue.requestsExecuting == 0 {
 		// the queue’s virtual start time is set to the virtual time.
 		queue.virtualStart = qs.virtualTime
-		if klog.V(6) {
-			klog.Infof("QS(%s) at r=%s v=%.9fs: initialized queue %d virtual start time due to request %#+v %#+v", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
+		if klog.V(6).Enabled() {
+			klog.Infof("QS(%s) at r=%s v=%.9fs: initialized queue %d virtual start time due to request %#+v %#+v", qs.qCfg.Name, now.Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
 		}
 	}
 	queue.Enqueue(request)
 	qs.totRequestsWaiting++
 	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, 1)
+	request.NoteQueued(true)
+	qs.obsPair.RequestsWaiting.Add(1)
 }
 
 // dispatchAsMuchAsPossibleLocked runs a loop, as long as there
@@ -523,22 +547,24 @@ func (qs *queueSet) dispatchAsMuchAsPossibleLocked() {
 	}
 }
 
-func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, fsName string, descr1, descr2 interface{}) *request {
+func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, flowDistinguisher, fsName string, descr1, descr2 interface{}) *request {
 	now := qs.clock.Now()
 	req := &request{
-		qs:          qs,
-		fsName:      fsName,
-		ctx:         ctx,
-		startTime:   now,
-		decision:    lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
-		arrivalTime: now,
-		descr1:      descr1,
-		descr2:      descr2,
+		qs:                qs,
+		fsName:            fsName,
+		flowDistinguisher: flowDistinguisher,
+		ctx:               ctx,
+		startTime:         now,
+		decision:          lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
+		arrivalTime:       now,
+		descr1:            descr1,
+		descr2:            descr2,
 	}
 	req.decision.SetLocked(decisionExecute)
 	qs.totRequestsExecuting++
 	metrics.AddRequestsExecuting(qs.qCfg.Name, fsName, 1)
-	if klog.V(5) {
+	qs.obsPair.RequestsExecuting.Add(1)
+	if klog.V(5).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
 	}
 	return req
@@ -567,8 +593,11 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.totRequestsExecuting++
 	queue.requestsExecuting++
 	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, -1)
+	request.NoteQueued(false)
 	metrics.AddRequestsExecuting(qs.qCfg.Name, request.fsName, 1)
-	if klog.V(6) {
+	qs.obsPair.RequestsWaiting.Add(-1)
+	qs.obsPair.RequestsExecuting.Add(1)
+	if klog.V(6).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: dispatching request %#+v %#+v from queue %d with virtual start time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2, queue.index, queue.virtualStart, len(queue.requests), queue.requestsExecuting)
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G
@@ -596,6 +625,8 @@ func (qs *queueSet) cancelWait(req *request) {
 			queue.requests = append(queue.requests[:i], queue.requests[i+1:]...)
 			qs.totRequestsWaiting--
 			metrics.AddRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
+			req.NoteQueued(false)
+			qs.obsPair.RequestsWaiting.Add(-1)
 			break
 		}
 	}
@@ -647,17 +678,19 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool 
 // previously dispatched request has completed it's service.  This
 // callback updates important state in the queueSet
 func (qs *queueSet) finishRequestLocked(r *request) {
+	now := qs.clock.Now()
 	qs.totRequestsExecuting--
 	metrics.AddRequestsExecuting(qs.qCfg.Name, r.fsName, -1)
+	qs.obsPair.RequestsExecuting.Add(-1)
 
 	if r.queue == nil {
-		if klog.V(6) {
-			klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, qs will have %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, qs.totRequestsExecuting)
+		if klog.V(6).Enabled() {
+			klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, qs.totRequestsExecuting)
 		}
 		return
 	}
 
-	S := qs.clock.Since(r.startTime).Seconds()
+	S := now.Sub(r.startTime).Seconds()
 
 	// When a request finishes being served, and the actual service time was S,
 	// the queue’s virtual start time is decremented by G - S.
@@ -666,8 +699,8 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	// request has finished, remove from requests executing
 	r.queue.requestsExecuting--
 
-	if klog.V(6) {
-		klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index, r.queue.virtualStart, S, len(r.queue.requests), r.queue.requestsExecuting)
+	if klog.V(6).Enabled() {
+		klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index, r.queue.virtualStart, S, len(r.queue.requests), r.queue.requestsExecuting)
 	}
 
 	// If there are more queues than desired and this one has no
@@ -708,4 +741,18 @@ func (qs *queueSet) preCreateOrUnblockGoroutine() {
 // properly update the accounting used in testing.
 func (qs *queueSet) goroutineDoneOrBlocked() {
 	qs.counter.Add(-1)
+}
+
+func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
+	qs.lock.Lock()
+	defer qs.lock.Unlock()
+	d := debug.QueueSetDump{
+		Queues:    make([]debug.QueueDump, len(qs.queues)),
+		Waiting:   qs.totRequestsWaiting,
+		Executing: qs.totRequestsExecuting,
+	}
+	for i, q := range qs.queues {
+		d.Queues[i] = q.dump(includeRequestDetails)
+	}
+	return d
 }

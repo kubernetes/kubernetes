@@ -12,11 +12,11 @@ func (obj *IngressAdmissionConfig) GetObjectKind() schema.ObjectKind { return &o
 var GroupVersion = schema.GroupVersion{Group: "route.openshift.io", Version: "v1"}
 
 var (
-	schemeBuilder = runtime.NewSchemeBuilder(
+	localSchemeBuilder = runtime.NewSchemeBuilder(
 		addKnownTypes,
 		ingressadmission.Install,
 	)
-	Install = schemeBuilder.AddToScheme
+	Install = localSchemeBuilder.AddToScheme
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {

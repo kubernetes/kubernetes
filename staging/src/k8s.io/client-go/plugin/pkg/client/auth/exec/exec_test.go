@@ -32,12 +32,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
@@ -168,15 +170,17 @@ func compJSON(t *testing.T, got, want []byte) {
 
 func TestRefreshCreds(t *testing.T) {
 	tests := []struct {
-		name        string
-		config      api.ExecConfig
-		output      string
-		interactive bool
-		response    *clientauthentication.Response
-		wantInput   string
-		wantCreds   credentials
-		wantExpiry  time.Time
-		wantErr     bool
+		name          string
+		config        api.ExecConfig
+		exitCode      int
+		output        string
+		interactive   bool
+		response      *clientauthentication.Response
+		wantInput     string
+		wantCreds     credentials
+		wantExpiry    time.Time
+		wantErr       bool
+		wantErrSubstr string
 	}{
 		{
 			name: "basic-request",
@@ -450,17 +454,42 @@ func TestRefreshCreds(t *testing.T) {
 			}`,
 			wantErr: true,
 		},
+		{
+			name: "unknown-binary",
+			config: api.ExecConfig{
+				APIVersion:  "client.authentication.k8s.io/v1beta1",
+				Command:     "does not exist",
+				InstallHint: "some install hint",
+			},
+			wantErr:       true,
+			wantErrSubstr: "some install hint",
+		},
+		{
+			name: "binary-fails",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			exitCode:      73,
+			wantErr:       true,
+			wantErrSubstr: "73",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := test.config
 
-			c.Command = "./testdata/test-plugin.sh"
-			c.Env = append(c.Env, api.ExecEnvVar{
-				Name:  "TEST_OUTPUT",
-				Value: test.output,
-			})
+			if c.Command == "" {
+				c.Command = "./testdata/test-plugin.sh"
+				c.Env = append(c.Env, api.ExecEnvVar{
+					Name:  "TEST_OUTPUT",
+					Value: test.output,
+				})
+				c.Env = append(c.Env, api.ExecEnvVar{
+					Name:  "TEST_EXIT_CODE",
+					Value: strconv.Itoa(test.exitCode),
+				})
+			}
 
 			a, err := newAuthenticator(newCache(), &c)
 			if err != nil {
@@ -475,6 +504,8 @@ func TestRefreshCreds(t *testing.T) {
 			if err := a.refreshCredsLocked(test.response); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
+				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
+					t.Errorf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
 				}
 				return
 			}
@@ -620,6 +651,27 @@ func TestRoundTripper(t *testing.T) {
 	get(t, http.StatusOK)
 }
 
+func TestTokenPresentCancelsExecAction(t *testing.T) {
+	a, err := newAuthenticator(newCache(), &api.ExecConfig{
+		Command:    "./testdata/test-plugin.sh",
+		APIVersion: "client.authentication.k8s.io/v1alpha1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
+	// transport config, in which case it takes precedence
+	cert := func() (*tls.Certificate, error) {
+		return nil, nil
+	}
+	tc := &transport.Config{BearerToken: "token1", TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
+
+	if err := a.UpdateTransportConfig(tc); err != nil {
+		t.Error("Expected presence of bearer token in config to cancel exec action")
+	}
+}
+
 func TestTLSCredentials(t *testing.T) {
 	now := time.Now()
 
@@ -761,6 +813,75 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 		}()
 	}
 	time.Sleep(2 * time.Second)
+}
+
+func TestInstallHintRateLimit(t *testing.T) {
+	tests := []struct {
+		name string
+
+		threshold int
+		interval  time.Duration
+
+		calls          int
+		perCallAdvance time.Duration
+
+		wantInstallHint int
+	}{
+		{
+			name:            "print-up-to-threshold",
+			threshold:       2,
+			interval:        time.Second,
+			calls:           10,
+			wantInstallHint: 2,
+		},
+		{
+			name:            "after-interval-threshold-resets",
+			threshold:       2,
+			interval:        time.Second * 5,
+			calls:           10,
+			perCallAdvance:  time.Second,
+			wantInstallHint: 4,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := api.ExecConfig{
+				Command:     "does not exist",
+				APIVersion:  "client.authentication.k8s.io/v1alpha1",
+				InstallHint: "some install hint",
+			}
+			a, err := newAuthenticator(newCache(), &c)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			a.sometimes.threshold = test.threshold
+			a.sometimes.interval = test.interval
+
+			clock := clock.NewFakeClock(time.Now())
+			a.sometimes.clock = clock
+
+			count := 0
+			for i := 0; i < test.calls; i++ {
+				err := a.refreshCredsLocked(&clientauthentication.Response{})
+				if strings.Contains(err.Error(), c.InstallHint) {
+					count++
+				}
+
+				clock.SetTime(clock.Now().Add(test.perCallAdvance))
+			}
+
+			if test.wantInstallHint != count {
+				t.Errorf(
+					"%s: expected install hint %d times got %d",
+					test.name,
+					test.wantInstallHint,
+					count,
+				)
+			}
+		})
+	}
 }
 
 // genClientCert generates an x509 certificate for testing. Certificate and key

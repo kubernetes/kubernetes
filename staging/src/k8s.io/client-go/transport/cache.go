@@ -52,6 +52,7 @@ type tlsCacheKey struct {
 	nextProtos         string
 	dial               string
 	disableCompression bool
+	proxy              string
 }
 
 func (t tlsCacheKey) String() string {
@@ -59,7 +60,7 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, getCert: %s, serverName:%s, dial:%s disableCompression:%t", t.insecure, t.caData, t.certData, keyText, t.getCert, t.serverName, t.dial, t.disableCompression)
+	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, getCert: %s, serverName:%s, dial:%s disableCompression:%t, proxy: %s", t.insecure, t.caData, t.certData, keyText, t.getCert, t.serverName, t.dial, t.disableCompression, t.proxy)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -83,7 +84,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil && config.Dial == nil {
+	if tlsConfig == nil && config.Dial == nil && config.Proxy == nil {
 		return http.DefaultTransport, nil
 	}
 
@@ -104,9 +105,14 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		go dynamicCertDialer.Run(wait.NeverStop)
 	}
 
+	proxy := http.ProxyFromEnvironment
+	if config.Proxy != nil {
+		proxy = config.Proxy
+	}
+
 	// Cache a single transport for these options
 	c.transports[key] = utilnet.SetTransportDefaults(&http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
+		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
@@ -130,6 +136,7 @@ func tlsConfigKey(c *Config) (tlsCacheKey, error) {
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		dial:               fmt.Sprintf("%p", c.Dial),
 		disableCompression: c.DisableCompression,
+		proxy:              fmt.Sprintf("%p", c.Proxy),
 	}
 
 	if c.TLS.ReloadTLSFiles {

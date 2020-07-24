@@ -415,7 +415,7 @@ func TestComponentPod(t *testing.T) {
 							Name: "foo",
 						},
 					},
-					PriorityClassName: "system-cluster-critical",
+					PriorityClassName: "system-node-critical",
 					HostNetwork:       true,
 					Volumes:           []v1.Volume{},
 				},
@@ -794,5 +794,86 @@ func TestKustomizeStaticPod(t *testing.T) {
 
 	if _, ok := kpod.ObjectMeta.Annotations["kustomize"]; !ok {
 		t.Error("Kustomize did not apply patches corresponding to the resource")
+	}
+}
+
+func TestPatchStaticPod(t *testing.T) {
+	type file struct {
+		name string
+		data string
+	}
+
+	tests := []struct {
+		name          string
+		files         []*file
+		pod           *v1.Pod
+		expectedPod   *v1.Pod
+		expectedError bool
+	}{
+		{
+			name: "valid: patch a kube-apiserver target using a couple of ordered patches",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-apiserver",
+					Namespace: "foo",
+				},
+			},
+			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-apiserver",
+					Namespace: "bar2",
+				},
+			},
+			files: []*file{
+				{
+					name: "kube-apiserver1+merge.json",
+					data: `{"metadata":{"namespace":"bar2"}}`,
+				},
+				{
+					name: "kube-apiserver0+json.json",
+					data: `[{"op": "replace", "path": "/metadata/namespace", "value": "bar1"}]`,
+				},
+			},
+		},
+		{
+			name: "invalid: unknown patch target name",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir, err := ioutil.TempDir("", "patch-files")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(tempDir)
+
+			for _, file := range tc.files {
+				filePath := filepath.Join(tempDir, file.name)
+				err := ioutil.WriteFile(filePath, []byte(file.data), 0644)
+				if err != nil {
+					t.Fatalf("could not write temporary file %q", filePath)
+				}
+			}
+
+			pod, err := PatchStaticPod(tc.pod, tempDir, ioutil.Discard)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+			if err != nil {
+				return
+			}
+
+			if tc.expectedPod.String() != pod.String() {
+				t.Fatalf("expected object:\n%s\ngot:\n%s", tc.expectedPod.String(), pod.String())
+			}
+		})
 	}
 }

@@ -22,6 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -31,78 +34,25 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestVisitContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	testCases := []struct {
-		description string
-		haveSpec    *api.PodSpec
-		wantNames   []string
-		mask        ContainerType
+		desc                       string
+		spec                       *api.PodSpec
+		wantContainers             []string
+		mask                       ContainerType
+		ephemeralContainersEnabled bool
 	}{
 		{
-			"empty podspec",
-			&api.PodSpec{},
-			[]string{},
-			DefaultContainers,
+			desc:           "empty podspec",
+			spec:           &api.PodSpec{},
+			wantContainers: []string{},
+			mask:           AllContainers,
 		},
 		{
-			"regular containers",
-			&api.PodSpec{
-				Containers: []api.Container{
-					{Name: "c1"},
-					{Name: "c2"},
-				},
-			},
-			[]string{"c1", "c2"},
-			DefaultContainers,
-		},
-		{
-			"init containers",
-			&api.PodSpec{
-				InitContainers: []api.Container{
-					{Name: "i1"},
-					{Name: "i2"},
-				},
-			},
-			[]string{"i1", "i2"},
-			DefaultContainers,
-		},
-		{
-			"regular and init containers",
-			&api.PodSpec{
-				Containers: []api.Container{
-					{Name: "c1"},
-					{Name: "c2"},
-				},
-				InitContainers: []api.Container{
-					{Name: "i1"},
-					{Name: "i2"},
-				},
-			},
-			[]string{"i1", "i2", "c1", "c2"},
-			DefaultContainers,
-		},
-		{
-			"ephemeral containers",
-			&api.PodSpec{
-				Containers: []api.Container{
-					{Name: "c1"},
-					{Name: "c2"},
-				},
-				EphemeralContainers: []api.EphemeralContainer{
-					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
-				},
-			},
-			[]string{"c1", "c2", "e1"},
-			DefaultContainers,
-		},
-		{
-			"all container types",
-			&api.PodSpec{
+			desc: "regular containers",
+			spec: &api.PodSpec{
 				Containers: []api.Container{
 					{Name: "c1"},
 					{Name: "c2"},
@@ -116,12 +66,12 @@ func TestVisitContainers(t *testing.T) {
 					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
 				},
 			},
-			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
-			DefaultContainers,
+			wantContainers: []string{"c1", "c2"},
+			mask:           Containers,
 		},
 		{
-			"all container types with init and regular container types chosen",
-			&api.PodSpec{
+			desc: "init containers",
+			spec: &api.PodSpec{
 				Containers: []api.Container{
 					{Name: "c1"},
 					{Name: "c2"},
@@ -135,12 +85,89 @@ func TestVisitContainers(t *testing.T) {
 					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
 				},
 			},
-			[]string{"i1", "i2", "c1", "c2"},
-			Containers | InitContainers,
+			wantContainers: []string{"i1", "i2"},
+			mask:           InitContainers,
 		},
 		{
-			"dropping fields",
-			&api.PodSpec{
+			desc: "ephemeral containers",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"e1", "e2"},
+			mask:           EphemeralContainers,
+		},
+		{
+			desc: "all container types",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:           AllContainers,
+		},
+		{
+			desc: "all feature enabled container types with ephemeral containers disabled",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2"},
+			mask:           AllFeatureEnabledContainers(),
+		},
+		{
+			desc: "all feature enabled container types with ephemeral containers enabled",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &api.SecurityContext{}},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &api.SecurityContext{}},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers:             []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:                       AllFeatureEnabledContainers(),
+			ephemeralContainersEnabled: true,
+		},
+		{
+			desc: "dropping fields",
+			spec: &api.PodSpec{
 				Containers: []api.Container{
 					{Name: "c1"},
 					{Name: "c2", SecurityContext: &api.SecurityContext{}},
@@ -154,38 +181,45 @@ func TestVisitContainers(t *testing.T) {
 					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2", SecurityContext: &api.SecurityContext{}}},
 				},
 			},
-			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
-			DefaultContainers,
+			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:           AllContainers,
 		},
 	}
 
 	for _, tc := range testCases {
-		gotNames := []string{}
-		VisitContainers(tc.haveSpec, tc.mask, func(c *api.Container, containerType ContainerType) bool {
-			gotNames = append(gotNames, c.Name)
-			if c.SecurityContext != nil {
-				c.SecurityContext = nil
+		t.Run(tc.desc, func(t *testing.T) {
+			if tc.ephemeralContainersEnabled {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+				tc.mask = AllFeatureEnabledContainers()
 			}
-			return true
+
+			gotContainers := []string{}
+			VisitContainers(tc.spec, tc.mask, func(c *api.Container, containerType ContainerType) bool {
+				gotContainers = append(gotContainers, c.Name)
+				if c.SecurityContext != nil {
+					c.SecurityContext = nil
+				}
+				return true
+			})
+			if !cmp.Equal(gotContainers, tc.wantContainers) {
+				t.Errorf("VisitContainers() = %+v, want %+v", gotContainers, tc.wantContainers)
+			}
+			for _, c := range tc.spec.Containers {
+				if c.SecurityContext != nil {
+					t.Errorf("VisitContainers() did not drop SecurityContext for container %q", c.Name)
+				}
+			}
+			for _, c := range tc.spec.InitContainers {
+				if c.SecurityContext != nil {
+					t.Errorf("VisitContainers() did not drop SecurityContext for init container %q", c.Name)
+				}
+			}
+			for _, c := range tc.spec.EphemeralContainers {
+				if c.SecurityContext != nil {
+					t.Errorf("VisitContainers() did not drop SecurityContext for ephemeral container %q", c.Name)
+				}
+			}
 		})
-		if !reflect.DeepEqual(gotNames, tc.wantNames) {
-			t.Errorf("VisitContainers() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
-		}
-		for _, c := range tc.haveSpec.Containers {
-			if c.SecurityContext != nil {
-				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
-			}
-		}
-		for _, c := range tc.haveSpec.InitContainers {
-			if c.SecurityContext != nil {
-				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for init container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
-			}
-		}
-		for _, c := range tc.haveSpec.EphemeralContainers {
-			if c.SecurityContext != nil {
-				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for ephemeral container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
-			}
-		}
 	}
 }
 
@@ -283,7 +317,7 @@ func TestPodSecrets(t *testing.T) {
 	VisitPodSecretNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
-	})
+	}, AllContainers)
 
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
 	excludedSecretPaths := sets.NewString(
@@ -428,7 +462,7 @@ func TestPodConfigmaps(t *testing.T) {
 	VisitPodConfigmapNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
-	})
+	}, AllContainers)
 
 	// expectedPaths holds struct paths to fields with "ConfigMap" in the name that are references to ConfigMap API objects.
 	// every path here should be represented as an example in the Pod stub above, with the ConfigMap name set to the path.
@@ -993,7 +1027,7 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 func TestDropAppArmor(t *testing.T) {
 	podWithAppArmor := func() *api.Pod {
 		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", apparmor.ContainerAnnotationKeyPrefix + "foo": "default"}},
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.AppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
 			Spec:       api.PodSpec{},
 		}
 	}
@@ -1479,7 +1513,6 @@ func TestDropSubPathExpr(t *testing.T) {
 			}
 
 			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, enabled)()
 
 				var oldPodSpec *api.PodSpec
 				if oldPod != nil {

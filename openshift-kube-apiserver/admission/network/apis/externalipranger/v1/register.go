@@ -9,11 +9,11 @@ import (
 var GroupVersion = schema.GroupVersion{Group: "network.openshift.io", Version: "v1"}
 
 var (
-	schemeBuilder = runtime.NewSchemeBuilder(
+	localSchemeBuilder = runtime.NewSchemeBuilder(
 		addKnownTypes,
 		restrictedendpoints.Install,
 	)
-	Install = schemeBuilder.AddToScheme
+	Install = localSchemeBuilder.AddToScheme
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {

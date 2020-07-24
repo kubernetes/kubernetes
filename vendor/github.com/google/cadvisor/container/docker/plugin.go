@@ -22,7 +22,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/watcher"
 	"golang.org/x/net/context"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const dockerClientTimeout = 10 * time.Second

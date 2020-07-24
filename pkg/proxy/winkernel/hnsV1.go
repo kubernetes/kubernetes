@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Microsoft/hcsshim"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 )

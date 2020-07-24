@@ -25,7 +25,8 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/klog"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -34,6 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -68,6 +71,11 @@ func (plugin *vsphereVolumePlugin) Init(host volume.VolumeHost) error {
 
 func (plugin *vsphereVolumePlugin) GetPluginName() string {
 	return vsphereVolumePluginName
+}
+
+func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
 }
 
 func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
@@ -456,7 +464,7 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.VsphereVolume, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
+	return nil, false, fmt.Errorf("spec does not reference a VSphere volume type")
 }
 
 func getNodeName(node *v1.Node) string {

@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/resource"

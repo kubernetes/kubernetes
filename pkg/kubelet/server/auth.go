@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // KubeletAuth implements AuthInterface

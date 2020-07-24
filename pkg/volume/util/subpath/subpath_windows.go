@@ -21,11 +21,12 @@ package subpath
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	"k8s.io/utils/nsenter"
 )
@@ -43,6 +44,32 @@ func NewNSEnter(mounter mount.Interface, ne *nsenter.Nsenter, rootDir string) In
 	return nil
 }
 
+// evalPath returns the path name after the evaluation of any symbolic links.
+// If the path after evaluation starts with Volume or \??\Volume, it means that it was a symlink from
+// volume (represented by volumeID) to the given path. In this case, the given path is returned.
+func evalPath(path string) (linkedPath string, err error) {
+	cmd := fmt.Sprintf("Get-Item -Path %s | Select-Object -ExpandProperty Target", path)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	klog.V(4).Infof("evaluate symlink from %s: %s %v", path, string(output), err)
+	if err != nil {
+		return "", err
+	}
+	linkedPath = strings.TrimSpace(string(output))
+	if isVolumePrefix(linkedPath) {
+		return path, err
+	}
+	return linkedPath, err
+}
+
+// isVolumePrefix returns true if the given path name starts with "Volume" or volume prefix including
+// "\\.\" or "\\?\". Otherwise, it returns false.
+func isVolumePrefix(path string) bool {
+	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") {
+		return true
+	}
+	return false
+}
+
 // check whether hostPath is within volume path
 // this func will lock all intermediate subpath directories, need to close handle outside of this func after container started
 func lockAndCheckSubPath(volumePath, hostPath string) ([]uintptr, error) {
@@ -50,11 +77,12 @@ func lockAndCheckSubPath(volumePath, hostPath string) ([]uintptr, error) {
 		return []uintptr{}, nil
 	}
 
-	finalSubPath, err := filepath.EvalSymlinks(hostPath)
+	finalSubPath, err := evalPath(hostPath)
 	if err != nil {
-		return []uintptr{}, fmt.Errorf("cannot read link %s: %s", hostPath, err)
+		return []uintptr{}, fmt.Errorf("cannot evaluate link %s: %s", hostPath, err)
 	}
-	finalVolumePath, err := filepath.EvalSymlinks(volumePath)
+
+	finalVolumePath, err := evalPath(volumePath)
 	if err != nil {
 		return []uintptr{}, fmt.Errorf("cannot read link %s: %s", volumePath, err)
 	}
@@ -162,7 +190,7 @@ func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
 
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
-	realBase, err := filepath.EvalSymlinks(base)
+	realBase, err := evalPath(base)
 	if err != nil {
 		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
 	}
@@ -201,11 +229,11 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	}
 
 	// Ensure the existing directory is inside allowed base
-	fullExistingPath, err := filepath.EvalSymlinks(existingPath)
+	fullExistingPath, err := evalPath(existingPath)
 	if err != nil {
 		return fmt.Errorf("error opening existing directory %s: %s", existingPath, err)
 	}
-	fullBasePath, err := filepath.EvalSymlinks(base)
+	fullBasePath, err := evalPath(base)
 	if err != nil {
 		return fmt.Errorf("cannot read link %s: %s", base, err)
 	}

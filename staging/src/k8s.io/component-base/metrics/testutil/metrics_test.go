@@ -18,6 +18,7 @@ package testutil
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"k8s.io/utils/pointer"
@@ -54,6 +55,7 @@ func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 
 func TestHistogramQuantile(t *testing.T) {
 	tests := []struct {
+		name    string
 		samples []float64
 		bounds  []float64
 		q50     float64
@@ -61,7 +63,7 @@ func TestHistogramQuantile(t *testing.T) {
 		q99     float64
 	}{
 		{
-			// repeating numbers
+			name:    "Repeating numbers",
 			samples: []float64{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6},
 			bounds:  []float64{1, 2, 4, 8},
 			q50:     2,
@@ -69,7 +71,7 @@ func TestHistogramQuantile(t *testing.T) {
 			q99:     7.84,
 		},
 		{
-			// random numbers
+			name:    "Random numbers",
 			samples: []float64{11, 67, 61, 21, 40, 36, 52, 63, 8, 3, 67, 35, 61, 1, 36, 58},
 			bounds:  []float64{10, 20, 40, 80},
 			q50:     40,
@@ -77,35 +79,45 @@ func TestHistogramQuantile(t *testing.T) {
 			q99:     79.2,
 		},
 		{
-			// the last bucket is empty
+			name:    "The last bucket is empty",
 			samples: []float64{6, 34, 30, 10, 20, 18, 26, 31, 4, 2, 33, 17, 30, 1, 18, 29},
 			bounds:  []float64{10, 20, 40, 80},
 			q50:     20,
 			q90:     36,
 			q99:     39.6,
 		},
+		{
+			name:    "The last bucket has positive infinity upper bound",
+			samples: []float64{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 500},
+			bounds:  []float64{10, 20, 40, math.Inf(1)},
+			q50:     5.3125,
+			q90:     9.5625,
+			q99:     40,
+		},
 	}
 
 	for _, test := range tests {
-		h := samples2Histogram(test.samples, test.bounds)
-		q50 := h.Quantile(0.5)
-		q90 := h.Quantile(0.9)
-		q99 := h.Quantile(0.99)
-		q999999 := h.Quantile(0.999999)
+		t.Run(test.name, func(t *testing.T) {
+			h := samples2Histogram(test.samples, test.bounds)
+			q50 := h.Quantile(0.5)
+			q90 := h.Quantile(0.9)
+			q99 := h.Quantile(0.99)
+			q999999 := h.Quantile(0.999999)
 
-		if q50 != test.q50 {
-			t.Errorf("Expected q50 to be %v, got %v instead", test.q50, q50)
-		}
-		if q90 != test.q90 {
-			t.Errorf("Expected q90 to be %v, got %v instead", test.q90, q90)
-		}
-		if q99 != test.q99 {
-			t.Errorf("Expected q99 to be %v, got %v instead", test.q99, q99)
-		}
-		lastUpperBound := test.bounds[len(test.bounds)-1]
-		if !(q999999 < lastUpperBound) {
-			t.Errorf("Expected q999999 to be less than %v, got %v instead", lastUpperBound, q999999)
-		}
+			if q50 != test.q50 {
+				t.Errorf("Expected q50 to be %v, got %v instead", test.q50, q50)
+			}
+			if q90 != test.q90 {
+				t.Errorf("Expected q90 to be %v, got %v instead", test.q90, q90)
+			}
+			if q99 != test.q99 {
+				t.Errorf("Expected q99 to be %v, got %v instead", test.q99, q99)
+			}
+			lastUpperBound := test.bounds[len(test.bounds)-1]
+			if !(q999999 < lastUpperBound) {
+				t.Errorf("Expected q999999 to be less than %v, got %v instead", lastUpperBound, q999999)
+			}
+		})
 	}
 }
 
@@ -251,5 +263,93 @@ func TestHistogramValidate(t *testing.T) {
 				t.Errorf("Expected error to be nil, got %q instead", err)
 			}
 		}
+	}
+}
+
+func TestLabelsMatch(t *testing.T) {
+	cases := []struct {
+		name          string
+		metric        *dto.Metric
+		labelFilter   map[string]string
+		expectedMatch bool
+	}{
+		{name: "metric labels and labelFilter have the same labels and values", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: true},
+		{name: "metric labels contain all labelFilter labels, and labelFilter is a subset of metric labels", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+		}, expectedMatch: true},
+		{name: "metric labels don't have all labelFilter labels and value", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "The intersection of metric labels and labelFilter labels is empty", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("aa"), Value: pointer.StringPtr("11")},
+				{Name: pointer.StringPtr("bb"), Value: pointer.StringPtr("22")},
+				{Name: pointer.StringPtr("cc"), Value: pointer.StringPtr("33")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels have the same labels names but different values with labelFilter labels and value", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
+			}}, labelFilter: map[string]string{
+			"a": "11",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels contain label name but different values with labelFilter labels and value", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("33")},
+				{Name: pointer.StringPtr("d"), Value: pointer.StringPtr("4")},
+			}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels is empty and labelFilter is not empty", metric: &dto.Metric{
+			Label: []*dto.LabelPair{}}, labelFilter: map[string]string{
+			"a": "1",
+			"b": "2",
+			"c": "3",
+		}, expectedMatch: false},
+		{name: "metric labels is not empty and labelFilter is empty", metric: &dto.Metric{
+			Label: []*dto.LabelPair{
+				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
+				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
+			}}, labelFilter: map[string]string{}, expectedMatch: true},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := LabelsMatch(tt.metric, tt.labelFilter)
+			if got != tt.expectedMatch {
+				t.Errorf("Expected %v, got %v instead", tt.expectedMatch, got)
+			}
+		})
 	}
 }

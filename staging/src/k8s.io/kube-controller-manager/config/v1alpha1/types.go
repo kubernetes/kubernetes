@@ -114,6 +114,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointSliceControllerConfiguration holds configuration for
 	// EndpointSliceController related features.
 	EndpointSliceController EndpointSliceControllerConfiguration
+	// EndpointSliceMirroringControllerConfiguration holds configuration for
+	// EndpointSliceMirroringController related features.
+	EndpointSliceMirroringController EndpointSliceMirroringControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -243,9 +246,29 @@ type CSRSigningControllerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string
+
+	// kubeletServingSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kubelet-serving signer
+	KubeletServingSignerConfiguration CSRSigningConfiguration
+	// kubeletClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client-kubelet
+	KubeletClientSignerConfiguration CSRSigningConfiguration
+	// kubeAPIServerClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client
+	KubeAPIServerClientSignerConfiguration CSRSigningConfiguration
+	// legacyUnknownSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/legacy-unknown
+	LegacyUnknownSignerConfiguration CSRSigningConfiguration
+
 	// clusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
+}
+
+// CSRSigningConfiguration holds information about a particular CSR signer
+type CSRSigningConfiguration struct {
+	// certFile is the filename containing a PEM-encoded
+	// X509 CA certificate used to issue certificates
+	CertFile string
+	// keyFile is the filename containing a PEM-encoded
+	// RSA or ECDSA private key used to issue certificates
+	KeyFile string
 }
 
 // DaemonSetControllerConfiguration contains elements describing DaemonSetController.
@@ -317,6 +340,27 @@ type EndpointSliceControllerConfiguration struct {
 	// Processing of pod changes will be delayed by this duration to join them with potential
 	// upcoming updates and reduce the overall number of endpoints updates.
 	EndpointUpdatesBatchPeriod metav1.Duration
+}
+
+// EndpointSliceMirroringControllerConfiguration contains elements describing
+// EndpointSliceMirroringController.
+type EndpointSliceMirroringControllerConfiguration struct {
+	// mirroringConcurrentServiceEndpointSyncs is the number of service endpoint
+	// syncing operations that will be done concurrently. Larger number = faster
+	// endpoint slice updating, but more CPU (and network) load.
+	MirroringConcurrentServiceEndpointSyncs int32
+
+	// mirroringMaxEndpointsPerSubset is the maximum number of endpoints that
+	// will be mirrored to an EndpointSlice for an EndpointSubset.
+	MirroringMaxEndpointsPerSubset int32
+
+	// mirroringEndpointUpdatesBatchPeriod can be used to batch EndpointSlice
+	// updates. All updates triggered by EndpointSlice changes will be delayed
+	// by up to 'mirroringEndpointUpdatesBatchPeriod'. If other addresses in the
+	// same Endpoints resource change in that period, they will be batched to a
+	// single EndpointSlice update. Default 0 value means that each Endpoints
+	// update triggers an EndpointSlice update.
+	MirroringEndpointUpdatesBatchPeriod metav1.Duration
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.

@@ -41,6 +41,8 @@ import (
 	"strconv"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -54,7 +56,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -84,7 +86,7 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
@@ -236,10 +238,13 @@ type mockCSIDriver struct {
 	driverInfo          testsuites.DriverInfo
 	manifests           []string
 	podInfo             *bool
+	storageCapacity     *bool
 	attachable          bool
 	attachLimit         int
+	enableTopology      bool
 	enableNodeExpansion bool
 	cleanupHandle       framework.CleanupActionHandle
+	javascriptHooks     map[string]string
 }
 
 // CSIMockDriverOpts defines options used for csi driver
@@ -247,9 +252,12 @@ type CSIMockDriverOpts struct {
 	RegisterDriver      bool
 	DisableAttach       bool
 	PodInfo             *bool
+	StorageCapacity     *bool
 	AttachLimit         int
+	EnableTopology      bool
 	EnableResizing      bool
 	EnableNodeExpansion bool
+	JavascriptHooks     map[string]string
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
@@ -295,9 +303,12 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		},
 		manifests:           driverManifests,
 		podInfo:             driverOpts.PodInfo,
+		storageCapacity:     driverOpts.StorageCapacity,
+		enableTopology:      driverOpts.EnableTopology,
 		attachable:          !driverOpts.DisableAttach,
 		attachLimit:         driverOpts.AttachLimit,
 		enableNodeExpansion: driverOpts.EnableNodeExpansion,
+		javascriptHooks:     driverOpts.JavascriptHooks,
 	}
 }
 
@@ -343,12 +354,37 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		containerArgs = append(containerArgs, "--disable-attach")
 	}
 
+	if m.enableTopology {
+		containerArgs = append(containerArgs, "--enable-topology")
+	}
+
 	if m.attachLimit > 0 {
 		containerArgs = append(containerArgs, "--attach-limit", strconv.Itoa(m.attachLimit))
 	}
 
 	if m.enableNodeExpansion {
 		containerArgs = append(containerArgs, "--node-expand-required=true")
+	}
+
+	// Create a config map with javascript hooks. Create it even when javascriptHooks
+	// are empty, so we can unconditionally add it to the mock pod.
+	const hooksConfigMapName = "mock-driver-hooks"
+	hooksYaml, err := yaml.Marshal(m.javascriptHooks)
+	framework.ExpectNoError(err)
+	hooks := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hooksConfigMapName,
+		},
+		Data: map[string]string{
+			"hooks.yaml": string(hooksYaml),
+		},
+	}
+
+	_, err = f.ClientSet.CoreV1().ConfigMaps(ns2).Create(context.TODO(), hooks, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	if len(m.javascriptHooks) > 0 {
+		containerArgs = append(containerArgs, "--hooks-file=/etc/hooks/hooks.yaml")
 	}
 
 	o := utils.PatchCSIOptions{
@@ -359,6 +395,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 node.Name,
 		PodInfo:                  m.podInfo,
+		StorageCapacity:          m.storageCapacity,
 		CanAttach:                &m.attachable,
 		VolumeLifecycleModes: &[]storagev1.VolumeLifecycleMode{
 			storagev1.VolumeLifecyclePersistent,
@@ -382,6 +419,13 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
 
 		ginkgo.By("uninstalling csi mock driver")
+		tryFunc(func() {
+			err := f.ClientSet.CoreV1().ConfigMaps(ns2).Delete(context.TODO(), hooksConfigMapName, metav1.DeleteOptions{})
+			if err != nil {
+				framework.Logf("deleting failed: %s", err)
+			}
+		})
+
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
@@ -395,6 +439,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	}
 
 	m.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
+
 	return config, cleanupFunc
 }
 
@@ -415,7 +460,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -442,6 +487,10 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
+			StressTestOptions: &testsuites.StressTestOptions{
+				NumPods:     10,
+				NumRestarts: 10,
+			},
 		},
 	}
 }
@@ -567,7 +616,7 @@ func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Inte
 }
 
 func waitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs clientset.Interface) error {
-	const csiNodeRegisterTimeout = 1 * time.Minute
+	const csiNodeRegisterTimeout = 5 * time.Minute
 
 	waitErr := wait.PollImmediate(10*time.Second, csiNodeRegisterTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})

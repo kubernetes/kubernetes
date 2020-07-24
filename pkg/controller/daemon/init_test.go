@@ -17,7 +17,7 @@ limitations under the License.
 package daemon
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {

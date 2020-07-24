@@ -157,8 +157,6 @@ func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command)
 	zshInitialization := `
 __kubectl_bash_source() {
 	alias shopt=':'
-	alias _expand=_bash_expand
-	alias _complete=_bash_comp
 	emulate -L sh
 	setopt kshglob noshglob braceexpand
 
@@ -225,49 +223,9 @@ __kubectl_get_comp_words_by_ref() {
 }
 
 __kubectl_filedir() {
-	local RET OLD_IFS w qw
-
-	__kubectl_debug "_filedir $@ cur=$cur"
-	if [[ "$1" = \~* ]]; then
-		# somehow does not work. Maybe, zsh does not call this at all
-		eval echo "$1"
-		return 0
-	fi
-
-	OLD_IFS="$IFS"
-	IFS=$'\n'
-	if [ "$1" = "-d" ]; then
-		shift
-		RET=( $(compgen -d) )
-	else
-		RET=( $(compgen -f) )
-	fi
-	IFS="$OLD_IFS"
-
-	IFS="," __kubectl_debug "RET=${RET[@]} len=${#RET[@]}"
-
-	for w in ${RET[@]}; do
-		if [[ ! "${w}" = "${cur}"* ]]; then
-			continue
-		fi
-		if eval "[[ \"\${w}\" = *.$1 || -d \"\${w}\" ]]"; then
-			qw="$(__kubectl_quote "${w}")"
-			if [ -d "${w}" ]; then
-				COMPREPLY+=("${qw}/")
-			else
-				COMPREPLY+=("${qw}")
-			fi
-		fi
-	done
-}
-
-__kubectl_quote() {
-    if [[ $1 == \'* || $1 == \"* ]]; then
-        # Leave out first character
-        printf %q "${1:1}"
-    else
-	printf %q "$1"
-    fi
+	# Don't need to do anything here.
+	# Otherwise we will get trailing space without "compopt -o nospace"
+	true
 }
 
 autoload -U +X bashcompinit && bashcompinit
@@ -275,7 +233,7 @@ autoload -U +X bashcompinit && bashcompinit
 # use word boundary patterns for BSD or GNU sed
 LWORD='[[:<:]]'
 RWORD='[[:>:]]'
-if sed --help 2>&1 | grep -q GNU; then
+if sed --help 2>&1 | grep -q 'GNU\|BusyBox'; then
 	LWORD='\<'
 	RWORD='\>'
 fi
@@ -307,7 +265,6 @@ BASH_COMPLETION_EOF
 }
 
 __kubectl_bash_source <(__kubectl_convert_bash_to_zsh)
-_complete kubectl 2>/dev/null
 `
 	out.Write([]byte(zshTail))
 	return nil

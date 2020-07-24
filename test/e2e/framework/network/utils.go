@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -42,6 +43,8 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -49,12 +52,16 @@ const (
 	// EndpointHTTPPort is an endpoint HTTP port for testing.
 	EndpointHTTPPort = 8080
 	// EndpointUDPPort is an endpoint UDP port for testing.
-	EndpointUDPPort       = 8081
+	EndpointUDPPort = 8081
+	// EndpointSCTPPort is an endpoint SCTP port for testing.
+	EndpointSCTPPort      = 8082
 	testContainerHTTPPort = 8080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
-	ClusterUDPPort             = 90
+	ClusterUDPPort = 90
+	// ClusterSCTPPort is a cluster SCTP port for testing.
+	ClusterSCTPPort            = 95
 	testPodName                = "test-container-pod"
 	hostTestPodName            = "host-test-container-pod"
 	nodePortServiceName        = "node-port-service"
@@ -84,8 +91,8 @@ const (
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
+	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -118,6 +125,9 @@ type NetworkingTestConfig struct {
 	HostTestContainerPod *v1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
+	// if the test pods are listening on sctp port. We need this as sctp tests
+	// are marked as disruptive as they may load the sctp module.
+	SCTPEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -141,9 +151,10 @@ type NetworkingTestConfig struct {
 	ClusterIP string
 	// External ip of first node for use in nodePort testing.
 	NodeIP string
-	// The http/udp nodePorts of the Service.
+	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
+	NodeSCTPPort int
 	// The kubernetes namespace within which all resources for this
 	// config are created
 	Namespace string
@@ -244,7 +255,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-					cmd, config.HostTestContainerPod.Name, stdout, err)
+					cmd, config.TestContainerPod.Name, stdout, err)
 				continue
 			}
 
@@ -302,11 +313,11 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// we confirm unreachability.
 			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
-			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
+			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.TestContainerPod)
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-					cmd, config.HostTestContainerPod.Name, stdout, err)
+					cmd, config.TestContainerPod.Name, stdout, err)
 				continue
 			}
 
@@ -336,8 +347,6 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
 	var cmd string
 	if protocol == "udp" {
-		// TODO: It would be enough to pass 1s+epsilon to timeout, but unfortunately
-		// busybox timeout doesn't support non-integer values.
 		cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
 		ipPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
@@ -485,6 +494,15 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 			},
 		},
 	}
+	// we want sctp to be optional as it will load the sctp kernel module
+	if config.SCTPEnabled {
+		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
+		pod.Spec.Containers[0].Ports = append(pod.Spec.Containers[0].Ports, v1.ContainerPort{
+			Name:          "sctp",
+			ContainerPort: EndpointSCTPPort,
+			Protocol:      v1.ProtocolSCTP,
+		})
+	}
 	return pod
 }
 
@@ -519,6 +537,10 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			},
 		},
 	}
+	// we want sctp to be optional as it will load the sctp kernel module
+	if config.SCTPEnabled {
+		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
+	}
 	return pod
 }
 
@@ -527,7 +549,7 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 	if enableSessionAffinity {
 		sessionAffinity = v1.ServiceAffinityClientIP
 	}
-	return &v1.Service{
+	res := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: svcName,
 		},
@@ -541,6 +563,11 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 			SessionAffinity: sessionAffinity,
 		},
 	}
+
+	if config.SCTPEnabled {
+		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt(EndpointSCTPPort)})
+	}
+	return res
 }
 
 func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
@@ -567,7 +594,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 		config.createPod(hostTestContainerPod)
 	}
 
-	framework.ExpectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
+	framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(config.f.ClientSet, testContainerPod.Name, config.f.Namespace.Name))
 
 	var err error
 	config.TestContainerPod, err = config.getPodClient().Get(context.TODO(), testContainerPod.Name, metav1.GetOptions{})
@@ -576,7 +603,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 	}
 
 	if config.HostNetwork {
-		framework.ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(config.f.ClientSet, hostTestContainerPod.Name, config.f.Namespace.Name))
 		config.HostTestContainerPod, err = config.getPodClient().Get(context.TODO(), hostTestContainerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
@@ -588,7 +615,7 @@ func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.S
 	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
-	err = framework.WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
@@ -634,6 +661,8 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 			config.NodeUDPPort = int(p.NodePort)
 		case v1.ProtocolTCP:
 			config.NodeHTTPPort = int(p.NodePort)
+		case v1.ProtocolSCTP:
+			config.NodeSCTPPort = int(p.NodePort)
 		default:
 			continue
 		}
@@ -644,6 +673,13 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	} else {
 		config.NodeIP = e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
 	}
+
+	ginkgo.By("Waiting for NodePort service to expose endpoint")
+	err = framework.WaitForServiceEndpointsNum(config.f.ClientSet, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", nodePortServiceName, config.Namespace)
+	ginkgo.By("Waiting for Session Affinity service to expose endpoint")
+	err = framework.WaitForServiceEndpointsNum(config.f.ClientSet, config.Namespace, sessionAffinityServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", sessionAffinityServiceName, config.Namespace)
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
@@ -666,7 +702,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	// wait that all of them are up
 	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
-		framework.ExpectNoError(config.f.WaitForPodReady(p.Name))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(config.f.ClientSet, p.Name, config.f.Namespace.Name, framework.PodStartTimeout))
 		rp, err := config.getPodClient().Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		runningPods = append(runningPods, rp)
@@ -873,7 +909,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		// separately, but I prefer to stay on the safe side).
 		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
 		for _, masterAddress := range masterAddresses {
-			framework.UnblockNetwork(host, masterAddress)
+			UnblockNetwork(host, masterAddress)
 		}
 	}()
 
@@ -882,7 +918,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	for _, masterAddress := range masterAddresses {
-		framework.BlockNetwork(host, masterAddress)
+		BlockNetwork(host, masterAddress)
 	}
 
 	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
@@ -892,4 +928,86 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 
 	testFunc()
 	// network traffic is unblocked in a deferred function
+}
+
+// BlockNetwork blocks network between the given from value and the given to value.
+// The following helper functions can block/unblock network from source
+// host to destination host by manipulating iptable rules.
+// This function assumes it can ssh to the source host.
+//
+// Caution:
+// Recommend to input IP instead of hostnames. Using hostnames will cause iptables to
+// do a DNS lookup to resolve the name to an IP address, which will
+// slow down the test and cause it to fail if DNS is absent or broken.
+//
+// Suggested usage pattern:
+// func foo() {
+//	...
+//	defer UnblockNetwork(from, to)
+//	BlockNetwork(from, to)
+//	...
+// }
+//
+func BlockNetwork(from string, to string) {
+	framework.Logf("block network traffic from %s to %s", from, to)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
+	if result, err := e2essh.SSH(dropCmd, from, framework.TestContext.Provider); result.Code != 0 || err != nil {
+		e2essh.LogResult(result)
+		framework.Failf("Unexpected error: %v", err)
+	}
+}
+
+// UnblockNetwork unblocks network between the given from value and the given to value.
+func UnblockNetwork(from string, to string) {
+	framework.Logf("Unblock network traffic from %s to %s", from, to)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
+	// Undrop command may fail if the rule has never been created.
+	// In such case we just lose 30 seconds, but the cluster is healthy.
+	// But if the rule had been created and removing it failed, the node is broken and
+	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
+	// may fail). Manual intervention is required in such case (recreating the
+	// cluster solves the problem too).
+	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
+		result, err := e2essh.SSH(undropCmd, from, framework.TestContext.Provider)
+		if result.Code == 0 && err == nil {
+			return true, nil
+		}
+		e2essh.LogResult(result)
+		if err != nil {
+			framework.Logf("Unexpected error: %v", err)
+		}
+		return false, nil
+	})
+	if err != nil {
+		framework.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
+			"required on host %s: remove rule %s, if exists", from, iptablesRule)
+	}
+}
+
+// WaitForService waits until the service appears (exist == true), or disappears (exist == false)
+func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		_, err := c.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		switch {
+		case err == nil:
+			framework.Logf("Service %s in namespace %s found.", name, namespace)
+			return exist, nil
+		case apierrors.IsNotFound(err):
+			framework.Logf("Service %s in namespace %s disappeared.", name, namespace)
+			return !exist, nil
+		case !testutils.IsRetryableAPIError(err):
+			framework.Logf("Non-retryable failure while getting service.")
+			return false, err
+		default:
+			framework.Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
+			return false, nil
+		}
+	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
 }

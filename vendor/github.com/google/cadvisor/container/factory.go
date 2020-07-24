@@ -22,7 +22,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/watcher"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type ContainerHandlerFactory interface {
@@ -43,20 +43,49 @@ type ContainerHandlerFactory interface {
 type MetricKind string
 
 const (
-	CpuUsageMetrics         MetricKind = "cpu"
-	ProcessSchedulerMetrics MetricKind = "sched"
-	PerCpuUsageMetrics      MetricKind = "percpu"
-	MemoryUsageMetrics      MetricKind = "memory"
-	CpuLoadMetrics          MetricKind = "cpuLoad"
-	DiskIOMetrics           MetricKind = "diskIO"
-	DiskUsageMetrics        MetricKind = "disk"
-	NetworkUsageMetrics     MetricKind = "network"
-	NetworkTcpUsageMetrics  MetricKind = "tcp"
-	NetworkUdpUsageMetrics  MetricKind = "udp"
-	AcceleratorUsageMetrics MetricKind = "accelerator"
-	AppMetrics              MetricKind = "app"
-	ProcessMetrics          MetricKind = "process"
+	CpuUsageMetrics                MetricKind = "cpu"
+	ProcessSchedulerMetrics        MetricKind = "sched"
+	PerCpuUsageMetrics             MetricKind = "percpu"
+	MemoryUsageMetrics             MetricKind = "memory"
+	CpuLoadMetrics                 MetricKind = "cpuLoad"
+	DiskIOMetrics                  MetricKind = "diskIO"
+	DiskUsageMetrics               MetricKind = "disk"
+	NetworkUsageMetrics            MetricKind = "network"
+	NetworkTcpUsageMetrics         MetricKind = "tcp"
+	NetworkAdvancedTcpUsageMetrics MetricKind = "advtcp"
+	NetworkUdpUsageMetrics         MetricKind = "udp"
+	AcceleratorUsageMetrics        MetricKind = "accelerator"
+	AppMetrics                     MetricKind = "app"
+	ProcessMetrics                 MetricKind = "process"
+	HugetlbUsageMetrics            MetricKind = "hugetlb"
+	PerfMetrics                    MetricKind = "perf_event"
+	ReferencedMemoryMetrics        MetricKind = "referenced_memory"
+	CPUTopologyMetrics             MetricKind = "cpu_topology"
+	ResctrlMetrics                 MetricKind = "resctrl"
 )
+
+// AllMetrics represents all kinds of metrics that cAdvisor supported.
+var AllMetrics = MetricSet{
+	CpuUsageMetrics:                struct{}{},
+	ProcessSchedulerMetrics:        struct{}{},
+	PerCpuUsageMetrics:             struct{}{},
+	MemoryUsageMetrics:             struct{}{},
+	CpuLoadMetrics:                 struct{}{},
+	DiskIOMetrics:                  struct{}{},
+	AcceleratorUsageMetrics:        struct{}{},
+	DiskUsageMetrics:               struct{}{},
+	NetworkUsageMetrics:            struct{}{},
+	NetworkTcpUsageMetrics:         struct{}{},
+	NetworkAdvancedTcpUsageMetrics: struct{}{},
+	NetworkUdpUsageMetrics:         struct{}{},
+	ProcessMetrics:                 struct{}{},
+	AppMetrics:                     struct{}{},
+	HugetlbUsageMetrics:            struct{}{},
+	PerfMetrics:                    struct{}{},
+	ReferencedMemoryMetrics:        struct{}{},
+	CPUTopologyMetrics:             struct{}{},
+	ResctrlMetrics:                 struct{}{},
+}
 
 func (mk MetricKind) String() string {
 	return string(mk)
@@ -71,6 +100,16 @@ func (ms MetricSet) Has(mk MetricKind) bool {
 
 func (ms MetricSet) Add(mk MetricKind) {
 	ms[mk] = struct{}{}
+}
+
+func (ms MetricSet) Difference(ms1 MetricSet) MetricSet {
+	result := MetricSet{}
+	for kind := range ms {
+		if !ms1.Has(kind) {
+			result.Add(kind)
+		}
+	}
+	return result
 }
 
 // All registered auth provider plugins.
@@ -173,9 +212,8 @@ func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, in
 			klog.V(3).Infof("Using factory %q for container %q", factory, name)
 			handle, err := factory.NewContainerHandler(name, inHostNamespace)
 			return handle, canAccept, err
-		} else {
-			klog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
 		}
+		klog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
 	}
 
 	return nil, false, fmt.Errorf("no known factory can handle creation of container")

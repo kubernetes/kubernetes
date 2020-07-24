@@ -20,12 +20,6 @@ import "testing"
 
 func TestCmdCompletion(t *testing.T) {
 	kubeadmPath := getKubeadmPath()
-
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	var tests = []struct {
 		name     string
 		args     string

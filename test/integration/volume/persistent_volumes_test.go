@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Several tests in this file are configurable by environment variables:

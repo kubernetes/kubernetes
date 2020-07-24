@@ -369,6 +369,39 @@ spec:
 		t.Fatalf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
 	}
 	verifyNumPorts(t, result, 2)
+
+	// UpdateOnCreate
+	notExistingYAMLBody := []byte(fmt.Sprintf(`
+	{
+		"apiVersion": "%s",
+		"kind": "%s",
+		"metadata": {
+		  "name": "%s",
+		  "finalizers": [
+			"test-finalizer"
+		  ]
+		},
+		"spec": {
+		  "cronSpec": "* * * * */5",
+		  "replicas": 1,
+		  "ports": [
+			{
+			  "name": "x",
+			  "containerPort": 80
+			}
+		  ]
+		},
+		"protocol": "TCP"
+	}`, apiVersion, kind, "should-not-exist"))
+	_, err = rest.Put().
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name("should-not-exist").
+		Param("fieldManager", "apply_test").
+		Body(notExistingYAMLBody).
+		DoRaw(context.TODO())
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("create on update should fail with notFound, got %v", err)
+	}
 }
 
 // TestApplyCRDNonStructuralSchema tests that when a CRD has a non-structural schema in its validation field,

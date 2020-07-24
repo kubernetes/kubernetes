@@ -38,11 +38,12 @@ var (
 	// VolumeSchedulingStageLatency tracks the latency of volume scheduling operations.
 	VolumeSchedulingStageLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      VolumeSchedulerSubsystem,
-			Name:           "scheduling_duration_seconds",
-			Help:           "Volume scheduling stage latency",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         VolumeSchedulerSubsystem,
+			Name:              "scheduling_duration_seconds",
+			Help:              "Volume scheduling stage latency (Deprecated since 1.19.0)",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.19.0",
 		},
 		[]string{"operation"},
 	)

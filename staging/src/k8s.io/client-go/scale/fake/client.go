@@ -60,7 +60,7 @@ func (f *fakeNamespacedScaleClient) Get(ctx context.Context, resource schema.Gro
 
 func (f *fakeNamespacedScaleClient) Update(ctx context.Context, resource schema.GroupResource, scale *autoscalingapi.Scale, opts metav1.UpdateOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
-		Invokes(testing.NewUpdateSubresourceAction(resource.WithVersion(""), f.namespace, "scale", scale), &autoscalingapi.Scale{})
+		Invokes(testing.NewUpdateSubresourceAction(resource.WithVersion(""), "scale", f.namespace, scale), &autoscalingapi.Scale{})
 
 	if err != nil {
 		return nil, err

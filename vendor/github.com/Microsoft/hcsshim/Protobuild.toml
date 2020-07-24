@@ -29,12 +29,25 @@ plugins = ["grpc", "fieldpath"]
   "google/protobuf/field_mask.proto" = "github.com/gogo/protobuf/types"
   "google/protobuf/timestamp.proto" = "github.com/gogo/protobuf/types"
   "google/protobuf/duration.proto" = "github.com/gogo/protobuf/types"
+  "github/containerd/cgroups/stats/v1/metrics.proto" = "github.com/containerd/cgroups/stats/v1"
+
+[[overrides]]
+prefixes = ["github.com/Microsoft/hcsshim/internal/shimdiag"]
+plugins = ["ttrpc"]
 
 # Lock down runhcs config
 
 [[descriptors]]
 prefix = "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 target = "cmd/containerd-shim-runhcs-v1/options/next.pb.txt"
+ignore_files = [
+	"google/protobuf/descriptor.proto",
+	"gogoproto/gogo.proto"
+]
+
+[[descriptors]]
+prefix = "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
+target = "cmd/containerd-shim-runhcs-v1/stats/next.pb.txt"
 ignore_files = [
 	"google/protobuf/descriptor.proto",
 	"gogoproto/gogo.proto"

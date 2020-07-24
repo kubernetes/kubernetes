@@ -59,7 +59,7 @@ type endpointMeta struct {
 func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) error {
 	addressType := discovery.AddressTypeIPv4
 
-	if isIPv6Service(service) {
+	if endpointutil.IsIPv6Service(service) {
 		addressType = discovery.AddressTypeIPv6
 	}
 
@@ -206,18 +206,23 @@ func (r *reconciler) finalize(
 		}
 	}
 
-	for _, endpointSlice := range slicesToCreate {
-		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		createdSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-		if err != nil {
-			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
-			if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				return nil
+	// Don't create new EndpointSlices if the Service is pending deletion. This
+	// is to avoid a potential race condition with the garbage collector where
+	// it tries to delete EndpointSlices as this controller replaces them.
+	if service.DeletionTimestamp == nil {
+		for _, endpointSlice := range slicesToCreate {
+			addTriggerTimeAnnotation(endpointSlice, triggerTime)
+			createdSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+			if err != nil {
+				// If the namespace is terminating, creates will continue to fail. Simply drop the item.
+				if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+					return nil
+				}
+				errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
+			} else {
+				r.endpointSliceTracker.Update(createdSlice)
+				metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 			}
-			errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
-		} else {
-			r.endpointSliceTracker.Update(createdSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
 

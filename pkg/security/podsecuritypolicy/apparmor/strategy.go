@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -47,7 +48,7 @@ var _ Strategy = &strategy{}
 // NewStrategy creates a new strategy that enforces AppArmor profile constraints.
 func NewStrategy(pspAnnotations map[string]string) Strategy {
 	var allowedProfiles map[string]bool
-	if allowed, ok := pspAnnotations[apparmor.AllowedProfilesAnnotationKey]; ok {
+	if allowed, ok := pspAnnotations[v1.AppArmorBetaAllowedProfilesAnnotationKey]; ok {
 		profiles := strings.Split(allowed, ",")
 		allowedProfiles = make(map[string]bool, len(profiles))
 		for _, p := range profiles {
@@ -55,16 +56,16 @@ func NewStrategy(pspAnnotations map[string]string) Strategy {
 		}
 	}
 	return &strategy{
-		defaultProfile:        pspAnnotations[apparmor.DefaultProfileAnnotationKey],
+		defaultProfile:        pspAnnotations[v1.AppArmorBetaDefaultProfileAnnotationKey],
 		allowedProfiles:       allowedProfiles,
-		allowedProfilesString: pspAnnotations[apparmor.AllowedProfilesAnnotationKey],
+		allowedProfilesString: pspAnnotations[v1.AppArmorBetaAllowedProfilesAnnotationKey],
 	}
 }
 
 func (s *strategy) Generate(annotations map[string]string, container *api.Container) (map[string]string, error) {
 	copy := maps.CopySS(annotations)
 
-	if annotations[apparmor.ContainerAnnotationKeyPrefix+container.Name] != "" {
+	if annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+container.Name] != "" {
 		// Profile already set, nothing to do.
 		return copy, nil
 	}
@@ -78,7 +79,7 @@ func (s *strategy) Generate(annotations map[string]string, container *api.Contai
 		copy = map[string]string{}
 	}
 	// Add the default profile.
-	copy[apparmor.ContainerAnnotationKeyPrefix+container.Name] = s.defaultProfile
+	copy[v1.AppArmorBetaContainerAnnotationKeyPrefix+container.Name] = s.defaultProfile
 
 	return copy, nil
 }
@@ -90,7 +91,7 @@ func (s *strategy) Validate(pod *api.Pod, container *api.Container) field.ErrorL
 	}
 
 	allErrs := field.ErrorList{}
-	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(apparmor.ContainerAnnotationKeyPrefix + container.Name)
+	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(v1.AppArmorBetaContainerAnnotationKeyPrefix + container.Name)
 
 	profile := apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
 	if profile == "" {

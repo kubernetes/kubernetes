@@ -4,9 +4,10 @@ package wclayer
 // functionality.
 
 import (
+	"context"
 	"syscall"
 
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -68,12 +69,12 @@ type WC_LAYER_DESCRIPTOR struct {
 	Pathp   *uint16
 }
 
-func layerPathsToDescriptors(parentLayerPaths []string) ([]WC_LAYER_DESCRIPTOR, error) {
+func layerPathsToDescriptors(ctx context.Context, parentLayerPaths []string) ([]WC_LAYER_DESCRIPTOR, error) {
 	// Array of descriptors that gets constructed.
 	var layers []WC_LAYER_DESCRIPTOR
 
 	for i := 0; i < len(parentLayerPaths); i++ {
-		g, err := LayerID(parentLayerPaths[i])
+		g, err := LayerID(ctx, parentLayerPaths[i])
 		if err != nil {
 			logrus.WithError(err).Debug("Failed to convert name to guid")
 			return nil, err

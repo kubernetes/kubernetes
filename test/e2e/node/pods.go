@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -102,7 +103,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
-			framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 			// save the running pod
 			pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
@@ -165,6 +166,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Release : v1.9
 			Testname: Pods, QOS
 			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
+			Behaviors:
+			- pod/spec/container/resources
 		*/
 		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
 			ginkgo.By("creating the pod")
@@ -232,6 +235,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			for i := 0; i < workers; i++ {
 				wg.Add(1)
 				go func(i int) {
+					defer ginkgo.GinkgoRecover()
 					defer wg.Done()
 					for retries := 0; retries < pods; retries++ {
 						name := fmt.Sprintf("pod-submit-status-%d-%d", i, retries)
@@ -271,6 +275,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 						created := podClient.Create(pod)
 						ch := make(chan []watch.Event)
 						go func() {
+							defer ginkgo.GinkgoRecover()
 							defer close(ch)
 							w, err := podClient.Watch(context.TODO(), metav1.ListOptions{
 								ResourceVersion: created.ResourceVersion,
@@ -286,7 +291,11 @@ var _ = SIGDescribe("Pods Extended", func() {
 							}
 							for event := range w.ResultChan() {
 								events = append(events, event)
+								if event.Type == watch.Error {
+									framework.Logf("watch error seen for %s: %#v", pod.Name, event.Object)
+								}
 								if event.Type == watch.Deleted {
+									framework.Logf("watch delete seen for %s", pod.Name)
 									break
 								}
 							}
@@ -298,12 +307,20 @@ var _ = SIGDescribe("Pods Extended", func() {
 						err := podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 						framework.ExpectNoError(err, "failed to delete pod")
 
-						events, ok := <-ch
-						if !ok {
-							continue
-						}
-						if len(events) < 2 {
-							framework.Fail("only got a single event")
+						var (
+							events []watch.Event
+							ok     bool
+						)
+						select {
+						case events, ok = <-ch:
+							if !ok {
+								continue
+							}
+							if len(events) < 2 {
+								framework.Fail("only got a single event")
+							}
+						case <-time.After(5 * time.Minute):
+							framework.Failf("timed out waiting for watch events for %s", pod.Name)
 						}
 
 						end := time.Now()
@@ -355,7 +372,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 									// expected
 								case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 									// pod volume teardown races with container start in CRI, which reports a failure
-									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766")
+									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
 								default:
 									return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
 								}
@@ -378,8 +395,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 							}
 						}
 						func() {
-							defer lock.Unlock()
 							lock.Lock()
+							defer lock.Unlock()
 
 							if eventErr != nil {
 								errs = append(errs, eventErr)

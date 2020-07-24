@@ -32,7 +32,6 @@ var DefaultSysSpec = SysSpec{
 		Optional:  []KernelConfig{},
 		Forbidden: []KernelConfig{},
 	},
-	Cgroups: []string{},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
 			Version:     []string{`18\.0[6,9]\..*`},

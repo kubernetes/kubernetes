@@ -56,12 +56,15 @@ var (
 
 	plog = capnslog.NewPackageLogger("go.etcd.io/etcd", "wal")
 
-	ErrMetadataConflict = errors.New("wal: conflicting metadata found")
-	ErrFileNotFound     = errors.New("wal: file not found")
-	ErrCRCMismatch      = errors.New("wal: crc mismatch")
-	ErrSnapshotMismatch = errors.New("wal: snapshot mismatch")
-	ErrSnapshotNotFound = errors.New("wal: snapshot not found")
-	crcTable            = crc32.MakeTable(crc32.Castagnoli)
+	ErrMetadataConflict             = errors.New("wal: conflicting metadata found")
+	ErrFileNotFound                 = errors.New("wal: file not found")
+	ErrCRCMismatch                  = errors.New("wal: crc mismatch")
+	ErrSnapshotMismatch             = errors.New("wal: snapshot mismatch")
+	ErrSnapshotNotFound             = errors.New("wal: snapshot not found")
+	ErrSliceOutOfRange              = errors.New("wal: slice bounds out of range")
+	ErrMaxWALEntrySizeLimitExceeded = errors.New("wal: max entry size limit exceeded")
+	ErrDecoderNotFound              = errors.New("wal: decoder not found")
+	crcTable                        = crc32.MakeTable(crc32.Castagnoli)
 )
 
 // WAL is a logical representation of the stable storage.
@@ -84,6 +87,8 @@ type WAL struct {
 	decoder   *decoder       // decoder to decode records
 	readClose func() error   // closer for decode reader
 
+	unsafeNoSync bool // if set, do not fsync
+
 	mu      sync.Mutex
 	enti    uint64   // index of the last entry saved to the wal
 	encoder *encoder // encoder to encode records
@@ -93,7 +98,8 @@ type WAL struct {
 }
 
 // Create creates a WAL ready for appending records. The given metadata is
-// recorded at the head of each WAL file, and can be retrieved with ReadAll.
+// recorded at the head of each WAL file, and can be retrieved with ReadAll
+// after the file is Open.
 func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 	if Exist(dirpath) {
 		return nil, os.ErrExist
@@ -204,6 +210,7 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 		}
 		return nil, perr
 	}
+	start := time.Now()
 	if perr = fileutil.Fsync(pdir); perr != nil {
 		if lg != nil {
 			lg.Warn(
@@ -215,6 +222,8 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 		}
 		return nil, perr
 	}
+	walFsyncSec.Observe(time.Since(start).Seconds())
+
 	if perr = pdir.Close(); perr != nil {
 		if lg != nil {
 			lg.Warn(
@@ -228,6 +237,10 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 	}
 
 	return w, nil
+}
+
+func (w *WAL) SetUnsafeNoFsync() {
+	w.unsafeNoSync = true
 }
 
 func (w *WAL) cleanupWAL(lg *zap.Logger) {
@@ -425,6 +438,10 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 	defer w.mu.Unlock()
 
 	rec := &walpb.Record{}
+
+	if w.decoder == nil {
+		return nil, state, nil, ErrDecoderNotFound
+	}
 	decoder := w.decoder
 
 	var match bool
@@ -432,8 +449,15 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 		switch rec.Type {
 		case entryType:
 			e := mustUnmarshalEntry(rec.Data)
+			// 0 <= e.Index-w.start.Index - 1 < len(ents)
 			if e.Index > w.start.Index {
-				ents = append(ents[:e.Index-w.start.Index-1], e)
+				// prevent "panic: runtime error: slice bounds out of range [:13038096702221461992] with capacity 0"
+				up := e.Index - w.start.Index - 1
+				if up > uint64(len(ents)) {
+					// return error before append call causes runtime panic
+					return nil, state, nil, ErrSliceOutOfRange
+				}
+				ents = append(ents[:up], e)
 			}
 			w.enti = e.Index
 
@@ -527,6 +551,71 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 	w.decoder = nil
 
 	return metadata, state, ents, err
+}
+
+// ValidSnapshotEntries returns all the valid snapshot entries in the wal logs in the given directory.
+// Snapshot entries are valid if their index is less than or equal to the most recent committed hardstate.
+func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]walpb.Snapshot, error) {
+	var snaps []walpb.Snapshot
+	var state raftpb.HardState
+	var err error
+
+	rec := &walpb.Record{}
+	names, err := readWALNames(lg, walDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// open wal files in read mode, so that there is no conflict
+	// when the same WAL is opened elsewhere in write mode
+	rs, _, closer, err := openWALFiles(lg, walDir, names, 0, false)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closer != nil {
+			closer()
+		}
+	}()
+
+	// create a new decoder from the readers on the WAL files
+	decoder := newDecoder(rs...)
+
+	for err = decoder.decode(rec); err == nil; err = decoder.decode(rec) {
+		switch rec.Type {
+		case snapshotType:
+			var loadedSnap walpb.Snapshot
+			pbutil.MustUnmarshal(&loadedSnap, rec.Data)
+			snaps = append(snaps, loadedSnap)
+		case stateType:
+			state = mustUnmarshalState(rec.Data)
+		case crcType:
+			crc := decoder.crc.Sum32()
+			// current crc of decoder must match the crc of the record.
+			// do no need to match 0 crc, since the decoder is a new one at this case.
+			if crc != 0 && rec.Validate(crc) != nil {
+				return nil, ErrCRCMismatch
+			}
+			decoder.updateCRC(rec.Crc)
+		}
+	}
+	// We do not have to read out all the WAL entries
+	// as the decoder is opened in read mode.
+	if err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+
+	// filter out any snaps that are newer than the committed hardstate
+	n := 0
+	for _, s := range snaps {
+		if s.Index <= state.Commit {
+			snaps[n] = s
+			n++
+		}
+	}
+	snaps = snaps[:n:n]
+
+	return snaps, nil
 }
 
 // Verify reads through the given WAL and verifies that it is not corrupted.
@@ -667,9 +756,11 @@ func (w *WAL) cut() error {
 	if err = os.Rename(newTail.Name(), fpath); err != nil {
 		return err
 	}
+	start := time.Now()
 	if err = fileutil.Fsync(w.dirFile); err != nil {
 		return err
 	}
+	walFsyncSec.Observe(time.Since(start).Seconds())
 
 	// reopen newTail with its new path so calls to Name() match the wal filename format
 	newTail.Close()
@@ -698,6 +789,9 @@ func (w *WAL) cut() error {
 }
 
 func (w *WAL) sync() error {
+	if w.unsafeNoSync {
+		return nil
+	}
 	if w.encoder != nil {
 		if err := w.encoder.flush(); err != nil {
 			return err
@@ -721,6 +815,10 @@ func (w *WAL) sync() error {
 	walFsyncSec.Observe(took.Seconds())
 
 	return err
+}
+
+func (w *WAL) Sync() error {
+	return w.sync()
 }
 
 // ReleaseLockTo releases the locks, which has smaller index than the given index

@@ -55,10 +55,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -76,7 +77,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
@@ -168,8 +168,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address with port for the health check server to serve on (set to '0.0.0.0:10256' for all IPv4 interfaces and '[::]:10256' for all IPv6 interfaces). Set empty to disable.")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable.")
+	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
-	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs'. If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' or 'kernelspace' (windows). If blank, use the best-available proxy (currently iptables). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
@@ -293,10 +294,7 @@ func (o *Options) processHostnameOverrideFlag() error {
 }
 
 // Validate validates all the required options.
-func (o *Options) Validate(args []string) error {
-	if len(args) != 0 {
-		return errors.New("no arguments are supported")
-	}
+func (o *Options) Validate() error {
 	if errs := validation.Validate(o.config); len(errs) != 0 {
 		return errs.ToAggregate()
 	}
@@ -480,7 +478,7 @@ addon that provides cluster DNS for these cluster IPs. The user must create a se
 with the apiserver API to configure the proxy.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cmd.Flags())
+			cliflag.PrintFlags(cmd.Flags())
 
 			if err := initForOS(opts.WindowsService); err != nil {
 				klog.Fatalf("failed OS init: %v", err)
@@ -489,13 +487,21 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Complete(); err != nil {
 				klog.Fatalf("failed complete: %v", err)
 			}
-			if err := opts.Validate(args); err != nil {
+			if err := opts.Validate(); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
 
 			if err := opts.Run(); err != nil {
 				klog.Exit(err)
 			}
+		},
+		Args: func(cmd *cobra.Command, args []string) error {
+			for _, arg := range args {
+				if len(arg) > 0 {
+					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
+				}
+			}
+			return nil
 		},
 	}
 
@@ -531,6 +537,7 @@ type ProxyServer struct {
 	NodeRef                *v1.ObjectReference
 	CleanupIPVS            bool
 	MetricsBindAddress     string
+	BindAddressHardFail    bool
 	EnableProfiling        bool
 	UseEndpointSlices      bool
 	OOMScoreAdj            *int32
@@ -576,6 +583,66 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	return client, eventClient.CoreV1(), nil
 }
 
+func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
+	if hz == nil {
+		return
+	}
+
+	fn := func() {
+		err := hz.Run()
+		if err != nil {
+			klog.Errorf("healthz server failed: %v", err)
+			if errCh != nil {
+				errCh <- fmt.Errorf("healthz server failed: %v", err)
+				// if in hardfail mode, never retry again
+				blockCh := make(chan error)
+				<-blockCh
+			}
+		} else {
+			klog.Errorf("healthz server returned without error")
+		}
+	}
+	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+}
+
+func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh chan error) {
+	if len(bindAddress) == 0 {
+		return
+	}
+
+	proxyMux := mux.NewPathRecorderMux("kube-proxy")
+	healthz.InstallHandler(proxyMux)
+	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		fmt.Fprintf(w, "%s", proxyMode)
+	})
+
+	//lint:ignore SA1019 See the Metrics Stability Migration KEP
+	proxyMux.Handle("/metrics", legacyregistry.Handler())
+
+	if enableProfiling {
+		routes.Profiling{}.Install(proxyMux)
+	}
+
+	configz.InstallHandler(proxyMux)
+
+	fn := func() {
+		err := http.ListenAndServe(bindAddress, proxyMux)
+		if err != nil {
+			err = fmt.Errorf("starting metrics server failed: %v", err)
+			utilruntime.HandleError(err)
+			if errCh != nil {
+				errCh <- err
+				// if in hardfail mode, never retry again
+				blockCh := make(chan error)
+				<-blockCh
+			}
+		}
+	}
+	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+}
+
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 // TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
@@ -595,33 +662,18 @@ func (s *ProxyServer) Run() error {
 		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 	}
 
-	// Start up a healthz server if requested
-	if s.HealthzServer != nil {
-		s.HealthzServer.Run()
+	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
+
+	var errCh chan error
+	if s.BindAddressHardFail {
+		errCh = make(chan error)
 	}
 
+	// Start up a healthz server if requested
+	serveHealthz(s.HealthzServer, errCh)
+
 	// Start up a metrics server if requested
-	if len(s.MetricsBindAddress) > 0 {
-		proxyMux := mux.NewPathRecorderMux("kube-proxy")
-		healthz.InstallHandler(proxyMux)
-		proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			fmt.Fprintf(w, "%s", s.ProxyMode)
-		})
-		//lint:ignore SA1019 See the Metrics Stability Migration KEP
-		proxyMux.Handle("/metrics", legacyregistry.Handler())
-		if s.EnableProfiling {
-			routes.Profiling{}.Install(proxyMux)
-		}
-		configz.InstallHandler(proxyMux)
-		go wait.Until(func() {
-			err := http.ListenAndServe(s.MetricsBindAddress, proxyMux)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
-			}
-		}, 5*time.Second, wait.NeverStop)
-	}
+	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
 
 	// Tune conntrack, if requested
 	// Conntracker is always nil for windows
@@ -723,9 +775,9 @@ func (s *ProxyServer) Run() error {
 	// Birth Cry after the birth is successful
 	s.birthCry()
 
-	// Just loop forever for now...
-	s.Proxier.SyncLoop()
-	return nil
+	go s.Proxier.SyncLoop()
+
+	return <-errCh
 }
 
 func (s *ProxyServer) birthCry() {

@@ -147,7 +147,7 @@ function download_tarball() {
   local -r download_path="$1"
   local -r file="$2"
   local trace_on="off"
-  if [[ -o xtrace ]]; then 
+  if [[ -o xtrace ]]; then
     trace_on="on"
     set +x
   fi

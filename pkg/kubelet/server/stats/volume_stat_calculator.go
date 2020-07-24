@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/volume"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // volumeStatCalculator calculates volume metrics for a given pod periodically in the background and caches the result

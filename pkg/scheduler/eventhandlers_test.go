@@ -19,11 +19,14 @@ package scheduler
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
 func TestSkipPodUpdate(t *testing.T) {
@@ -179,6 +182,51 @@ func TestSkipPodUpdate(t *testing.T) {
 				}
 			},
 			expected: false,
+		},
+		{
+			name: "with changes on Finalizers",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-0",
+					Finalizers: []string{"a", "b"},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "pod-0",
+						Finalizers: []string{"c", "d"},
+					},
+				}
+			},
+			expected: true,
+		},
+		{
+			name: "with changes on Conditions",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-0",
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{Type: "foo"},
+					},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-0",
+					},
+				}
+			},
+			expected: true,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -345,4 +393,52 @@ func TestNodeConditionsChanged(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdatePodInCache(t *testing.T) {
+	ttl := 10 * time.Second
+	nodeName := "node"
+
+	tests := []struct {
+		name   string
+		oldObj interface{}
+		newObj interface{}
+	}{
+		{
+			name:   "pod updated with the same UID",
+			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newObj: withPodName(podWithPort("oldUID", nodeName, 8080), "pod"),
+		},
+		{
+			name:   "pod updated with different UIDs",
+			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newObj: withPodName(podWithPort("newUID", nodeName, 8080), "pod"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			schedulerCache := cache.New(ttl, stopCh)
+			schedulerQueue := queue.NewPriorityQueue(nil)
+			sched := &Scheduler{
+				SchedulerCache:  schedulerCache,
+				SchedulingQueue: schedulerQueue,
+			}
+			sched.addPodToCache(tt.oldObj)
+			sched.updatePodInCache(tt.oldObj, tt.newObj)
+			pod, err := sched.SchedulerCache.GetPod(tt.newObj.(*v1.Pod))
+			if err != nil {
+				t.Errorf("Failed to get pod from scheduler: %v", err)
+			}
+			if pod.UID != tt.newObj.(*v1.Pod).UID {
+				t.Errorf("Want pod UID %v, got %v", tt.newObj.(*v1.Pod).UID, pod.UID)
+			}
+		})
+	}
+}
+
+func withPodName(pod *v1.Pod, name string) *v1.Pod {
+	pod.Name = name
+	return pod
 }

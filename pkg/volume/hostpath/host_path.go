@@ -370,7 +370,11 @@ func (ftc *fileTypeChecker) IsFile() bool {
 	if !ftc.Exists() {
 		return false
 	}
-	return !ftc.IsDir()
+	pathType, err := ftc.hu.GetFileType(ftc.path)
+	if err != nil {
+		return false
+	}
+	return string(pathType) == string(v1.HostPathFile)
 }
 
 func (ftc *fileTypeChecker) MakeFile() error {

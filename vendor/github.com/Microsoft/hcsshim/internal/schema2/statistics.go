@@ -15,12 +15,11 @@ import (
 
 //  Runtime statistics for a container
 type Statistics struct {
-
 	Timestamp time.Time `json:"Timestamp,omitempty"`
 
 	ContainerStartTime time.Time `json:"ContainerStartTime,omitempty"`
 
-	Uptime100ns int32 `json:"Uptime100ns,omitempty"`
+	Uptime100ns uint64 `json:"Uptime100ns,omitempty"`
 
 	Processor *ProcessorStats `json:"Processor,omitempty"`
 

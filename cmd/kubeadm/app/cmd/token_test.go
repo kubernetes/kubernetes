@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -420,7 +420,7 @@ abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid b
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "jsonpath={.token} {.groups}",
-			expected:     "abcdef.1234567890123456 [system:bootstrappers:kubeadm:default-node-token]",
+			expected:     "abcdef.1234567890123456 [\"system:bootstrappers:kubeadm:default-node-token\"]",
 		},
 	}
 	for _, tc := range testCases {

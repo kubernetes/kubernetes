@@ -135,7 +135,7 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*v1.Endpoints)) *v1.
 
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func TestEndpointsToEndpointsMap(t *testing.T) {
-	epTracker := NewEndpointChangeTracker("test-hostname", nil, nil, nil, false)
+	epTracker := NewEndpointChangeTracker("test-hostname", nil, nil, nil, false, nil)
 
 	trueVal := true
 	falseVal := false
@@ -1446,7 +1446,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test starting from an empty state
 		"add a simple slice that doesn't already exist": {
 			startingSlices:        []*discovery.EndpointSlice{},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1469,7 +1469,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1481,7 +1481,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    fqdnSlice,
 			paramRemoveSlice:      false,
@@ -1494,7 +1494,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1526,7 +1526,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSliceWithOffset("svc1", "ns1", 3, 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80)}),
 			paramRemoveSlice:      false,
@@ -1556,7 +1556,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      true,
@@ -1578,7 +1578,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 3, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      true,
@@ -1590,7 +1590,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 1, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1602,7 +1602,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 2, 1, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 2, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1624,7 +1624,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 2, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 2, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 3, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1683,20 +1683,20 @@ func TestCheckoutChanges(t *testing.T) {
 		pendingSlices         []*discovery.EndpointSlice
 	}{
 		"empty slices": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true, nil),
 			expectedChanges:       []*endpointsChange{},
 			useEndpointSlices:     true,
 			appliedSlices:         []*discovery.EndpointSlice{},
 			pendingSlices:         []*discovery.EndpointSlice{},
 		},
 		"without slices, empty items": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false, nil),
 			expectedChanges:       []*endpointsChange{},
 			items:                 map[types.NamespacedName]*endpointsChange{},
 			useEndpointSlices:     false,
 		},
 		"without slices, simple items": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
 					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", ""), newTestEp("10.0.1.2:80", "")},
@@ -1720,7 +1720,7 @@ func TestCheckoutChanges(t *testing.T) {
 			useEndpointSlices: false,
 		},
 		"adding initial slice": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{},
 				current: EndpointsMap{
@@ -1734,7 +1734,7 @@ func TestCheckoutChanges(t *testing.T) {
 			},
 		},
 		"removing port in update": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
 					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1"), newTestEp("10.0.1.2:80", "host1")},

@@ -43,6 +43,7 @@ func (s *store) scheduleCompaction(compactMainRev int64, keep map[revision]struc
 			rev = bytesToRev(key)
 			if _, ok := keep[rev]; !ok {
 				tx.UnsafeDelete(keyBucketName, key)
+				keyCompactions++
 			}
 		}
 

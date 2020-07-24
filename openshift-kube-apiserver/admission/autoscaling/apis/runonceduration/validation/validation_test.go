@@ -10,7 +10,7 @@ func TestRunOnceDurationConfigValidation(t *testing.T) {
 	// Check invalid duration returns an error
 	var invalidSecs int64 = -1
 	invalidConfig := &runonceduration.RunOnceDurationConfig{
-		ActiveDeadlineSecondsLimit: &invalidSecs,
+		ActiveDeadlineSecondsOverride: &invalidSecs,
 	}
 	errs := ValidateRunOnceDurationConfig(invalidConfig)
 	if len(errs) == 0 {
@@ -20,7 +20,7 @@ func TestRunOnceDurationConfigValidation(t *testing.T) {
 	// Check that valid duration returns no error
 	var validSecs int64 = 5
 	validConfig := &runonceduration.RunOnceDurationConfig{
-		ActiveDeadlineSecondsLimit: &validSecs,
+		ActiveDeadlineSecondsOverride: &validSecs,
 	}
 	errs = ValidateRunOnceDurationConfig(validConfig)
 	if len(errs) > 0 {

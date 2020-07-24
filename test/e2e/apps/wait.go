@@ -23,7 +23,7 @@ import (
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 )
 
 // waitForPartitionedRollingUpdate waits for all Pods in set to exist and have the correct revision. set must have
@@ -43,7 +43,7 @@ func waitForPartitionedRollingUpdate(c clientset.Interface, set *appsv1.Stateful
 			set.Namespace,
 			set.Name)
 	}
-	e2esset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		partition := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
@@ -55,7 +55,7 @@ func waitForPartitionedRollingUpdate(c clientset.Interface, set *appsv1.Stateful
 				set.Namespace,
 				set.Name,
 			)
-			e2esset.SortStatefulPods(pods)
+			e2estatefulset.SortStatefulPods(pods)
 			for i := range pods.Items {
 				if pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
 					framework.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
@@ -85,7 +85,7 @@ func waitForPartitionedRollingUpdate(c clientset.Interface, set *appsv1.Stateful
 // waitForStatus waits for the StatefulSetStatus's ObservedGeneration to be greater than or equal to set's Generation.
 // The returned StatefulSet contains such a StatefulSetStatus
 func waitForStatus(c clientset.Interface, set *appsv1.StatefulSet) *appsv1.StatefulSet {
-	e2esset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation {
 			set = set2
 			return true, nil
@@ -98,7 +98,7 @@ func waitForStatus(c clientset.Interface, set *appsv1.StatefulSet) *appsv1.State
 // waitForPodNotReady waits for the Pod named podName in set to exist and to not have a Ready condition.
 func waitForPodNotReady(c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
 	var pods *v1.PodList
-	e2esset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
@@ -121,7 +121,7 @@ func waitForRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*apps
 			set.Name,
 			set.Spec.UpdateStrategy.Type)
 	}
-	e2esset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		if len(pods.Items) < int(*set.Spec.Replicas) {
@@ -132,7 +132,7 @@ func waitForRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*apps
 				set.Namespace,
 				set.Name,
 			)
-			e2esset.SortStatefulPods(pods)
+			e2estatefulset.SortStatefulPods(pods)
 			for i := range pods.Items {
 				if pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
 					framework.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
@@ -151,5 +151,5 @@ func waitForRollingUpdate(c clientset.Interface, set *appsv1.StatefulSet) (*apps
 
 // waitForRunningAndNotReady waits for numStatefulPods in ss to be Running and not Ready.
 func waitForRunningAndNotReady(c clientset.Interface, numStatefulPods int32, ss *appsv1.StatefulSet) {
-	e2esset.WaitForRunning(c, numStatefulPods, 0, ss)
+	e2estatefulset.WaitForRunning(c, numStatefulPods, 0, ss)
 }

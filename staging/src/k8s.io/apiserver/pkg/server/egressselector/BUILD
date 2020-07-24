@@ -18,7 +18,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/egressselector/metrics:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
         "//vendor/sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client:go_default_library",

@@ -93,24 +93,9 @@ func parseZoned(zonedString string, kind v1.AzureDataDiskKind) (bool, error) {
 }
 
 func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
-		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
-	}
-	supportedModes := p.plugin.GetAccessModes()
-
 	// perform static validation first
 	if p.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("azureDisk - claim.Spec.Selector is not supported for dynamic provisioning on Azure disk")
-	}
-
-	if len(p.options.PVC.Spec.AccessModes) > 1 {
-		return nil, fmt.Errorf("AzureDisk - multiple access modes are not supported on AzureDisk plugin")
-	}
-
-	if len(p.options.PVC.Spec.AccessModes) == 1 {
-		if p.options.PVC.Spec.AccessModes[0] != supportedModes[0] {
-			return nil, fmt.Errorf("AzureDisk - mode %s is not supported by AzureDisk plugin (supported mode is %s)", p.options.PVC.Spec.AccessModes[0], supportedModes)
-		}
 	}
 
 	var (
@@ -133,6 +118,9 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		diskIopsReadWrite   string
 		diskMbpsReadWrite   string
 		diskEncryptionSetID string
+		customTags          string
+
+		maxShares int
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -177,10 +165,44 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			diskMbpsReadWrite = v
 		case "diskencryptionsetid":
 			diskEncryptionSetID = v
+		case "tags":
+			customTags = v
 		case azure.WriteAcceleratorEnabled:
 			writeAcceleratorEnabled = v
+		case "maxshares":
+			maxShares, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("parse %s failed with error: %v", v, err)
+			}
+			if maxShares < 1 {
+				return nil, fmt.Errorf("parse %s returned with invalid value: %d", v, maxShares)
+			}
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
+		}
+	}
+
+	supportedModes := p.plugin.GetAccessModes()
+	if maxShares < 2 {
+		// only do AccessModes validation when maxShares < 2
+		if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+			return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported with maxShares(%d) < 2", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes(), maxShares)
+		}
+
+		if len(p.options.PVC.Spec.AccessModes) > 1 {
+			return nil, fmt.Errorf("AzureDisk - multiple access modes are not supported on AzureDisk plugin with maxShares(%d) < 2", maxShares)
+		}
+
+		if len(p.options.PVC.Spec.AccessModes) == 1 {
+			if p.options.PVC.Spec.AccessModes[0] != supportedModes[0] {
+				return nil, fmt.Errorf("AzureDisk - mode %s is not supported by AzureDisk plugin (supported mode is %s) with maxShares(%d) < 2", p.options.PVC.Spec.AccessModes[0], supportedModes, maxShares)
+			}
+		}
+	} else {
+		supportedModes = []v1.PersistentVolumeAccessMode{
+			v1.ReadWriteOnce,
+			v1.ReadOnlyMany,
+			v1.ReadWriteMany,
 		}
 	}
 
@@ -242,9 +264,14 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	diskURI := ""
 	labels := map[string]string{}
 	if kind == v1.AzureManagedDisk {
-		tags := make(map[string]string)
+		tags, err := azure.ConvertTagsToMap(customTags)
+		if err != nil {
+			return nil, err
+		}
 		if p.options.CloudTags != nil {
-			tags = *(p.options.CloudTags)
+			for k, v := range *(p.options.CloudTags) {
+				tags[k] = v
+			}
 		}
 		if strings.EqualFold(writeAcceleratorEnabled, "true") {
 			tags[azure.WriteAcceleratorEnabled] = "true"
@@ -261,6 +288,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			DiskIOPSReadWrite:   diskIopsReadWrite,
 			DiskMBpsReadWrite:   diskMbpsReadWrite,
 			DiskEncryptionSetID: diskEncryptionSetID,
+			MaxShares:           int32(maxShares),
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {
@@ -270,7 +298,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else { // Attention: blob disk feature is deprecated
 		if kind == v1.AzureDedicatedBlobDisk {
 			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGiB)
 			if err != nil {

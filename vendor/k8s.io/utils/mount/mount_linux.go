@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	utilio "k8s.io/utils/io"
 )
@@ -103,7 +103,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 }
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
-// sensitiveOptions is an extention of options except they will not be logged (because they may contain sensitive material)
+// sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
 func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	mountArgs, mountArgsLogStr := MakeMountArgsSensitive(source, target, fstype, options, sensitiveOptions)
 	if len(mounterPath) > 0 {
@@ -187,7 +187,7 @@ func MakeMountArgs(source, target, fstype string, options []string) (mountArgs [
 }
 
 // MakeMountArgsSensitive makes the arguments to the mount(8) command.
-// sensitiveOptions is an extention of options except they will not be logged (because they may contain sensitive material)
+// sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
 func MakeMountArgsSensitive(source, target, fstype string, options []string, sensitiveOptions []string) (mountArgs []string, mountArgsLogStr string) {
 	// Build mount command as follows:
 	//   mount [-t $fstype] [-o $options] [$source] $target

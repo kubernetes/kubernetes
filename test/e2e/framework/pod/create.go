@@ -33,6 +33,22 @@ var (
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 )
 
+// Config is a struct containing all arguments for creating a pod.
+// SELinux testing requires to pass HostIPC and HostPID as boolean arguments.
+type Config struct {
+	NS                  string
+	PVCs                []*v1.PersistentVolumeClaim
+	PVCsReadOnly        bool
+	InlineVolumeSources []*v1.VolumeSource
+	IsPrivileged        bool
+	Command             string
+	HostIPC             bool
+	HostPID             bool
+	SeLinuxLabel        *v1.SELinuxOptions
+	FsGroup             *int64
+	NodeSelection       NodeSelection
+}
+
 // CreateUnschedulablePod with given claims based on node selector
 func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
@@ -79,27 +95,29 @@ func CreatePod(client clientset.Interface, namespace string, nodeSelector map[st
 }
 
 // CreateSecPod creates security pod with given claims
-func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
-	return CreateSecPodWithNodeSelection(client, namespace, pvclaims, inlineVolumeSources, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, NodeSelection{}, timeout)
+func CreateSecPod(client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
+	return CreateSecPodWithNodeSelection(client, podConfig, timeout)
 }
 
 // CreateSecPodWithNodeSelection creates security pod with given claims
-func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
-	pod := MakeSecPod(namespace, pvclaims, inlineVolumeSources, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
-	SetNodeSelection(&pod.Spec, node)
+func CreateSecPodWithNodeSelection(client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
+	pod, err := MakeSecPod(podConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create pod: %v", err)
+	}
 
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err = client.CoreV1().Pods(podConfig.NS).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 
 	// Waiting for pod to be running
-	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
+	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, podConfig.NS, timeout)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}
 	// get fresh pod info
-	pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = client.CoreV1().Pods(podConfig.NS).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	if err != nil {
 		return pod, fmt.Errorf("pod Get API error: %v", err)
 	}
@@ -153,14 +171,16 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 
 // MakeSecPod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod.
-// SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
-func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
-	if len(command) == 0 {
-		command = "trap exit TERM; while true; do sleep 1; done"
+func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
+	if podConfig.NS == "" {
+		return nil, fmt.Errorf("Cannot create pod with empty namespace")
 	}
-	podName := "security-context-" + string(uuid.NewUUID())
-	if fsGroup == nil {
-		fsGroup = func(i int64) *int64 {
+	if len(podConfig.Command) == 0 {
+		podConfig.Command = "trap exit TERM; while true; do sleep 1; done"
+	}
+	podName := "pod-" + string(uuid.NewUUID())
+	if podConfig.FsGroup == nil {
+		podConfig.FsGroup = func(i int64) *int64 {
 			return &i
 		}(1000)
 	}
@@ -171,22 +191,22 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSou
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
-			Namespace: ns,
+			Namespace: podConfig.NS,
 		},
 		Spec: v1.PodSpec{
-			HostIPC: hostIPC,
-			HostPID: hostPID,
+			HostIPC: podConfig.HostIPC,
+			HostPID: podConfig.HostPID,
 			SecurityContext: &v1.PodSecurityContext{
-				FSGroup: fsGroup,
+				FSGroup: podConfig.FsGroup,
 			},
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
+					Args:    []string{"-c", podConfig.Command},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &isPrivileged,
+						Privileged: &podConfig.IsPrivileged,
 					},
 				},
 			},
@@ -195,9 +215,9 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSou
 	}
 	var volumeMounts = make([]v1.VolumeMount, 0)
 	var volumeDevices = make([]v1.VolumeDevice, 0)
-	var volumes = make([]v1.Volume, len(pvclaims)+len(inlineVolumeSources))
+	var volumes = make([]v1.Volume, len(podConfig.PVCs)+len(podConfig.InlineVolumeSources))
 	volumeIndex := 0
-	for _, pvclaim := range pvclaims {
+	for _, pvclaim := range podConfig.PVCs {
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
 			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
@@ -205,10 +225,10 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSou
 			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
 		}
 
-		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: podConfig.PVCsReadOnly}}}
 		volumeIndex++
 	}
-	for _, src := range inlineVolumeSources {
+	for _, src := range podConfig.InlineVolumeSources {
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		// In-line volumes can be only filesystem, not block.
 		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
@@ -219,6 +239,8 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSou
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Spec.Volumes = volumes
-	podSpec.Spec.SecurityContext.SELinuxOptions = seLinuxLabel
-	return podSpec
+	podSpec.Spec.SecurityContext.SELinuxOptions = podConfig.SeLinuxLabel
+
+	SetNodeSelection(&podSpec.Spec, podConfig.NodeSelection)
+	return podSpec, nil
 }

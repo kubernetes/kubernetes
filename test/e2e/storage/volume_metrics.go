@@ -32,7 +32,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -47,7 +47,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		c              clientset.Interface
 		ns             string
 		pvc            *v1.PersistentVolumeClaim
-		metricsGrabber *metrics.Grabber
+		metricsGrabber *e2emetrics.Grabber
 		invalidSc      *storagev1.StorageClass
 		defaultScName  string
 	)
@@ -59,9 +59,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		defaultScName, err = e2epv.GetDefaultStorageClassName(c)
-		if err != nil {
-			framework.Failf(err.Error())
-		}
+		framework.ExpectNoError(err)
+
 		test := testsuites.StorageClassTest{
 			Name:      "default",
 			ClaimSize: "2Gi",
@@ -72,7 +71,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			VolumeMode: &test.VolumeMode,
 		}, ns)
 
-		metricsGrabber, err = metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
+		metricsGrabber, err = e2emetrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
 
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)
@@ -86,7 +85,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		} else {
 			e2epv.DeletePersistentVolumeClaim(c, newPvc.Name, newPvc.Namespace)
 			if newPvc.Spec.VolumeName != "" {
-				err = framework.WaitForPersistentVolumeDeleted(c, newPvc.Spec.VolumeName, 5*time.Second, 5*time.Minute)
+				err = e2epv.WaitForPersistentVolumeDeleted(c, newPvc.Spec.VolumeName, 5*time.Second, 5*time.Minute)
 				framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", newPvc.Spec.VolumeName)
 			}
 		}
@@ -101,7 +100,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func() {
 		var err error
 
-		if !metricsGrabber.HasRegisteredMaster() {
+		if !metricsGrabber.HasControlPlanePods() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
@@ -147,7 +146,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func() {
 		var err error
 
-		if !metricsGrabber.HasRegisteredMaster() {
+		if !metricsGrabber.HasControlPlanePods() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
@@ -231,7 +230,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 		// Poll kubelet metrics waiting for the volume to be picked up
 		// by the volume stats collector
-		var kubeMetrics metrics.KubeletMetrics
+		var kubeMetrics e2emetrics.KubeletMetrics
 		waitErr := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
 			framework.Logf("Grabbing Kubelet metrics")
 			// Grab kubelet metrics from the node the pod was scheduled on
@@ -405,7 +404,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			}
 			pvcConfig = e2epv.PersistentVolumeClaimConfig{StorageClassName: &className}
 
-			metrics = []struct {
+			e2emetrics = []struct {
 				name      string
 				dimension string
 			}{
@@ -431,7 +430,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
 
-			for i, metric := range metrics {
+			for i, metric := range e2emetrics {
 				expectValues := metricValues[i]
 				if expectValues == nil {
 					expectValues = make(map[string]int64)
@@ -447,7 +446,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		ginkgo.BeforeEach(func() {
-			if !metricsGrabber.HasRegisteredMaster() {
+			if !metricsGrabber.HasControlPlanePods() {
 				e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 			}
 
@@ -457,7 +456,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			// Initializes all original metric values.
 			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
-			for _, metric := range metrics {
+			for _, metric := range e2emetrics {
 				originMetricValues = append(originMetricValues,
 					testutil.GetMetricValuesForLabel(testutil.Metrics(controllerMetrics), metric.name, metric.dimension))
 			}
@@ -528,7 +527,7 @@ func newStorageControllerMetrics() *storageControllerMetrics {
 	}
 }
 
-func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGrabber *metrics.Grabber, pluginName string) *storageControllerMetrics {
+func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGrabber *e2emetrics.Grabber, pluginName string) *storageControllerMetrics {
 	backoff := wait.Backoff{
 		Duration: 10 * time.Second,
 		Factor:   1.2,
@@ -610,7 +609,7 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 	gomega.Expect(newStatusCount).To(gomega.BeNumerically(">", oldStatusCount), "New status count %d should be more than old count %d for action %s", newStatusCount, oldStatusCount, metricName)
 }
 
-func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics, pluginName string) *storageControllerMetrics {
+func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginName string) *storageControllerMetrics {
 	result := newStorageControllerMetrics()
 
 	for method, samples := range ms {
@@ -654,7 +653,7 @@ func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics, pluginName
 
 // Finds the sample in the specified metric from `KubeletMetrics` tagged with
 // the specified namespace and pvc name
-func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string, kubeletMetrics metrics.KubeletMetrics) bool {
+func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string, kubeletMetrics e2emetrics.KubeletMetrics) bool {
 	found := false
 	errCount := 0
 	framework.Logf("Looking for sample in metric `%s` tagged with namespace `%s`, PVC `%s`", metricKeyName, namespace, pvcName)
@@ -683,7 +682,7 @@ func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string
 }
 
 // Wait for the count of a pv controller's metric specified by metricName and dimension bigger than zero.
-func waitForPVControllerSync(metricsGrabber *metrics.Grabber, metricName, dimension string) {
+func waitForPVControllerSync(metricsGrabber *e2emetrics.Grabber, metricName, dimension string) {
 	backoff := wait.Backoff{
 		Duration: 10 * time.Second,
 		Factor:   1.2,
@@ -728,7 +727,7 @@ func getStatesMetrics(metricKey string, givenMetrics testutil.Metrics) map[strin
 	return states
 }
 
-func waitForADControllerStatesMetrics(metricsGrabber *metrics.Grabber, metricName string, dimensions []string, stateNames []string) {
+func waitForADControllerStatesMetrics(metricsGrabber *e2emetrics.Grabber, metricName string, dimensions []string, stateNames []string) {
 	backoff := wait.Backoff{
 		Duration: 10 * time.Second,
 		Factor:   1.2,

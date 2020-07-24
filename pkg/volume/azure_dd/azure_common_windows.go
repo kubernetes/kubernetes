@@ -25,10 +25,12 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 )
+
+var winDiskNumFormat = "/dev/disk%d"
 
 func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"

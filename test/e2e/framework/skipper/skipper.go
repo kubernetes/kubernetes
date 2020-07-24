@@ -36,10 +36,14 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
+
+// New local storage types to support local storage capacity isolation
+var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
@@ -127,8 +131,8 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 
 // SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
 func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
+	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
+		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
 	}
 }
 
@@ -175,7 +179,7 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 
 // SkipUnlessMultizone skips if the cluster does not have multizone.
 func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -186,7 +190,7 @@ func SkipUnlessMultizone(c clientset.Interface) {
 
 // SkipIfMultizone skips if the cluster has multizone.
 func SkipIfMultizone(c clientset.Interface) {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}

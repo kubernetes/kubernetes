@@ -34,7 +34,7 @@ import (
 	utilnet "k8s.io/utils/net"
 
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -81,9 +81,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 		return nil, err
 	}
 	klog.V(4).Infof("ensureExternalLoadBalancer(%s): Desired network tier %q.", lbRefStr, netTier)
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		g.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
-	}
+	g.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
 	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := g.forwardingRuleNeedsUpdate(loadBalancerName, g.region, requestedIP, ports)
@@ -1072,9 +1070,6 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 }
 
 func (g *Cloud) getServiceNetworkTier(svc *v1.Service) (cloud.NetworkTier, error) {
-	if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return cloud.NetworkTierDefault, nil
-	}
 	tier, err := GetServiceNetworkTier(svc)
 	if err != nil {
 		// Returns an error if the annotation is invalid.

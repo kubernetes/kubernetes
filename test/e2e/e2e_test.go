@@ -24,12 +24,15 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo"
 
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/generated"
@@ -58,12 +61,13 @@ import (
 
 var viperConfig = flag.String("viper-config", "", "The name of a viper config file (https://github.com/spf13/viper#what-is-viper). All e2e command line parameters can also be configured in such a file. May contain a path and may or may not contain the file suffix. The default is to look for an optional file with `e2e` as base name. If a file is specified explicitly, it must be present.")
 
-func init() {
+func TestMain(m *testing.M) {
+	var versionFlag bool
+	flag.CommandLine.BoolVar(&versionFlag, "version", false, "Displays version information.")
+
 	// Register test flags, then parse flags.
 	HandleFlags()
-}
 
-func TestMain(m *testing.M) {
 	// Now that we know which Viper config (if any) was chosen,
 	// parse it and update those options which weren't already set via command line flags
 	// (which have higher priority).
@@ -78,6 +82,40 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
+	if versionFlag {
+		fmt.Printf("%s\n", version.Get())
+		os.Exit(0)
+	}
+
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
+	if framework.TestContext.ListConformanceTests {
+		var tests []struct {
+			Testname    string `yaml:"testname"`
+			Codename    string `yaml:"codename"`
+			Description string `yaml:"description"`
+			Release     string `yaml:"release"`
+			File        string `yaml:"file"`
+		}
+
+		data, err := testfiles.Read("test/conformance/testdata/conformance.yaml")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := yaml.Unmarshal(data, &tests); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := yaml.NewEncoder(os.Stdout).Encode(tests); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
@@ -89,12 +127,6 @@ func TestMain(m *testing.M) {
 	if framework.TestContext.RepoRoot != "" {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
-
-	// Enable bindata file lookup as fallback.
-	testfiles.AddFileSource(testfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
 
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())

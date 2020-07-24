@@ -17,7 +17,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
@@ -50,7 +50,6 @@ type BuiltInAuthenticationOptions struct {
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
 	OIDC            *OIDCAuthenticationOptions
-	PasswordFile    *PasswordFileAuthenticationOptions
 	RequestHeader   *genericoptions.RequestHeaderAuthenticationOptions
 	ServiceAccounts *ServiceAccountAuthenticationOptions
 	TokenFile       *TokenFileAuthenticationOptions
@@ -80,16 +79,13 @@ type OIDCAuthenticationOptions struct {
 	RequiredClaims map[string]string
 }
 
-type PasswordFileAuthenticationOptions struct {
-	BasicAuthFile string
-}
-
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles      []string
-	Lookup        bool
-	Issuer        string
-	JWKSURI       string
-	MaxExpiration time.Duration
+	KeyFiles         []string
+	Lookup           bool
+	Issuer           string
+	JWKSURI          string
+	MaxExpiration    time.Duration
+	ExtendExpiration bool
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -115,7 +111,6 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithBootstrapToken().
 		WithClientCert().
 		WithOIDC().
-		WithPasswordFile().
 		WithRequestHeader().
 		WithServiceAccounts().
 		WithTokenFile().
@@ -139,11 +134,6 @@ func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOp
 
 func (s *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
 	s.OIDC = &OIDCAuthenticationOptions{}
-	return s
-}
-
-func (s *BuiltInAuthenticationOptions) WithPasswordFile() *BuiltInAuthenticationOptions {
-	s.PasswordFile = &PasswordFileAuthenticationOptions{}
 	return s
 }
 
@@ -281,13 +271,6 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Repeat this flag to specify multiple claims.")
 	}
 
-	if s.PasswordFile != nil {
-		fs.StringVar(&s.PasswordFile.BasicAuthFile, "basic-auth-file", s.PasswordFile.BasicAuthFile, ""+
-			"If set, the file that will be used to admit requests to the secure port of the API server "+
-			"via http basic authentication.")
-		fs.MarkDeprecated("basic-auth-file", "Basic authentication mode is deprecated and will be removed in a future release. It is not recommended for production environments.")
-	}
-
 	if s.RequestHeader != nil {
 		s.RequestHeader.AddFlags(fs)
 	}
@@ -329,6 +312,12 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.DurationVar(&s.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", s.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
 			"TokenRequest with a validity duration larger than this value is requested, a token will be issued with a validity duration of this value.")
+
+		fs.BoolVar(&s.ServiceAccounts.ExtendExpiration, "service-account-extend-token-expiration", s.ServiceAccounts.ExtendExpiration, ""+
+			"Turns on projected service account expiration extension during token generation, "+
+			"which helps safe transition from legacy token to bound service account token feature. "+
+			"If this flag is enabled, admission injected tokens would be extended up to 1 year to "+
+			"prevent unexpected failure during transition, ignoring value of service-account-max-token-expiration.")
 	}
 
 	if s.TokenFile != nil {
@@ -382,10 +371,6 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
 		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
 		ret.OIDCRequiredClaims = s.OIDC.RequiredClaims
-	}
-
-	if s.PasswordFile != nil {
-		ret.BasicAuthFile = s.PasswordFile.BasicAuthFile
 	}
 
 	if s.RequestHeader != nil {
@@ -453,8 +438,6 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
-
-	authInfo.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
 
 	authInfo.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {

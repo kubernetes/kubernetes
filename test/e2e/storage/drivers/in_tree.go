@@ -54,12 +54,12 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -81,9 +81,9 @@ type nfsDriver struct {
 }
 
 type nfsVolume struct {
-	serverIP  string
-	serverPod *v1.Pod
-	f         *framework.Framework
+	serverHost string
+	serverPod  *v1.Pod
+	f          *framework.Framework
 }
 
 var _ testsuites.TestDriver = &nfsDriver{}
@@ -99,7 +99,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			Name:             "nfs",
 			InTreePluginName: "kubernetes.io/nfs",
 			MaxFileSize:      testpatterns.FileSizeLarge,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -124,24 +124,24 @@ func (n *nfsDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (n *nfsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	nv, ok := volume.(*nfsVolume)
+func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	nv, ok := e2evolume.(*nfsVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   nv.serverHost,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
 	}
 }
 
-func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	nv, ok := volume.(*nfsVolume)
+func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	nv, ok := e2evolume.(*nfsVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   nv.serverHost,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
@@ -164,11 +164,11 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	err := auth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
+	err := e2eauth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
 
-	err = auth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
+	err = e2eauth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
 		"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
@@ -199,12 +199,12 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
-		c, serverPod, serverIP := volume.NewNFSServer(cs, ns.Name, []string{})
+		c, serverPod, serverHost := e2evolume.NewNFSServer(cs, ns.Name, []string{})
 		config.ServerConfig = &c
 		return &nfsVolume{
-			serverIP:  serverIP,
-			serverPod: serverPod,
-			f:         f,
+			serverHost: serverHost,
+			serverPod:  serverPod,
+			f:          f,
 		}
 	case testpatterns.DynamicPV:
 		// Do nothing
@@ -241,7 +241,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			Name:             "gluster",
 			InTreePluginName: "kubernetes.io/glusterfs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -265,8 +265,8 @@ func (g *glusterFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) 
 	e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 }
 
-func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	gv, ok := volume.(*glusterVolume)
+func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	gv, ok := e2evolume.(*glusterVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
@@ -280,8 +280,8 @@ func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume t
 	}
 }
 
-func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	gv, ok := volume.(*glusterVolume)
+func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	gv, ok := e2evolume.(*glusterVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
@@ -308,7 +308,7 @@ func (g *glusterFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, _ := volume.NewGlusterfsServer(cs, ns.Name)
+	c, serverPod, _ := e2evolume.NewGlusterfsServer(cs, ns.Name)
 	config.ServerConfig = &c
 	return &glusterVolume{
 		prefix:    config.Prefix,
@@ -391,8 +391,8 @@ func (i *iSCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (i *iSCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	iv, ok := volume.(*iSCSIVolume)
+func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	iv, ok := e2evolume.(*iSCSIVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
 
 	volSource := v1.VolumeSource{
@@ -409,8 +409,8 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 	return &volSource
 }
 
-func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	iv, ok := volume.(*iSCSIVolume)
+func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	iv, ok := e2evolume.(*iSCSIVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
 
 	pvSource := v1.PersistentVolumeSource{
@@ -452,10 +452,10 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 }
 
 // newISCSIServer is an iSCSI-specific wrapper for CreateStorageServer.
-func newISCSIServer(cs clientset.Interface, namespace string) (config volume.TestConfig, pod *v1.Pod, ip, iqn string) {
+func newISCSIServer(cs clientset.Interface, namespace string) (config e2evolume.TestConfig, pod *v1.Pod, ip, iqn string) {
 	// Generate cluster-wide unique IQN
 	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
-	config = volume.TestConfig{
+	config = e2evolume.TestConfig{
 		Namespace:   namespace,
 		Prefix:      "iscsi",
 		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
@@ -471,15 +471,15 @@ func newISCSIServer(cs clientset.Interface, namespace string) (config volume.Tes
 		ServerReadyMessage: "iscsi target started",
 		ServerHostNetwork:  true,
 	}
-	pod, ip = volume.CreateStorageServer(cs, config)
+	pod, ip = e2evolume.CreateStorageServer(cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: pod.Spec.NodeName}
 	return config, pod, ip, iqn
 }
 
 // newRBDServer is a CephRBD-specific wrapper for CreateStorageServer.
-func newRBDServer(cs clientset.Interface, namespace string) (config volume.TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
-	config = volume.TestConfig{
+func newRBDServer(cs clientset.Interface, namespace string) (config e2evolume.TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
+	config = e2evolume.TestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
 		ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
@@ -489,7 +489,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config volume.TestC
 		},
 		ServerReadyMessage: "Ceph is ready",
 	}
-	pod, ip = volume.CreateStorageServer(cs, config)
+	pod, ip = e2evolume.CreateStorageServer(cs, config)
 	// create secrets for the server
 	secret = &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -543,7 +543,7 @@ func InitRbdDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/rbd",
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -571,8 +571,8 @@ func (r *rbdDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (r *rbdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	rv, ok := volume.(*rbdVolume)
+func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	rv, ok := e2evolume.(*rbdVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
 
 	volSource := v1.VolumeSource{
@@ -593,8 +593,8 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 	return &volSource
 }
 
-func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	rv, ok := volume.(*rbdVolume)
+func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	rv, ok := e2evolume.(*rbdVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
 
 	f := rv.f
@@ -671,7 +671,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/cephfs",
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -694,8 +694,8 @@ func (c *cephFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (c *cephFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	cv, ok := volume.(*cephVolume)
+func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	cv, ok := e2evolume.(*cephVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
 
 	return &v1.VolumeSource{
@@ -710,8 +710,8 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 	}
 }
 
-func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	cv, ok := volume.(*cephVolume)
+func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	cv, ok := e2evolume.(*cephVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
 
 	ns := cv.f.Namespace
@@ -793,7 +793,7 @@ func (h *hostPathDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (h *hostPathDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
+func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
 	// hostPath doesn't support readOnly volume
 	if readOnly {
 		return nil
@@ -868,8 +868,8 @@ func (h *hostPathSymlinkDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	hv, ok := volume.(*hostPathSymlinkVolume)
+func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	hv, ok := e2evolume.(*hostPathSymlinkVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Hostpath Symlink test volume")
 
 	// hostPathSymlink doesn't support readOnly volume
@@ -1010,7 +1010,7 @@ func (e *emptydirDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (e *emptydirDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (e *emptydirDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
+func (e *emptydirDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
 	// emptydir doesn't support readOnly volume
 	if readOnly {
 		return nil
@@ -1059,7 +1059,7 @@ func InitCinderDriver() testsuites.TestDriver {
 			Name:             "cinder",
 			InTreePluginName: "kubernetes.io/cinder",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -1089,8 +1089,8 @@ func (c *cinderDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("openstack")
 }
 
-func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	cv, ok := volume.(*cinderVolume)
+func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	cv, ok := e2evolume.(*cinderVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
 
 	volSource := v1.VolumeSource{
@@ -1105,8 +1105,8 @@ func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 	return &volSource
 }
 
-func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	cv, ok := volume.(*cinderVolume)
+func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	cv, ok := e2evolume.(*cinderVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
 
 	pvSource := v1.PersistentVolumeSource{
@@ -1233,7 +1233,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 			Name:             "gcepd",
 			InTreePluginName: "kubernetes.io/gce-pd",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType:      supportedTypes,
@@ -1267,8 +1267,8 @@ func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	}
 }
 
-func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	gv, ok := volume.(*gcePdVolume)
+func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	gv, ok := e2evolume.(*gcePdVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
@@ -1282,8 +1282,8 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 	return &volSource
 }
 
-func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	gv, ok := volume.(*gcePdVolume)
+func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	gv, ok := e2evolume.(*gcePdVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
@@ -1374,7 +1374,7 @@ func InitVSphereDriver() testsuites.TestDriver {
 			Name:             "vsphere",
 			InTreePluginName: "kubernetes.io/vsphere-volume",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -1400,8 +1400,8 @@ func (v *vSphereDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("vsphere")
 }
 
-func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	vsv, ok := volume.(*vSphereVolume)
+func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	vsv, ok := e2evolume.(*vSphereVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
@@ -1420,8 +1420,8 @@ func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume tes
 	return &volSource
 }
 
-func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	vsv, ok := volume.(*vSphereVolume)
+func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	vsv, ok := e2evolume.(*vSphereVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
@@ -1498,7 +1498,7 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 			Name:             "azure-disk",
 			InTreePluginName: "kubernetes.io/azure-disk",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -1531,8 +1531,8 @@ func (a *azureDiskDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) 
 	e2eskipper.SkipUnlessProviderIs("azure")
 }
 
-func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	av, ok := volume.(*azureDiskVolume)
+func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	av, ok := e2evolume.(*azureDiskVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
@@ -1551,8 +1551,8 @@ func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, volume t
 	return &volSource
 }
 
-func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	av, ok := volume.(*azureDiskVolume)
+func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	av, ok := e2evolume.(*azureDiskVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
@@ -1639,7 +1639,7 @@ func InitAwsDriver() testsuites.TestDriver {
 			Name:             "aws",
 			InTreePluginName: "kubernetes.io/aws-ebs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(
@@ -1677,8 +1677,8 @@ func (a *awsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("aws")
 }
 
-func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	av, ok := volume.(*awsVolume)
+func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) *v1.VolumeSource {
+	av, ok := e2evolume.(*awsVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
 	volSource := v1.VolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
@@ -1692,8 +1692,8 @@ func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 	return &volSource
 }
 
-func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	av, ok := volume.(*awsVolume)
+func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	av, ok := e2evolume.(*awsVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
 	pvSource := v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
@@ -1936,8 +1936,8 @@ func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity 
 	}
 }
 
-func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	lv, ok := volume.(*localVolume)
+func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	lv, ok := e2evolume.(*localVolume)
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to local test volume")
 	return &v1.PersistentVolumeSource{
 		Local: &v1.LocalVolumeSource{

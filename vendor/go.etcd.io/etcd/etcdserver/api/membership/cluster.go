@@ -657,8 +657,8 @@ func (c *RaftCluster) IsReadyToRemoveVotingMember(id uint64) bool {
 }
 
 func (c *RaftCluster) IsReadyToPromoteMember(id uint64) bool {
-	nmembers := 1
-	nstarted := 0
+	nmembers := 1 // We count the learner to be promoted for the future quorum
+	nstarted := 1 // and we also count it as started.
 
 	for _, member := range c.VotingMembers() {
 		if member.IsStarted() {

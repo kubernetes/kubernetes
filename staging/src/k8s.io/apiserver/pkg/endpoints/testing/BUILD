@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "doc.go",
         "types.go",
         "zz_generated.deepcopy.go",
@@ -16,6 +17,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/endpoints/testing",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )

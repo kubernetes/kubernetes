@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"reflect"
@@ -1655,6 +1654,16 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
 				}},
 			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-second-ip",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "2001:db7::", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}}},
+					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
+				}},
+			},
 		},
 	}
 	pods := &api.PodList{
@@ -1721,6 +1730,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a simple id (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:80", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a name + port.
 	location, _, err = redirector.ResourceLocation(ctx, "foo:p")
 	if err != nil {
@@ -1730,6 +1751,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Unexpected nil: %v", location)
 	}
 	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a name + port (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:93", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
@@ -1745,6 +1778,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a name + port number (service port 93 -> target port 80, using second ip)
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:93")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:80", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93)
 	location, _, err = redirector.ResourceLocation(ctx, "foo:9393")
 	if err != nil {
@@ -1754,6 +1799,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Unexpected nil: %v", location)
 	}
 	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93, using second ip)
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:9393")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:93", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
@@ -1769,8 +1826,26 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a scheme + name + port (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "https:foo-second-ip:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "https://[2001:db7::]:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a non-existent name + port.
-	location, _, err = redirector.ResourceLocation(ctx, "foo:q")
+	_, _, err = redirector.ResourceLocation(ctx, "foo:q")
+	if err == nil {
+		t.Errorf("Unexpected nil error")
+	}
+
+	// Test a non-existent name + port (using second ip).
+	_, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:q")
 	if err == nil {
 		t.Errorf("Unexpected nil error")
 	}
@@ -3095,22 +3170,22 @@ func TestAllocGetters(t *testing.T) {
 
 			alloc := storage.getAllocatorByClusterIP(tc.svc)
 			if tc.expectClusterIPPrimary {
-				if !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
 					t.Fatalf("expected clusterIP primary allocator, but primary allocator was not selected")
 				}
 			} else {
-				if !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
 					t.Errorf("expected clusterIP secondary allocator, but secondary allocator was not selected")
 				}
 			}
 
 			alloc = storage.getAllocatorBySpec(tc.svc)
 			if tc.expectSpecPrimary {
-				if !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
 					t.Errorf("expected spec primary allocator, but primary allocator was not selected")
 				}
 			} else {
-				if !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+				if !net.IP.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
 					t.Errorf("expected spec secondary allocator, but secondary allocator was not selected")
 				}
 			}

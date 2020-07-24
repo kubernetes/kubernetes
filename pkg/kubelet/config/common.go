@@ -43,7 +43,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -138,7 +138,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	opts := validation.PodValidationOptions{
 		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	if errs := validation.ValidatePod(newPod, opts); len(errs) > 0 {
+	if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
@@ -172,7 +172,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
-		if errs := validation.ValidatePod(newPod, opts); len(errs) > 0 {
+		if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

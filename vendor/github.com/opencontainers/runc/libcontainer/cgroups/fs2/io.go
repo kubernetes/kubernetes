@@ -14,14 +14,26 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
+func isIoSet(cgroup *configs.Cgroup) bool {
+	return cgroup.Resources.BlkioWeight != 0 ||
+		len(cgroup.Resources.BlkioThrottleReadBpsDevice) > 0 ||
+		len(cgroup.Resources.BlkioThrottleWriteBpsDevice) > 0 ||
+		len(cgroup.Resources.BlkioThrottleReadIOPSDevice) > 0 ||
+		len(cgroup.Resources.BlkioThrottleWriteIOPSDevice) > 0
+}
+
 func setIo(dirPath string, cgroup *configs.Cgroup) error {
+	if !isIoSet(cgroup) {
+		return nil
+	}
+
 	if cgroup.Resources.BlkioWeight != 0 {
 		filename := "io.bfq.weight"
-		if err := fscommon.WriteFile(dirPath, filename, strconv.FormatUint(uint64(cgroup.Resources.BlkioWeight), 10)); err != nil {
+		if err := fscommon.WriteFile(dirPath, filename,
+			strconv.FormatUint(cgroups.ConvertBlkIOToCgroupV2Value(cgroup.Resources.BlkioWeight), 10)); err != nil {
 			return err
 		}
 	}
-
 	for _, td := range cgroup.Resources.BlkioThrottleReadBpsDevice {
 		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("rbps")); err != nil {
 			return err
@@ -81,11 +93,11 @@ func statIo(dirPath string, stats *cgroups.Stats) error {
 		if len(d) != 2 {
 			continue
 		}
-		minor, err := strconv.ParseUint(d[0], 10, 0)
+		major, err := strconv.ParseUint(d[0], 10, 0)
 		if err != nil {
 			return err
 		}
-		major, err := strconv.ParseUint(d[1], 10, 0)
+		minor, err := strconv.ParseUint(d[1], 10, 0)
 		if err != nil {
 			return err
 		}

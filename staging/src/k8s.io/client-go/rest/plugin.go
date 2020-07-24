@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )

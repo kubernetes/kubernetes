@@ -38,7 +38,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -48,15 +47,12 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -513,38 +509,6 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 	}
 }
 
-// WaitForPodTerminated waits for the pod to be terminated with the given reason.
-func (f *Framework) WaitForPodTerminated(podName, reason string) error {
-	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
-}
-
-// WaitForPodNotFound waits for the pod to be completely terminated (not "Get-able").
-func (f *Framework) WaitForPodNotFound(podName string, timeout time.Duration) error {
-	return e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
-}
-
-// WaitForPodRunning waits for the pod to run in the namespace.
-func (f *Framework) WaitForPodRunning(podName string) error {
-	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
-}
-
-// WaitForPodReady waits for the pod to flip to ready in the namespace.
-func (f *Framework) WaitForPodReady(podName string) error {
-	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
-}
-
-// WaitForPodRunningSlow waits for the pod to run in the namespace.
-// It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
-func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
-}
-
-// WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
-// success or failure.
-func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
-}
-
 // ClientConfig an externally accessible method for reading the kube client config.
 func (f *Framework) ClientConfig() *rest.Config {
 	ret := rest.CopyConfig(f.clientConfig)
@@ -566,76 +530,6 @@ func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, contai
 // the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
-}
-
-// CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
-func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
-	var err error
-	theService := f.CreateServiceForSimpleApp(contPort, svcPort, appName)
-	f.CreatePodsPerNodeForSimpleApp(appName, podSpec, count)
-	if block {
-		err = testutils.WaitForPodsWithLabelRunning(f.ClientSet, f.Namespace.Name, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
-	}
-	return theService, err
-}
-
-// CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
-func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName string) *v1.Service {
-	if appName == "" {
-		panic(fmt.Sprintf("no app name provided"))
-	}
-
-	serviceSelector := map[string]string{
-		"app": appName + "-pod",
-	}
-
-	// For convenience, user sending ports are optional.
-	portsFunc := func() []v1.ServicePort {
-		if contPort < 1 || svcPort < 1 {
-			return nil
-		}
-		return []v1.ServicePort{{
-			Protocol:   v1.ProtocolTCP,
-			Port:       int32(svcPort),
-			TargetPort: intstr.FromInt(contPort),
-		}}
-	}
-	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "service-for-" + appName,
-			Labels: map[string]string{
-				"app": appName + "-service",
-			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports:    portsFunc(),
-			Selector: serviceSelector,
-		},
-	}, metav1.CreateOptions{})
-	ExpectNoError(err)
-	return service
-}
-
-// CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
-func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxCount)
-	ExpectNoError(err)
-	podLabels := map[string]string{
-		"app": appName + "-pod",
-	}
-	for i, node := range nodes.Items {
-		Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   fmt.Sprintf(appName+"-pod-%v", i),
-				Labels: podLabels,
-			},
-			Spec: podSpec(node),
-		}, metav1.CreateOptions{})
-		ExpectNoError(err)
-	}
-	return podLabels
 }
 
 // KubeUser is a struct for managing kubernetes user info.

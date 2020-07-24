@@ -19,19 +19,19 @@ package testpatterns
 import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 )
 
 const (
 	// MinFileSize represents minimum file size (1 MiB) for testing
-	MinFileSize = 1 * volume.MiB
+	MinFileSize = 1 * e2evolume.MiB
 
 	// FileSizeSmall represents small file size (1 MiB) for testing
-	FileSizeSmall = 1 * volume.MiB
+	FileSizeSmall = 1 * e2evolume.MiB
 	// FileSizeMedium represents medium file size (100 MiB) for testing
-	FileSizeMedium = 100 * volume.MiB
+	FileSizeMedium = 100 * e2evolume.MiB
 	// FileSizeLarge represents large file size (1 GiB) for testing
-	FileSizeLarge = 1 * volume.GiB
+	FileSizeLarge = 1 * e2evolume.GiB
 )
 
 // TestVolType represents a volume type to be tested in a TestSuite
@@ -46,6 +46,8 @@ var (
 	DynamicPV TestVolType = "DynamicPV"
 	// CSIInlineVolume represents a volume type that is defined inline and provided by a CSI driver.
 	CSIInlineVolume TestVolType = "CSIInlineVolume"
+	// GenericEphemeralVolume represents a volume type that is defined inline and provisioned through a PVC.
+	GenericEphemeralVolume TestVolType = "GenericEphemeralVolume"
 )
 
 // TestSnapshotType represents a snapshot type to be tested in a TestSuite
@@ -54,18 +56,31 @@ type TestSnapshotType string
 var (
 	// DynamicCreatedSnapshot represents a snapshot type for dynamic created snapshot
 	DynamicCreatedSnapshot TestSnapshotType = "DynamicSnapshot"
+	// PreprovisionedCreatedSnapshot represents a snapshot type for pre-provisioned snapshot
+	PreprovisionedCreatedSnapshot TestSnapshotType = "PreprovisionedSnapshot"
+)
+
+// TestSnapshotDeletionPolicy represents the deletion policy of the snapshot class
+type TestSnapshotDeletionPolicy string
+
+var (
+	// DeleteSnapshot represents delete policy
+	DeleteSnapshot TestSnapshotDeletionPolicy = "Delete"
+	// RetainSnapshot represents retain policy
+	RetainSnapshot TestSnapshotDeletionPolicy = "Retain"
 )
 
 // TestPattern represents a combination of parameters to be tested in a TestSuite
 type TestPattern struct {
-	Name           string                      // Name of TestPattern
-	FeatureTag     string                      // featureTag for the TestSuite
-	VolType        TestVolType                 // Volume type of the volume
-	FsType         string                      // Fstype of the volume
-	VolMode        v1.PersistentVolumeMode     // PersistentVolumeMode of the volume
-	SnapshotType   TestSnapshotType            // Snapshot type of the snapshot
-	BindingMode    storagev1.VolumeBindingMode // VolumeBindingMode of the volume
-	AllowExpansion bool                        // AllowVolumeExpansion flag of the StorageClass
+	Name                   string                      // Name of TestPattern
+	FeatureTag             string                      // featureTag for the TestSuite
+	VolType                TestVolType                 // Volume type of the volume
+	FsType                 string                      // Fstype of the volume
+	VolMode                v1.PersistentVolumeMode     // PersistentVolumeMode of the volume
+	SnapshotType           TestSnapshotType            // Snapshot type of the snapshot
+	SnapshotDeletionPolicy TestSnapshotDeletionPolicy  // Deletion policy of the snapshot class
+	BindingMode            storagev1.VolumeBindingMode // VolumeBindingMode of the volume
+	AllowExpansion         bool                        // AllowVolumeExpansion flag of the StorageClass
 }
 
 var (
@@ -76,10 +91,15 @@ var (
 		Name:    "Inline-volume (default fs)",
 		VolType: InlineVolume,
 	}
-	// DefaultFsEphemeralVolume is TestPattern for "Ephemeral-volume (default fs)"
-	DefaultFsEphemeralVolume = TestPattern{
-		Name:    "Ephemeral-volume (default fs)",
+	// DefaultFsCSIEphemeralVolume is TestPattern for "CSI Ephemeral-volume (default fs)"
+	DefaultFsCSIEphemeralVolume = TestPattern{
+		Name:    "CSI Ephemeral-volume (default fs)",
 		VolType: CSIInlineVolume,
+	}
+	// DefaultFsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (default fs)"
+	DefaultFsGenericEphemeralVolume = TestPattern{
+		Name:    "Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume]",
+		VolType: GenericEphemeralVolume,
 	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
 	DefaultFsPreprovisionedPV = TestPattern{
@@ -88,8 +108,10 @@ var (
 	}
 	// DefaultFsDynamicPV is TestPattern for "Dynamic PV (default fs)"
 	DefaultFsDynamicPV = TestPattern{
-		Name:    "Dynamic PV (default fs)",
-		VolType: DynamicPV,
+		Name:                   "Dynamic PV (default fs)",
+		VolType:                DynamicPV,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for ext3
@@ -100,10 +122,16 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext3",
 	}
-	// Ext3EphemeralVolume is TestPattern for "Ephemeral-volume (ext3)"
-	Ext3EphemeralVolume = TestPattern{
-		Name:    "Ephemeral-volume (ext3)",
-		VolType: InlineVolume,
+	// Ext3CSIEphemeralVolume is TestPattern for "CSI Ephemeral-volume (ext3)"
+	Ext3CSIEphemeralVolume = TestPattern{
+		Name:    "CSI Ephemeral-volume (ext3)",
+		VolType: CSIInlineVolume,
+		FsType:  "ext3",
+	}
+	// Ext3GenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ext3)"
+	Ext3GenericEphemeralVolume = TestPattern{
+		Name:    "Generic Ephemeral-volume (ext3) [Feature:GenericEphemeralVolume]",
+		VolType: GenericEphemeralVolume,
 		FsType:  "ext3",
 	}
 	// Ext3PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext3)"
@@ -127,10 +155,16 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext4",
 	}
-	// Ext4EphemeralVolume is TestPattern for "Ephemeral-volume (ext4)"
-	Ext4EphemeralVolume = TestPattern{
-		Name:    "Ephemeral-volume (ext4)",
+	// Ext4CSIEphemeralVolume is TestPattern for "CSI Ephemeral-volume (ext4)"
+	Ext4CSIEphemeralVolume = TestPattern{
+		Name:    "CSI Ephemeral-volume (ext4)",
 		VolType: CSIInlineVolume,
+		FsType:  "ext4",
+	}
+	// Ext4GenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ext4)"
+	Ext4GenericEphemeralVolume = TestPattern{
+		Name:    "Generic Ephemeral-volume (ext4) [Feature:GenericEphemeralVolume]",
+		VolType: GenericEphemeralVolume,
 		FsType:  "ext4",
 	}
 	// Ext4PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext4)"
@@ -155,10 +189,17 @@ var (
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
 	}
-	// XfsEphemeralVolume is TestPattern for "Ephemeral-volume (xfs)"
-	XfsEphemeralVolume = TestPattern{
-		Name:       "Ephemeral-volume (xfs)",
+	// XfsCSIEphemeralVolume is TestPattern for "CSI Ephemeral-volume (xfs)"
+	XfsCSIEphemeralVolume = TestPattern{
+		Name:       "CSI Ephemeral-volume (xfs)",
 		VolType:    CSIInlineVolume,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
+	}
+	// XfsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (xfs)"
+	XfsGenericEphemeralVolume = TestPattern{
+		Name:       "Generic Ephemeral-volume (xfs) [Feature:GenericEphemeralVolume]",
+		VolType:    GenericEphemeralVolume,
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
 	}
@@ -186,10 +227,17 @@ var (
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}
-	// NtfsEphemeralVolume is TestPattern for "Ephemeral-volume (ntfs)"
-	NtfsEphemeralVolume = TestPattern{
-		Name:       "Ephemeral-volume (ntfs)",
+	// NtfsCSIEphemeralVolume is TestPattern for "CSI Ephemeral-volume (ntfs)"
+	NtfsCSIEphemeralVolume = TestPattern{
+		Name:       "CSI Ephemeral-volume (ntfs) [alpha]",
 		VolType:    CSIInlineVolume,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+	// NtfsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ntfs)"
+	NtfsGenericEphemeralVolume = TestPattern{
+		Name:       "Generic Ephemeral-volume (ntfs) [Feature:GenericEphemeralVolume]",
+		VolType:    GenericEphemeralVolume,
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}
@@ -233,17 +281,42 @@ var (
 	}
 	// BlockVolModeDynamicPV is TestPattern for "Dynamic PV (block)"
 	BlockVolModeDynamicPV = TestPattern{
-		Name:    "Dynamic PV (block volmode)",
-		VolType: DynamicPV,
-		VolMode: v1.PersistentVolumeBlock,
+		Name:                   "Dynamic PV (block volmode)",
+		VolType:                DynamicPV,
+		VolMode:                v1.PersistentVolumeBlock,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for snapshot case
 
-	// DynamicSnapshot is TestPattern for "Dynamic snapshot"
-	DynamicSnapshot = TestPattern{
-		Name:         "Dynamic Snapshot",
-		SnapshotType: DynamicCreatedSnapshot,
+	// DynamicSnapshotDelete is TestPattern for "Dynamic snapshot"
+	DynamicSnapshotDelete = TestPattern{
+		Name:                   "Dynamic Snapshot (delete policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                DynamicPV,
+	}
+	// PreprovisionedSnapshotDelete is TestPattern for "Pre-provisioned snapshot"
+	PreprovisionedSnapshotDelete = TestPattern{
+		Name:                   "Pre-provisioned Snapshot (delete policy)",
+		SnapshotType:           PreprovisionedCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                DynamicPV,
+	}
+	// DynamicSnapshotRetain is TestPattern for "Dynamic snapshot"
+	DynamicSnapshotRetain = TestPattern{
+		Name:                   "Dynamic Snapshot (retain policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
+	}
+	// PreprovisionedSnapshotRetain is TestPattern for "Pre-provisioned snapshot"
+	PreprovisionedSnapshotRetain = TestPattern{
+		Name:                   "Pre-provisioned Snapshot (retain policy)",
+		SnapshotType:           PreprovisionedCreatedSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                DynamicPV,
 	}
 
 	// Definitions for volume expansion case

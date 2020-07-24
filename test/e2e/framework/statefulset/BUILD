@@ -11,7 +11,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/statefulset",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -21,8 +20,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/podutils:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/manifest:go_default_library",
+        "//test/e2e/framework/manifest:go_default_library",
         "//test/utils/image:go_default_library",
     ],
 )

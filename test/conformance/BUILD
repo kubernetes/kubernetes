@@ -9,6 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/conformance",
     visibility = ["//visibility:private"],
     deps = [
+        "//test/conformance/behaviors:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
@@ -32,7 +33,8 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/conformance/behaviors:all-srcs",
-        "//test/conformance/kubetestgen:all-srcs",
+        "//test/conformance/kubeconform:all-srcs",
+        "//test/conformance/testdata:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
@@ -67,8 +69,8 @@ sh_test(
     name = "conformance_test",
     srcs = ["conformance_test.sh"],
     data = [
-        "testdata/conformance.yaml",
         ":list_conformance_tests",
+        ":testdata",
     ],
 )
 
@@ -77,6 +79,7 @@ go_test(
     srcs = ["walk_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
+    deps = ["//test/conformance/behaviors:go_default_library"],
 )
 
 genrule(

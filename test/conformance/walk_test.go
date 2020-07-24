@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
 func TestConformance(t *testing.T) {
@@ -28,7 +30,7 @@ func TestConformance(t *testing.T) {
 		filename    string
 		code        string
 		targetFrame frame
-		output      *conformanceData
+		output      *behaviors.ConformanceData
 	}{
 		{
 			desc:     "Grabs comment above test",
@@ -45,7 +47,7 @@ func TestConformance(t *testing.T) {
 	*/
 	 framework.ConformanceIt("validates describe with ConformanceIt", func() {})
 	})`,
-			output: &conformanceData{
+			output: &behaviors.ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/test/list/main_test.go#L11",
 				TestName:    "Kubelet-OutputToLogs",
 				Description: `By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.`,
@@ -65,7 +67,7 @@ func TestConformance(t *testing.T) {
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,
-			output: &conformanceData{
+			output: &behaviors.ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8",
 				TestName:    "Test with spaces",
 				Description: `Should pick up testname even if it is not within 3 spaces even when executed from memory.`,
@@ -89,7 +91,7 @@ func TestConformance(t *testing.T) {
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,
-			output: &conformanceData{
+			output: &behaviors.ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L13",
 				TestName:    "Second test",
 				Description: `Should target the correct test/comment based on the line numbers`,
@@ -112,7 +114,7 @@ func TestConformance(t *testing.T) {
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,
-			output: &conformanceData{
+			output: &behaviors.ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8",
 				TestName:    "First test",
 				Description: `Should target the correct test/comment based on the line numbers`,
@@ -139,7 +141,7 @@ func TestCommentToConformanceData(t *testing.T) {
 	tcs := []struct {
 		desc     string
 		input    string
-		expected *conformanceData
+		expected *behaviors.ConformanceData
 	}{
 		{
 			desc: "Empty comment leads to nil",
@@ -147,17 +149,24 @@ func TestCommentToConformanceData(t *testing.T) {
 			desc:  "No Release or Testname leads to nil",
 			input: "Description: foo",
 		}, {
-			desc:     "Release but no Testname does not result in nil",
-			input:    "Release: v1.1\nDescription: foo",
-			expected: &conformanceData{Release: "v1.1", Description: "foo"},
+			desc:  "Release but no Testname should result in nil",
+			input: "Release: v1.1\nDescription: foo",
 		}, {
 			desc:     "Testname but no Release does not result in nil",
 			input:    "Testname: mytest\nDescription: foo",
-			expected: &conformanceData{TestName: "mytest", Description: "foo"},
+			expected: &behaviors.ConformanceData{TestName: "mytest", Description: "foo"},
 		}, {
 			desc:     "All fields parsed and newlines and whitespace removed from description",
 			input:    "Release: v1.1\n\t\tTestname: mytest\n\t\tDescription: foo\n\t\tbar\ndone",
-			expected: &conformanceData{TestName: "mytest", Release: "v1.1", Description: "foo bar done"},
+			expected: &behaviors.ConformanceData{TestName: "mytest", Release: "v1.1", Description: "foo bar done"},
+		}, {
+			desc:     "Behaviors are read",
+			input:    "Testname: behaviors\nBehaviors:\n- should behave\n- second behavior",
+			expected: &behaviors.ConformanceData{TestName: "behaviors", Behaviors: []string{"should behave", "second behavior"}},
+		}, {
+			desc:     "Multiple behaviors are parsed",
+			input:    "Testname: behaviors2\nBehaviors:\n- first behavior\n- second behavior",
+			expected: &behaviors.ConformanceData{TestName: "behaviors2", Behaviors: []string{"first behavior", "second behavior"}},
 		},
 	}
 

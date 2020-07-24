@@ -124,3 +124,46 @@ Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil, nil
 		t.Errorf("expected error: %q", errStr)
 	}
 }
+
+func TestDeleteRule(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			// Exists
+			func() ([]byte, []byte, error) {
+				return []byte(`Bridge table: filter
+
+Bridge chain: OUTPUT, entries: 4, policy: ACCEPT
+-j TEST
+`), nil, nil
+			},
+			// Fail to delete
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
+			// Does not Exists.
+			func() ([]byte, []byte, error) {
+				return []byte(`Bridge table: filter
+
+Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil, nil
+			},
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+
+	runner := New(&fexec)
+
+	err := runner.DeleteRule(TableFilter, ChainOutput, "-j", "TEST")
+	errStr := "Failed to delete rule: exit 2, output: "
+	if err == nil || err.Error() != errStr {
+		t.Errorf("expected error: %q", errStr)
+	}
+
+	err = runner.DeleteRule(TableFilter, ChainOutput, "-j", "TEST")
+	if err != nil {
+		t.Errorf("expected err = nil")
+	}
+}

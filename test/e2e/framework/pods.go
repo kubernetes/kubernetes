@@ -31,9 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -42,13 +40,27 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-// DefaultPodDeletionTimeout is the default timeout for deleting pod
-const DefaultPodDeletionTimeout = 3 * time.Minute
+const (
+	// DefaultPodDeletionTimeout is the default timeout for deleting pod
+	DefaultPodDeletionTimeout = 3 * time.Minute
 
-// ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and
-// the images in the white list should be pre-pulled in the test suite.  Currently, this is only used by
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	killingContainer = "Killing"
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	failedToCreateContainer = "Failed"
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	startedContainer = "Started"
+
+	// it is copied from k8s.io/kubernetes/pkg/kubelet/sysctl
+	forbiddenReason = "SysctlForbidden"
+)
+
+// ImagePrePullList is the images used in the current test suite. It should be initialized in test suite and
+// the images in the list should be pre-pulled in the test suite.  Currently, this is only used by
 // node e2e test.
-var ImageWhiteList sets.String
+var ImagePrePullList sets.String
 
 // PodClient is a convenience method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
@@ -173,10 +185,10 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 			// in the test anyway.
 			continue
 		}
-		// If the image policy is not PullAlways, the image must be in the white list and
+		// If the image policy is not PullAlways, the image must be in the pre-pull list and
 		// pre-pulled.
-		gomega.Expect(ImageWhiteList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the white list, consider adding it to CommonImageWhiteList in test/e2e/common/util.go or NodeImageWhiteList in test/e2e_node/image_list.go", c.Image)
-		// Do not pull images during the tests because the images in white list should have
+		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image)
+		// Do not pull images during the tests because the images in pre-pull list should have
 		// been prepulled.
 		c.ImagePullPolicy = v1.PullNever
 	}
@@ -197,7 +209,7 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 				return false, nil
 			}
 		},
-	)).To(gomega.Succeed(), "wait for pod %q to success", name)
+	)).To(gomega.Succeed(), "wait for pod %q to succeed", name)
 }
 
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
@@ -227,10 +239,10 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
-			case events.KillingContainer, events.FailedToCreateContainer, sysctl.ForbiddenReason:
+			case killingContainer, failedToCreateContainer, forbiddenReason:
 				ev = &e
 				return true, nil
-			case events.StartedContainer:
+			case startedContainer:
 				return true, nil
 			default:
 				// ignore all other errors
@@ -262,5 +274,5 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	ExpectNoError(err)
-	return podutil.IsPodReady(pod)
+	return podutils.IsPodReady(pod)
 }

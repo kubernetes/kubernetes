@@ -9,6 +9,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_ingress.go",
+        "fake_ingressclass.go",
         "fake_networking_client.go",
         "fake_networkpolicy.go",
     ],

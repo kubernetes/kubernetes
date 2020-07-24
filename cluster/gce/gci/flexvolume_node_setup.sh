@@ -56,10 +56,10 @@ umount_silent() {
 # Waits for kubelet to restart for 1 minute.
 kubelet_wait() {
   timeout=60
-  kubelet_readonly_port=10255
+  healthz_port=10248
   until [[ $timeout -eq 0 ]]; do
     printf "."
-    if [[ $( curl -s http://localhost:${kubelet_readonly_port}/healthz ) == "ok" ]]; then
+    if [[ $( curl -s http://localhost:${healthz_port}/healthz ) == "ok" ]]; then
       return 0
     fi
     sleep 1

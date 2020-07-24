@@ -18,28 +18,24 @@ package kubelet
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
-	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
-	utilsexec "k8s.io/utils/exec"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
-	featureGates             map[string]bool
 	pauseImage               string
 	registerTaintsUsingFlags bool
-	execer                   utilsexec.Interface
-	isServiceActiveFunc      func(string) (bool, error)
 }
 
 // GetNodeNameAndHostname obtains the name for this Node using the following precedence
@@ -65,17 +61,8 @@ func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, st
 func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeReg,
-		featureGates:             cfg.FeatureGates,
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:                   utilsexec.New(),
-		isServiceActiveFunc: func(name string) (bool, error) {
-			initSystem, err := initsystem.GetInitSystem()
-			if err != nil {
-				return false, err
-			}
-			return initSystem.ServiceIsActive(name), nil
-		},
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
@@ -119,12 +106,6 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["hostname-override"] = nodeName
 	}
 
-	// TODO: The following code should be removed after dual-stack is GA.
-	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := opts.featureGates[features.IPv6DualStack]; present {
-		kubeletFlags["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
-	}
-
 	return kubeletFlags
 }
 
@@ -141,4 +122,10 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", kubeletEnvFilePath)
 	}
 	return nil
+}
+
+// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// that should be given to the local kubelet daemon.
+func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
+	return buildKubeletArgMapCommon(opts)
 }

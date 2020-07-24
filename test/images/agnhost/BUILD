@@ -41,7 +41,7 @@ go_library(
         "//test/images/agnhost/test-webserver:go_default_library",
         "//test/images/agnhost/webhook:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

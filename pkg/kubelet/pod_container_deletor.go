@@ -20,7 +20,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -30,7 +30,7 @@ const (
 	containerDeletorBufferLimit = 50
 )
 
-type containerStatusbyCreatedList []*kubecontainer.ContainerStatus
+type containerStatusbyCreatedList []*kubecontainer.Status
 
 type podContainerDeletor struct {
 	worker           chan<- kubecontainer.ContainerID
@@ -48,7 +48,9 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 	go wait.Until(func() {
 		for {
 			id := <-buffer
-			runtime.DeleteContainer(id)
+			if err := runtime.DeleteContainer(id); err != nil {
+				klog.Warningf("[pod_container_deletor] DeleteContainer returned error for (id=%v): %v", id, err)
+			}
 		}
 	}, 0, wait.NeverStop)
 
@@ -61,7 +63,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 // getContainersToDeleteInPod returns the exited containers in a pod whose name matches the name inferred from filterContainerId (if not empty), ordered by the creation time from the latest to the earliest.
 // If filterContainerID is empty, all dead containers in the pod are returned.
 func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontainer.PodStatus, containersToKeep int) containerStatusbyCreatedList {
-	matchedContainer := func(filterContainerId string, podStatus *kubecontainer.PodStatus) *kubecontainer.ContainerStatus {
+	matchedContainer := func(filterContainerId string, podStatus *kubecontainer.PodStatus) *kubecontainer.Status {
 		if filterContainerId == "" {
 			return nil
 		}

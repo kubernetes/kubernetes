@@ -180,7 +180,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(context.TODO(), e.baseKey, "", existing, true); err != nil {
+	if err := e.storage.Get(context.TODO(), e.baseKey, storage.GetOptions{IgnoreNotFound: true}, existing); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.resource, "")
 	}
 	return existing, nil

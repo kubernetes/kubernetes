@@ -18,7 +18,6 @@ package resource
 
 import (
 	"context"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +45,10 @@ type Helper struct {
 	// and on resources that support dry-run. If the apiserver or the resource
 	// does not support dry-run, then the change will be persisted to storage.
 	ServerDryRun bool
+
+	// FieldManager is the name associated with the actor or entity that is making
+	// changes.
+	FieldManager string
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -64,27 +67,26 @@ func (m *Helper) DryRun(dryRun bool) *Helper {
 	return m
 }
 
-func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error) {
+// WithFieldManager sets the field manager option to indicate the actor or entity
+// that is making changes in a create or update operation.
+func (m *Helper) WithFieldManager(fieldManager string) *Helper {
+	m.FieldManager = fieldManager
+	return m
+}
+
+func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name)
-	if export {
-		// TODO: I should be part of GetOptions
-		req.Param("export", strconv.FormatBool(export))
-	}
 	return req.Do(context.TODO()).Get()
 }
 
-func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
+func (m *Helper) List(namespace, apiVersion string, options *metav1.ListOptions) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(options, metav1.ParameterCodec)
-	if export {
-		// TODO: I should be part of ListOptions
-		req.Param("export", strconv.FormatBool(export))
-	}
 	return req.Do(context.TODO()).Get()
 }
 
@@ -141,6 +143,9 @@ func (m *Helper) CreateWithOptions(namespace string, modify bool, obj runtime.Ob
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
+	if m.FieldManager != "" {
+		options.FieldManager = m.FieldManager
+	}
 	if modify {
 		// Attempt to version the object based on client logic.
 		version, err := metadataAccessor.ResourceVersion(obj)
@@ -174,6 +179,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
+	if m.FieldManager != "" {
+		options.FieldManager = m.FieldManager
+	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
@@ -189,6 +197,9 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	var options = &metav1.UpdateOptions{}
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
+	}
+	if m.FieldManager != "" {
+		options.FieldManager = m.FieldManager
 	}
 
 	// Attempt to version the object based on client logic.

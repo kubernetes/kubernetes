@@ -74,7 +74,6 @@ func (t *dnsFederationsConfigMapTest) run() {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
-            upstream
             fallthrough in-addr.arpa ip6.arpa
             ttl 30
         }
@@ -91,7 +90,6 @@ func (t *dnsFederationsConfigMapTest) run() {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
-            upstream
             fallthrough in-addr.arpa ip6.arpa
             ttl 30
         }
@@ -242,7 +240,6 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
-           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }
@@ -342,7 +339,6 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
-           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }
@@ -454,7 +450,6 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
         ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
-           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }

@@ -32,7 +32,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/windows"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // MemoryStatusEx is the same as Windows structure MEMORYSTATUSEX

@@ -106,6 +106,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd.Flags().String("from-env-file", "", "Specify the path to a file to read lines of key=val pairs to create a secret (i.e. a Docker .env file).")
 	cmd.Flags().String("type", "", i18n.T("The type of secret to create"))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 	return cmd
 }
 
@@ -189,13 +190,12 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, generateversioned.SecretForDockerRegistryV1GeneratorName)
 	cmd.Flags().String("docker-username", "", i18n.T("Username for Docker registry authentication"))
-	cmd.MarkFlagRequired("docker-username")
 	cmd.Flags().String("docker-password", "", i18n.T("Password for Docker registry authentication"))
-	cmd.MarkFlagRequired("docker-password")
 	cmd.Flags().String("docker-email", "", i18n.T("Email for Docker registry"))
 	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", i18n.T("Server location for Docker registry"))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 
 	return cmd
 }
@@ -284,6 +284,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmd.Flags().String("cert", "", i18n.T("Path to PEM encoded public key certificate."))
 	cmd.Flags().String("key", "", i18n.T("Path to private key associated with given certificate."))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 	return cmd
 }
 

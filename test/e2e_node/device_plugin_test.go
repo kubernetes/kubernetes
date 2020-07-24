@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"regexp"
 
@@ -80,7 +80,12 @@ func numberOfSampleResources(node *v1.Node) int64 {
 
 // getSampleDevicePluginPod returns the Device Plugin pod for sample resources in e2e tests.
 func getSampleDevicePluginPod() *v1.Pod {
-	ds := readDaemonSetV1OrDie(testfiles.ReadOrDie(sampleDevicePluginDSYAML))
+	data, err := e2etestfiles.Read(sampleDevicePluginDSYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+
+	ds := readDaemonSetV1OrDie(data)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      sampleDevicePluginName,

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Requirements is AND of all requirements.
@@ -68,13 +68,15 @@ func Everything() Selector {
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool                                      { return false }
-func (n nothingSelector) Empty() bool                                                { return false }
-func (n nothingSelector) String() string                                             { return "" }
-func (n nothingSelector) Add(_ ...Requirement) Selector                              { return n }
-func (n nothingSelector) Requirements() (Requirements, bool)                         { return nil, false }
-func (n nothingSelector) DeepCopySelector() Selector                                 { return n }
-func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) { return "", false }
+func (n nothingSelector) Matches(_ Labels) bool              { return false }
+func (n nothingSelector) Empty() bool                        { return false }
+func (n nothingSelector) String() string                     { return "" }
+func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
+func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
+func (n nothingSelector) DeepCopySelector() Selector         { return n }
+func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) {
+	return "", false
+}
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -221,7 +223,7 @@ func (r *Requirement) Matches(ls Labels) bool {
 			return false
 		}
 
-		// There should be only one strValue in r.strValues, and can be converted to a integer.
+		// There should be only one strValue in r.strValues, and can be converted to an integer.
 		if len(r.strValues) != 1 {
 			klog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
 			return false
@@ -869,23 +871,30 @@ func validateLabelValue(k, v string) error {
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil and empty Sets are considered equivalent to Everything().
+// It does not perform any validation, which means the server will reject
+// the request if the Set contains invalid values.
 func SelectorFromSet(ls Set) Selector {
+	return SelectorFromValidatedSet(ls)
+}
+
+// ValidatedSelectorFromSet returns a Selector which will match exactly the given Set. A
+// nil and empty Sets are considered equivalent to Everything().
+// The Set is validated client-side, which allows to catch errors early.
+func ValidatedSelectorFromSet(ls Set) (Selector, error) {
 	if ls == nil || len(ls) == 0 {
-		return internalSelector{}
+		return internalSelector{}, nil
 	}
 	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		r, err := NewRequirement(label, selection.Equals, []string{value})
-		if err == nil {
-			requirements = append(requirements, *r)
-		} else {
-			//TODO: double check errors when input comes from serialization?
-			return internalSelector{}
+		if err != nil {
+			return nil, err
 		}
+		requirements = append(requirements, *r)
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return internalSelector(requirements)
+	return internalSelector(requirements), nil
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.

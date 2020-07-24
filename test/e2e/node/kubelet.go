@@ -36,7 +36,7 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -172,7 +172,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 	rtnPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	err = f.WaitForPodReady(rtnPod.Name) // running & ready
+	err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, rtnPod.Name, f.Namespace.Name, framework.PodStartTimeout) // running & ready
 	framework.ExpectNoError(err)
 
 	rtnPod, err = c.CoreV1().Pods(ns).Get(context.TODO(), rtnPod.Name, metav1.GetOptions{}) // return fresh pod
@@ -418,7 +418,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			ginkgo.BeforeEach(func() {
 				e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				_, nfsServerPod, nfsIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+				_, nfsServerPod, nfsIP = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 
 			ginkgo.AfterEach(func() {

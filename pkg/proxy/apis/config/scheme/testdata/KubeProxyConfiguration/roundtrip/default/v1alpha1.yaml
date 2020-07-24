@@ -1,5 +1,6 @@
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 10
@@ -20,7 +21,7 @@ hostnameOverride: ""
 iptables:
   masqueradeAll: false
   masqueradeBit: 14
-  minSyncPeriod: 0s
+  minSyncPeriod: 1s
   syncPeriod: 30s
 ipvs:
   excludeCIDRs: null

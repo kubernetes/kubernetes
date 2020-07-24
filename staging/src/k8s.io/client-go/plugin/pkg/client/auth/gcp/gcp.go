@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {

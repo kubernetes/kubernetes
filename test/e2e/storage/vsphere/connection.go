@@ -25,7 +25,7 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

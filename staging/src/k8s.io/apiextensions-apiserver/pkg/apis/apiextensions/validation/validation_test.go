@@ -18,6 +18,7 @@ package validation
 
 import (
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -38,6 +39,7 @@ import (
 type validationMatch struct {
 	path      *field.Path
 	errorType field.ErrorType
+	contains  string
 }
 
 func required(path ...string) validationMatch {
@@ -58,9 +60,12 @@ func immutable(path ...string) validationMatch {
 func forbidden(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden}
 }
+func forbiddenContains(contains string, path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden, contains: contains}
+}
 
 func (v validationMatch) matches(err *field.Error) bool {
-	return err.Type == v.errorType && err.Field == v.path.String()
+	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.contains)
 }
 
 func strPtr(s string) *string { return &s }
@@ -1641,7 +1646,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
-				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disallowed via v1beta1
+				forbiddenContains("cannot set default values in apiextensions.k8s.io/v1beta1", "spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disallowed via v1beta1
 			},
 		},
 		{
@@ -7480,4 +7485,86 @@ func jsonSlice(l ...interface{}) []apiextensions.JSON {
 		ret = append(ret, x)
 	}
 	return ret
+}
+
+func Test_validateDeprecationWarning(t *testing.T) {
+	tests := []struct {
+		name string
+
+		deprecated bool
+		warning    *string
+
+		want []string
+	}{
+		{
+			name:       "not deprecated, nil warning",
+			deprecated: false,
+			warning:    nil,
+			want:       nil,
+		},
+
+		{
+			name:       "not deprecated, empty warning",
+			deprecated: false,
+			warning:    pointer.StringPtr(""),
+			want:       []string{"can only be set for deprecated versions"},
+		},
+		{
+			name:       "not deprecated, set warning",
+			deprecated: false,
+			warning:    pointer.StringPtr("foo"),
+			want:       []string{"can only be set for deprecated versions"},
+		},
+
+		{
+			name:       "utf-8",
+			deprecated: true,
+			warning:    pointer.StringPtr("Iñtërnâtiônàlizætiøn,💝🐹🌇⛔"),
+			want:       nil,
+		},
+		{
+			name:       "long warning",
+			deprecated: true,
+			warning:    pointer.StringPtr(strings.Repeat("x", 256)),
+			want:       nil,
+		},
+
+		{
+			name:       "too long warning",
+			deprecated: true,
+			warning:    pointer.StringPtr(strings.Repeat("x", 257)),
+			want:       []string{"must be <= 256 characters long"},
+		},
+		{
+			name:       "newline",
+			deprecated: true,
+			warning:    pointer.StringPtr("Test message\nfoo"),
+			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
+		},
+		{
+			name:       "non-printable character",
+			deprecated: true,
+			warning:    pointer.StringPtr("Test message\u0008"),
+			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
+		},
+		{
+			name:       "null character",
+			deprecated: true,
+			warning:    pointer.StringPtr("Test message\u0000"),
+			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
+		},
+		{
+			name:       "non-utf-8",
+			deprecated: true,
+			warning:    pointer.StringPtr("Test message\xc5foo"),
+			want:       []string{"must only contain printable UTF-8 characters"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := validateDeprecationWarning(tt.deprecated, tt.warning); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("validateDeprecationWarning() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

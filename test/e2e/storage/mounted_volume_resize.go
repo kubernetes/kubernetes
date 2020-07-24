@@ -33,7 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -120,7 +120,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
 		// We should consider adding a unit test that exercises this better.
 		ginkgo.By("Creating a deployment with selected PVC")
-		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		deployment, err := e2edeployment.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 
@@ -147,7 +147,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
-		podList, err := e2edeploy.GetPodsForDeployment(c, deployment)
+		podList, err := e2edeployment.GetPodsForDeployment(c, deployment)
 		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
@@ -172,7 +172,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
 	var runningPod v1.Pod
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
+		podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
 		if err != nil {
 			return false, fmt.Errorf("failed to get pods for deployment: %v", err)
 		}

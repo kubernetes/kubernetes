@@ -50,7 +50,6 @@ type ServerRunOptions struct {
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
 	MaxRequestBodyBytes       int64
-	TargetRAMMB               int
 	EnablePriorityAndFairness bool
 }
 
@@ -69,7 +68,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 }
 
-// ApplyOptions applies the run options to the method receiver and returns self
+// ApplyTo applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.ExternalAddress = s.ExternalHost
@@ -108,9 +107,6 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 // Validate checks validation of ServerRunOptions
 func (s *ServerRunOptions) Validate() []error {
 	errors := []error{}
-	if s.TargetRAMMB < 0 {
-		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
-	}
 
 	if s.LivezGracePeriod < 0 {
 		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
@@ -165,8 +161,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
 
-	fs.IntVar(&s.TargetRAMMB, "target-ram-mb", s.TargetRAMMB,
-		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
+	deprecatedTargetRAMMB := 0
+	fs.IntVar(&deprecatedTargetRAMMB, "target-ram-mb", deprecatedTargetRAMMB,
+		"DEPRECATED: Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
+	fs.MarkDeprecated("target-ram-mb", "This flag will be removed in v1.23")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).")
@@ -209,8 +207,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If true and the APIPriorityAndFairness feature gate is enabled, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
-		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
-		"returns success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
+		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+
+		"will return success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)

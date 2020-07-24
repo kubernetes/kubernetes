@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,12 +43,11 @@ import (
 	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
@@ -391,7 +390,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 }
 
 // UpdatePluginResources updates node resources based on devices already allocated to pods.
-func (m *ManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+func (m *ManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 
 	m.mutex.Lock()
@@ -658,49 +657,107 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, nil
 	}
 	klog.V(3).Infof("Needs to allocate %d %q for pod %q container %q", needed, resource, podUID, contName)
-	// Needs to allocate additional devices.
+	// Check if resource registered with devicemanager
 	if _, ok := m.healthyDevices[resource]; !ok {
 		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
-	devices = sets.NewString()
-	// Allocates from reusableDevices list first.
-	for device := range reusableDevices {
-		devices.Insert(device)
-		needed--
-		if needed == 0 {
-			return devices, nil
+
+	// Declare the list of allocated devices.
+	// This will be populated and returned below.
+	allocated := sets.NewString()
+
+	// Create a closure to help with device allocation
+	// Returns 'true' once no more devices need to be allocated.
+	allocateRemainingFrom := func(devices sets.String) bool {
+		for device := range devices.Difference(allocated) {
+			m.allocatedDevices[resource].Insert(device)
+			allocated.Insert(device)
+			needed--
+			if needed == 0 {
+				return true
+			}
 		}
+		return false
 	}
+
+	// Allocates from reusableDevices list first.
+	if allocateRemainingFrom(reusableDevices) {
+		return allocated, nil
+	}
+
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
 	}
+
 	// Gets Devices in use.
 	devicesInUse := m.allocatedDevices[resource]
-	// Gets a list of available devices.
+	// Gets Available devices.
 	available := m.healthyDevices[resource].Difference(devicesInUse)
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
-	// By default, pull devices from the unsorted list of available devices.
-	allocated := available.UnsortedList()[:needed]
-	// If topology alignment is desired, update allocated to the set of devices
-	// with the best alignment.
-	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
-	if m.deviceHasTopologyAlignment(resource) && hint.NUMANodeAffinity != nil {
-		allocated = m.takeByTopology(resource, available, hint.NUMANodeAffinity, needed)
+
+	// Filters available Devices based on NUMA affinity.
+	aligned, unaligned, noAffinity := m.filterByAffinity(podUID, contName, resource, available)
+
+	// If we can allocate all remaining devices from the set of aligned ones, then
+	// give the plugin the chance to influence which ones to allocate from that set.
+	if needed < aligned.Len() {
+		// First allocate from the preferred devices list (if available).
+		preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, aligned.Union(allocated), allocated, required)
+		if err != nil {
+			return nil, err
+		}
+		if allocateRemainingFrom(preferred.Intersection(aligned)) {
+			return allocated, nil
+		}
+		// Then fallback to allocate from the aligned set if no preferred list
+		// is returned (or not enough devices are returned in that list).
+		if allocateRemainingFrom(aligned) {
+			return allocated, nil
+		}
+
+		return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
 	}
-	// Updates m.allocatedDevices with allocated devices to prevent them
-	// from being allocated to other pods/containers, given that we are
-	// not holding lock during the rpc call.
-	for _, device := range allocated {
-		m.allocatedDevices[resource].Insert(device)
-		devices.Insert(device)
+
+	// If we can't allocate all remaining devices from the set of aligned ones,
+	// then start by first allocating all of the  aligned devices (to ensure
+	// that the alignment guaranteed by the TopologyManager is honored).
+	if allocateRemainingFrom(aligned) {
+		return allocated, nil
 	}
-	return devices, nil
+
+	// Then give the plugin the chance to influence the decision on any
+	// remaining devices to allocate.
+	preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, available.Union(allocated), allocated, required)
+	if err != nil {
+		return nil, err
+	}
+	if allocateRemainingFrom(preferred.Intersection(available)) {
+		return allocated, nil
+	}
+
+	// Finally, if the plugin did not return a preferred allocation (or didn't
+	// return a large enough one), then fall back to allocating the remaining
+	// devices from the 'unaligned' and 'noAffinity' sets.
+	if allocateRemainingFrom(unaligned) {
+		return allocated, nil
+	}
+	if allocateRemainingFrom(noAffinity) {
+		return allocated, nil
+	}
+
+	return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
 }
 
-func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity bitmask.BitMask, request int) []string {
+func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.String) (sets.String, sets.String, sets.String) {
+	// If alignment information is not available, just pass the available list back.
+	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	if !m.deviceHasTopologyAlignment(resource) || hint.NUMANodeAffinity == nil {
+		return sets.NewString(), sets.NewString(), available
+	}
+
 	// Build a map of NUMA Nodes to the devices associated with them. A
 	// device may be associated to multiple NUMA nodes at the same time. If an
 	// available device does not have any NUMA Nodes associated with it, add it
@@ -754,7 +811,7 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 			if perNodeDevices[n].Has(d) {
 				if n == nodeWithoutTopology {
 					withoutTopology = append(withoutTopology, d)
-				} else if affinity.IsSet(n) {
+				} else if hint.NUMANodeAffinity.IsSet(n) {
 					fromAffinity = append(fromAffinity, d)
 				} else {
 					notFromAffinity = append(notFromAffinity, d)
@@ -764,8 +821,8 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 		}
 	}
 
-	// Concatenate the lists above return the first 'request' devices from it..
-	return append(append(fromAffinity, notFromAffinity...), withoutTopology...)[:request]
+	// Return all three lists containing the full set of devices across them.
+	return sets.NewString(fromAffinity...), sets.NewString(notFromAffinity...), sets.NewString(withoutTopology...)
 }
 
 // allocateContainerResources attempts to allocate all of required device
@@ -920,13 +977,39 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 	return nil
 }
 
+// callGetPreferredAllocationIfAvailable issues GetPreferredAllocation grpc
+// call for device plugin resource with GetPreferredAllocationAvailable option set.
+func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, resource string, available, mustInclude sets.String, size int) (sets.String, error) {
+	eI, ok := m.endpoints[resource]
+	if !ok {
+		return nil, fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)
+	}
+
+	if eI.opts == nil || !eI.opts.GetPreferredAllocationAvailable {
+		klog.V(4).Infof("Plugin options indicate to skip GetPreferredAllocation for resource: %s", resource)
+		return nil, nil
+	}
+
+	m.mutex.Unlock()
+	klog.V(4).Infof("Issuing a GetPreferredAllocation call for container, %s, of pod %s", contName, podUID)
+	resp, err := eI.e.getPreferredAllocation(available.UnsortedList(), mustInclude.UnsortedList(), size)
+	m.mutex.Lock()
+	if err != nil {
+		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %v", err)
+	}
+	if resp != nil && len(resp.ContainerResponses) > 0 {
+		return sets.NewString(resp.ContainerResponses[0].DeviceIDs...), nil
+	}
+	return sets.NewString(), nil
+}
+
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager
 // and if necessary, updates allocatableResource in nodeInfo to at least equal to
 // the allocated capacity. This allows pods that have already been scheduled on
 // the node to pass GeneralPredicates admission checking even upon device plugin failure.
-func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulernodeinfo.NodeInfo) {
-	var newAllocatableResource *schedulernodeinfo.Resource
-	allocatableResource := node.AllocatableResource()
+func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulerframework.NodeInfo) {
+	var newAllocatableResource *schedulerframework.Resource
+	allocatableResource := node.Allocatable
 	if allocatableResource.ScalarResources == nil {
 		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)
 	}
@@ -944,7 +1027,7 @@ func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulernodeinfo.NodeInfo) 
 		newAllocatableResource.ScalarResources[v1.ResourceName(resource)] = int64(needed)
 	}
 	if newAllocatableResource != nil {
-		node.SetAllocatableResource(newAllocatableResource)
+		node.Allocatable = newAllocatableResource
 	}
 }
 

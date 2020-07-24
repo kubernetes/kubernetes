@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -97,12 +97,12 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		ginkgo.By("Creating a Deployment")
-		deployment, err := e2edeploy.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
+		deployment, err := e2edeployment.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		defer client.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Get pod from the deployment")
-		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
+		podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployment with err: %v", err))
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
@@ -179,7 +179,7 @@ func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deploym
 
 // getNodeForDeployment returns node name for the Deployment
 func getNodeForDeployment(client clientset.Interface, deployment *appsv1.Deployment) (string, error) {
-	podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
+	podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
 	if err != nil {
 		return "", err
 	}

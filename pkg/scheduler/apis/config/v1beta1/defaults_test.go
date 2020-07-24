@@ -21,9 +21,16 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -44,25 +51,21 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1beta1.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				DisablePreemption:        pointer.BoolPtr(false),
 				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
@@ -88,25 +91,21 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1beta1.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				DisablePreemption:        pointer.BoolPtr(false),
 				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
@@ -147,25 +146,21 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1beta1.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				DisablePreemption:        pointer.BoolPtr(false),
 				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
@@ -200,25 +195,21 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1beta1.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				DisablePreemption:        pointer.BoolPtr(false),
 				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
@@ -239,25 +230,21 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1beta1.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				DisablePreemption:        pointer.BoolPtr(false),
 				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				BindTimeoutSeconds:       pointer.Int64Ptr(600),
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
@@ -270,6 +257,168 @@ func TestSchedulerDefaults(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
+				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPluginArgsDefaults(t *testing.T) {
+	tests := []struct {
+		name    string
+		feature featuregate.Feature
+		in      runtime.Object
+		want    runtime.Object
+	}{
+		{
+			name: "InterPodAffinityArgs empty",
+			in:   &v1beta1.InterPodAffinityArgs{},
+			want: &v1beta1.InterPodAffinityArgs{
+				HardPodAffinityWeight: pointer.Int32Ptr(1),
+			},
+		},
+		{
+			name: "InterPodAffinityArgs explicit 0",
+			in: &v1beta1.InterPodAffinityArgs{
+				HardPodAffinityWeight: pointer.Int32Ptr(0),
+			},
+			want: &v1beta1.InterPodAffinityArgs{
+				HardPodAffinityWeight: pointer.Int32Ptr(0),
+			},
+		},
+		{
+			name: "InterPodAffinityArgs with value",
+			in: &v1beta1.InterPodAffinityArgs{
+				HardPodAffinityWeight: pointer.Int32Ptr(5),
+			},
+			want: &v1beta1.InterPodAffinityArgs{
+				HardPodAffinityWeight: pointer.Int32Ptr(5),
+			},
+		},
+		{
+			name: "NodeResourcesLeastAllocatedArgs resources empty",
+			in:   &v1beta1.NodeResourcesLeastAllocatedArgs{},
+			want: &v1beta1.NodeResourcesLeastAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "cpu", Weight: 1},
+					{Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesLeastAllocatedArgs resources with value",
+			in: &v1beta1.NodeResourcesLeastAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+			want: &v1beta1.NodeResourcesLeastAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesMostAllocatedArgs resources empty",
+			in:   &v1beta1.NodeResourcesMostAllocatedArgs{},
+			want: &v1beta1.NodeResourcesMostAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "cpu", Weight: 1},
+					{Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesMostAllocatedArgs resources with value",
+			in: &v1beta1.NodeResourcesMostAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+			want: &v1beta1.NodeResourcesMostAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesMostAllocatedArgs resources empty",
+			in:   &v1beta1.NodeResourcesMostAllocatedArgs{},
+			want: &v1beta1.NodeResourcesMostAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "cpu", Weight: 1},
+					{Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesMostAllocatedArgs resources with value",
+			in: &v1beta1.NodeResourcesMostAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+			want: &v1beta1.NodeResourcesMostAllocatedArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+		},
+		{
+			name: "PodTopologySpreadArgs resources empty",
+			in:   &v1beta1.PodTopologySpreadArgs{},
+			want: &v1beta1.PodTopologySpreadArgs{},
+		},
+		{
+			name: "PodTopologySpreadArgs resources with value",
+			in: &v1beta1.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						TopologyKey:       "planet",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						MaxSkew:           2,
+					},
+				},
+			},
+			want: &v1beta1.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						TopologyKey:       "planet",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						MaxSkew:           2,
+					},
+				},
+			},
+		},
+		{
+			name:    "PodTopologySpreadArgs resources empty, NewPodTopologySpread feature enabled",
+			feature: features.DefaultPodTopologySpread,
+			in:      &v1beta1.PodTopologySpreadArgs{},
+			want: &v1beta1.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						TopologyKey:       v1.LabelHostname,
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+						MaxSkew:           3,
+					},
+					{
+						TopologyKey:       v1.LabelZoneFailureDomainStable,
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+						MaxSkew:           5,
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		scheme := runtime.NewScheme()
+		utilruntime.Must(AddToScheme(scheme))
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.feature != "" {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.feature, true)()
+			}
+			scheme.Default(tc.in)
+			if diff := cmp.Diff(tc.in, tc.want); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})

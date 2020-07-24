@@ -456,8 +456,8 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if mounter == nil {
-				t.Fatal("failed to create CSI mounter")
+			if err != nil {
+				t.Fatalf("failed to create CSI mounter: %v", err)
 			}
 
 			csiMounter := mounter.(*csiMountMgr)
@@ -640,12 +640,14 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
-		name        string
-		accessModes []api.PersistentVolumeAccessMode
-		readOnly    bool
-		fsType      string
-		setFsGroup  bool
-		fsGroup     int64
+		name                string
+		accessModes         []api.PersistentVolumeAccessMode
+		readOnly            bool
+		fsType              string
+		setFsGroup          bool
+		fsGroup             int64
+		driverFSGroupPolicy bool
+		supportMode         storage.FSGroupPolicy
 	}{
 		{
 			name: "default fstype, with no fsgroup (should not apply fsgroup)",
@@ -694,10 +696,92 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			setFsGroup: true,
 			fsGroup:    3000,
 		},
+		{
+			name: "fstype, fsgroup, RWO provided, FSGroupPolicy ReadWriteOnceWithFSType (should apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			fsType:              "ext4",
+			setFsGroup:          true,
+			fsGroup:             3000,
+			driverFSGroupPolicy: true,
+			supportMode:         storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name: "default fstype with no fsgroup, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly:            false,
+			fsType:              "",
+			driverFSGroupPolicy: true,
+			supportMode:         storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name: "default fstype with fsgroup, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly:            false,
+			fsType:              "",
+			setFsGroup:          true,
+			fsGroup:             3000,
+			driverFSGroupPolicy: true,
+			supportMode:         storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name: "fstype, fsgroup, RWO provided, readonly, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly:            true,
+			fsType:              "ext4",
+			setFsGroup:          true,
+			fsGroup:             3000,
+			driverFSGroupPolicy: true,
+			supportMode:         storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name: "fstype, fsgroup, RWX provided, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteMany,
+			},
+			readOnly:            false,
+			fsType:              "ext4",
+			setFsGroup:          true,
+			fsGroup:             3000,
+			driverFSGroupPolicy: true,
+			supportMode:         storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name: "fstype, fsgroup, RWO provided, FSGroupPolicy None (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			fsType:              "ext4",
+			setFsGroup:          true,
+			fsGroup:             3000,
+			driverFSGroupPolicy: true,
+			supportMode:         storage.NoneFSGroupPolicy,
+		},
+		{
+			name: "fstype, fsgroup, RWO provided, readOnly, FSGroupPolicy File (should apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly:            true,
+			fsType:              "ext4",
+			setFsGroup:          true,
+			fsGroup:             3000,
+			driverFSGroupPolicy: true,
+			supportMode:         storage.FileFSGroupPolicy,
+		},
 	}
 
 	for i, tc := range testCases {
 		t.Logf("Running test %s", tc.name)
+
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeFSGroupPolicy, tc.driverFSGroupPolicy)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -725,6 +809,9 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		}
 
 		csiMounter := mounter.(*csiMountMgr)
+		if tc.driverFSGroupPolicy {
+			csiMounter.fsGroupPolicy = tc.supportMode
+		}
 		csiMounter.csiClient = setupClient(t, true)
 
 		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))

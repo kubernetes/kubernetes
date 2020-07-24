@@ -39,7 +39,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -80,7 +80,7 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, corein
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	podInformer := informerFactory.Core().V1().Pods()
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: clientSet.EventsV1beta1().Events("")})
+		Interface: clientSet.EventsV1()})
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
@@ -181,6 +181,12 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 	}
 }
 
+// SyncInformerFactory starts informer and waits for caches to be synced
+func SyncInformerFactory(testCtx *TestContext) {
+	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
+	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+}
+
 // CleanupTest cleans related resources which were created during integration test
 func CleanupTest(t *testing.T, testCtx *TestContext) {
 	// Kill the scheduler.
@@ -213,9 +219,25 @@ func AddTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) err
 	if err != nil {
 		return err
 	}
-	copy := node.DeepCopy()
-	copy.Spec.Taints = append(copy.Spec.Taints, taint)
-	_, err = cs.CoreV1().Nodes().Update(context.TODO(), copy, metav1.UpdateOptions{})
+	node.Spec.Taints = append(node.Spec.Taints, taint)
+	_, err = cs.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	return err
+}
+
+// RemoveTaintOffNode removes a specific taint from a node
+func RemoveTaintOffNode(cs clientset.Interface, nodeName string, taint v1.Taint) error {
+	node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	var taints []v1.Taint
+	for _, t := range node.Spec.Taints {
+		if !t.MatchTaint(&taint) {
+			taints = append(taints, t)
+		}
+	}
+	node.Spec.Taints = taints
+	_, err = cs.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 	return err
 }
 
@@ -379,13 +401,12 @@ func InitTestSchedulerWithOptions(
 	}
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: testCtx.ClientSet.EventsV1beta1().Events(""),
+		Interface: testCtx.ClientSet.EventsV1(),
 	})
 
 	if policy != nil {
 		opts = append(opts, scheduler.WithAlgorithmSource(CreateAlgorithmSourceFromPolicy(policy, testCtx.ClientSet)))
 	}
-	opts = append([]scheduler.Option{scheduler.WithBindTimeoutSeconds(600)}, opts...)
 	testCtx.Scheduler, err = scheduler.New(
 		testCtx.ClientSet,
 		testCtx.InformerFactory,
@@ -407,11 +428,6 @@ func InitTestSchedulerWithOptions(
 
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
-
-	testCtx.InformerFactory.Start(testCtx.Scheduler.StopEverything)
-	testCtx.InformerFactory.WaitForCacheSync(testCtx.Scheduler.StopEverything)
-
-	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	return testCtx
 }

@@ -52,7 +52,7 @@ func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, 
 		ResourceVersion: "",
 	}
 	waitForReplicas := scale.NewRetryParams(waitRetryInterval, waitRetryTimeout)
-	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr))
+	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr, false))
 	err := wait.PollImmediate(updateRetryInterval, updateRetryTimeout, cond)
 	if err == nil {
 		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gvr.GroupResource(), name, namespace, size, waitForReplicas)

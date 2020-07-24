@@ -19,6 +19,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -218,5 +219,262 @@ func TestFromObject(t *testing.T) {
 		if e, a := item.message, FromObject(item.obj).Error(); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+	}
+}
+
+func TestReasonForErrorSupportsWrappedErrors(t *testing.T) {
+	testCases := []struct {
+		name           string
+		err            error
+		expectedReason metav1.StatusReason
+	}{
+		{
+			name:           "Direct match",
+			err:            &StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonUnauthorized}},
+			expectedReason: metav1.StatusReasonUnauthorized,
+		},
+		{
+			name:           "No match",
+			err:            errors.New("some other error"),
+			expectedReason: metav1.StatusReasonUnknown,
+		},
+		{
+			name:           "Nested match",
+			err:            fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", &StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists}})),
+			expectedReason: metav1.StatusReasonAlreadyExists,
+		},
+		{
+			name:           "Nested, no match",
+			err:            fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectedReason: metav1.StatusReasonUnknown,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if result := ReasonForError(tc.err); result != tc.expectedReason {
+				t.Errorf("expected reason: %q, but got known reason: %q", tc.expectedReason, result)
+			}
+		})
+	}
+}
+
+func TestIsTooManyRequestsSupportsWrappedErrors(t *testing.T) {
+	testCases := []struct {
+		name        string
+		err         error
+		expectMatch bool
+	}{
+		{
+			name:        "Direct match via status reason",
+			err:         &StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonTooManyRequests}},
+			expectMatch: true,
+		},
+		{
+			name:        "Direct match via status code",
+			err:         &StatusError{ErrStatus: metav1.Status{Code: http.StatusTooManyRequests}},
+			expectMatch: true,
+		},
+		{
+			name:        "No match",
+			err:         &StatusError{},
+			expectMatch: false,
+		},
+		{
+			name:        "Nested match via status reason",
+			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonTooManyRequests}}),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested match via status code",
+			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusTooManyRequests}}),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested,no match",
+			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
+			expectMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		if result := IsTooManyRequests(tc.err); result != tc.expectMatch {
+			t.Errorf("Expect match %t, got match %t", tc.expectMatch, result)
+		}
+	}
+}
+func TestIsRequestEntityTooLargeErrorSupportsWrappedErrors(t *testing.T) {
+	testCases := []struct {
+		name        string
+		err         error
+		expectMatch bool
+	}{
+		{
+			name:        "Direct match via status reason",
+			err:         &StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonRequestEntityTooLarge}},
+			expectMatch: true,
+		},
+		{
+			name:        "Direct match via status code",
+			err:         &StatusError{ErrStatus: metav1.Status{Code: http.StatusRequestEntityTooLarge}},
+			expectMatch: true,
+		},
+		{
+			name:        "No match",
+			err:         &StatusError{},
+			expectMatch: false,
+		},
+		{
+			name:        "Nested match via status reason",
+			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonRequestEntityTooLarge}}),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested match via status code",
+			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusRequestEntityTooLarge}}),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested,no match",
+			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
+			expectMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		if result := IsRequestEntityTooLargeError(tc.err); result != tc.expectMatch {
+			t.Errorf("Expect match %t, got match %t", tc.expectMatch, result)
+		}
+	}
+}
+
+func TestIsUnexpectedServerError(t *testing.T) {
+	unexpectedServerErr := func() error {
+		return &StatusError{
+			ErrStatus: metav1.Status{
+				Details: &metav1.StatusDetails{
+					Causes: []metav1.StatusCause{{Type: metav1.CauseTypeUnexpectedServerResponse}},
+				},
+			},
+		}
+	}
+	testCases := []struct {
+		name        string
+		err         error
+		expectMatch bool
+	}{
+		{
+			name:        "Direct match",
+			err:         unexpectedServerErr(),
+			expectMatch: true,
+		},
+		{
+			name:        "No match",
+			err:         errors.New("some other error"),
+			expectMatch: false,
+		},
+		{
+			name:        "Nested match",
+			err:         fmt.Errorf("wrapping: %w", unexpectedServerErr()),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested, no match",
+			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if result := IsUnexpectedServerError(tc.err); result != tc.expectMatch {
+				t.Errorf("expected match: %t, but got match: %t", tc.expectMatch, result)
+			}
+		})
+	}
+}
+
+func TestIsUnexpectedObjectError(t *testing.T) {
+	unexpectedObjectErr := func() error {
+		return &UnexpectedObjectError{}
+	}
+	testCases := []struct {
+		name        string
+		err         error
+		expectMatch bool
+	}{
+		{
+			name:        "Direct match",
+			err:         unexpectedObjectErr(),
+			expectMatch: true,
+		},
+		{
+			name:        "No match",
+			err:         errors.New("some other error"),
+			expectMatch: false,
+		},
+		{
+			name:        "Nested match",
+			err:         fmt.Errorf("wrapping: %w", unexpectedObjectErr()),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested, no match",
+			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if result := IsUnexpectedObjectError(tc.err); result != tc.expectMatch {
+				t.Errorf("expected match: %t, but got match: %t", tc.expectMatch, result)
+			}
+		})
+	}
+}
+
+func TestSuggestsClientDelaySupportsWrapping(t *testing.T) {
+	suggestsClientDelayErr := func() error {
+		return &StatusError{
+			ErrStatus: metav1.Status{
+				Reason:  metav1.StatusReasonServerTimeout,
+				Details: &metav1.StatusDetails{},
+			},
+		}
+	}
+	testCases := []struct {
+		name        string
+		err         error
+		expectMatch bool
+	}{
+		{
+			name:        "Direct match",
+			err:         suggestsClientDelayErr(),
+			expectMatch: true,
+		},
+		{
+			name:        "No match",
+			err:         errors.New("some other error"),
+			expectMatch: false,
+		},
+		{
+			name:        "Nested match",
+			err:         fmt.Errorf("wrapping: %w", suggestsClientDelayErr()),
+			expectMatch: true,
+		},
+		{
+			name:        "Nested, no match",
+			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, result := SuggestsClientDelay(tc.err); result != tc.expectMatch {
+				t.Errorf("expected match: %t, but got match: %t", tc.expectMatch, result)
+			}
+		})
 	}
 }

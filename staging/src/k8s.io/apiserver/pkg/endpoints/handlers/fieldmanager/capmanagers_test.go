@@ -41,14 +41,16 @@ func (*fakeManager) Update(_, newObj runtime.Object, managed fieldmanager.Manage
 	return newObj, managed, nil
 }
 
-func (*fakeManager) Apply(_, _ runtime.Object, _ fieldmanager.Managed, _ string, force bool) (runtime.Object, fieldmanager.Managed, error) {
+func (*fakeManager) Apply(_, _ runtime.Object, _ fieldmanager.Managed, _ string, _ bool) (runtime.Object, fieldmanager.Managed, error) {
 	panic("not implemented")
 	return nil, nil, nil
 }
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewCapManagersManager(f.fieldManager, 3)
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
+		func(m fieldmanager.Manager) fieldmanager.Manager {
+			return fieldmanager.NewCapManagersManager(m, 3)
+		})
 
 	podWithLabels := func(labels ...string) runtime.Object {
 		labelMap := map[string]interface{}{}
@@ -110,8 +112,10 @@ func TestCapManagersManagerMergesEntries(t *testing.T) {
 }
 
 func TestCapUpdateManagers(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewCapManagersManager(&fakeManager{}, 3)
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
+		func(m fieldmanager.Manager) fieldmanager.Manager {
+			return fieldmanager.NewCapManagersManager(m, 3)
+		})
 
 	set := func(fields ...string) *metav1.FieldsV1 {
 		s := fieldpath.NewSet()

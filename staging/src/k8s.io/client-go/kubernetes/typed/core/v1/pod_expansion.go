@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 )
@@ -31,6 +32,7 @@ type PodExpansion interface {
 	Bind(ctx context.Context, binding *v1.Binding, opts metav1.CreateOptions) error
 	Evict(ctx context.Context, eviction *policy.Eviction) error
 	GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request
+	ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper
 }
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
@@ -45,4 +47,18 @@ func (c *pods) Evict(ctx context.Context, eviction *policy.Eviction) error {
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
 	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, scheme.ParameterCodec)
+}
+
+// ProxyGet returns a response of the pod by calling it through the proxy.
+func (c *pods) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
+	request := c.client.Get().
+		Namespace(c.ns).
+		Resource("pods").
+		SubResource("proxy").
+		Name(net.JoinSchemeNamePort(scheme, name, port)).
+		Suffix(path)
+	for k, v := range params {
+		request = request.Param(k, v)
+	}
+	return request
 }

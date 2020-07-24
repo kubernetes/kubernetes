@@ -94,7 +94,7 @@ func testWatch(t *testing.T, recursive bool) {
 		},
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", tt.pred, recursive)
+		w, err := store.watch(ctx, tt.key, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred}, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -131,7 +131,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestWatchFromZero(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
-	w, err := store.Watch(ctx, key, "0", storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestWatchFromZero(t *testing.T) {
 	}
 
 	// Make sure when we watch from 0 we receive an ADDED event
-	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestWatchFromZero(t *testing.T) {
 	}
 
 	// Make sure we can still watch from 0 and receive an ADDED event
-	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestWatchFromNoneZero(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestWatchError(t *testing.T) {
 	defer cluster.Terminate(t)
 	invalidStore := newStore(cluster.RandClient(), true, codec, "", &prefixTransformer{prefix: []byte("test!")})
 	ctx := context.Background()
-	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
+	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}

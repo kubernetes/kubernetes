@@ -24,7 +24,7 @@ import (
 	"github.com/gregjones/httpcache"
 	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type cacheRoundTripper struct {

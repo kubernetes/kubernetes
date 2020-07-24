@@ -18,15 +18,15 @@ package rest
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"reflect"
 	"testing"
 	"time"
-
-	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type TestParam struct {
@@ -252,7 +254,7 @@ func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utilt
 
 }
 
-func TestHttpMethods(t *testing.T) {
+func TestHTTPMethods(t *testing.T) {
 	testServer, _, _ := testServerEnv(t, 200)
 	defer testServer.Close()
 	c, _ := restClient(testServer)
@@ -280,6 +282,57 @@ func TestHttpMethods(t *testing.T) {
 	request = c.Patch(types.JSONPatchType)
 	if request == nil {
 		t.Errorf("Patch : Object returned should not be nil")
+	}
+}
+
+func TestHTTPProxy(t *testing.T) {
+	ctx := context.Background()
+	testServer, fh, _ := testServerEnv(t, 200)
+	fh.ResponseBody = "backend data"
+	defer testServer.Close()
+
+	testProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		to, err := url.Parse(req.RequestURI)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		w.Write([]byte("proxied: "))
+		httputil.NewSingleHostReverseProxy(to).ServeHTTP(w, req)
+	}))
+	defer testProxyServer.Close()
+
+	t.Logf(testProxyServer.URL)
+
+	u, err := url.Parse(testProxyServer.URL)
+	if err != nil {
+		t.Fatalf("Failed to parse test proxy server url: %v", err)
+	}
+
+	c, err := RESTClientFor(&Config{
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &v1.SchemeGroupVersion,
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		},
+		Proxy:    http.ProxyURL(u),
+		Username: "user",
+		Password: "pass",
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	request := c.Get()
+	if request == nil {
+		t.Fatalf("Get: Object returned should not be nil")
+	}
+
+	b, err := request.DoRaw(ctx)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if got, want := string(b), "proxied: backend data"; !cmp.Equal(got, want) {
+		t.Errorf("unexpected body: %v", cmp.Diff(want, got))
 	}
 }
 

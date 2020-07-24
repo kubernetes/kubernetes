@@ -25,7 +25,7 @@ import (
 	"sort"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +34,7 @@ import (
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/ingress"
+	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 )
@@ -153,7 +153,7 @@ func main() {
 
 	// Setting up a localized scale test framework.
 	f := scale.NewIngressScaleFramework(cs, ns.Name, cloudConfig)
-	f.Logger = &ingress.GLogger{}
+	f.Logger = &e2eingress.GLogger{}
 	// Customizing scale test.
 	f.EnableTLS = enableTLS
 	f.OutputFile = outputFile

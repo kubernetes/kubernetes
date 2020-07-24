@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -91,6 +91,8 @@ type ExposeServiceOptions struct {
 	DryRunVerifier   *resource.DryRunVerifier
 	EnforceNamespace bool
 
+	fieldManager string
+
 	Generators                func(string) map[string]generate.Generator
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
@@ -157,6 +159,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd.Flags().String("name", "", i18n.T("The name for the newly created object."))
 	cmd.Flags().String("session-affinity", "", i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
 	cmd.Flags().String("cluster-ip", "", i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-expose")
 
 	usage := "identifying the resource to expose a service"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
@@ -363,6 +366,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		actualObject, err := resource.
 			NewHelper(client, objMapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			WithFieldManager(o.fieldManager).
 			Create(o.Namespace, false, asUnstructured)
 		if err != nil {
 			return err

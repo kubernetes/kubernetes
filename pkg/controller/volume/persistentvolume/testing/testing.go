@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ErrVersionConflict is the error returned when resource version of requested

@@ -35,6 +35,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -54,10 +55,10 @@ var _ = SIGDescribe("LimitRange", func() {
 	*/
 	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		ginkgo.By("Creating a LimitRange")
-		min := getResourceList("50m", "100Mi", "")
-		max := getResourceList("500m", "500Mi", "")
-		defaultLimit := getResourceList("500m", "500Mi", "")
-		defaultRequest := getResourceList("100m", "200Mi", "")
+		min := getResourceList("50m", "100Mi", "100Gi")
+		max := getResourceList("500m", "500Mi", "500Gi")
+		defaultLimit := getResourceList("500m", "500Mi", "500Gi")
+		defaultRequest := getResourceList("100m", "200Mi", "200Gi")
 		maxLimitRequestRatio := v1.ResourceList{}
 		value := strconv.Itoa(time.Now().Nanosecond()) + string(uuid.NewUUID())
 		limitRange := newLimitRange("limit-range", value, v1.LimitTypeContainer,
@@ -129,7 +130,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a Pod with no resource requirements")
-		pod := f.NewTestPod("pod-no-resources", v1.ResourceList{}, v1.ResourceList{})
+		pod := newTestPod("pod-no-resources", v1.ResourceList{}, v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -146,7 +147,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		}
 
 		ginkgo.By("Creating a Pod with partial resource requirements")
-		pod = f.NewTestPod("pod-partial-resources", getResourceList("", "150Mi", ""), getResourceList("300m", "", ""))
+		pod = newTestPod("pod-partial-resources", getResourceList("", "150Mi", "150Gi"), getResourceList("300m", "", ""))
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -156,7 +157,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		// This is an interesting case, so it's worth a comment
 		// If you specify a Limit, and no Request, the Limit will default to the Request
 		// This means that the LimitRange.DefaultRequest will ONLY take affect if a container.resources.limit is not supplied
-		expected = v1.ResourceRequirements{Requests: getResourceList("300m", "150Mi", ""), Limits: getResourceList("300m", "500Mi", "")}
+		expected = v1.ResourceRequirements{Requests: getResourceList("300m", "150Mi", "150Gi"), Limits: getResourceList("300m", "500Mi", "500Gi")}
 		for i := range pod.Spec.Containers {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
 			if err != nil {
@@ -167,17 +168,17 @@ var _ = SIGDescribe("LimitRange", func() {
 		}
 
 		ginkgo.By("Failing to create a Pod with less than min resources")
-		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi", ""), v1.ResourceList{})
+		pod = newTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectError(err)
 
 		ginkgo.By("Failing to create a Pod with more than max resources")
-		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi", ""), v1.ResourceList{})
+		pod = newTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectError(err)
 
 		ginkgo.By("Updating a LimitRange")
-		newMin := getResourceList("9m", "49Mi", "")
+		newMin := getResourceList("9m", "49Mi", "49Gi")
 		limitRange.Spec.Limits[0].Min = newMin
 		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Update(context.TODO(), limitRange, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
@@ -191,12 +192,12 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a Pod with less than former min resources")
-		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi", ""), v1.ResourceList{})
+		pod = newTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Failing to create a Pod with more than max resources")
-		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi", ""), v1.ResourceList{})
+		pod = newTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectError(err)
 
@@ -235,7 +236,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
 		ginkgo.By("Creating a Pod with more than former max resources")
-		pod = f.NewTestPod(podName+"2", getResourceList("600m", "600Mi", ""), v1.ResourceList{})
+		pod = newTestPod(podName+"2", getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	})
@@ -302,6 +303,27 @@ func newLimitRange(name, value string, limitType v1.LimitType,
 					Default:              defaultLimit,
 					DefaultRequest:       defaultRequest,
 					MaxLimitRequestRatio: maxLimitRequestRatio,
+				},
+			},
+		},
+	}
+}
+
+// newTestPod returns a pod that has the specified requests and limits
+func newTestPod(name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{
+						Requests: requests,
+						Limits:   limits,
+					},
 				},
 			},
 		},

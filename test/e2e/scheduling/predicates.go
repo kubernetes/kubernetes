@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -53,8 +52,8 @@ const (
 
 var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
-// variable set in BeforeEach, never modified afterwards
-var masterNodes sets.String
+// variable populated in BeforeEach, never modified afterwards
+var workerNodes = sets.String{}
 
 type pausePodConfig struct {
 	Name                              string
@@ -96,24 +95,21 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		framework.AllNodesReady(cs, time.Minute)
 
-		// NOTE: Here doesn't get nodeList for supporting a master nodes which can host workload pods.
-		masterNodes, _, err = e2enode.GetMasterAndWorkerNodes(cs)
-		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
-		}
 		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-
 		framework.ExpectNoErrorWithOffset(0, err)
+		for _, n := range nodeList.Items {
+			workerNodes.Insert(n.Name)
+		}
 
 		err = framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
-			printAllKubeletPods(cs, node.Name)
+			framework.Logf("\nLogging pods the apiserver thinks is on node %v before test", node.Name)
+			printAllPodsOnNode(cs, node.Name)
 		}
 
 	})
@@ -136,7 +132,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				nodeMaxAllocatable = allocatable.Value()
 			}
 		}
-		WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, workerNodes)
 
 		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -216,7 +212,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		var beardsecond v1.ResourceName = "example.com/beardsecond"
 
 		ginkgo.BeforeEach(func() {
-			WaitForStableCluster(cs, masterNodes)
+			WaitForStableCluster(cs, workerNodes)
 			ginkgo.By("Add RuntimeClass and fake resource")
 
 			// find a node which can run a pod:
@@ -324,7 +320,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
-		WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, workerNodes)
 		nodeMaxAllocatable := int64(0)
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
@@ -437,7 +433,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, workerNodes)
 
 		conf := pausePodConfig{
 			Name:   podName,
@@ -492,7 +488,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, workerNodes)
 
 		conf := pausePodConfig{
 			Name: podName,
@@ -586,9 +582,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Value:  "testing-taint-value",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
@@ -629,9 +625,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Value:  "testing-taint-value",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
@@ -796,11 +792,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 })
 
-// printAllKubeletPods outputs status of all kubelet pods into log.
-func printAllKubeletPods(c clientset.Interface, nodeName string) {
-	podList, err := e2ekubelet.GetKubeletPods(c, nodeName)
+// printAllPodsOnNode outputs status of all kubelet pods into log.
+func printAllPodsOnNode(c clientset.Interface, nodeName string) {
+	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.nodeName=" + nodeName})
 	if err != nil {
-		framework.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
+		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
 		return
 	}
 	for _, p := range podList.Items {
@@ -905,7 +901,7 @@ func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 // from the given node upon invocation.
 func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) Action {
 	return func() error {
-		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
 	}
 }
@@ -934,7 +930,7 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podN
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
 	allPods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
-	scheduledPods, notScheduledPods := GetPodsScheduled(masterNodes, allPods)
+	scheduledPods, notScheduledPods := GetPodsScheduled(workerNodes, allPods)
 
 	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
 	framework.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
@@ -1040,30 +1036,24 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 // adding the well known prefix "0::ffff:" https://tools.ietf.org/html/rfc2765
 // if the ip is IPv4 and the cluster IPFamily is IPv6, otherwise returns the same ip
 func translateIPv4ToIPv6(ip string) string {
-	if framework.TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
+	if framework.TestContext.IPFamily == "ipv6" && ip != "" && !k8utilnet.IsIPv6String(ip) {
 		ip = "0::ffff:" + ip
 	}
 	return ip
 }
 
-// GetPodsScheduled returns a number of currently scheduled and not scheduled Pods.
-func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
+// GetPodsScheduled returns a number of currently scheduled and not scheduled Pods on worker nodes.
+func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
 	for _, pod := range pods.Items {
-		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				framework.ExpectEqual(scheduledCondition != nil, true)
+		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
+			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+			framework.ExpectEqual(scheduledCondition != nil, true)
+			if scheduledCondition != nil {
 				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
 				scheduledPods = append(scheduledPods, pod)
-			} else {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				framework.ExpectEqual(scheduledCondition != nil, true)
-				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
-				if scheduledCondition.Reason == "Unschedulable" {
-
-					notScheduledPods = append(notScheduledPods, pod)
-				}
 			}
+		} else if pod.Spec.NodeName == "" {
+			notScheduledPods = append(notScheduledPods, pod)
 		}
 	}
 	return

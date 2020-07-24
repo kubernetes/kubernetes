@@ -94,6 +94,22 @@ func (s *Set) Difference(s2 *Set) *Set {
 	}
 }
 
+// RecursiveDifference returns a Set containing elements which:
+// * appear in s
+// * do not appear in s2
+//
+// Compared to a regular difference,
+// this removes every field **and its children** from s that is contained in s2.
+//
+// For example, with s containing `a.b.c` and s2 containing `a.b`,
+// a RecursiveDifference will result in `a`, as the entire node `a.b` gets removed.
+func (s *Set) RecursiveDifference(s2 *Set) *Set {
+	return &Set{
+		Members:  *s.Members.Difference(&s2.Members),
+		Children: *s.Children.RecursiveDifference(s2),
+	}
+}
+
 // Size returns the number of members of the set.
 func (s *Set) Size() int {
 	return s.Members.Size() + s.Children.Size()
@@ -330,6 +346,48 @@ func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap {
 	if i < len(s.members) {
 		out.members = append(out.members, s.members[i:]...)
 	}
+	return out
+}
+
+// RecursiveDifference returns a SetNodeMap with members that appear in s but not in s2.
+//
+// Compared to a regular difference,
+// this removes every field **and its children** from s that is contained in s2.
+//
+// For example, with s containing `a.b.c` and s2 containing `a.b`,
+// a RecursiveDifference will result in `a`, as the entire node `a.b` gets removed.
+func (s *SetNodeMap) RecursiveDifference(s2 *Set) *SetNodeMap {
+	out := &SetNodeMap{}
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.Children.members) {
+		if s.members[i].pathElement.Less(s2.Children.members[j].pathElement) {
+			if !s2.Members.Has(s.members[i].pathElement) {
+				out.members = append(out.members, setNode{pathElement: s.members[i].pathElement, set: s.members[i].set})
+			}
+			i++
+		} else {
+			if !s2.Children.members[j].pathElement.Less(s.members[i].pathElement) {
+				if !s2.Members.Has(s.members[i].pathElement) {
+					diff := s.members[i].set.RecursiveDifference(s2.Children.members[j].set)
+					if !diff.Empty() {
+						out.members = append(out.members, setNode{pathElement: s.members[i].pathElement, set: diff})
+					}
+				}
+				i++
+			}
+			j++
+		}
+	}
+
+	if i < len(s.members) {
+		for _, c := range s.members[i:] {
+			if !s2.Members.Has(c.pathElement) {
+				out.members = append(out.members, c)
+			}
+		}
+	}
+
 	return out
 }
 

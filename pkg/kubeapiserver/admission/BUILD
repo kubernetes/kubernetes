@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "config.go",
         "initializer.go",
-        "patch_restmapper.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/admission",
     visibility = ["//visibility:public"],
@@ -13,7 +12,6 @@ go_library(
         "//pkg/quota/v1:go_default_library",
         "//pkg/quota/v1/install:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/initializer:go_default_library",
@@ -25,7 +23,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -29,8 +29,9 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	utilnet "k8s.io/utils/net"
 )
@@ -90,9 +91,12 @@ func newDelayedRouteUpdater(az *Cloud, interval time.Duration) *delayedRouteUpda
 
 // run starts the updater reconciling loop.
 func (d *delayedRouteUpdater) run() {
-	for {
+	err := wait.PollImmediateInfinite(d.interval, func() (bool, error) {
 		d.updateRoutes()
-		time.Sleep(d.interval)
+		return false, nil
+	})
+	if err != nil { // this should never happen, if it does, panic
+		panic(err)
 	}
 }
 
@@ -405,7 +409,7 @@ func mapNodeNameToRouteName(ipv6DualStackEnabled bool, nodeName types.NodeName, 
 // Used with mapNodeNameToRouteName. See comment on mapNodeNameToRouteName.
 func mapRouteNameToNodeName(ipv6DualStackEnabled bool, routeName string) types.NodeName {
 	if !ipv6DualStackEnabled {
-		return types.NodeName(fmt.Sprintf("%s", routeName))
+		return types.NodeName(routeName)
 	}
 	parts := strings.Split(routeName, routeNameSeparator)
 	nodeName := parts[0]

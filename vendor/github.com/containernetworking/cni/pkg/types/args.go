@@ -36,7 +36,7 @@ func (b *UnmarshallableBool) UnmarshalText(data []byte) error {
 	case "0", "false":
 		*b = false
 	default:
-		return fmt.Errorf("Boolean unmarshal error: invalid input %s", s)
+		return fmt.Errorf("boolean unmarshal error: invalid input %s", s)
 	}
 	return nil
 }

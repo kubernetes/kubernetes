@@ -54,19 +54,10 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 }
 
 func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
-	if i.cpuManager != nil {
-		return i.cpuManager.RemoveContainer(containerID)
-	}
 	return nil
 }
 
 func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
-	if i.cpuManager != nil {
-		err := i.cpuManager.RemoveContainer(containerID)
-		if err != nil {
-			return err
-		}
-	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		err := i.topologyManager.RemoveContainer(containerID)
 		if err != nil {

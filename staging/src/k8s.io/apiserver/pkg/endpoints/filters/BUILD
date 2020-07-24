@@ -17,6 +17,7 @@ go_test(
         "impersonation_test.go",
         "metrics_test.go",
         "requestinfo_test.go",
+        "warning_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -45,6 +46,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "audit.go",
+        "audit_annotations.go",
         "authentication.go",
         "authn_audit.go",
         "authorization.go",
@@ -53,6 +55,7 @@ go_library(
         "impersonation.go",
         "metrics.go",
         "requestinfo.go",
+        "warning.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/filters",
     importpath = "k8s.io/apiserver/pkg/endpoints/filters",
@@ -63,6 +66,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
@@ -74,9 +78,10 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/httplog:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/warning:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

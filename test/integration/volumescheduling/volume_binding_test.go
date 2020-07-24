@@ -27,19 +27,23 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -78,7 +82,7 @@ const (
 	podLimit              = 50
 	volsPerPod            = 3
 	nodeAffinityLabelKey  = "kubernetes.io/hostname"
-	provisionerPluginName = "kubernetes.io/mock-provisioner"
+	provisionerPluginName = "mock-provisioner.kubernetes.io"
 )
 
 type testPV struct {
@@ -700,10 +704,17 @@ func TestPVAffinityConflict(t *testing.T) {
 }
 
 func TestVolumeProvision(t *testing.T) {
+	t.Run("with CSIStorageCapacity", func(t *testing.T) { testVolumeProvision(t, true) })
+	t.Run("without CSIStorageCapacity", func(t *testing.T) { testVolumeProvision(t, false) })
+}
+
+func testVolumeProvision(t *testing.T, storageCapacity bool) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, storageCapacity)()
+
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
 
-	cases := map[string]struct {
+	type testcaseType struct {
 		pod             *v1.Pod
 		pvs             []*testPV
 		boundPvcs       []*testPVC
@@ -711,7 +722,9 @@ func TestVolumeProvision(t *testing.T) {
 		// Create these, but they should not be bound in the end
 		unboundPvcs []*testPVC
 		shouldFail  bool
-	}{
+	}
+
+	cases := map[string]testcaseType{
 		"wait provisioned": {
 			pod:             makePod("pod-pvc-canprovision", config.ns, []string{"pvc-canprovision"}),
 			provisionedPvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
@@ -748,9 +761,7 @@ func TestVolumeProvision(t *testing.T) {
 		},
 	}
 
-	for name, test := range cases {
-		klog.Infof("Running test %v", name)
-
+	run := func(t *testing.T, test testcaseType) {
 		// Create StorageClasses
 		suffix := rand.String(4)
 		classes := map[string]*storagev1.StorageClass{}
@@ -830,6 +841,152 @@ func TestVolumeProvision(t *testing.T) {
 
 		// Force delete objects, but they still may not be immediately removed
 		deleteTestObjects(config.client, config.ns, deleteOption)
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) { run(t, test) })
+	}
+}
+
+// TestCapacity covers different scenarios involving CSIStorageCapacity objects.
+func TestCapacity(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
+
+	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
+	defer config.teardown()
+
+	type testcaseType struct {
+		pod               *v1.Pod
+		pvcs              []*testPVC
+		haveCapacity      bool
+		capacitySupported bool
+	}
+
+	cases := map[string]testcaseType{
+		"baseline": {
+			pod:  makePod("pod-pvc-canprovision", config.ns, []string{"pvc-canprovision"}),
+			pvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
+		},
+		"out of space": {
+			pod:               makePod("pod-pvc-canprovision", config.ns, []string{"pvc-canprovision"}),
+			pvcs:              []*testPVC{{"pvc-canprovision", classWait, ""}},
+			capacitySupported: true,
+		},
+		"with space": {
+			pod:               makePod("pod-pvc-canprovision", config.ns, []string{"pvc-canprovision"}),
+			pvcs:              []*testPVC{{"pvc-canprovision", classWait, ""}},
+			capacitySupported: true,
+			haveCapacity:      true,
+		},
+		"ignored": {
+			pod:          makePod("pod-pvc-canprovision", config.ns, []string{"pvc-canprovision"}),
+			pvcs:         []*testPVC{{"pvc-canprovision", classWait, ""}},
+			haveCapacity: true,
+		},
+	}
+
+	run := func(t *testing.T, test testcaseType) {
+		// Create StorageClasses
+		suffix := rand.String(4)
+		classes := map[string]*storagev1.StorageClass{}
+		classes[classImmediate] = makeDynamicProvisionerStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate, nil)
+		classes[classWait] = makeDynamicProvisionerStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait, nil)
+		topo := []v1.TopologySelectorTerm{
+			{
+				MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+					{
+						Key:    nodeAffinityLabelKey,
+						Values: []string{node2},
+					},
+				},
+			},
+		}
+		classes[classTopoMismatch] = makeDynamicProvisionerStorageClass(fmt.Sprintf("topomismatch-%v", suffix), &modeWait, topo)
+		for _, sc := range classes {
+			if _, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+			}
+		}
+
+		// The provisioner isn't actually a CSI driver, but
+		// that doesn't matter here.
+		if test.capacitySupported {
+			if _, err := config.client.StorageV1().CSIDrivers().Create(context.TODO(),
+				&storagev1.CSIDriver{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: provisionerPluginName,
+					},
+					Spec: storagev1.CSIDriverSpec{
+						StorageCapacity: &test.capacitySupported,
+					},
+				},
+				metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create CSIDriver: %v", err)
+			}
+
+			// kube-scheduler may need some time before it gets the CSIDriver object.
+			// Without it, scheduling will happen without considering capacity, which
+			// is not what we want to test.
+			time.Sleep(5 * time.Second)
+		}
+
+		// Create CSIStorageCapacity
+		if test.haveCapacity {
+			if _, err := config.client.StorageV1alpha1().CSIStorageCapacities("default").Create(context.TODO(),
+				&storagev1alpha1.CSIStorageCapacity{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "foo-",
+					},
+					StorageClassName: classes[classWait].Name,
+					NodeTopology:     &metav1.LabelSelector{},
+					// More than the 5Gi used in makePVC.
+					Capacity: resource.NewQuantity(6*1024*1024*1024, resource.BinarySI),
+				},
+				metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create CSIStorageCapacity: %v", err)
+			}
+		}
+
+		// Create PVCs
+		for _, pvcConfig := range test.pvcs {
+			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
+			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			}
+		}
+
+		// Create Pod
+		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
+		}
+
+		// Lack of capacity prevents pod scheduling and binding.
+		shouldFail := test.capacitySupported && !test.haveCapacity
+		if shouldFail {
+			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+				t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
+			}
+		} else {
+			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			}
+		}
+
+		// Validate
+		for _, pvc := range test.pvcs {
+			if shouldFail {
+				validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending, false)
+			} else {
+				validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound, true)
+			}
+		}
+
+		// Force delete objects, but they still may not be immediately removed
+		deleteTestObjects(config.client, config.ns, deleteOption)
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) { run(t, test) })
 	}
 }
 
@@ -988,6 +1145,8 @@ func deleteTestObjects(client clientset.Interface, ns string, option metav1.Dele
 	client.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().StorageClasses().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.StorageV1().CSIDrivers().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.StorageV1alpha1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
@@ -1148,7 +1307,7 @@ func validatePVCPhase(t *testing.T, client clientset.Interface, pvcName string, 
 	// Check whether the bound claim is provisioned/bound as expect.
 	if phase == v1.ClaimBound {
 		if err := validateProvisionAnn(claim, isProvisioned); err != nil {
-			t.Errorf("Provisoning annotaion on PVC %v/%v not bahaviors as expected: %v", ns, pvcName, err)
+			t.Errorf("Provisoning annotation on PVC %v/%v not as expected: %v", ns, pvcName, err)
 		}
 	}
 }

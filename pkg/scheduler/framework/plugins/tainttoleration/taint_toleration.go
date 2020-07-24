@@ -25,7 +25,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
@@ -52,14 +51,9 @@ func (pl *TaintToleration) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.Error, "invalid nodeInfo")
-	}
-
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
 	}
 
 	filterPredicate := func(t *v1.Taint) bool {
@@ -67,7 +61,7 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(taints, pod.Spec.Tolerations, filterPredicate)
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, filterPredicate)
 	if !isUntolerated {
 		return nil
 	}
@@ -168,6 +162,6 @@ func (pl *TaintToleration) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &TaintToleration{handle: h}, nil
 }

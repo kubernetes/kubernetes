@@ -6,6 +6,8 @@ approvers:
 - Random-Liu
 - vishh
 - yujuhong
+- dashpole
+- sjenning
 reviewers:
 - sig-node-reviewers
 labels:

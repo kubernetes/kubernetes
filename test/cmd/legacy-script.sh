@@ -29,6 +29,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/test/cmd/apply.sh"
 source "${KUBE_ROOT}/test/cmd/apps.sh"
+source "${KUBE_ROOT}/test/cmd/authentication.sh"
 source "${KUBE_ROOT}/test/cmd/authorization.sh"
 source "${KUBE_ROOT}/test/cmd/batch.sh"
 source "${KUBE_ROOT}/test/cmd/certificate.sh"
@@ -41,7 +42,6 @@ source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/exec.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
-source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/plugins.sh"
@@ -342,10 +342,12 @@ runTests() {
     '-s' "http://127.0.0.1:${API_PORT}"
   )
 
-  # token defined in hack/testdata/auth-tokens.csv
-  kube_flags_with_token=(
-    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--token=admin-token' '--insecure-skip-tls-verify=true'
+  kube_flags_without_token=(
+    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify=true'
   )
+
+  # token defined in hack/testdata/auth-tokens.csv
+  kube_flags_with_token=( "${kube_flags_without_token[@]}" '--token=admin-token' )
 
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
     kube_flags+=('--match-server-version')
@@ -416,7 +418,7 @@ runTests() {
     fi
   }
 
-   if [[ -n "${WHAT-}" ]]; then
+  if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
     do
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
@@ -439,6 +441,18 @@ runTests() {
   #######################
 
   record_command run_kubectl_config_set_tests
+
+  ##############################
+  # kubectl config set-cluster #
+  ##############################
+
+  record_command run_kubectl_config_set_cluster_tests
+
+  ##################################
+  # kubectl config set-credentials #
+  ##################################
+
+  record_command run_kubectl_config_set_credentials_tests
 
   #######################
   # kubectl local proxy #
@@ -505,6 +519,7 @@ runTests() {
 
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_apply_tests
+    record_command run_kubectl_server_side_apply_tests
     record_command run_kubectl_run_tests
     record_command run_kubectl_create_filter_tests
   fi
@@ -748,6 +763,11 @@ runTests() {
     record_command run_nodes_tests
   fi
 
+  ########################
+  # Authentication
+  ########################
+
+  record_command run_exec_credentials_tests
 
   ########################
   # authorization.k8s.io #

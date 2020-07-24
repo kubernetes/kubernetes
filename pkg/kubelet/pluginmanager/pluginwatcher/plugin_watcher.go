@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -191,7 +191,6 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 	if runtime.GOOS == "windows" {
 		socketPath = util.NormalizePath(socketPath)
 	}
-	//TODO: Implement rate limiting to mitigate any DOS kind of attacks.
 	// Update desired state of world list of plugins
 	// If the socket path does exist in the desired world cache, there's still
 	// a possibility that it has been deleted and recreated again before it is

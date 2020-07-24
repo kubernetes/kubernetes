@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -15,10 +14,6 @@ var applyOpenShiftServiceServingCertCA = func(in serviceaccountcontroller.Tokens
 }
 
 func applyOpenShiftServiceServingCertCAFunc(openshiftConfigBase string, openshiftConfig map[string]interface{}) error {
-	if os.Getenv("ADD_SERVICE_SERVING_CA_TO_TOKEN_SECRETS") != "true" {
-		return nil
-	}
-
 	serviceServingCertCAFilename := getServiceServingCertCAFilename(openshiftConfig)
 	if len(serviceServingCertCAFilename) == 0 {
 		return nil

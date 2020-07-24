@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const workItemKey = "key"

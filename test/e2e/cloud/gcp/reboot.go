@@ -166,6 +166,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	failed := false
 	for ix := range nodelist.Items {
 		go func(ix int) {
+			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 			n := nodelist.Items[ix]
 			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)

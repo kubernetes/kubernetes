@@ -37,23 +37,15 @@ type testConversions struct {
 }
 
 func (c *testConversions) internalToExternalSimple(in *runtimetesting.InternalSimple, out *runtimetesting.ExternalSimple, scope conversion.Scope) error {
-	if err := scope.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := scope.Convert(&in.TestString, &out.TestString, 0); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.TestString = in.TestString
 	c.internalToExternalCalls++
 	return nil
 }
 
 func (c *testConversions) externalToInternalSimple(in *runtimetesting.ExternalSimple, out *runtimetesting.InternalSimple, scope conversion.Scope) error {
-	if err := scope.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := scope.Convert(&in.TestString, &out.TestString, 0); err != nil {
-		return err
-	}
+	out.TypeMeta = in.TypeMeta
+	out.TestString = in.TestString
 	c.externalToInternalCalls++
 	return nil
 }
@@ -81,6 +73,7 @@ func TestScheme(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
+	utilruntime.Must(runtimetesting.RegisterConversions(scheme))
 
 	// If set, would clear TypeMeta during conversion.
 	//scheme.AddIgnoredConversionType(&TypeMeta{}, &TypeMeta{})
@@ -94,9 +87,7 @@ func TestScheme(t *testing.T) {
 	}
 
 	// Register functions to verify that scope.Meta() gets set correctly.
-	if err := conversions.registerConversions(scheme); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	utilruntime.Must(conversions.registerConversions(scheme))
 
 	t.Run("Encode, Decode, DecodeInto, and DecodeToVersion", func(t *testing.T) {
 		simple := &runtimetesting.InternalSimple{
@@ -272,6 +263,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(internalGV.WithKind("OptionalExtensionType"), &runtimetesting.InternalOptionalExtensionType{})
 	scheme.AddKnownTypeWithName(externalGV.WithKind("OptionalExtensionType"), &runtimetesting.ExternalOptionalExtensionType{})
+	utilruntime.Must(runtimetesting.RegisterConversions(scheme))
 
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
@@ -311,6 +303,7 @@ func TestExtensionMapping(t *testing.T) {
 	scheme.AddKnownTypeWithName(externalGV.WithKind("B"), &runtimetesting.ExtensionB{})
 	scheme.AddKnownTypeWithName(internalGV.WithKind("A"), &runtimetesting.ExtensionA{})
 	scheme.AddKnownTypeWithName(internalGV.WithKind("B"), &runtimetesting.ExtensionB{})
+	utilruntime.Must(runtimetesting.RegisterConversions(scheme))
 
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
@@ -379,6 +372,7 @@ func TestEncode(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
+	utilruntime.Must(runtimetesting.RegisterConversions(scheme))
 
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
@@ -414,6 +408,7 @@ func TestUnversionedTypes(t *testing.T) {
 	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
 	scheme.AddKnownTypeWithName(otherGV.WithKind("Simple"), &runtimetesting.ExternalSimple{})
+	utilruntime.Must(runtimetesting.RegisterConversions(scheme))
 
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
@@ -488,14 +483,8 @@ func GetTestScheme() *runtime.Scheme {
 	s.AddKnownTypeWithName(alternateExternalGV.WithKind("TestType5"), &runtimetesting.ExternalTestType1{})
 	s.AddKnownTypeWithName(differentExternalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
 	s.AddUnversionedTypes(externalGV, &runtimetesting.UnversionedType{})
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 
-	convertTestType := func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) error {
-		out.A = in.A
-		return nil
-	}
-	utilruntime.Must(s.AddConversionFunc((*runtimetesting.TestType1)(nil), (*runtimetesting.ExternalTestType1)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return convertTestType(a.(*runtimetesting.TestType1), b.(*runtimetesting.ExternalTestType1), scope)
-	}))
 	return s
 }
 
@@ -941,6 +930,7 @@ func TestMetaValues(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypeWithName(internalGV.WithKind("Simple"), &runtimetesting.InternalSimple{})
 	s.AddKnownTypeWithName(externalGV.WithKind("Simple"), &runtimetesting.ExternalSimple{})
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 
 	conversions := &testConversions{
 		internalToExternalCalls: 0,
@@ -948,9 +938,8 @@ func TestMetaValues(t *testing.T) {
 	}
 
 	// Register functions to verify that scope.Meta() gets set correctly.
-	if err := conversions.registerConversions(s); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	utilruntime.Must(conversions.registerConversions(s))
+
 	simple := &runtimetesting.InternalSimple{
 		TestString: "foo",
 	}
@@ -997,7 +986,7 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 
 	// Register functions to verify that scope.Meta() gets set correctly.
 	convertSimple := func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-		scope.Convert(&in.TestString, &out.TestString, 0)
+		out.TestString = in.TestString
 		internalToExternalCalls++
 		return nil
 	}

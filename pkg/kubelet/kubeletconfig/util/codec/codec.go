@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	// ensure the core apis are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"

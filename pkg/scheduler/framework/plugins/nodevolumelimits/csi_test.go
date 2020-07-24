@@ -35,8 +35,7 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -475,8 +474,8 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVLister(volumeName string, driverNames ...string) fakelisters.PersistentVolumeLister {
-	pvLister := fakelisters.PersistentVolumeLister{}
+func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.PersistentVolumeLister {
+	pvLister := fakeframework.PersistentVolumeLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -520,8 +519,8 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakelisters.Pe
 	return pvLister
 }
 
-func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakelisters.PersistentVolumeClaimLister {
-	pvcLister := fakelisters.PersistentVolumeClaimLister{}
+func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakeframework.PersistentVolumeClaimLister {
+	pvcLister := fakeframework.PersistentVolumeClaimLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -563,8 +562,8 @@ func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 	csiNode.Annotations = nodeInfoAnnotations
 }
 
-func getFakeCSIStorageClassLister(scName, provisionerName string) fakelisters.StorageClassLister {
-	return fakelisters.StorageClassLister{
+func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.StorageClassLister {
+	return fakeframework.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
@@ -572,15 +571,15 @@ func getFakeCSIStorageClassLister(scName, provisionerName string) fakelisters.St
 	}
 }
 
-func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakelisters.CSINodeLister {
+func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeLister {
 	if csiNode != nil {
-		return fakelisters.CSINodeLister(*csiNode)
+		return fakeframework.CSINodeLister(*csiNode)
 	}
-	return fakelisters.CSINodeLister{}
+	return fakeframework.CSINodeLister{}
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *storagev1.CSINode) {
-	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
+	nodeInfo := framework.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
 		Status: v1.NodeStatus{

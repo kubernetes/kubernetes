@@ -19,22 +19,21 @@ package lifecycle
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-
-	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
 
-type pluginResourceUpdateFuncType func(*schedulernodeinfo.NodeInfo, *PodAdmitAttributes) error
+type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
@@ -50,7 +49,9 @@ type predicateAdmitHandler struct {
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
+// NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluates
+// if a pod can be admitted from the perspective of predicates.
+func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
 		pluginResourceUpdateFunc,
@@ -70,7 +71,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
-	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
+	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
@@ -156,7 +157,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 }
 
-func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *v1.Pod {
+func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
 	podCopy := pod.DeepCopy()
 	for i, c := range pod.Spec.Containers {
 		// We only handle requests in Requests but not Limits because the
@@ -165,7 +166,7 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.Nod
 		podCopy.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
 		for rName, rQuant := range c.Resources.Requests {
 			if v1helper.IsExtendedResourceName(rName) {
-				if _, found := nodeInfo.AllocatableResource().ScalarResources[rName]; !found {
+				if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 					continue
 				}
 			}
@@ -220,13 +221,13 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // GeneralPredicates checks a group of predicates that the kubelet cares about.
-func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) ([]PredicateFailureReason, error) {
+func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
 	if nodeInfo.Node() == nil {
 		return nil, fmt.Errorf("node not found")
 	}
 
 	var reasons []PredicateFailureReason
-	for _, r := range noderesources.Fits(pod, nodeInfo, nil) {
+	for _, r := range noderesources.Fits(pod, nodeInfo) {
 		reasons = append(reasons, &InsufficientResourceError{
 			ResourceName: r.ResourceName,
 			Requested:    r.Requested,

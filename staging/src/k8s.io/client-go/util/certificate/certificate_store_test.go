@@ -314,7 +314,7 @@ func TestUpdateTwoCerts(t *testing.T) {
 		t.Errorf("Got %v while updating certificate store.", err)
 	}
 	if cert == nil {
-		t.Errorf("Got nil certificate, expected something real.")
+		t.Fatalf("Got nil certificate, expected something real.")
 	}
 	if len(cert.Certificate) != 2 {
 		t.Fatalf("Unexpected number of certificates, expected 2, got %v", len(cert.Certificate))

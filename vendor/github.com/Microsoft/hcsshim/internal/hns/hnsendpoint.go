@@ -3,6 +3,7 @@ package hns
 import (
 	"encoding/json"
 	"net"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -94,6 +95,27 @@ func GetHNSEndpointByName(endpointName string) (*HNSEndpoint, error) {
 	return nil, EndpointNotFoundError{EndpointName: endpointName}
 }
 
+type endpointAttachInfo struct {
+	SharedContainers json.RawMessage `json:",omitempty"`
+}
+
+func (endpoint *HNSEndpoint) IsAttached(vID string) (bool, error) {
+	attachInfo := endpointAttachInfo{}
+	err := hnsCall("GET", "/endpoints/"+endpoint.Id, "", &attachInfo)
+
+	// Return false allows us to just return the err
+	if err != nil {
+		return false, err
+	}
+
+	if strings.Contains(strings.ToLower(string(attachInfo.SharedContainers)), strings.ToLower(vID)) {
+		return true, nil
+	}
+
+	return false, nil
+
+}
+
 // Create Endpoint by sending EndpointRequest to HNS. TODO: Create a separate HNS interface to place all these methods
 func (endpoint *HNSEndpoint) Create() (*HNSEndpoint, error) {
 	operation := "Create"
@@ -133,6 +155,27 @@ func (endpoint *HNSEndpoint) Update() (*HNSEndpoint, error) {
 // ApplyACLPolicy applies a set of ACL Policies on the Endpoint
 func (endpoint *HNSEndpoint) ApplyACLPolicy(policies ...*ACLPolicy) error {
 	operation := "ApplyACLPolicy"
+	title := "hcsshim::HNSEndpoint::" + operation
+	logrus.Debugf(title+" id=%s", endpoint.Id)
+
+	for _, policy := range policies {
+		if policy == nil {
+			continue
+		}
+		jsonString, err := json.Marshal(policy)
+		if err != nil {
+			return err
+		}
+		endpoint.Policies = append(endpoint.Policies, jsonString)
+	}
+
+	_, err := endpoint.Update()
+	return err
+}
+
+// ApplyProxyPolicy applies a set of Proxy Policies on the Endpoint
+func (endpoint *HNSEndpoint) ApplyProxyPolicy(policies ...*ProxyPolicy) error {
+	operation := "ApplyProxyPolicy"
 	title := "hcsshim::HNSEndpoint::" + operation
 	logrus.Debugf(title+" id=%s", endpoint.Id)
 

@@ -245,7 +245,7 @@ func TestTableGet(t *testing.T) {
 				if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
 					t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
 				}
-				if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
+				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
 					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 				}
 				// Validate extra column for v1
@@ -343,7 +343,7 @@ func TestTableGet(t *testing.T) {
 				if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
 					t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
 				}
-				if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
+				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
 					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 				}
 				// Validate extra column for v1

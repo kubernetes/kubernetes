@@ -18,7 +18,7 @@ package generators
 
 import (
 	"k8s.io/gengo/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // extractBoolTagOrDie gets the comment-tags for the key and asserts that, if

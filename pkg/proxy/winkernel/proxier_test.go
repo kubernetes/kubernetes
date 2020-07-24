@@ -19,18 +19,20 @@ limitations under the License.
 package winkernel
 
 import (
+	"fmt"
 	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	utilpointer "k8s.io/utils/pointer"
 	"net"
 	"strings"
 	"testing"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const testHostName = "test-hostname"
@@ -70,7 +72,7 @@ func (hns fakeHNS) getEndpointByIpAddress(ip string, networkName string) (*endpo
 	if ipNet.Contains(net.ParseIP(ip)) {
 		return &endpointsInfo{
 			ip:         ip,
-			isLocal:    true,
+			isLocal:    false,
 			macAddress: macAddress,
 			hnsID:      guid,
 			hns:        hns,
@@ -99,18 +101,17 @@ func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancer
 func (hns fakeHNS) deleteLoadBalancer(hnsID string) error {
 	return nil
 }
-func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
+func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string, endpointSliceEnabled bool) *Proxier {
 	sourceVip := "192.168.1.2"
 	hnsNetworkInfo := &hnsNetworkInfo{
+		id:          strings.ToUpper(guid),
 		name:        "TestNetwork",
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		portsMap:            make(map[localPort]closeable),
-		serviceMap:          make(proxyServiceMap),
-		serviceChanges:      newServiceChangeMap(),
-		endpointsMap:        make(proxyEndpointsMap),
-		endpointsChanges:    newEndpointsChangeMap(hostname),
+		portsMap:            make(map[utilproxy.LocalPort]utilproxy.Closeable),
+		serviceMap:          make(proxy.ServiceMap),
+		endpointsMap:        make(proxy.EndpointsMap),
 		clusterCIDR:         clusterCIDR,
 		hostname:            testHostName,
 		nodeIP:              nodeIP,
@@ -120,13 +121,21 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		hostMac:             macAddress,
 		isDSR:               false,
 		hns:                 newFakeHNS(),
+		endPointsRefCount:   make(endPointsReferenceCountMap),
 	}
+
+	isIPv6 := false
+	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, &isIPv6, nil, proxier.serviceMapChange)
+	endpointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, &isIPv6, nil, endpointSliceEnabled, proxier.endpointsMapChange)
+	proxier.endpointsChanges = endpointChangeTracker
+	proxier.serviceChanges = serviceChanges
+
 	return proxier
 }
 
 func TestCreateServiceVip(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay")
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -138,6 +147,7 @@ func TestCreateServiceVip(t *testing.T) {
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
 	}
 	timeoutSeconds := v1.DefaultClientIPServiceAffinitySeconds
 
@@ -161,19 +171,26 @@ func TestCreateServiceVip(t *testing.T) {
 		}),
 	)
 	makeEndpointsMap(proxier)
-
+	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	if proxier.serviceMap[svcPortName].remoteEndpoint == nil {
-		t.Error()
-	}
-	if proxier.serviceMap[svcPortName].remoteEndpoint.ip != svcIP {
-		t.Error()
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		if svcInfo.remoteEndpoint == nil {
+			t.Error()
+		}
+		if svcInfo.remoteEndpoint.ip != svcIP {
+			t.Error()
+		}
 	}
 }
 func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay")
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -184,6 +201,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
 	}
 
 	makeServiceMap(proxier,
@@ -205,22 +223,38 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 					IP: epIpAddressRemote,
 				}},
 				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
 				}},
 			}}
 		}),
 	)
-
+	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	if proxier.endpointsMap[svcPortName][0].hnsID != guid {
-		t.Errorf("%v does not match %v", proxier.endpointsMap[svcPortName][0].hnsID, guid)
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointsInfo)
+	if !ok {
+		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+
+	} else {
+		if epInfo.hnsID != guid {
+			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		}
+	}
+
+	if *proxier.endPointsRefCount[guid] <= 0 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	}
+
+	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
 }
 func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "L2Bridge")
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "L2Bridge", false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -231,6 +265,7 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
 	}
 
 	makeServiceMap(proxier,
@@ -252,22 +287,38 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 					IP: epIpAddressRemote,
 				}},
 				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
 				}},
 			}}
 		}),
 	)
-
+	proxier.setInitialized(true)
 	proxier.syncProxyRules()
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointsInfo)
+	if !ok {
+		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
 
-	if proxier.endpointsMap[svcPortName][0].hnsID != guid {
-		t.Errorf("%v does not match %v", proxier.endpointsMap[svcPortName][0].hnsID, guid)
+	} else {
+		if epInfo.hnsID != guid {
+			t.Errorf("%v does not match %v", epInfo.hnsID, guid)
+		}
+	}
+
+	if *proxier.endPointsRefCount[guid] <= 0 {
+		t.Errorf("RefCount not incremented. Current value: %v", *proxier.endPointsRefCount[guid])
+	}
+
+	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
+		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
 }
+
 func TestCreateLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay")
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -278,6 +329,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
 	}
 
 	makeServiceMap(proxier,
@@ -299,26 +351,128 @@ func TestCreateLoadBalancer(t *testing.T) {
 					IP: epIpAddressRemote,
 				}},
 				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
 				}},
 			}}
 		}),
 	)
 
+	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	if proxier.serviceMap[svcPortName].hnsID != guid {
-		t.Errorf("%v does not match %v", proxier.serviceMap[svcPortName].hnsID, guid)
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		if svcInfo.hnsID != guid {
+			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
+		}
+	}
+
+}
+func TestEndpointSlice(t *testing.T) {
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", true)
+	if proxier == nil {
+		t.Error()
+	}
+
+	proxier.servicesSynced = true
+	proxier.endpointSlicesSynced = true
+
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	proxier.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: svcPortName.Name, Namespace: svcPortName.Namespace},
+		Spec: v1.ServiceSpec{
+			ClusterIP: "172.20.1.1",
+			Selector:  map[string]string{"foo": "bar"},
+			Ports:     []v1.ServicePort{{Name: svcPortName.Port, TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+		},
+	})
+
+	// Add initial endpoint slice
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", svcPortName.Name),
+			Namespace: svcPortName.Namespace,
+			Labels:    map[string]string{discovery.LabelServiceName: svcPortName.Name},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     &svcPortName.Port,
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"192.168.2.3"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": "testhost2"},
+		}},
+	}
+
+	proxier.OnEndpointSliceAdd(endpointSlice)
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		if svcInfo.hnsID != guid {
+			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, guid, svcPortName.String())
+		}
+	}
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointsInfo)
+	if !ok {
+		t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+
+	} else {
+		if epInfo.hnsID != guid {
+			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, guid, svcPortName.String())
+		}
 	}
 }
-
 func TestNoopEndpointSlice(t *testing.T) {
 	p := Proxier{}
 	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
 	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
 	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
 	p.OnEndpointSlicesSynced()
+}
+
+func TestFindRemoteSubnetProviderAddress(t *testing.T) {
+	networkInfo, _ := newFakeHNS().getNetworkByName("TestNetwork")
+	pa := networkInfo.findRemoteSubnetProviderAddress(providerAddress)
+
+	if pa != providerAddress {
+		t.Errorf("%v does not match %v", pa, providerAddress)
+	}
+
+	pa = networkInfo.findRemoteSubnetProviderAddress(epIpAddressRemote)
+
+	if pa != providerAddress {
+		t.Errorf("%v does not match %v", pa, providerAddress)
+	}
+
+	pa = networkInfo.findRemoteSubnetProviderAddress(serviceVip)
+
+	if len(pa) != 0 {
+		t.Errorf("Provider address is not empty as expected")
+	}
 }
 
 func makeNSN(namespace, name string) types.NamespacedName {

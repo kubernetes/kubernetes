@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   generateName: preferred-anti-affinity-pod-
   labels:
-    foo: ""
+    color: yellow
 spec:
   affinity:
     podAntiAffinity:
@@ -11,7 +11,7 @@ spec:
         - podAffinityTerm:
             labelSelector:
               matchLabels:
-                foo: ""
+                color: yellow
             topologyKey: kubernetes.io/hostname
             namespaces: ["sched-test", "sched-setup"]
           weight: 1

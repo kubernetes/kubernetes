@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -226,7 +227,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.utilPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod: %v", t.utilPod)
 	framework.Logf("Created pod %v", t.utilPod)
-	err = t.f.WaitForPodRunning(t.utilPod.Name)
+	err = e2epod.WaitForPodNameRunningInNamespace(t.f.ClientSet, t.utilPod.Name, t.f.Namespace.Name)
 	framework.ExpectNoError(err, "pod failed to start running: %v", t.utilPod)
 
 	t.utilService = &v1.Service{
@@ -351,7 +352,7 @@ func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.dnsServerPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod: %v", t.dnsServerPod)
 	framework.Logf("Created pod %v", t.dnsServerPod)
-	err = t.f.WaitForPodRunning(t.dnsServerPod.Name)
+	err = e2epod.WaitForPodNameRunningInNamespace(t.f.ClientSet, t.dnsServerPod.Name, t.f.Namespace.Name)
 	framework.ExpectNoError(err, "pod failed to start running: %v", t.dnsServerPod)
 
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(context.TODO(), t.dnsServerPod.Name, metav1.GetOptions{})
@@ -583,7 +584,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(f.WaitForPodRunningSlow(pod.Name))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -611,7 +612,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(f.WaitForPodRunningSlow(pod.Name))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})

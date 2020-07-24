@@ -57,25 +57,25 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
-	"k8s.io/component-base/metrics"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
+	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -88,11 +88,9 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	eventstorage "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 const (
@@ -112,6 +110,12 @@ cluster's shared state through which all other components interact.`,
 
 		// stop printing usage when the command errors
 		SilenceUsage: true,
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			// silence client-go warnings.
+			// kube-apiserver loopback clients should not log self-issued warnings.
+			rest.SetDefaultWarningHandler(rest.NoWarnings{})
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 
@@ -136,12 +140,12 @@ cluster's shared state through which all other components interact.`,
 				}
 
 				// print merged flags (merged from OpenshiftConfig)
-				utilflag.PrintFlags(cmd.Flags())
+				cliflag.PrintFlags(cmd.Flags())
 
 				enablement.ForceGlobalInitializationForOpenShift()
 			} else {
 				// print default flags
-				utilflag.PrintFlags(cmd.Flags())
+				cliflag.PrintFlags(cmd.Flags())
 			}
 
 			// set default options
@@ -156,6 +160,14 @@ cluster's shared state through which all other components interact.`,
 			}
 
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
+		},
+		Args: func(cmd *cobra.Command, args []string) error {
+			for _, arg := range args {
+				if len(arg) > 0 {
+					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
+				}
+			}
+			return nil
 		},
 	}
 
@@ -268,6 +280,8 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSHKey tunneler.InstallSSHKey
+
+		cloudprovider.DeprecationWarningForProvider(s.CloudProvider.CloudProvider)
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			return nil, nil, fmt.Errorf("cloud provider could not be initialized: %v", err)
@@ -340,9 +354,10 @@ func CreateKubeAPIServerConfig(
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	if len(s.ShowHiddenMetricsForVersion) > 0 {
-		metrics.SetShowHidden()
-	}
+	s.Metrics.Apply()
+	serviceaccount.RegisterMetrics()
+
+	s.Logs.Apply()
 
 	serviceIPRange, apiServerServiceIP, err := master.ServiceIPRange(s.PrimaryServiceClusterIPRange)
 	if err != nil {
@@ -392,6 +407,7 @@ func CreateKubeAPIServerConfig(
 
 			ServiceAccountIssuer:        s.ServiceAccountIssuer,
 			ServiceAccountMaxExpiration: s.ServiceAccountTokenMaxExpiration,
+			ExtendExpiration:            s.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
 		},
@@ -564,29 +580,17 @@ func buildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
+	lastErr = s.Audit.ApplyTo(genericConfig)
+	if lastErr != nil {
+		return
+	}
+
 	admissionConfig := &kubeapiserveradmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
 		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
-
-	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.EgressSelector, genericConfig.LoopbackClientConfig)
-
-	lastErr = s.Audit.ApplyTo(
-		genericConfig,
-		genericConfig.LoopbackClientConfig,
-		versionedInformers,
-		serveroptions.NewProcessInfo("kube-apiserver", "kube-system"),
-		&serveroptions.WebhookOptions{
-			AuthInfoResolverWrapper: authInfoResolverWrapper,
-			ServiceResolver:         serviceResolver,
-		},
-	)
-	if lastErr != nil {
-		return
-	}
-
 	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create admission plugin initializer: %v", err)
@@ -716,6 +720,14 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
 				return options, fmt.Errorf("the serviceaccount max expiration must be between 1 hour to 2^32 seconds")
 			}
+			if s.Authentication.ServiceAccounts.ExtendExpiration {
+				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
+					klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than 3607 seconds (currently %s)", s.Authentication.ServiceAccounts.MaxExpiration)
+				}
+				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
+					klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to 1 year, which is longer than service-account-max-token-expiration set to %s", s.Authentication.ServiceAccounts.MaxExpiration)
+				}
+			}
 		}
 
 		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
@@ -726,15 +738,8 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 
 	if s.Etcd.EnableWatchCache {
-		klog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
-		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
-		if userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err == nil {
-			for resource, size := range userSpecified {
-				sizes[resource] = size
-			}
-		}
-		s.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
-		if err != nil {
+		// Ensure that overrides parse correctly.
+		if _, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err != nil {
 			return options, err
 		}
 	}

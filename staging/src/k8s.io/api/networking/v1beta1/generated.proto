@@ -134,7 +134,6 @@ message IngressClassList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of IngressClasses.
-  // +listType=set
   repeated IngressClass items = 2;
 }
 

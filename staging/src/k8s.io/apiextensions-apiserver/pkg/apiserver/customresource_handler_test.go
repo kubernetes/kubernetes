@@ -475,7 +475,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		CountMetricPollPeriod:   time.Minute,
 	}
 	if enableWatchCache {
-		restOptionsGetter.Decorator = genericregistry.StorageWithCacher(100)
+		restOptionsGetter.Decorator = genericregistry.StorageWithCacher()
 	}
 
 	handler, err := NewCustomResourceDefinitionHandler(
@@ -681,4 +681,77 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 			Plural: "multiversion", Singular: "multiversion", Kind: "MultiVersion", ShortNames: []string{"mv"}, ListKind: "MultiVersionList", Categories: []string{"all"},
 		},
 	},
+}
+
+func Test_defaultDeprecationWarning(t *testing.T) {
+	tests := []struct {
+		name              string
+		deprecatedVersion string
+		crd               apiextensionsv1.CustomResourceDefinitionSpec
+		want              string
+	}{
+		{
+			name:              "no replacement",
+			deprecatedVersion: "v1",
+			crd: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Widget"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{Name: "v1", Served: true, Deprecated: true},
+					{Name: "v2", Served: true, Deprecated: true},
+					{Name: "v3", Served: false},
+				},
+			},
+			want: "example.com/v1 Widget is deprecated",
+		},
+		{
+			name:              "replacement sorting",
+			deprecatedVersion: "v1",
+			crd: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Widget"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{Name: "v1", Served: true},
+					{Name: "v1alpha1", Served: true},
+					{Name: "v1alpha2", Served: true},
+					{Name: "v1beta1", Served: true},
+					{Name: "v1beta2", Served: true},
+					{Name: "v2", Served: true},
+					{Name: "v2alpha1", Served: true},
+					{Name: "v2alpha2", Served: true},
+					{Name: "v2beta1", Served: true},
+					{Name: "v2beta2", Served: true},
+					{Name: "v3", Served: false},
+					{Name: "v3alpha1", Served: false},
+					{Name: "v3alpha2", Served: false},
+					{Name: "v3beta1", Served: false},
+					{Name: "v3beta2", Served: false},
+				},
+			},
+			want: "example.com/v1 Widget is deprecated; use example.com/v2 Widget",
+		},
+		{
+			name:              "no newer replacement of equal stability",
+			deprecatedVersion: "v2",
+			crd: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{Kind: "Widget"},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{Name: "v1", Served: true},
+					{Name: "v3", Served: false},
+					{Name: "v3alpha1", Served: true},
+					{Name: "v3beta1", Served: true},
+					{Name: "v4", Served: true, Deprecated: true},
+				},
+			},
+			want: "example.com/v2 Widget is deprecated",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := defaultDeprecationWarning(tt.deprecatedVersion, tt.crd); got != tt.want {
+				t.Errorf("defaultDeprecationWarning() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

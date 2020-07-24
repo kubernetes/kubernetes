@@ -32,7 +32,7 @@ import (
 
 	sio "github.com/thecodeteam/goscaleio"
 	siotypes "github.com/thecodeteam/goscaleio/types/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

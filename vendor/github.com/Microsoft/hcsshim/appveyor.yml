@@ -6,9 +6,9 @@ clone_folder: c:\gopath\src\github.com\Microsoft\hcsshim
 
 environment:
   GOPATH: c:\gopath
-  PATH: C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%GOPATH%\bin;C:\gometalinter-2.0.12-windows-amd64;%PATH%
+  PATH: "%GOPATH%\\bin;C:\\gometalinter-2.0.12-windows-amd64;%PATH%"
 
-stack: go 1.12.2
+stack: go 1.13.4
 
 build_script:
   - appveyor DownloadFile https://github.com/alecthomas/gometalinter/releases/download/v2.0.12/gometalinter-2.0.12-windows-amd64.zip
@@ -22,10 +22,12 @@ build_script:
   - go build ./internal/tools/uvmboot
   - go build ./internal/tools/zapdir
   - go test -v ./... -tags admin
-  - go test -c ./test/containerd-shim-runhcs-v1/ -tags functional
-  - go test -c ./test/cri-containerd/ -tags functional
-  - go test -c ./test/functional/ -tags functional
-  - go test -c ./test/runhcs/ -tags functional
+  - cd test
+  - go test -v ./internal -tags admin
+  - go test -c ./containerd-shim-runhcs-v1/ -tags functional
+  - go test -c ./cri-containerd/ -tags functional
+  - go test -c ./functional/ -tags functional
+  - go test -c ./runhcs/ -tags functional
 
 artifacts:
   - path: 'containerd-shim-runhcs-v1.exe'
@@ -35,7 +37,7 @@ artifacts:
   - path: 'grantvmgroupaccess.exe'  
   - path: 'uvmboot.exe'
   - path: 'zapdir.exe'
-  - path: 'containerd-shim-runhcs-v1.test.exe'
-  - path: 'cri-containerd.test.exe'
-  - path: 'functional.test.exe'
-  - path: 'runhcs.test.exe'
+  - path: './test/containerd-shim-runhcs-v1.test.exe'
+  - path: './test/cri-containerd.test.exe'
+  - path: './test/functional.test.exe'
+  - path: './test/runhcs.test.exe'

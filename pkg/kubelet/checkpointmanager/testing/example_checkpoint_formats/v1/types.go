@@ -24,7 +24,7 @@ import (
 
 type protocol string
 
-// portMapping is the port mapping configurations of a sandbox.
+// PortMapping is the port mapping configurations of a sandbox.
 type PortMapping struct {
 	// protocol of the port mapping.
 	Protocol *protocol
@@ -34,7 +34,7 @@ type PortMapping struct {
 	HostPort *int32
 }
 
-// CheckpointData contains all types of data that can be stored in the checkpoint.
+// Data contains all types of data that can be stored in the checkpoint.
 type Data struct {
 	PortMappings []*PortMapping `json:"port_mappings,omitempty"`
 	HostNetwork  bool           `json:"host_network,omitempty"`
@@ -48,15 +48,18 @@ type CheckpointData struct {
 	Checksum checksum.Checksum
 }
 
+// MarshalCheckpoint tries to marshal the CheckpointData into JSON data.
 func (cp *CheckpointData) MarshalCheckpoint() ([]byte, error) {
 	cp.Checksum = checksum.New(*cp.Data)
 	return json.Marshal(*cp)
 }
 
+// UnmarshalCheckpoint tries to unmarshal the passed JSON data into CheckpointData.
 func (cp *CheckpointData) UnmarshalCheckpoint(blob []byte) error {
 	return json.Unmarshal(blob, cp)
 }
 
+// VerifyChecksum verifies that CheckpointData's checksum is same as the checksum calculated by its data.
 func (cp *CheckpointData) VerifyChecksum() error {
 	return cp.Checksum.Verify(*cp.Data)
 }

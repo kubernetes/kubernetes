@@ -90,8 +90,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				t.Fatalf("can't make a temp dir: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
-			cpm := podtest.NewMockCheckpointManager()
-			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
+			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
 			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
@@ -147,8 +146,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	cpm := podtest.NewMockCheckpointManager()
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 	node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 	claim.Status = v1.PersistentVolumeClaimStatus{
@@ -193,8 +191,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	cpm := podtest.NewMockCheckpointManager()
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 

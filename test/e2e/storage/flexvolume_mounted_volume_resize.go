@@ -31,7 +31,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -45,7 +45,7 @@ const (
 	totalResizeWaitPeriod = 5 * time.Minute
 )
 
-var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
+var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]", func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -153,7 +153,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Creating a deployment with the provisioned volume")
-		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		deployment, err := e2edeployment.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
-		podList, err := e2edeploy.GetPodsForDeployment(c, deployment)
+		podList, err := e2edeployment.GetPodsForDeployment(c, deployment)
 		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]

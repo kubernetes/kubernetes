@@ -23,7 +23,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 
@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -150,7 +151,7 @@ func NewAttachDetachController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
@@ -202,11 +203,8 @@ func NewAttachDetachController(
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
-	err := adc.podIndexer.AddIndexers(kcache.Indexers{
-		pvcKeyIndex: indexByPVCKey,
-	})
-	if err != nil {
-		klog.Warningf("adding indexer got %v", err)
+	if err := common.AddPodPVCIndexerIfNotPresent(adc.podIndexer); err != nil {
+		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
 	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
@@ -225,30 +223,6 @@ func NewAttachDetachController(
 	})
 
 	return adc, nil
-}
-
-const (
-	pvcKeyIndex string = "pvcKey"
-)
-
-// indexByPVCKey returns PVC keys for given pod. Note that the index is only
-// used for attaching, so we are only interested in active pods with nodeName
-// set.
-func indexByPVCKey(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return []string{}, nil
-	}
-	if len(pod.Spec.NodeName) == 0 || volumeutil.IsPodTerminated(pod, pod.Status) {
-		return []string{}, nil
-	}
-	keys := []string{}
-	for _, podVolume := range pod.Spec.Volumes {
-		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
-		}
-	}
-	return keys, nil
 }
 
 type attachDetachController struct {
@@ -451,7 +425,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd.Namespace, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
 				klog.Errorf(
 					"Error creating spec for volume %q, pod %q/%q: %v",
@@ -651,13 +625,17 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 		return nil
 	}
 
-	objs, err := adc.podIndexer.ByIndex(pvcKeyIndex, key)
+	objs, err := adc.podIndexer.ByIndex(common.PodPVCIndex, key)
 	if err != nil {
 		return err
 	}
 	for _, obj := range objs {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
+			continue
+		}
+		// we are only interested in active pods with nodeName set
+		if len(pod.Spec.NodeName) == 0 || volumeutil.IsPodTerminated(pod, pod.Status) {
 			continue
 		}
 		volumeActionFlag := util.DetermineVolumeAction(

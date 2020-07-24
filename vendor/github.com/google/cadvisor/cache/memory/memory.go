@@ -23,7 +23,7 @@ import (
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/utils"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ErrDataNotFound is the error resulting if failed to find a container in memory cache.
@@ -38,19 +38,19 @@ type containerCache struct {
 	lock        sync.RWMutex
 }
 
-func (self *containerCache) AddStats(stats *info.ContainerStats) error {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+func (c *containerCache) AddStats(stats *info.ContainerStats) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	// Add the stat to storage.
-	self.recentStats.Add(stats.Timestamp, stats)
+	c.recentStats.Add(stats.Timestamp, stats)
 	return nil
 }
 
-func (self *containerCache) RecentStats(start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-	result := self.recentStats.InTimeRange(start, end, maxStats)
+func (c *containerCache) RecentStats(start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	result := c.recentStats.InTimeRange(start, end, maxStats)
 	converted := make([]*info.ContainerStats, len(result))
 	for i, el := range result {
 		converted[i] = el.(*info.ContainerStats)
@@ -73,20 +73,20 @@ type InMemoryCache struct {
 	backend           []storage.StorageDriver
 }
 
-func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.ContainerStats) error {
+func (c *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.ContainerStats) error {
 	var cstore *containerCache
 	var ok bool
 
 	func() {
-		self.lock.Lock()
-		defer self.lock.Unlock()
-		if cstore, ok = self.containerCacheMap[cInfo.ContainerReference.Name]; !ok {
-			cstore = newContainerStore(cInfo.ContainerReference, self.maxAge)
-			self.containerCacheMap[cInfo.ContainerReference.Name] = cstore
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		if cstore, ok = c.containerCacheMap[cInfo.ContainerReference.Name]; !ok {
+			cstore = newContainerStore(cInfo.ContainerReference, c.maxAge)
+			c.containerCacheMap[cInfo.ContainerReference.Name] = cstore
 		}
 	}()
 
-	for _, backend := range self.backend {
+	for _, backend := range c.backend {
 		// TODO(monnand): To deal with long delay write operations, we
 		// may want to start a pool of goroutines to do write
 		// operations.
@@ -97,13 +97,13 @@ func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.Conta
 	return cstore.AddStats(stats)
 }
 
-func (self *InMemoryCache) RecentStats(name string, start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
+func (c *InMemoryCache) RecentStats(name string, start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
 	var cstore *containerCache
 	var ok bool
 	err := func() error {
-		self.lock.RLock()
-		defer self.lock.RUnlock()
-		if cstore, ok = self.containerCacheMap[name]; !ok {
+		c.lock.RLock()
+		defer c.lock.RUnlock()
+		if cstore, ok = c.containerCacheMap[name]; !ok {
 			return ErrDataNotFound
 		}
 		return nil
@@ -115,17 +115,17 @@ func (self *InMemoryCache) RecentStats(name string, start, end time.Time, maxSta
 	return cstore.RecentStats(start, end, maxStats)
 }
 
-func (self *InMemoryCache) Close() error {
-	self.lock.Lock()
-	self.containerCacheMap = make(map[string]*containerCache, 32)
-	self.lock.Unlock()
+func (c *InMemoryCache) Close() error {
+	c.lock.Lock()
+	c.containerCacheMap = make(map[string]*containerCache, 32)
+	c.lock.Unlock()
 	return nil
 }
 
-func (self *InMemoryCache) RemoveContainer(containerName string) error {
-	self.lock.Lock()
-	delete(self.containerCacheMap, containerName)
-	self.lock.Unlock()
+func (c *InMemoryCache) RemoveContainer(containerName string) error {
+	c.lock.Lock()
+	delete(c.containerCacheMap, containerName)
+	c.lock.Unlock()
 	return nil
 }
 

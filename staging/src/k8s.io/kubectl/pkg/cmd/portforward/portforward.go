@@ -31,6 +31,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -225,6 +226,71 @@ func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, erro
 	return converted, nil
 }
 
+func checkUDPPorts(udpOnlyPorts sets.Int, ports []string, obj metav1.Object) error {
+	for _, port := range ports {
+		_, remotePort := splitPort(port)
+		portNum, err := strconv.Atoi(remotePort)
+		if err != nil {
+			switch v := obj.(type) {
+			case *corev1.Service:
+				svcPort, err := util.LookupServicePortNumberByName(*v, remotePort)
+				if err != nil {
+					return err
+				}
+				portNum = int(svcPort)
+
+			case *corev1.Pod:
+				ctPort, err := util.LookupContainerPortNumberByName(*v, remotePort)
+				if err != nil {
+					return err
+				}
+				portNum = int(ctPort)
+
+			default:
+				return fmt.Errorf("unknown object: %v", obj)
+			}
+		}
+		if udpOnlyPorts.Has(portNum) {
+			return fmt.Errorf("UDP protocol is not supported for %s", remotePort)
+		}
+	}
+	return nil
+}
+
+// checkUDPPortInService returns an error if remote port in Service is a UDP port
+// TODO: remove this check after #47862 is solved
+func checkUDPPortInService(ports []string, svc *corev1.Service) error {
+	udpOnlyPorts := sets.NewInt()
+	for _, port := range svc.Spec.Ports {
+		portNum := int(port.Port)
+		switch port.Protocol {
+		case corev1.ProtocolUDP:
+			udpOnlyPorts.Insert(portNum)
+		case corev1.ProtocolTCP:
+			udpOnlyPorts.Delete(portNum)
+		}
+	}
+	return checkUDPPorts(udpOnlyPorts, ports, svc)
+}
+
+// checkUDPPortInPod returns an error if remote port in Pod is a UDP port
+// TODO: remove this check after #47862 is solved
+func checkUDPPortInPod(ports []string, pod *corev1.Pod) error {
+	udpOnlyPorts := sets.NewInt()
+	for _, ct := range pod.Spec.Containers {
+		for _, ctPort := range ct.Ports {
+			portNum := int(ctPort.ContainerPort)
+			switch ctPort.Protocol {
+			case corev1.ProtocolUDP:
+				udpOnlyPorts.Insert(portNum)
+			case corev1.ProtocolTCP:
+				udpOnlyPorts.Delete(portNum)
+			}
+		}
+	}
+	return checkUDPPorts(udpOnlyPorts, ports, pod)
+}
+
 // Complete completes all the required options for port-forward cmd.
 func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
@@ -265,11 +331,19 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	// handle service port mapping to target port if needed
 	switch t := obj.(type) {
 	case *corev1.Service:
+		err = checkUDPPortInService(args[1:], t)
+		if err != nil {
+			return err
+		}
 		o.Ports, err = translateServicePortToTargetPort(args[1:], *t, *forwardablePod)
 		if err != nil {
 			return err
 		}
 	default:
+		err = checkUDPPortInPod(args[1:], forwardablePod)
+		if err != nil {
+			return err
+		}
 		o.Ports, err = convertPodNamedPortToNumber(args[1:], *forwardablePod)
 		if err != nil {
 			return err

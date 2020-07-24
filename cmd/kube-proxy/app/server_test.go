@@ -37,34 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/util/configz"
 )
-
-// This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
-func TestProxyServerWithCleanupAndExit(t *testing.T) {
-	// Each bind address below is a separate test case
-	bindAddresses := []string{
-		"0.0.0.0",
-		"::",
-	}
-	for _, addr := range bindAddresses {
-		options := NewOptions()
-
-		options.config = &kubeproxyconfig.KubeProxyConfiguration{
-			BindAddress: addr,
-		}
-		options.CleanupAndExit = true
-
-		proxyserver, err := NewProxyServer(options)
-
-		assert.Nil(t, err, "unexpected error in NewProxyServer, addr: %s", addr)
-		assert.NotNil(t, proxyserver, "nil proxy server obj, addr: %s", addr)
-		assert.NotNil(t, proxyserver.IptInterface, "nil iptables intf, addr: %s", addr)
-
-		// Clean up config for next test case
-		configz.Delete(kubeproxyconfig.GroupName)
-	}
-}
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
@@ -445,6 +418,7 @@ func TestConfigChange(t *testing.T) {
 
 		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 10

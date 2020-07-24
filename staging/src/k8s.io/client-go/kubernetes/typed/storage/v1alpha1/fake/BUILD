@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_csistoragecapacity.go",
         "fake_storage_client.go",
         "fake_volumeattachment.go",
     ],

@@ -42,7 +42,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -53,6 +54,8 @@ const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
+	podRetryPeriod       = 1 * time.Second
+	podRetryTimeout      = 1 * time.Minute
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -290,7 +293,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 		// save the running pod
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
@@ -298,28 +301,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err, "failed to delete pod")
-
-		ginkgo.By("verifying the kubelet observed the termination notice")
-		err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-			podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
-			if err != nil {
-				framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
-				return false, nil
-			}
-			for _, kubeletPod := range podList.Items {
-				if pod.Name != kubeletPod.Name {
-					continue
-				}
-				if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-					framework.Logf("deletion has not yet been observed")
-					return false, nil
-				}
-				return true, nil
-			}
-			framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
-			return true, nil
-		})
-		framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false
@@ -358,6 +339,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Release : v1.9
 		Testname: Pods, update
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. Update the pod to change the value of the Label. Query for the Pod with the new value for the label MUST be successful.
+		Behaviors:
+		- pod/spec/label/create
+		- pod/spec/label/patch
 	*/
 	framework.ConformanceIt("should be updated [NodeConformance]", func() {
 		ginkgo.By("creating the pod")
@@ -397,7 +381,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			pod.Labels["time"] = value
 		})
 
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("verifying the updated pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
@@ -451,7 +435,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
 		})
 
-		framework.ExpectNoError(f.WaitForPodTerminated(pod.Name, "DeadlineExceeded"))
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "DeadlineExceeded", f.Namespace.Name))
 	})
 
 	/*
@@ -587,7 +571,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			Param("command", "remote execution test")
 
 		url := req.URL()
-		ws, err := framework.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
+		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
 		if err != nil {
 			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}
@@ -666,7 +650,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		url := req.URL()
 
-		ws, err := framework.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
+		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
 		if err != nil {
 			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}
@@ -718,7 +702,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		})
 
 		time.Sleep(syncLoopFrequency)
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("get restart delay after image update")
 		delayAfterUpdate, err := getRestartDelay(podClient, podName, containerName)
@@ -847,4 +831,62 @@ var _ = framework.KubeDescribe("Pods", func() {
 		validatePodReadiness(false)
 
 	})
+
+	ginkgo.It("should delete a collection of pods", func() {
+		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
+
+		ginkgo.By("Create set of pods")
+		// create a set of pods in test namespace
+		for _, podTestName := range podTestNames {
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podTestName,
+					Labels: map[string]string{
+						"type": "Testing"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:  "token-test",
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				}}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create pod")
+			framework.Logf("created %v", podTestName)
+		}
+
+		// wait as required for all 3 pods to be found
+		ginkgo.By("waiting for all 3 pods to be located")
+		err := wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 3))
+		framework.ExpectNoError(err, "3 pods not found")
+
+		// delete Collection of pods with a label in the current namespace
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "type=Testing"})
+		framework.ExpectNoError(err, "failed to delete collection of pods")
+
+		// wait for all pods to be deleted
+		ginkgo.By("waiting for all pods to be deleted")
+		err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 0))
+		framework.ExpectNoError(err, "found a pod(s)")
+	})
 })
+
+func checkPodListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != quantity {
+			framework.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
+			return false, err
+		}
+		return true, nil
+	}
+}

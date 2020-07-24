@@ -36,6 +36,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

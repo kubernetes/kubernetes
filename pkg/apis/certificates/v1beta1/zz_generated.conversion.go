@@ -24,10 +24,12 @@ import (
 	unsafe "unsafe"
 
 	v1beta1 "k8s.io/api/certificates/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -124,9 +126,11 @@ func Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSignin
 
 func autoConvert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *v1beta1.CertificateSigningRequestCondition, out *certificates.CertificateSigningRequestCondition, s conversion.Scope) error {
 	out.Type = certificates.RequestConditionType(in.Type)
+	out.Status = core.ConditionStatus(in.Status)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	out.LastUpdateTime = in.LastUpdateTime
+	out.LastTransitionTime = in.LastTransitionTime
 	return nil
 }
 
@@ -137,9 +141,11 @@ func Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_Certific
 
 func autoConvert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in *certificates.CertificateSigningRequestCondition, out *v1beta1.CertificateSigningRequestCondition, s conversion.Scope) error {
 	out.Type = v1beta1.RequestConditionType(in.Type)
+	out.Status = v1.ConditionStatus(in.Status)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	out.LastUpdateTime = in.LastUpdateTime
+	out.LastTransitionTime = in.LastTransitionTime
 	return nil
 }
 
@@ -192,7 +198,7 @@ func Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSi
 
 func autoConvert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *v1beta1.CertificateSigningRequestSpec, out *certificates.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
-	if err := v1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
+	if err := metav1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
 		return err
 	}
 	out.Usages = *(*[]certificates.KeyUsage)(unsafe.Pointer(&in.Usages))
@@ -210,7 +216,7 @@ func Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSi
 
 func autoConvert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *certificates.CertificateSigningRequestSpec, out *v1beta1.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
-	if err := v1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
+	if err := metav1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
 		return err
 	}
 	out.Usages = *(*[]v1beta1.KeyUsage)(unsafe.Pointer(&in.Usages))

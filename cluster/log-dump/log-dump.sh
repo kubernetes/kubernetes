@@ -37,9 +37,9 @@ else
   readonly use_custom_instance_list=
 fi
 
-readonly master_ssh_supported_providers="gce aws kubernetes-anywhere"
-readonly node_ssh_supported_providers="gce gke aws kubernetes-anywhere"
-readonly gcloud_supported_providers="gce gke kubernetes-anywhere"
+readonly master_ssh_supported_providers="gce aws"
+readonly node_ssh_supported_providers="gce gke aws"
+readonly gcloud_supported_providers="gce gke"
 
 readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log konnectivity-server.log fluentd.log kubelet.cov"
 readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov"
@@ -51,9 +51,11 @@ readonly kern_logfile="kern.log"
 readonly initd_logfiles="docker/log"
 readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
 readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly extra_log_files="${LOG_DUMP_EXTRA_FILES:-}"
+readonly extra_systemd_services="${LOG_DUMP_SAVE_SERVICES:-}"
 readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 # Log files found in WINDOWS_LOGS_DIR on Windows nodes:
-readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log"
+readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log"
 # Log files found in other directories on Windows nodes:
 readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 
@@ -140,13 +142,14 @@ function save-logs() {
     local opt_systemd_services="${4:-""}"
     local on_master="${5:-"false"}"
 
+    files="${files} ${extra_log_files}"
     if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
       fi
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke|kubernetes-anywhere)
+        gce|gke)
           files="${files} ${gce_logfiles}"
           ;;
         aws)
@@ -154,7 +157,7 @@ function save-logs() {
           ;;
       esac
     fi
-    local -r services=( ${systemd_services} ${opt_systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
+    local -r services=( ${systemd_services} ${opt_systemd_services} ${extra_systemd_services} )
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
         if [[ "${on_master}" == "true" ]]; then
@@ -267,7 +270,7 @@ function save-windows-logs-via-ssh() {
 
     export-windows-docker-event-log "${node}"
     export-windows-docker-images-list "${node}"
-    
+
     local remote_files=()
     for file in ${windows_node_logfiles[@]}; do
       remote_files+=( "${WINDOWS_LOGS_DIR}\\${file}" )
@@ -417,6 +420,12 @@ function dump_nodes() {
   all_selected_nodes+=( "${windows_node_names[@]}" )
 
   proc=${max_dump_processes}
+  start="$(date +%s)"
+  # log_dump_ssh_timeout is the maximal number of seconds the log dumping over
+  # SSH operation can take. Please note that the logic enforcing the timeout
+  # is only a best effort. The actual time of the operation may be longer
+  # due to waiting for all the child processes below.
+  log_dump_ssh_timeout_seconds="${LOG_DUMP_SSH_TIMEOUT_SECONDS:-}"
   for i in "${!all_selected_nodes[@]}"; do
     node_name="${all_selected_nodes[$i]}"
     node_dir="${report_dir}/${node_name}"
@@ -436,6 +445,11 @@ function dump_nodes() {
     if [[ proc -eq 0 ]]; then
       proc=${max_dump_processes}
       wait
+      now="$(date +%s)"
+      if [[ -n "${log_dump_ssh_timeout_seconds}" && $((now - start)) -gt ${log_dump_ssh_timeout_seconds} ]]; then
+        echo "WARNING: Hit timeout after ${log_dump_ssh_timeout_seconds} seconds, finishing log dumping over SSH shortly"
+        break
+      fi
     fi
   done
   # Wait for any remaining processes.
@@ -455,7 +469,9 @@ function dump_nodes() {
 # Sets:
 #   NON_LOGEXPORTED_NODES
 function find_non_logexported_nodes() {
-  succeeded_nodes=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry) || return 1
+  local file="${gcs_artifacts_dir}/logexported-nodes-registry"
+  echo "Listing marker files ($file) for successful nodes..."
+  succeeded_nodes=$(gsutil ls "${file}") || return 1
   echo "Successfully listed marker files for successful nodes"
   NON_LOGEXPORTED_NODES=()
   for node in "${NODE_NAMES[@]}"; do
@@ -494,6 +510,8 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.ExtraLogFiles}}@${extra_log_files}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"

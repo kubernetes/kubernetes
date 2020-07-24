@@ -66,13 +66,13 @@ type InfrastructureStatus struct {
 	// For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery
 	EtcdDiscoveryDomain string `json:"etcdDiscoveryDomain"`
 
-	// apiServerURL is a valid URI with scheme(http/https), address and
-	// port.  apiServerURL can be used by components like the web console
+	// apiServerURL is a valid URI with scheme 'https', address and
+	// optionally a port (defaulting to 443).  apiServerURL can be used by components like the web console
 	// to tell users where to find the Kubernetes API.
 	APIServerURL string `json:"apiServerURL"`
 
-	// apiServerInternalURL is a valid URI with scheme(http/https),
-	// address and port.  apiServerInternalURL can be used by components
+	// apiServerInternalURL is a valid URI with scheme 'https',
+	// address and optionally a port (defaulting to 443).  apiServerInternalURL can be used by components
 	// like kubelets, to contact the Kubernetes API server using the
 	// infrastructure provider rather than Kubernetes networking.
 	APIServerInternalURL string `json:"apiServerInternalURI"`
@@ -388,12 +388,7 @@ type OvirtPlatformStatus struct {
 	// The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
 	IngressIP string `json:"ingressIP,omitempty"`
 
-	// nodeDNSIP is the IP address for the internal DNS used by the
-	// nodes. Unlike the one managed by the DNS operator, `NodeDNSIP`
-	// provides name resolution for the nodes themselves. There is no DNS-as-a-service for
-	// oVirt deployments. In order to minimize necessary changes to the
-	// datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames
-	// to the nodes in the cluster.
+	// deprecated: as of 4.6, this field is no longer set or honored.  It will be removed in a future release.
 	NodeDNSIP string `json:"nodeDNSIP,omitempty"`
 }
 

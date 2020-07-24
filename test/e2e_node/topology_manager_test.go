@@ -41,7 +41,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -246,7 +246,12 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 
 // getSRIOVDevicePluginPod returns the Device Plugin pod for sriov resources in e2e tests.
 func getSRIOVDevicePluginPod() *v1.Pod {
-	ds := readDaemonSetV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginDSYAML))
+	data, err := e2etestfiles.Read(SRIOVDevicePluginDSYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+
+	ds := readDaemonSetV1OrDie(data)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      SRIOVDevicePluginName,
@@ -415,13 +420,15 @@ func isTopologyAffinityError(pod *v1.Pod) bool {
 }
 
 func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
-	cmData := testfiles.ReadOrDie(SRIOVDevicePluginCMYAML)
-	var err error
+	data, err := e2etestfiles.Read(SRIOVDevicePluginCMYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
 
 	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
 	framework.Logf("host-local SRIOV Device Plugin Config Map %q", cmFile)
 	if cmFile != "" {
-		cmData, err = ioutil.ReadFile(cmFile)
+		data, err = ioutil.ReadFile(cmFile)
 		if err != nil {
 			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
 		}
@@ -429,7 +436,7 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 		framework.Logf("Using built-in SRIOV Device Plugin Config Map")
 	}
 
-	return readConfigMapV1OrDie(cmData)
+	return readConfigMapV1OrDie(data)
 }
 
 type sriovData struct {
@@ -449,7 +456,11 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sr
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	serviceAccount := readServiceAccountV1OrDie(testfiles.ReadOrDie(SRIOVDevicePluginSAYAML))
+	data, err := e2etestfiles.Read(SRIOVDevicePluginSAYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	serviceAccount := readServiceAccountV1OrDie(data)
 	ginkgo.By(fmt.Sprintf("Creating serviceAccount %v/%v", metav1.NamespaceSystem, serviceAccount.Name))
 	if _, err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(context.TODO(), serviceAccount, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test serviceAccount %s: %v", serviceAccount.Name, err)
@@ -758,7 +769,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeAlphaFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
 
 	ginkgo.Context("With kubeconfig updated to static CPU Manager policy run the Topology Manager tests", func() {

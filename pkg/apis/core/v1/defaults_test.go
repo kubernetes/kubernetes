@@ -142,6 +142,7 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode":                                       `420`,
 		".Spec.Volumes[0].VolumeSource.DownwardAPI.Items[0].FieldRef.APIVersion":                      `"v1"`,
 		".Spec.Volumes[0].VolumeSource.EmptyDir":                                                      `{}`,
+		".Spec.Volumes[0].VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode":                 `"Filesystem"`,
 		".Spec.Volumes[0].VolumeSource.HostPath.Type":                                                 `""`,
 		".Spec.Volumes[0].VolumeSource.ISCSI.ISCSIInterface":                                          `"default"`,
 		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `420`,
@@ -265,6 +266,7 @@ func TestPodDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode":                                       `420`,
 		".Spec.Volumes[0].VolumeSource.DownwardAPI.Items[0].FieldRef.APIVersion":                      `"v1"`,
 		".Spec.Volumes[0].VolumeSource.EmptyDir":                                                      `{}`,
+		".Spec.Volumes[0].VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode":                 `"Filesystem"`,
 		".Spec.Volumes[0].VolumeSource.HostPath.Type":                                                 `""`,
 		".Spec.Volumes[0].VolumeSource.ISCSI.ISCSIInterface":                                          `"default"`,
 		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `420`,
@@ -1371,6 +1373,58 @@ func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
 		}
 		if *pvc1.Spec.VolumeMode != test.expectedVolumeMode {
 			t.Errorf("Test %s failed, Expected VolumeMode: %v, but got %v", test.name, test.volumeMode, *pvc1.Spec.VolumeMode)
+		}
+	}
+}
+
+func TestSetDefaultEphemeral(t *testing.T) {
+	fsMode := v1.PersistentVolumeFilesystem
+	blockMode := v1.PersistentVolumeBlock
+
+	tests := []struct {
+		name               string
+		volumeMode         *v1.PersistentVolumeMode
+		expectedVolumeMode v1.PersistentVolumeMode
+	}{
+		{
+			name:               "volume mode nil",
+			volumeMode:         nil,
+			expectedVolumeMode: v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:               "volume mode filesystem",
+			volumeMode:         &fsMode,
+			expectedVolumeMode: v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:               "volume mode block",
+			volumeMode:         &blockMode,
+			expectedVolumeMode: v1.PersistentVolumeBlock,
+		},
+	}
+
+	for _, test := range tests {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							Ephemeral: &v1.EphemeralVolumeSource{
+								VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
+									Spec: v1.PersistentVolumeClaimSpec{
+										VolumeMode: test.volumeMode,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		obj1 := roundTrip(t, runtime.Object(pod))
+		pod1 := obj1.(*v1.Pod)
+		if *pod1.Spec.Volumes[0].VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode != test.expectedVolumeMode {
+			t.Errorf("Test %s failed, Expected VolumeMode: %v, but got %v", test.name, test.volumeMode, *pod1.Spec.Volumes[0].VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode)
 		}
 	}
 }

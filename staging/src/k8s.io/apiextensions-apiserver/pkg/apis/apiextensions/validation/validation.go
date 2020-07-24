@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
@@ -55,8 +57,10 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		return ret
 	}
 
+	allowDefaults, rejectDefaultsReason := allowDefaults(requestGV, nil)
 	opts := validationOptions{
-		allowDefaults:                            allowDefaults(requestGV, nil),
+		allowDefaults:                            allowDefaults,
+		disallowDefaultsReason:                   rejectDefaultsReason,
 		requireRecognizedConversionReviewVersion: true,
 		requireImmutableNames:                    false,
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, nil),
@@ -80,6 +84,8 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 type validationOptions struct {
 	// allowDefaults permits the validation schema to contain default attributes
 	allowDefaults bool
+	// disallowDefaultsReason gives a reason as to why allowDefaults is false (for better user feedback)
+	disallowDefaultsReason string
 	// requireRecognizedConversionReviewVersion requires accepted webhook conversion versions to contain a recognized version
 	requireRecognizedConversionReviewVersion bool
 	// requireImmutableNames disables changing spec.names
@@ -102,8 +108,10 @@ type validationOptions struct {
 
 // ValidateCustomResourceDefinitionUpdate statically validates
 func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
+	allowDefaults, rejectDefaultsReason := allowDefaults(requestGV, &oldObj.Spec)
 	opts := validationOptions{
-		allowDefaults:                            allowDefaults(requestGV, &oldObj.Spec),
+		allowDefaults:                            allowDefaults,
+		disallowDefaultsReason:                   rejectDefaultsReason,
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
 		requireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, &oldObj.Spec),
@@ -160,12 +168,45 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 // validateCustomResourceDefinitionVersion statically validates.
 func validateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
+	}
 	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
 		allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("additionalPrinterColumns").Index(i))...)
 	}
 	return allErrs
+}
+
+func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []string {
+	if !deprecated && deprecationWarning != nil {
+		return []string{"can only be set for deprecated versions"}
+	}
+	if deprecationWarning == nil {
+		return nil
+	}
+	var errors []string
+	if len(*deprecationWarning) > 256 {
+		errors = append(errors, "must be <= 256 characters long")
+	}
+	if len(*deprecationWarning) == 0 {
+		errors = append(errors, "must not be an empty string")
+	}
+	for i, r := range *deprecationWarning {
+		if !unicode.IsPrint(r) {
+			errors = append(errors, fmt.Sprintf("must only contain printable UTF-8 characters; non-printable character found at index %d", i))
+			break
+		}
+		if unicode.IsControl(r) {
+			errors = append(errors, fmt.Sprintf("must only contain printable UTF-8 characters; control character found at index %d", i))
+			break
+		}
+	}
+	if !utf8.ValidString(*deprecationWarning) {
+		errors = append(errors, "must only contain printable UTF-8 characters")
+	}
+	return errors
 }
 
 func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
@@ -661,6 +702,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 
 		openAPIV3Schema := &specStandardValidatorV3{
 			allowDefaults:            opts.allowDefaults,
+			disallowDefaultsReason:   opts.disallowDefaultsReason,
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
@@ -1110,16 +1152,17 @@ func allVersionsSpecifyOpenAPISchema(spec *apiextensions.CustomResourceDefinitio
 	return true
 }
 
-// allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults
-func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+// allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults,
+// or false and a reason for the user if defaults are not allowed.
+func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) (bool, string) {
 	if oldCRDSpec != nil && specHasDefaults(oldCRDSpec) {
 		// don't tighten validation on existing persisted data
-		return true
+		return true, ""
 	}
 	if requestGV == apiextensionsv1beta1.SchemeGroupVersion {
-		return false
+		return false, "(cannot set default values in apiextensions.k8s.io/v1beta1 CRDs, must use apiextensions.k8s.io/v1)"
 	}
-	return true
+	return true, ""
 }
 
 func specHasDefaults(spec *apiextensions.CustomResourceDefinitionSpec) bool {

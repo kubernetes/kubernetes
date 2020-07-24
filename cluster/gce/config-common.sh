@@ -79,7 +79,6 @@ function get-master-disk-size() {
 
 function get-node-ip-range {
   if [[ -n "${NODE_IP_RANGE:-}" ]]; then
-    >&2 echo "Using user provided NODE_IP_RANGE: ${NODE_IP_RANGE}"
     echo "${NODE_IP_RANGE}"
     return
   fi
@@ -143,7 +142,7 @@ export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # CNI storage path for Windows nodes
 export WINDOWS_CNI_STORAGE_PATH="https://storage.googleapis.com/k8s-artifacts-cni/release"
 # CNI version for Windows nodes
-export WINDOWS_CNI_VERSION="v0.8.5"
+export WINDOWS_CNI_VERSION="v0.8.6"
 # Pod manifests directory for Windows nodes on Windows nodes.
 export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.
@@ -158,3 +157,9 @@ export WINDOWS_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.kubeconfig"
 export WINDOWS_BOOTSTRAP_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.bootstrap-kubeconfig"
 # Path for kube-proxy kubeconfig file on Windows nodes.
 export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfig"
+# Pause container image for Windows container.
+export WINDOWS_INFRA_CONTAINER="gcr.io/gke-release/pause-win:1.2.1"
+# Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
+export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
+# Version for csi-proxy
+export CSI_PROXY_VERSION="v0.1.0-gke.1"

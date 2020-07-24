@@ -2,10 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "config.go",
-        "patch.go",
-    ],
+    srcs = ["config.go"],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app/config",
     visibility = ["//visibility:public"],
     deps = [

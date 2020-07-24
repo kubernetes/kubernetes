@@ -15,10 +15,13 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: gcr.io/k8s-staging-csi/csi-provisioner:v1.6.0
+          image: gcr.io/k8s-staging-csi/csi-provisioner:v2.0.0-rc1
           args:
             - "--csi-address=$(ADDRESS)"
-            - "--connection-timeout=15s"
+            # Topology support is needed for the pod rescheduling test
+            # ("storage capacity" in csi_mock_volume.go).
+            - "--feature-gates=Topology=true"
+            - "-v=5"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
@@ -65,6 +68,8 @@ spec:
             - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
+            - name: hooks
+              mountPath: /etc/hooks
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-mock
@@ -78,3 +83,6 @@ spec:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
+        - name: hooks
+          configMap:
+            name: mock-driver-hooks

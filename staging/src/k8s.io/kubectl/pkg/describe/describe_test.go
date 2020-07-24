@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -178,6 +179,7 @@ func TestDescribePodTolerations(t *testing.T) {
 		},
 		Spec: corev1.PodSpec{
 			Tolerations: []corev1.Toleration{
+				{Operator: corev1.TolerationOpExists},
 				{Key: "key0", Operator: corev1.TolerationOpExists},
 				{Key: "key1", Value: "value1"},
 				{Key: "key2", Operator: corev1.TolerationOpEqual, Value: "value2", Effect: corev1.TaintEffectNoSchedule},
@@ -192,7 +194,8 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key0\n") ||
+	if !strings.Contains(out, "  op=Exists\n") ||
+		!strings.Contains(out, "key0 op=Exists\n") ||
 		!strings.Contains(out, "key1=value1\n") ||
 		!strings.Contains(out, "key2=value2:NoSchedule\n") ||
 		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
@@ -1674,12 +1677,11 @@ func TestDescribeDeployment(t *testing.T) {
 }
 
 func TestDescribeIngress(t *testing.T) {
-	defaultBackend := networkingv1beta1.IngressBackend{
+	backendV1beta1 := networkingv1beta1.IngressBackend{
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
 	}
-
-	fakeClient := fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+	v1beta1 := fake.NewSimpleClientset(&networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -1691,6 +1693,278 @@ func TestDescribeIngress(t *testing.T) {
 					IngressRuleValue: networkingv1beta1.IngressRuleValue{
 						HTTP: &networkingv1beta1.HTTPIngressRuleValue{
 							Paths: []networkingv1beta1.HTTPIngressPath{
+								{
+									Path:    "/foo",
+									Backend: backendV1beta1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	backendV1 := networkingv1.IngressBackend{
+		Service: &networkingv1.IngressServiceBackend{
+			Name: "default-backend",
+			Port: networkingv1.ServiceBackendPort{
+				Number: 80,
+			},
+		},
+	}
+
+	netv1 := fake.NewSimpleClientset(&networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "foo.bar.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:    "/foo",
+									Backend: backendV1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	backendResource := networkingv1.IngressBackend{
+		Resource: &corev1.TypedLocalObjectReference{
+			APIGroup: utilpointer.StringPtr("example.com"),
+			Kind:     "foo",
+			Name:     "bar",
+		},
+	}
+
+	tests := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"IngressRule.HTTP.Paths.Backend.Service v1beta1": {
+			input: v1beta1,
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com  
+               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:   <none>
+Events:        <none>` + "\n",
+		},
+		"IngressRule.HTTP.Paths.Backend.Service v1": {
+			input: netv1,
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com  
+               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:   <none>
+Events:        <none>` + "\n",
+		},
+		"IngressRule.HTTP.Paths.Backend.Resource v1": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.bar.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:    "/foo",
+											Backend: backendResource,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com  
+               /foo   APIGroup: example.com, Kind: foo, Name: bar
+Annotations:   <none>
+Events:        <none>` + "\n",
+		},
+		"Spec.DefaultBackend.Service & IngressRule.HTTP.Paths.Backend.Service v1": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					DefaultBackend: &backendV1,
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.bar.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:    "/foo",
+											Backend: backendV1,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com  
+               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:   <none>
+Events:        <none>` + "\n",
+		},
+		"Spec.DefaultBackend.Resource & IngressRule.HTTP.Paths.Backend.Resource v1": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					DefaultBackend: &backendResource,
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.bar.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:    "/foo",
+											Backend: backendResource,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  APIGroup: example.com, Kind: foo, Name: bar
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com  
+               /foo   APIGroup: example.com, Kind: foo, Name: bar
+Annotations:   <none>
+Events:        <none>` + "\n",
+		},
+		"Spec.DefaultBackend.Resource & IngressRule.HTTP.Paths.Backend.Service v1": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					DefaultBackend: &backendResource,
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.bar.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:    "/foo",
+											Backend: backendV1,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  APIGroup: example.com, Kind: foo, Name: bar
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com  
+               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:   <none>
+Events:        <none>` + "\n",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: test.input}
+			i := IngressDescriber{c}
+			out, err := i.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != test.output {
+				t.Logf(out)
+				t.Logf(test.output)
+				t.Errorf("expected: \n%q\n but got output: \n%q\n", test.output, out)
+			}
+		})
+	}
+}
+
+func TestDescribeIngressV1(t *testing.T) {
+	defaultBackend := networkingv1.IngressBackend{
+		Service: &networkingv1.IngressServiceBackend{
+			Name: "default-backend",
+			Port: networkingv1.ServiceBackendPort{
+				Number: 80,
+			},
+		},
+	}
+
+	fakeClient := fake.NewSimpleClientset(&networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "foo.bar.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
 								{
 									Path:    "/foo",
 									Backend: defaultBackend,
@@ -1775,6 +2049,38 @@ func TestDescribeStorageClass(t *testing.T) {
 		!strings.Contains(out, "kubernetes.io/hostname") ||
 		!strings.Contains(out, "node1") ||
 		!strings.Contains(out, "zone2") ||
+		!strings.Contains(out, "node2") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeCSINode(t *testing.T) {
+	limit := utilpointer.Int32Ptr(int32(2))
+	f := fake.NewSimpleClientset(&storagev1.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storagev1.CSINodeSpec{
+			Drivers: []storagev1.CSINodeDriver{
+				{
+					Name:   "driver1",
+					NodeID: "node1",
+				},
+				{
+					Name:        "driver2",
+					NodeID:      "node2",
+					Allocatable: &storagev1.VolumeNodeResources{Count: limit},
+				},
+			},
+		},
+	})
+	s := CSINodeDescriber{f}
+	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") ||
+		!strings.Contains(out, "driver1") ||
+		!strings.Contains(out, "node1") ||
+		!strings.Contains(out, "driver2") ||
 		!strings.Contains(out, "node2") {
 		t.Errorf("unexpected out: %s", out)
 	}
@@ -2698,8 +3004,14 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
-		// TODO(jchaloup): add tests for:
-		// - JobDescriber
+		"JobDescriber": &JobDescriber{
+			fake.NewSimpleClientset(&batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 		"IngressDescriber": &IngressDescriber{
 			fake.NewSimpleClientset(&networkingv1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -3056,27 +3368,6 @@ func TestDescribeResourceQuota(t *testing.T) {
 }
 
 func TestDescribeIngressClass(t *testing.T) {
-	fake := fake.NewSimpleClientset(&networkingv1beta1.IngressClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "example-class",
-		},
-		Spec: networkingv1beta1.IngressClassSpec{
-			Controller: "example.com/controller",
-			Parameters: &corev1.TypedLocalObjectReference{
-				APIGroup: utilpointer.StringPtr("v1"),
-				Kind:     "ConfigMap",
-				Name:     "example-parameters",
-			},
-		},
-	})
-
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := IngressClassDescriber{c}
-	out, err := d.Describe("", "example-class", DescriberSettings{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
 	expectedOut := `Name:         example-class
 Labels:       <none>
 Annotations:  <none>
@@ -3086,9 +3377,57 @@ Parameters:
   Kind:      ConfigMap
   Name:      example-parameters` + "\n"
 
-	if out != expectedOut {
-		t.Logf(out)
-		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
+	tests := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"basic IngressClass (v1beta1)": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "example-class",
+				},
+				Spec: networkingv1beta1.IngressClassSpec{
+					Controller: "example.com/controller",
+					Parameters: &corev1.TypedLocalObjectReference{
+						APIGroup: utilpointer.StringPtr("v1"),
+						Kind:     "ConfigMap",
+						Name:     "example-parameters",
+					},
+				},
+			}),
+			output: expectedOut,
+		},
+		"basic IngressClass (v1)": {
+			input: fake.NewSimpleClientset(&networkingv1.IngressClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "example-class",
+				},
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "example.com/controller",
+					Parameters: &corev1.TypedLocalObjectReference{
+						APIGroup: utilpointer.StringPtr("v1"),
+						Kind:     "ConfigMap",
+						Name:     "example-parameters",
+					},
+				},
+			}),
+			output: expectedOut,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: test.input}
+			d := IngressClassDescriber{c}
+			out, err := d.Describe("", "example-class", DescriberSettings{})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != expectedOut {
+				t.Logf(out)
+				t.Errorf("expected : %q\n but got output:\n %q", test.output, out)
+			}
+		})
 	}
 }
 

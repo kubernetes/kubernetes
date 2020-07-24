@@ -24,9 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
@@ -52,6 +53,8 @@ type APIServiceRegistrationController struct {
 
 	queue workqueue.RateLimitingInterface
 }
+
+var _ dynamiccertificates.Listener = &APIServiceRegistrationController{}
 
 // NewAPIServiceRegistrationController returns a new APIServiceRegistrationController.
 func NewAPIServiceRegistrationController(apiServiceInformer informers.APIServiceInformer, apiHandlerManager APIHandlerManager) *APIServiceRegistrationController {
@@ -193,6 +196,7 @@ func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
 }
 
 // Enqueue queues all apiservices to be rehandled.
+// This method is used by the controller to notify when the proxy cert content changes.
 func (c *APIServiceRegistrationController) Enqueue() {
 	apiServices, err := c.apiServiceLister.List(labels.Everything())
 	if err != nil {

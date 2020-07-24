@@ -27,7 +27,6 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
-	auditregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1"
 	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -38,12 +37,14 @@ import (
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
+	certificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
 	discoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
@@ -73,7 +74,6 @@ type Interface interface {
 	AppsV1() appsv1.AppsV1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
-	AuditregistrationV1alpha1() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface
 	AuthenticationV1() authenticationv1.AuthenticationV1Interface
 	AuthenticationV1beta1() authenticationv1beta1.AuthenticationV1beta1Interface
 	AuthorizationV1() authorizationv1.AuthorizationV1Interface
@@ -84,12 +84,14 @@ type Interface interface {
 	BatchV1() batchv1.BatchV1Interface
 	BatchV1beta1() batchv1beta1.BatchV1beta1Interface
 	BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface
+	CertificatesV1() certificatesv1.CertificatesV1Interface
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface
 	CoordinationV1() coordinationv1.CoordinationV1Interface
 	CoreV1() corev1.CoreV1Interface
 	DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Interface
 	DiscoveryV1beta1() discoveryv1beta1.DiscoveryV1beta1Interface
+	EventsV1() eventsv1.EventsV1Interface
 	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface
@@ -119,7 +121,6 @@ type Clientset struct {
 	appsV1                       *appsv1.AppsV1Client
 	appsV1beta1                  *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                  *appsv1beta2.AppsV1beta2Client
-	auditregistrationV1alpha1    *auditregistrationv1alpha1.AuditregistrationV1alpha1Client
 	authenticationV1             *authenticationv1.AuthenticationV1Client
 	authenticationV1beta1        *authenticationv1beta1.AuthenticationV1beta1Client
 	authorizationV1              *authorizationv1.AuthorizationV1Client
@@ -130,12 +131,14 @@ type Clientset struct {
 	batchV1                      *batchv1.BatchV1Client
 	batchV1beta1                 *batchv1beta1.BatchV1beta1Client
 	batchV2alpha1                *batchv2alpha1.BatchV2alpha1Client
+	certificatesV1               *certificatesv1.CertificatesV1Client
 	certificatesV1beta1          *certificatesv1beta1.CertificatesV1beta1Client
 	coordinationV1beta1          *coordinationv1beta1.CoordinationV1beta1Client
 	coordinationV1               *coordinationv1.CoordinationV1Client
 	coreV1                       *corev1.CoreV1Client
 	discoveryV1alpha1            *discoveryv1alpha1.DiscoveryV1alpha1Client
 	discoveryV1beta1             *discoveryv1beta1.DiscoveryV1beta1Client
+	eventsV1                     *eventsv1.EventsV1Client
 	eventsV1beta1                *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1            *extensionsv1beta1.ExtensionsV1beta1Client
 	flowcontrolV1alpha1          *flowcontrolv1alpha1.FlowcontrolV1alpha1Client
@@ -179,11 +182,6 @@ func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 // AppsV1beta2 retrieves the AppsV1beta2Client
 func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
 	return c.appsV1beta2
-}
-
-// AuditregistrationV1alpha1 retrieves the AuditregistrationV1alpha1Client
-func (c *Clientset) AuditregistrationV1alpha1() auditregistrationv1alpha1.AuditregistrationV1alpha1Interface {
-	return c.auditregistrationV1alpha1
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
@@ -236,6 +234,11 @@ func (c *Clientset) BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface {
 	return c.batchV2alpha1
 }
 
+// CertificatesV1 retrieves the CertificatesV1Client
+func (c *Clientset) CertificatesV1() certificatesv1.CertificatesV1Interface {
+	return c.certificatesV1
+}
+
 // CertificatesV1beta1 retrieves the CertificatesV1beta1Client
 func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface {
 	return c.certificatesV1beta1
@@ -264,6 +267,11 @@ func (c *Clientset) DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Inter
 // DiscoveryV1beta1 retrieves the DiscoveryV1beta1Client
 func (c *Clientset) DiscoveryV1beta1() discoveryv1beta1.DiscoveryV1beta1Interface {
 	return c.discoveryV1beta1
+}
+
+// EventsV1 retrieves the EventsV1Client
+func (c *Clientset) EventsV1() eventsv1.EventsV1Interface {
+	return c.eventsV1
 }
 
 // EventsV1beta1 retrieves the EventsV1beta1Client
@@ -397,10 +405,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.auditregistrationV1alpha1, err = auditregistrationv1alpha1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.authenticationV1, err = authenticationv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -441,6 +445,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.certificatesV1, err = certificatesv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.certificatesV1beta1, err = certificatesv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -462,6 +470,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.discoveryV1beta1, err = discoveryv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.eventsV1, err = eventsv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +566,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.appsV1 = appsv1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta2 = appsv1beta2.NewForConfigOrDie(c)
-	cs.auditregistrationV1alpha1 = auditregistrationv1alpha1.NewForConfigOrDie(c)
 	cs.authenticationV1 = authenticationv1.NewForConfigOrDie(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.NewForConfigOrDie(c)
 	cs.authorizationV1 = authorizationv1.NewForConfigOrDie(c)
@@ -565,12 +576,14 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.batchV1 = batchv1.NewForConfigOrDie(c)
 	cs.batchV1beta1 = batchv1beta1.NewForConfigOrDie(c)
 	cs.batchV2alpha1 = batchv2alpha1.NewForConfigOrDie(c)
+	cs.certificatesV1 = certificatesv1.NewForConfigOrDie(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.NewForConfigOrDie(c)
 	cs.coordinationV1beta1 = coordinationv1beta1.NewForConfigOrDie(c)
 	cs.coordinationV1 = coordinationv1.NewForConfigOrDie(c)
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
 	cs.discoveryV1alpha1 = discoveryv1alpha1.NewForConfigOrDie(c)
 	cs.discoveryV1beta1 = discoveryv1beta1.NewForConfigOrDie(c)
+	cs.eventsV1 = eventsv1.NewForConfigOrDie(c)
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.NewForConfigOrDie(c)
@@ -602,7 +615,6 @@ func New(c rest.Interface) *Clientset {
 	cs.appsV1 = appsv1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
-	cs.auditregistrationV1alpha1 = auditregistrationv1alpha1.New(c)
 	cs.authenticationV1 = authenticationv1.New(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.New(c)
 	cs.authorizationV1 = authorizationv1.New(c)
@@ -613,12 +625,14 @@ func New(c rest.Interface) *Clientset {
 	cs.batchV1 = batchv1.New(c)
 	cs.batchV1beta1 = batchv1beta1.New(c)
 	cs.batchV2alpha1 = batchv2alpha1.New(c)
+	cs.certificatesV1 = certificatesv1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
 	cs.coordinationV1beta1 = coordinationv1beta1.New(c)
 	cs.coordinationV1 = coordinationv1.New(c)
 	cs.coreV1 = corev1.New(c)
 	cs.discoveryV1alpha1 = discoveryv1alpha1.New(c)
 	cs.discoveryV1beta1 = discoveryv1beta1.New(c)
+	cs.eventsV1 = eventsv1.New(c)
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.New(c)

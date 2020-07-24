@@ -27,7 +27,7 @@ import (
 
 	"google.golang.org/api/googleapi"
 	tpuapi "google.golang.org/api/tpu/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )

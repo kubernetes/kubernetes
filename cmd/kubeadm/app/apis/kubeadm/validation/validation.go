@@ -289,7 +289,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		if (e.External.CertFile == "" && e.External.KeyFile != "") || (e.External.CertFile != "" && e.External.KeyFile == "") {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set"))
 		}
-		// If the cert and key are specified, require the VA as well
+		// If the cert and key are specified, require the CA as well
 		if e.External.CertFile != "" && e.External.KeyFile != "" && e.External.CAFile == "" {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile"))
 		}
@@ -397,7 +397,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	for _, s := range subnets {
 		numAddresses := utilnet.RangeSize(s)
 		if numAddresses < minAddrs {
-			allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
+			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), "subnet is too small"))
 		}
 	}
 	return allErrs
@@ -463,6 +463,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
 		kubeadmcmdoptions.Kustomize,
+		kubeadmcmdoptions.Patches,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {
 		return true

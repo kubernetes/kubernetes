@@ -24,6 +24,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "ciphersuites_flag.go",
+        "ciphersuites_flag_114.go",
         "colon_separated_multimap_string_string.go",
         "configuration_map.go",
         "flags.go",
@@ -42,7 +43,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

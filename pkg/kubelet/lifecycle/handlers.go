@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -37,9 +37,9 @@ const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
-type HandlerRunner struct {
+type handlerRunner struct {
 	httpGetter       kubetypes.HTTPGetter
-	commandRunner    kubecontainer.ContainerCommandRunner
+	commandRunner    kubecontainer.CommandRunner
 	containerManager podStatusProvider
 }
 
@@ -47,15 +47,16 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
-	return &HandlerRunner{
+// NewHandlerRunner returns a configured lifecycle handler for a container.
+func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+	return &handlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,
 		containerManager: containerManager,
 	}
 }
 
-func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
@@ -104,7 +105,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
@@ -129,10 +130,10 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	}
 	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
 	resp, err := hr.httpGetter.Get(url)
-	return getHttpRespBody(resp), err
+	return getHTTPRespBody(resp), err
 }
 
-func getHttpRespBody(resp *http.Response) string {
+func getHTTPRespBody(resp *http.Response) string {
 	if resp == nil {
 		return ""
 	}
@@ -144,6 +145,8 @@ func getHttpRespBody(resp *http.Response) string {
 	return ""
 }
 
+// NewAppArmorAdmitHandler returns a PodAdmitHandler which is used to evaluate
+// if a pod can be admitted from the perspective of AppArmor.
 func NewAppArmorAdmitHandler(validator apparmor.Validator) PodAdmitHandler {
 	return &appArmorAdmitHandler{
 		Validator: validator,
@@ -171,6 +174,8 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	}
 }
 
+// NewNoNewPrivsAdmitHandler returns a PodAdmitHandler which is used to evaluate
+// if a pod can be admitted from the perspective of NoNewPrivs.
 func NewNoNewPrivsAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
 	return &noNewPrivsAdmitHandler{
 		Runtime: runtime,
@@ -236,6 +241,8 @@ func noNewPrivsRequired(pod *v1.Pod) bool {
 	return false
 }
 
+// NewProcMountAdmitHandler returns a PodAdmitHandler which is used to evaluate
+// if a pod can be admitted from the perspective of ProcMount.
 func NewProcMountAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
 	return &procMountAdmitHandler{
 		Runtime: runtime,

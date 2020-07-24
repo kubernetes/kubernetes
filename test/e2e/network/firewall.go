@@ -29,9 +29,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/master/ports"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -145,7 +147,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			podName := fmt.Sprintf("netexec%v", i)
 
 			framework.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
-			pod := f.NewAgnhostPod(podName,
+			pod := newAgnhostPod(podName,
 				"netexec",
 				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
 				fmt.Sprintf("--udp-port=%d", firewallTestUDPPort))
@@ -154,7 +156,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			pod.Spec.HostNetwork = true
 			_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(f.WaitForPodReady(podName))
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, framework.PodStartTimeout))
 			framework.Logf("Netexec pod %q in namespace %q running", podName, ns)
 
 			defer func() {
@@ -166,7 +168,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
+		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
 		framework.ExpectNoError(err)
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
@@ -187,12 +189,12 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
+			err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
 			framework.ExpectNoError(err)
 		}()
 
 		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet, 15)
+		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
 
@@ -217,7 +219,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		masterAddresses := framework.GetAllMasterAddresses(cs)
 		for _, masterAddress := range masterAddresses {
 			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
 		}
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)

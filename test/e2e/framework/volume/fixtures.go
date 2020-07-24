@@ -44,6 +44,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -143,7 +144,7 @@ type Test struct {
 }
 
 // NewNFSServer is a NFS-specific wrapper for CreateStorageServer.
-func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *v1.Pod, ip string) {
+func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *v1.Pod, host string) {
 	config = TestConfig{
 		Namespace:          namespace,
 		Prefix:             "nfs",
@@ -155,8 +156,11 @@ func NewNFSServer(cs clientset.Interface, namespace string, args []string) (conf
 	if len(args) > 0 {
 		config.ServerArgs = args
 	}
-	pod, ip = CreateStorageServer(cs, config)
-	return config, pod, ip
+	pod, host = CreateStorageServer(cs, config)
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	return config, pod, host
 }
 
 // NewGlusterfsServer is a GlusterFS-specific wrapper for CreateStorageServer. Also creates the gluster endpoints object.

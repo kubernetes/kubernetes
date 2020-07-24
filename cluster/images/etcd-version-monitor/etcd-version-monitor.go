@@ -27,11 +27,11 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
 
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 )
 
 // Initialize the prometheus instrumentation and client related flags.
@@ -271,9 +271,7 @@ func scrapeMetrics() (map[string]*dto.MetricFamily, error) {
 	}
 	defer resp.Body.Close()
 
-	// Parse the metrics in text format to a MetricFamily struct.
-	var textParser expfmt.TextParser
-	return textParser.TextToMetricFamilies(resp.Body)
+	return testutil.TextToMetricFamilies(resp.Body)
 }
 
 func renameMetric(mf *dto.MetricFamily, name string) {

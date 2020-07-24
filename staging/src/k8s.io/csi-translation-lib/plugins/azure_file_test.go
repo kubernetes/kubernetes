@@ -224,6 +224,45 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "azure file volume with rg annotation",
+			volume: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "file.csi.azure.com-sharename",
+					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureFile: &corev1.AzureFilePersistentVolumeSource{
+							ShareName:       "sharename",
+							SecretName:      "secretname",
+							SecretNamespace: &secretNamespace,
+							ReadOnly:        true,
+						},
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "file.csi.azure.com-sharename",
+					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver:   "file.csi.azure.com",
+							ReadOnly: true,
+							NodeStageSecretRef: &corev1.SecretReference{
+								Name:      "secretname",
+								Namespace: secretNamespace,
+							},
+							VolumeAttributes: map[string]string{azureFileShareName: "sharename"},
+							VolumeHandle:     "rg#secretname#sharename#",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {

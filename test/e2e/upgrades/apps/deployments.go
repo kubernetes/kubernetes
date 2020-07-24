@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -66,12 +66,12 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	rsClient := c.AppsV1().ReplicaSets(ns)
 
 	ginkgo.By(fmt.Sprintf("Creating a deployment %q with 1 replica in namespace %q", deploymentName, ns))
-	d := e2edeploy.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, appsv1.RollingUpdateDeploymentStrategyType)
+	d := e2edeployment.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deployment, err := deploymentClient.Create(context.TODO(), d, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(c, deployment))
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
 
 	ginkgo.By(fmt.Sprintf("Getting replicaset revision 1 of deployment %q", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
@@ -79,9 +79,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
-	if len(rss) != 1 {
-		framework.ExpectNoError(fmt.Errorf("expected one replicaset, got %d", len(rss)))
-	}
+	framework.ExpectEqual(len(rss), 1, "expected one replicaset, got %d", len(rss))
 	t.oldRSUID = rss[0].UID
 
 	ginkgo.By(fmt.Sprintf("Waiting for revision of the deployment %q to become 1", deploymentName))
@@ -89,21 +87,19 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Trigger a new rollout so that we have some history.
 	ginkgo.By(fmt.Sprintf("Triggering a new rollout for deployment %q", deploymentName))
-	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *appsv1.Deployment) {
+	deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *appsv1.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = "updated-name"
 	})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(c, deployment))
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
 
 	ginkgo.By(fmt.Sprintf("Getting replicasets revision 1 and 2 of deployment %q", deploymentName))
 	rsList, err = rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss = rsList.Items
-	if len(rss) != 2 {
-		framework.ExpectNoError(fmt.Errorf("expected 2 replicaset, got %d", len(rss)))
-	}
+	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
 
 	ginkgo.By(fmt.Sprintf("Checking replicaset of deployment %q that is created before rollout survives the rollout", deploymentName))
 	switch t.oldRSUID {
@@ -144,9 +140,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
-	if len(rss) != 2 {
-		framework.ExpectNoError(fmt.Errorf("expected 2 replicaset, got %d", len(rss)))
-	}
+	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
 
 	switch t.oldRSUID {
 	case rss[0].UID:
@@ -161,21 +155,17 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectEqual(deployment.Annotations[deploymentutil.RevisionAnnotation], "2")
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deploymentName))
-	framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(c, deployment))
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
 
 	// Verify the upgraded deployment is active by scaling up the deployment by 1
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
-	deploymentWithUpdatedReplicas, err := e2edeploy.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *appsv1.Deployment) {
+	deploymentWithUpdatedReplicas, err := e2edeployment.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *appsv1.Deployment) {
 		*deployment.Spec.Replicas = *deployment.Spec.Replicas + 1
 	})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete after scaling", deploymentName))
-	err = e2edeploy.WaitForDeploymentComplete(c, deploymentWithUpdatedReplicas)
-	if err != nil {
-		framework.DumpAllNamespaceInfo(f.ClientSet, deployment.Namespace)
-	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploymentWithUpdatedReplicas))
 }
 
 // Teardown cleans up any remaining resources.

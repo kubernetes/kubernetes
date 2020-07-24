@@ -22,8 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	imageutils "k8s.io/kubernetes/test/utils/image"
-
 	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,7 +35,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // LoadFromManifests loads .yaml or .json manifest files and returns
@@ -80,7 +79,7 @@ func LoadFromManifests(files ...string) ([]interface{}, error) {
 
 func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
-		data, err := testfiles.Read(fileName)
+		data, err := e2etestfiles.Read(fileName)
 		if err != nil {
 			framework.Failf("reading manifest file: %v", err)
 		}

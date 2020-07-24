@@ -26,7 +26,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
 func nowStamp() string {
@@ -53,7 +53,7 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	skip := offset + 1
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
-	ginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }
 
 // Fail is a replacement for ginkgo.Fail which logs the problem as it occurs
@@ -64,7 +64,7 @@ func Fail(msg string, callerSkip ...int) {
 		skip += callerSkip[0]
 	}
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
-	ginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }
 
 var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)

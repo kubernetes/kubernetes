@@ -8,11 +8,11 @@ import (
 // ValidateRunOnceDurationConfig validates the RunOnceDuration plugin configuration
 func ValidateRunOnceDurationConfig(config *runonceduration.RunOnceDurationConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if config == nil || config.ActiveDeadlineSecondsLimit == nil {
+	if config == nil || config.ActiveDeadlineSecondsOverride == nil {
 		return allErrs
 	}
-	if *config.ActiveDeadlineSecondsLimit <= 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("activeDeadlineSecondsOverride"), config.ActiveDeadlineSecondsLimit, "must be greater than 0"))
+	if *config.ActiveDeadlineSecondsOverride <= 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("activeDeadlineSecondsOverride"), config.ActiveDeadlineSecondsOverride, "must be greater than 0"))
 	}
 	return allErrs
 }

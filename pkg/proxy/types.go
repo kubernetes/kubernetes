@@ -49,7 +49,14 @@ type ServicePortName struct {
 }
 
 func (spn ServicePortName) String() string {
-	return fmt.Sprintf("%s:%s", spn.NamespacedName.String(), spn.Port)
+	return fmt.Sprintf("%s%s", spn.NamespacedName.String(), fmtPortName(spn.Port))
+}
+
+func fmtPortName(in string) string {
+	if in == "" {
+		return ""
+	}
+	return fmt.Sprintf(":%s", in)
 }
 
 // ServicePort is an interface which abstracts information about a service.

@@ -83,6 +83,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/warning:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
@@ -90,7 +91,7 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

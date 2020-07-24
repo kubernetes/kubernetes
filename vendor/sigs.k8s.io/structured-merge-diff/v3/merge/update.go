@@ -30,7 +30,8 @@ type Converter interface {
 // Updater is the object used to compute updated FieldSets and also
 // merge the object on Apply.
 type Updater struct {
-	Converter Converter
+	Converter     Converter
+	IgnoredFields map[fieldpath.APIVersion]*fieldpath.Set
 
 	enableUnions bool
 }
@@ -50,7 +51,7 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 	}
 
 	versions := map[fieldpath.APIVersion]*typed.Comparison{
-		version: compare,
+		version: compare.ExcludeFields(s.IgnoredFields[version]),
 	}
 
 	for manager, managerSet := range managers {
@@ -80,7 +81,7 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to compare objects: %v", err)
 			}
-			versions[managerSet.APIVersion()] = compare
+			versions[managerSet.APIVersion()] = compare.ExcludeFields(s.IgnoredFields[managerSet.APIVersion()])
 		}
 
 		conflictSet := managerSet.Set().Intersection(compare.Modified.Union(compare.Added))
@@ -135,8 +136,13 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 	if _, ok := managers[manager]; !ok {
 		managers[manager] = fieldpath.NewVersionedSet(fieldpath.NewSet(), version, false)
 	}
+
+	ignored := s.IgnoredFields[version]
+	if ignored == nil {
+		ignored = fieldpath.NewSet()
+	}
 	managers[manager] = fieldpath.NewVersionedSet(
-		managers[manager].Set().Union(compare.Modified).Union(compare.Added).Difference(compare.Removed),
+		managers[manager].Set().Union(compare.Modified).Union(compare.Added).Difference(compare.Removed).RecursiveDifference(ignored),
 		version,
 		false,
 	)
@@ -174,6 +180,15 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to get field set: %v", err)
 	}
+
+	ignored := s.IgnoredFields[version]
+	if ignored != nil {
+		set = set.RecursiveDifference(ignored)
+		// TODO: is this correct. If we don't remove from lastSet pruning might remove the fields?
+		if lastSet != nil {
+			lastSet.Set().RecursiveDifference(ignored)
+		}
+	}
 	managers[manager] = fieldpath.NewVersionedSet(set, version, true)
 	newObject, err = s.prune(newObject, managers, manager, lastSet)
 	if err != nil {
@@ -197,7 +212,7 @@ func shallowCopyManagers(managers fieldpath.ManagedFields) fieldpath.ManagedFiel
 	return newManagers
 }
 
-// prune will remove a list or map item, iff:
+// prune will remove a field, list or map item, iff:
 // * applyingManager applied it last time
 // * applyingManager didn't apply it this time
 // * no other applier claims to manage it
@@ -225,18 +240,16 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 	return s.Converter.Convert(pruned, managers[applyingManager].APIVersion())
 }
 
-// addBackOwnedItems adds back any list and map items that were removed by prune,
-// but other appliers (or the current applier's new config) claim to own.
+// addBackOwnedItems adds back any fields, list and map items that were removed by prune,
+// but other appliers or updaters (or the current applier's new config) claim to own.
 func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFields fieldpath.ManagedFields, applyingManager string) (*typed.TypedValue, error) {
 	var err error
 	managedAtVersion := map[fieldpath.APIVersion]*fieldpath.Set{}
 	for _, managerSet := range managedFields {
-		if managerSet.Applied() {
-			if _, ok := managedAtVersion[managerSet.APIVersion()]; !ok {
-				managedAtVersion[managerSet.APIVersion()] = fieldpath.NewSet()
-			}
-			managedAtVersion[managerSet.APIVersion()] = managedAtVersion[managerSet.APIVersion()].Union(managerSet.Set())
+		if _, ok := managedAtVersion[managerSet.APIVersion()]; !ok {
+			managedAtVersion[managerSet.APIVersion()] = fieldpath.NewSet()
 		}
+		managedAtVersion[managerSet.APIVersion()] = managedAtVersion[managerSet.APIVersion()].Union(managerSet.Set())
 	}
 	for version, managed := range managedAtVersion {
 		merged, err = s.Converter.Convert(merged, version)
@@ -266,9 +279,9 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 	return pruned, nil
 }
 
-// addBackDanglingItems makes sure that the only items removed by prune are items that were
-// previously owned by the currently applying manager. This will add back unowned items and items
-// which are owned by Updaters that shouldn't be removed.
+// addBackDanglingItems makes sure that the fields list and map items removed by prune were
+// previously owned by the currently applying manager. This will add back fields list and map items
+// that are unowned or that are owned by Updaters and shouldn't be removed.
 func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet fieldpath.VersionedSet) (*typed.TypedValue, error) {
 	convertedPruned, err := s.Converter.Convert(pruned, lastSet.APIVersion())
 	if err != nil {

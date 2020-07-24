@@ -39,14 +39,7 @@ var testPool = "testpool"
 var testFSType = "ext2"
 var testVolUUID = "01c43d34-89f8-83d3-422b-43536a0f25e6"
 
-type fakeConfig struct {
-	apiAddr    string
-	apiUser    string
-	apiPass    string
-	apiVersion string
-}
-
-func (c fakeConfig) GetAPIConfig() *storageosAPIConfig {
+func GetAPIConfig() *storageosAPIConfig {
 	return &storageosAPIConfig{
 		apiAddr:    "http://5.6.7.8:9999",
 		apiUser:    "abc",
@@ -57,8 +50,7 @@ func (c fakeConfig) GetAPIConfig() *storageosAPIConfig {
 
 func TestClient(t *testing.T) {
 	util := storageosUtil{}
-	cfg := fakeConfig{}
-	err := util.NewAPI(cfg.GetAPIConfig())
+	err := util.NewAPI(GetAPIConfig())
 	if err != nil {
 		t.Fatalf("error getting api config: %v", err)
 	}

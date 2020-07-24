@@ -66,12 +66,12 @@ spec:
     matchLabels:
       8---jop9641lg.p-g8c2-k-912e5-c-e63-n-3n/E9.8ThjT9s-j41-0-6p-JFHn7y-74.-0MUORQQ.N2.3: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-_Bq.m_4
   volumeMounts:
-  - mountPath: "144"
-    mountPropagation: 腿ħ缶.蒅!a
-    name: "143"
+  - mountPath: "172"
+    mountPropagation: œȠƬQg鄠[颐o啛更偢ɇ卷荙JLĹ]
+    name: "171"
     readOnly: true
-    subPath: "145"
-    subPathExpr: "146"
+    subPath: "173"
+    subPathExpr: "174"
   volumes:
   - awsElasticBlockStore:
       fsType: "43"
@@ -133,6 +133,61 @@ spec:
           resource: "88"
     emptyDir:
       sizeLimit: "700"
+    ephemeral:
+      readOnly: true
+      volumeClaimTemplate:
+        metadata:
+          annotations:
+            "150": "151"
+          clusterName: "156"
+          creationTimestamp: null
+          deletionGracePeriodSeconds: -2351574817327272831
+          finalizers:
+          - "155"
+          generateName: "144"
+          generation: 2131277878630553496
+          labels:
+            "148": "149"
+          managedFields:
+          - apiVersion: "158"
+            fieldsType: "159"
+            manager: "157"
+            operation: ɍi縱ù墴1Rƥ贫
+          name: "143"
+          namespace: "145"
+          ownerReferences:
+          - apiVersion: "152"
+            blockOwnerDeletion: false
+            controller: false
+            kind: "153"
+            name: "154"
+            uid: 臷Ľð»ųKĵ&4ʑ%:;栍dʪ
+          resourceVersion: "16267283576845911679"
+          selfLink: "146"
+          uid: y綸_Ú8參遼ū
+        spec:
+          accessModes:
+          - 掊°nʮ閼咎櫸eʔŊƞ究:hoĂɋ瀐
+          dataSource:
+            apiGroup: "168"
+            kind: "169"
+            name: "170"
+          resources:
+            limits:
+              <鴒翁杙Ŧ癃8鸖ɱJȉ罴: "587"
+            requests:
+              Ó6ǳ娝嘚庎D}埽uʎȺ眖R#yV: "156"
+          selector:
+            matchExpressions:
+            - key: x--r7v66bm71u-n4f9wk-3--652x01--p--n4-4-t--2/C.A-j..9dfn3Y8d_0_.---M_4FpF_W-1._-vL_i.-_-a--G-I.-_Y33--.8U.6
+              operator: In
+              values:
+              - A.0.__cd..lv-_aLQbI2_-.XFw.8._..._Wxpe..J7r6
+            matchLabels:
+              d.iUaC_wYSJfB._.zS-._..3le-Q4-R-083.SD..P.---5.-Z3P__D__6t-2.-m: wE._._3.-.83_iQ
+          storageClassName: "167"
+          volumeMode: 瘦ɖ緕ȚÍ勅跦Opwǩ曬逴
+          volumeName: "166"
     fc:
       fsType: "90"
       lun: -460478410

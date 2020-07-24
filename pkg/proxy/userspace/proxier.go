@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -346,7 +346,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
-		klog.V(2).Infof("userspace syncProxyRules took %v", time.Since(start))
+		klog.V(4).Infof("userspace syncProxyRules took %v", time.Since(start))
 	}()
 
 	// don't sync rules till we've received services and endpoints
@@ -367,7 +367,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
-	klog.V(2).Infof("userspace proxy: processing %d service events", len(changes))
+	klog.V(4).Infof("userspace proxy: processing %d service events", len(changes))
 	for _, change := range changes {
 		existingPorts := proxier.mergeService(change.current)
 		proxier.unmergeService(change.previous, existingPorts)
@@ -489,12 +489,11 @@ func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 	if service == nil {
 		return nil
 	}
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if utilproxy.ShouldSkipService(svcName, service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+	if utilproxy.ShouldSkipService(service) {
 		return nil
 	}
 	existingPorts := sets.NewString()
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		serviceName := proxy.ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
@@ -551,12 +550,12 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPorts sets.S
 	if service == nil {
 		return
 	}
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if utilproxy.ShouldSkipService(svcName, service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+
+	if utilproxy.ShouldSkipService(service) {
 		return
 	}
 	staleUDPServices := sets.NewString()
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		if existingPorts.Has(servicePort.Name) {
@@ -621,18 +620,26 @@ func (proxier *Proxier) serviceChange(previous, current *v1.Service, detail stri
 	}
 }
 
+// OnServiceAdd is called whenever creation of new service object
+// is observed.
 func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 	proxier.serviceChange(nil, service, "OnServiceAdd")
 }
 
+// OnServiceUpdate is called whenever modification of an existing
+// service object is observed.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	proxier.serviceChange(oldService, service, "OnServiceUpdate")
 }
 
+// OnServiceDelete is called whenever deletion of an existing service
+// object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.serviceChange(service, nil, "OnServiceDelete")
 }
 
+// OnServiceSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	klog.V(2).Infof("userspace OnServiceSynced")
 
@@ -649,18 +656,26 @@ func (proxier *Proxier) OnServiceSynced() {
 	go proxier.syncProxyRules()
 }
 
+// OnEndpointsAdd is called whenever creation of new endpoints object
+// is observed.
 func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsAdd(endpoints)
 }
 
+// OnEndpointsUpdate is called whenever modification of an existing
+// endpoints object is observed.
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsUpdate(oldEndpoints, endpoints)
 }
 
+// OnEndpointsDelete is called whenever deletion of an existing endpoints
+// object is observed.
 func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsDelete(endpoints)
 }
 
+// OnEndpointsSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnEndpointsSynced() {
 	klog.V(2).Infof("userspace OnEndpointsSynced")
 	proxier.loadBalancer.OnEndpointsSynced()

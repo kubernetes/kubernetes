@@ -26,10 +26,13 @@ import (
 )
 
 // IngressClassLister helps list IngressClasses.
+// All objects returned here must be treated as read-only.
 type IngressClassLister interface {
 	// List lists all IngressClasses in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.IngressClass, err error)
 	// Get retrieves the IngressClass from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.IngressClass, error)
 	IngressClassListerExpansion
 }

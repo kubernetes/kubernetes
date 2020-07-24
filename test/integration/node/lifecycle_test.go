@@ -30,15 +30,21 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
-	"k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
+
+// poll is how often to poll pods, nodes and claims.
+const poll = 2 * time.Second
+
+type podCondition func(pod *v1.Pod) (bool, error)
 
 // TestTaintBasedEvictions tests related cases for the TaintBasedEvictions feature
 func TestTaintBasedEvictions(t *testing.T) {
@@ -65,18 +71,18 @@ func TestTaintBasedEvictions(t *testing.T) {
 	}
 	tolerationSeconds := []int64{200, 300, 0}
 	tests := []struct {
-		name                string
-		nodeTaints          []v1.Taint
-		nodeConditions      []v1.NodeCondition
-		pod                 *v1.Pod
-		waitForPodCondition string
+		name                        string
+		nodeTaints                  []v1.Taint
+		nodeConditions              []v1.NodeCondition
+		pod                         *v1.Pod
+		expectedWaitForPodCondition string
 	}{
 		{
-			name:                "Taint based evictions for NodeNotReady and 200 tolerationseconds",
-			nodeTaints:          []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions:      []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			pod:                 testPod,
-			waitForPodCondition: "updated with tolerationSeconds of 200",
+			name:                        "Taint based evictions for NodeNotReady and 200 tolerationseconds",
+			nodeTaints:                  []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:              []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                         testPod,
+			expectedWaitForPodCondition: "updated with tolerationSeconds of 200",
 		},
 		{
 			name:           "Taint based evictions for NodeNotReady with no pod tolerations",
@@ -90,14 +96,14 @@ func TestTaintBasedEvictions(t *testing.T) {
 					},
 				},
 			},
-			waitForPodCondition: "updated with tolerationSeconds=300",
+			expectedWaitForPodCondition: "updated with tolerationSeconds=300",
 		},
 		{
-			name:                "Taint based evictions for NodeNotReady and 0 tolerationseconds",
-			nodeTaints:          []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions:      []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			pod:                 testPod,
-			waitForPodCondition: "terminating",
+			name:                        "Taint based evictions for NodeNotReady and 0 tolerationseconds",
+			nodeTaints:                  []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:              []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                         testPod,
+			expectedWaitForPodCondition: "terminating",
 		},
 		{
 			name:           "Taint based evictions for NodeUnreachable",
@@ -128,7 +134,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testCtx = testutils.InitTestScheduler(t, testCtx, true, nil)
 			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
-			informers := testCtx.InformerFactory
 			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), testCtx.NS, metav1.CreateOptions{})
 			if err != nil {
 				t.Errorf("Failed to create namespace %+v", err)
@@ -136,10 +141,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
-				informers.Coordination().V1().Leases(),
-				informers.Core().V1().Pods(),
-				informers.Core().V1().Nodes(),
-				informers.Apps().V1().DaemonSets(),
+				externalInformers.Coordination().V1().Leases(),
+				externalInformers.Core().V1().Pods(),
+				externalInformers.Core().V1().Nodes(),
+				externalInformers.Apps().V1().DaemonSets(),
 				cs,
 				5*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period
@@ -156,13 +161,14 @@ func TestTaintBasedEvictions(t *testing.T) {
 				return
 			}
 
-			go nc.Run(testCtx.Ctx.Done())
-
-			// Waiting for all controller sync.
+			// Waiting for all controllers to sync
 			externalInformers.Start(testCtx.Ctx.Done())
 			externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-			informers.Start(testCtx.Ctx.Done())
-			informers.WaitForCacheSync(testCtx.Ctx.Done())
+			testutils.SyncInformerFactory(testCtx)
+
+			// Run all controllers
+			go nc.Run(testCtx.Ctx.Done())
+			go testCtx.Scheduler.Run(testCtx.Ctx)
 
 			nodeRes := v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4000m"),
@@ -275,7 +281,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			}
 
 			if test.pod != nil {
-				err = pod.WaitForPodCondition(cs, testCtx.NS.Name, test.pod.Name, test.waitForPodCondition, time.Second*15, func(pod *v1.Pod) (bool, error) {
+				err = waitForPodCondition(cs, testCtx.NS.Name, test.pod.Name, test.expectedWaitForPodCondition, time.Second*15, func(pod *v1.Pod) (bool, error) {
 					// as node is unreachable, pod0 is expected to be in Terminating status
 					// rather than getting deleted
 					if tolerationSeconds[i] == 0 {
@@ -285,10 +291,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 						return seconds == tolerationSeconds[i], nil
 					}
 					return false, nil
-				})
+				}, t)
 				if err != nil {
 					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
-					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.waitForPodCondition, pod)
+					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.expectedWaitForPodCondition, pod)
 				}
 				testutils.CleanupPods(cs, t, []*v1.Pod{test.pod})
 			}
@@ -296,4 +302,30 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testutils.WaitForSchedulerCacheCleanup(testCtx.Scheduler, t)
 		})
 	}
+}
+
+// waitForPodCondition waits a pods to be matched to the given condition.
+func waitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition, t *testing.T) error {
+	t.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				t.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
+				return err
+			}
+			t.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
+			continue
+		}
+		// log now so that current pod info is reported before calling `condition()`
+		t.Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
+			podName, pod.Status.Phase, pod.Status.Reason, podutil.IsPodReady(pod), time.Since(start))
+		if done, err := condition(pod); done {
+			if err == nil {
+				t.Logf("Pod %q satisfied condition %q", podName, desc)
+			}
+			return err
+		}
+	}
+	return fmt.Errorf("gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
 }

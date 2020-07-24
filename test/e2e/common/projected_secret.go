@@ -174,8 +174,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: imageutils.GetE2EImage(imageutils.Mounttest),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Args: []string{
+							"mounttest",
 							"--file_content=/etc/projected-secret-volume/data-1",
 							"--file_mode=/etc/projected-secret-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
@@ -196,7 +197,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 			},
 		}
 
-		fileModeRegexp := framework.GetFileModeRegex("/etc/projected-secret-volume/data-1", nil)
+		fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", nil)
 		f.TestContainerOutputRegexp("consume secrets", pod, 0, []string{
 			"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 			fileModeRegexp,
@@ -209,7 +210,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Description: Create a Pod with three containers with secrets namely a create, update and delete container. Create Container when started MUST no have a secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/projected-secret-volumes"
@@ -324,9 +325,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    deleteContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
+						Name:  deleteContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -336,9 +337,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 						},
 					},
 					{
-						Name:    updateContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
+						Name:  updateContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -348,9 +349,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 						},
 					},
 					{
-						Name:    createContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
+						Name:  createContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -466,8 +467,9 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 			Containers: []v1.Container{
 				{
 					Name:  "projected-secret-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						"--file_content=/etc/projected-secret-volume/data-1",
 						"--file_mode=/etc/projected-secret-volume/data-1"},
 					VolumeMounts: []v1.VolumeMount{
@@ -494,7 +496,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 		}
 	}
 
-	fileModeRegexp := framework.GetFileModeRegex("/etc/projected-secret-volume/data-1", defaultMode)
+	fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", defaultMode)
 	expectedOutput := []string{
 		"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 		fileModeRegexp,
@@ -549,8 +551,9 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "projected-secret-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						"--file_content=/etc/projected-secret-volume/new-path-data-1",
 						"--file_mode=/etc/projected-secret-volume/new-path-data-1"},
 					VolumeMounts: []v1.VolumeMount{
@@ -570,7 +573,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = mode
 	}
 
-	fileModeRegexp := framework.GetFileModeRegex("/etc/projected-secret-volume/new-path-data-1", mode)
+	fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/new-path-data-1", mode)
 	expectedOutput := []string{
 		"content of file \"/etc/projected-secret-volume/new-path-data-1\": value-1",
 		fileModeRegexp,

@@ -37,14 +37,14 @@ func (pl *PrioritySort) Name() string {
 
 // Less is the function used by the activeQ heap algorithm to sort pods.
 // It sorts pods based on their priority. When priorities are equal, it uses
-// PodInfo.timestamp.
-func (pl *PrioritySort) Less(pInfo1, pInfo2 *framework.PodInfo) bool {
+// PodQueueInfo.timestamp.
+func (pl *PrioritySort) Less(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
 	p1 := pod.GetPodPriority(pInfo1.Pod)
 	p2 := pod.GetPodPriority(pInfo2.Pod)
 	return (p1 > p2) || (p1 == p2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	return &PrioritySort{}, nil
 }

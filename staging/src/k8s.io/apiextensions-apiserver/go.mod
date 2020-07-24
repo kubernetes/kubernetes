@@ -11,43 +11,39 @@ require (
 	github.com/go-openapi/strfmt v0.19.3
 	github.com/go-openapi/validate v0.19.5
 	github.com/gogo/protobuf v1.3.1
-	github.com/google/go-cmp v0.3.1
+	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
-	github.com/googleapis/gnostic v0.2.0
-	github.com/spf13/cobra v0.0.5
+	github.com/googleapis/gnostic v0.4.1
+	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
-	google.golang.org/grpc v1.26.0
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200716221620-18dfb9cca345
+	google.golang.org/grpc v1.27.0
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.18.4
-	k8s.io/apimachinery v0.18.4
-	k8s.io/apiserver v0.18.3
-	k8s.io/client-go v0.18.3
-	k8s.io/code-generator v0.18.3
-	k8s.io/component-base v0.18.3
-	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6 // release-1.18
-	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+	k8s.io/api v0.19.0-rc.2
+	k8s.io/apimachinery v0.19.0-rc.2
+	k8s.io/apiserver v0.19.0-rc.2
+	k8s.io/client-go v0.19.0-rc.2
+	k8s.io/code-generator v0.19.0-rc.2
+	k8s.io/component-base v0.19.0-rc.2
+	k8s.io/klog/v2 v2.2.0
+	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
+	k8s.io/utils v0.0.0-20200720150651-0bdb4ca86cbc
 	sigs.k8s.io/yaml v1.2.0
 )
 
 replace (
+	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
+	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
+	github.com/evanphx/json-patch => github.com/evanphx/json-patch v0.0.0-20190815234213-e83c0a1c26c8
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
-	github.com/google/cadvisor => github.com/openshift/cadvisor v0.33.2-0.20200609152315-52275b81dc5b // Fix incorrect diskstats on mapper devices
-	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.1.0
+	github.com/golang/glog => github.com/openshift/golang-glog v0.0.0-20190322123450-3c92600d7533
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
-	github.com/json-iterator/go => github.com/json-iterator/go v1.1.8
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.0.0
-	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
-	go.uber.org/atomic => go.uber.org/atomic v1.3.2
+	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
+	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
-	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
-	golang.org/x/text => golang.org/x/text v0.3.2
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	golang.org/x/net => golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver

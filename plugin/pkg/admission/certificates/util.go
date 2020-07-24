@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // IsAuthorizedForSignerName returns true if 'info' is authorized to perform the given

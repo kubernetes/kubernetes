@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"

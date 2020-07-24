@@ -98,11 +98,11 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if set.Status.Replicas != 3 {
 		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
-	pods, err := spc.addTerminatingPod(set, 3)
+	_, err := spc.addTerminatingPod(set, 3)
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.addTerminatingPod(set, 4)
+	pods, err := spc.addTerminatingPod(set, 4)
 	if err != nil {
 		t.Error(err)
 	}
@@ -152,7 +152,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	*set.Spec.Replicas = 5
 	fakeResourceVersion(set)
 	spc.setsIndexer.Update(set)
-	pods, err := spc.setPodTerminated(set, 0)
+	_, err := spc.setPodTerminated(set, 0)
 	if err != nil {
 		t.Error("Failed to set pod terminated at ordinal 0")
 	}
@@ -162,7 +162,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -227,7 +227,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 		t.Fatal(err)
 	}
 	revision.OwnerReferences = nil
-	revision, err = ssh.CreateControllerRevision(set, revision, set.Status.CollisionCount)
+	_, err = ssh.CreateControllerRevision(set, revision, set.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,11 +700,10 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 			return err
 		}
 		ord := len(pods) - 1
-		pod := getPodAtOrdinal(pods, ord)
 		if pods, err = spc.setPodPending(set, ord); err != nil {
 			return err
 		}
-		pod = getPodAtOrdinal(pods, ord)
+		pod := getPodAtOrdinal(pods, ord)
 		ssc.addPod(pod)
 		fakeWorker(ssc)
 		pod = getPodAtOrdinal(pods, ord)

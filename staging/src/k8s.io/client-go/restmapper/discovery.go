@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // APIGroupResources is an API group with a mapping of versions to

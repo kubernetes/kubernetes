@@ -14,6 +14,7 @@ go_test(
         "basic_test.go",
         "change_test.go",
         "defaulting_test.go",
+        "deprecation_test.go",
         "finalization_test.go",
         "limit_test.go",
         "listtype_test.go",

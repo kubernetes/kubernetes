@@ -18,7 +18,7 @@ package install
 import (
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {

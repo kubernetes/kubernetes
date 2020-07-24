@@ -39,7 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DiskType defines a specific type for holding disk types (eg. pd-ssd)

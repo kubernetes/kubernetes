@@ -43,8 +43,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -252,9 +251,7 @@ func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 		},
 	}
 
-	if err := legacyscheme.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
-		return fmt.Errorf("unable to convert pod template: %v", err)
-	}
+	template.Spec.DeepCopyInto(&pod.Spec)
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
@@ -286,9 +283,7 @@ func (f *fakePodControl) CreatePodsWithControllerRef(namespace string, template 
 
 	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%p-", pod))
 
-	if err := legacyscheme.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
-		return fmt.Errorf("unable to convert pod template: %v", err)
-	}
+	template.Spec.DeepCopyInto(&pod.Spec)
 
 	f.podStore.Update(pod)
 	f.podIDMap[pod.Name] = pod

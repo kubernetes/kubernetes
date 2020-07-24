@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 
@@ -491,6 +491,22 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
 		return err
 	}
+
+	if b.volumeMode == v1.PersistentVolumeFilesystem {
+		notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+		if err != nil {
+			return err
+		}
+		if !notMnt {
+			// The volume is already mounted, therefore the previous WaitForAttach must have
+			// persisted the volume metadata. In addition, the metadata is actually *inside*
+			// globalPDPath and we can't write it here, because it was shadowed by the volume
+			// mount.
+			klog.V(4).Infof("Skipping persistISCSI, the volume is already mounted at %s", globalPDPath)
+			return nil
+		}
+	}
+
 	// Persist iscsi disk config to json file for DetachDisk path
 	return util.persistISCSIFile(*(b.iscsiDisk), globalPDPath)
 }
@@ -955,7 +971,7 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 func execWithLog(b iscsiDiskMounter, cmd string, args ...string) (string, error) {
 	start := time.Now()
 	out, err := b.exec.Command(cmd, args...).CombinedOutput()
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		d := time.Since(start)
 		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
 		klog.V(5).Infof("Output: %s", string(out))

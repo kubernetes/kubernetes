@@ -103,6 +103,10 @@ type Attributes struct {
 
 // MounterArgs provides more easily extensible arguments to Mounter
 type MounterArgs struct {
+	// When FsUser is set, the ownership of the volume will be modified to be
+	// owned and writable by FsUser. Otherwise, there is no side effects.
+	// Currently only supported with projected service account tokens.
+	FsUser              *int64
 	FsGroup             *int64
 	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
 	DesiredSize         *resource.Quantity
@@ -126,7 +130,7 @@ type Mounter interface {
 
 	// SetUp prepares and mounts/unpacks the volume to a
 	// self-determined directory path. The mount point and its
-	// content should be owned by 'fsGroup' so that it can be
+	// content should be owned by `fsUser` or 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
 	// It could return following types of errors:
@@ -137,7 +141,7 @@ type Mounter interface {
 
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
-	// The mount point and its content should be owned by
+	// The mount point and its content should be owned by `fsUser`
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
@@ -170,14 +174,19 @@ type CustomBlockVolumeMapper interface {
 	// For most in-tree plugins, attacher.Attach() and attacher.WaitForAttach()
 	// will do necessary works.
 	// This may be called more than once, so implementations must be idempotent.
-	SetUpDevice() error
+	// SetUpDevice returns stagingPath if device setup was successful
+	SetUpDevice() (stagingPath string, err error)
 
 	// MapPodDevice maps the block device to a path and return the path.
 	// Unique device path across kubelet node reboot is required to avoid
 	// unexpected block volume destruction.
 	// If empty string is returned, the path retuned by attacher.Attach() and
 	// attacher.WaitForAttach() will be used.
-	MapPodDevice() (string, error)
+	MapPodDevice() (publishPath string, err error)
+
+	// GetStagingPath returns path that was used for staging the volume
+	// it is mainly used by CSI plugins
+	GetStagingPath() string
 }
 
 // BlockVolumeUnmapper interface is an unmapper interface for block volume.

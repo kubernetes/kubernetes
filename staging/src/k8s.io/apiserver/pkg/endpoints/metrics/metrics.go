@@ -28,10 +28,10 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -48,6 +48,8 @@ type resettableCollector interface {
 
 const (
 	APIServerComponent string = "apiserver"
+	OtherContentType   string = "other"
+	OtherRequestMethod string = "other"
 )
 
 /*
@@ -59,6 +61,15 @@ const (
  * the metric stability policy.
  */
 var (
+	deprecatedRequestGauge = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "apiserver_requested_deprecated_apis",
+			Help:           "Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "resource", "subresource", "removed_release"},
+	)
+
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
 	// the upstream library supports it.
 	requestCounter = compbasemetrics.NewCounterVec(
@@ -111,7 +122,15 @@ var (
 			Help:           "Number of requests dropped with 'Try again later' response",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"requestKind"},
+		[]string{"request_kind"},
+	)
+	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
+	TLSHandshakeErrors = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_tls_handshake_errors_total",
+			Help:           "Number of requests dropped with 'TLS handshake error from' error",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
 	)
 	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
 	RegisteredWatchers = compbasemetrics.NewGaugeVec(
@@ -147,7 +166,15 @@ var (
 			Help:           "Maximal number of currently used inflight request limit of this apiserver per request kind in last second.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"requestKind"},
+		[]string{"request_kind"},
+	)
+	currentInqueueRequests = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "apiserver_current_inqueue_requests",
+			Help:           "Maximal number of queued requests in this apiserver per request kind in last second.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"request_kind"},
 	)
 
 	requestTerminationsTotal = compbasemetrics.NewCounterVec(
@@ -161,17 +188,51 @@ var (
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
+		deprecatedRequestGauge,
 		requestCounter,
 		longRunningRequestGauge,
 		requestLatencies,
 		responseSizes,
 		DroppedRequests,
+		TLSHandshakeErrors,
 		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
+		currentInqueueRequests,
 		requestTerminationsTotal,
 	}
+
+	// these are the known (e.g. whitelisted/known) content types which we will report for
+	// request metrics. Any other RFC compliant content types will be aggregated under 'unknown'
+	knownMetricContentTypes = utilsets.NewString(
+		"application/apply-patch+yaml",
+		"application/json",
+		"application/json-patch+json",
+		"application/merge-patch+json",
+		"application/strategic-merge-patch+json",
+		"application/vnd.kubernetes.protobuf",
+		"application/vnd.kubernetes.protobuf;stream=watch",
+		"application/yaml",
+		"text/plain",
+		"text/plain;charset=utf-8")
+	// these are the valid request methods which we report in our metrics. Any other request methods
+	// will be aggregated under 'unknown'
+	validRequestMethods = utilsets.NewString(
+		"APPLY",
+		"CONNECT",
+		"CREATE",
+		"DELETE",
+		"DELETECOLLECTION",
+		"GET",
+		"LIST",
+		"PATCH",
+		"POST",
+		"PROXY",
+		"PUT",
+		"UPDATE",
+		"WATCH",
+		"WATCHLIST")
 )
 
 const (
@@ -179,6 +240,21 @@ const (
 	ReadOnlyKind = "readOnly"
 	// MutatingKind is a string identifying mutating request kind
 	MutatingKind = "mutating"
+
+	// WaitingPhase is the phase value for a request waiting in a queue
+	WaitingPhase = "waiting"
+	// ExecutingPhase is the phase value for an executing request
+	ExecutingPhase = "executing"
+)
+
+const (
+	// deprecatedAnnotationKey is a key for an audit annotation set to
+	// "true" on requests made to deprecated API versions
+	deprecatedAnnotationKey = "k8s.io/deprecated"
+	// removedReleaseAnnotationKey is a key for an audit annotation set to
+	// the target removal release, in "<major>.<minor>" format,
+	// on requests made to deprecated API versions with a target removal release
+	removedReleaseAnnotationKey = "k8s.io/removed-release"
 )
 
 var registerMetrics sync.Once
@@ -199,9 +275,19 @@ func Reset() {
 	}
 }
 
-func UpdateInflightRequestMetrics(nonmutating, mutating int) {
-	currentInflightRequests.WithLabelValues(ReadOnlyKind).Set(float64(nonmutating))
-	currentInflightRequests.WithLabelValues(MutatingKind).Set(float64(mutating))
+// UpdateInflightRequestMetrics reports concurrency metrics classified by
+// mutating vs Readonly.
+func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
+	for _, kc := range []struct {
+		kind  string
+		count int
+	}{{ReadOnlyKind, nonmutating}, {MutatingKind, mutating}} {
+		if phase == ExecutingPhase {
+			currentInflightRequests.WithLabelValues(kc.kind).Set(float64(kc.count))
+		} else {
+			currentInqueueRequests.WithLabelValues(kc.kind).Set(float64(kc.count))
+		}
+	}
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
@@ -219,6 +305,10 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
+	// set verbs to a bounded set of known and expected verbs
+	if !validRequestMethods.Has(verb) {
+		verb = OtherRequestMethod
+	}
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
@@ -252,11 +342,19 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component, contentType string, httpCode, respSize int, elapsed time.Duration) {
+func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := cleanVerb(verb, req)
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
-	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, contentType, codeToString(httpCode)).Inc()
+	cleanContentType := cleanContentType(contentType)
+	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
+	if deprecated {
+		deprecatedRequestGauge.WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
+		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
+		if len(removedRelease) > 0 {
+			audit.AddAuditAnnotation(req.Context(), removedReleaseAnnotationKey, removedRelease)
+		}
+	}
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
@@ -266,7 +364,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 // InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
 // the go-restful RouteFunction instead of a HandlerFunc plus some Kubernetes endpoint specific information.
-func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, component string, routeFunc restful.RouteFunction) restful.RouteFunction {
+func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, routeFunc restful.RouteFunction) restful.RouteFunction {
 	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
 		now := time.Now()
 
@@ -285,12 +383,12 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		routeFunc(request, response)
 
-		MonitorRequest(request.Request, verb, group, version, resource, subresource, scope, component, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
+		MonitorRequest(request.Request, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	})
 }
 
 // InstrumentHandlerFunc works like Prometheus' InstrumentHandlerFunc but adds some Kubernetes endpoint specific information.
-func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, component string, handler http.HandlerFunc) http.HandlerFunc {
+func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		now := time.Now()
 
@@ -307,8 +405,21 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
+		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	}
+}
+
+// cleanContentType binds the contentType (for metrics related purposes) to a
+// bounded set of known/expected content-types.
+func cleanContentType(contentType string) string {
+	normalizedContentType := strings.ToLower(contentType)
+	if strings.HasSuffix(contentType, " stream=watch") || strings.HasSuffix(contentType, " charset=utf-8") {
+		normalizedContentType = strings.ReplaceAll(contentType, " ", "")
+	}
+	if knownMetricContentTypes.Has(normalizedContentType) {
+		return normalizedContentType
+	}
+	return OtherContentType
 }
 
 // CleanScope returns the scope of the request.
@@ -355,7 +466,10 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reportedVerb = "APPLY"
 	}
-	return reportedVerb
+	if validRequestMethods.Has(reportedVerb) {
+		return reportedVerb
+	}
+	return OtherRequestMethod
 }
 
 func cleanDryRun(u *url.URL) string {

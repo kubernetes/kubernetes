@@ -137,7 +137,7 @@ type loggableValueCompare struct {
 	Result    Compare_CompareResult `protobuf:"varint,1,opt,name=result,proto3,enum=etcdserverpb.Compare_CompareResult"`
 	Target    Compare_CompareTarget `protobuf:"varint,2,opt,name=target,proto3,enum=etcdserverpb.Compare_CompareTarget"`
 	Key       []byte                `protobuf:"bytes,3,opt,name=key,proto3"`
-	ValueSize int                   `protobuf:"bytes,7,opt,name=value_size,proto3"`
+	ValueSize int64                 `protobuf:"varint,7,opt,name=value_size,proto3"`
 	RangeEnd  []byte                `protobuf:"bytes,64,opt,name=range_end,proto3"`
 }
 
@@ -146,7 +146,7 @@ func newLoggableValueCompare(c *Compare, cv *Compare_Value) *loggableValueCompar
 		c.Result,
 		c.Target,
 		c.Key,
-		len(cv.Value),
+		int64(len(cv.Value)),
 		c.RangeEnd,
 	}
 }
@@ -160,7 +160,7 @@ func (*loggableValueCompare) ProtoMessage()    {}
 // To preserve proto encoding of the key bytes, a faked out proto type is used here.
 type loggablePutRequest struct {
 	Key         []byte `protobuf:"bytes,1,opt,name=key,proto3"`
-	ValueSize   int    `protobuf:"varint,2,opt,name=value_size,proto3"`
+	ValueSize   int64  `protobuf:"varint,2,opt,name=value_size,proto3"`
 	Lease       int64  `protobuf:"varint,3,opt,name=lease,proto3"`
 	PrevKv      bool   `protobuf:"varint,4,opt,name=prev_kv,proto3"`
 	IgnoreValue bool   `protobuf:"varint,5,opt,name=ignore_value,proto3"`
@@ -170,7 +170,7 @@ type loggablePutRequest struct {
 func NewLoggablePutRequest(request *PutRequest) *loggablePutRequest {
 	return &loggablePutRequest{
 		request.Key,
-		len(request.Value),
+		int64(len(request.Value)),
 		request.Lease,
 		request.PrevKv,
 		request.IgnoreValue,

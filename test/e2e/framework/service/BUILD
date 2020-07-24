@@ -12,7 +12,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/service",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/registry/core/service/portallocator:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

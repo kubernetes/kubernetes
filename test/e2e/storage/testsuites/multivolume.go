@@ -32,7 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -54,7 +54,7 @@ func InitMultiVolumeTestSuite() TestSuite {
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 		},
@@ -79,8 +79,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		driver    TestDriver
 		resources []*VolumeResource
 
-		intreeOps   opCounts
-		migratedOps opCounts
+		migrationCheck *migrationOpCheck
 	}
 	var (
 		dInfo = driver.GetDriverInfo()
@@ -108,7 +107,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 	}
 
 	cleanup := func() {
@@ -120,7 +119,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		errs = append(errs, tryFunc(l.driverCleanup))
 		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
-		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	// This tests below configuration:
@@ -323,7 +322,35 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */)
+			l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */, false /* readOnly */)
+	})
+
+	// This tests below configuration:
+	// [pod1] [pod2]
+	// [   node1   ]
+	//   \      /     <- same volume mode (read only)
+	//   [volume1]
+	ginkgo.It("should concurrently access the single read-only volume from pods on the same node", func() {
+		init()
+		defer cleanup()
+
+		numPods := 2
+
+		if !l.driver.GetDriverInfo().Capabilities[CapMultiPODs] {
+			e2eskipper.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
+		}
+
+		// Create volume
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		l.resources = append(l.resources, resource)
+
+		// Initialize the volume with a filesystem - it's going to be mounted as read-only below.
+		initializeVolume(l.cs, l.ns.Name, resource.Pvc, l.config.ClientNodeSelection)
+
+		// Test access to the volume from pods on a single node
+		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
+			l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */, true /* readOnly */)
 	})
 
 	// This tests below configuration:
@@ -365,7 +392,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			l.config.ClientNodeSelection, resource.Pvc, numPods, false /* sameNode */)
+			l.config.ClientNodeSelection, resource.Pvc, numPods, false /* sameNode */, false /* readOnly */)
 	})
 }
 
@@ -374,9 +401,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, ns string,
 	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim, readSeedBase int64, writeSeedBase int64) string {
 	ginkgo.By(fmt.Sprintf("Creating pod on %+v with multiple volumes", node))
-	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, ns, pvcs, nil,
-		false, "", false, false, e2epv.SELinuxLabel,
-		nil, node, framework.PodStartTimeout)
+	podConfig := e2epod.Config{
+		NS:            ns,
+		PVCs:          pvcs,
+		SeLinuxLabel:  e2epv.SELinuxLabel,
+		NodeSelection: node,
+	}
+	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
@@ -439,7 +470,8 @@ func TestAccessMultipleVolumesAcrossPodRecreation(f *framework.Framework, cs cli
 // pod deletion doesn't affect. Pods are deployed on the same node or different nodes depending on requiresSameNode.
 // Read/write check are done across pod, by check reading both what pod{n-1} and pod{n} wrote from pod{n}.
 func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Interface, ns string,
-	node e2epod.NodeSelection, pvc *v1.PersistentVolumeClaim, numPods int, requiresSameNode bool) {
+	node e2epod.NodeSelection, pvc *v1.PersistentVolumeClaim, numPods int, requiresSameNode bool,
+	readOnly bool) {
 
 	var pods []*v1.Pod
 
@@ -447,10 +479,14 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	for i := 0; i < numPods; i++ {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
-		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, ns,
-			[]*v1.PersistentVolumeClaim{pvc}, nil,
-			false, "", false, false, e2epv.SELinuxLabel,
-			nil, node, framework.PodStartTimeout)
+		podConfig := e2epod.Config{
+			NS:            ns,
+			PVCs:          []*v1.PersistentVolumeClaim{pvc},
+			SeLinuxLabel:  e2epv.SELinuxLabel,
+			NodeSelection: node,
+			PVCsReadOnly:  readOnly,
+		}
+		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()
@@ -476,6 +512,11 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
+
+		if readOnly {
+			ginkgo.By("Skipping volume content checks, volume is read-only")
+			continue
+		}
 
 		if i != 0 {
 			ginkgo.By(fmt.Sprintf("From pod%d, checking if reading the data that pod%d write works properly", index, index-1))
@@ -507,6 +548,11 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+
+		if readOnly {
+			ginkgo.By("Skipping volume content checks, volume is read-only")
+			continue
+		}
 
 		if i == 0 {
 			// This time there should be data that last pod wrote, for 1st pod
@@ -578,4 +624,27 @@ func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.N
 	e2epod.SetNodeAffinityTopologyRequirement(nodeSelection, suitableTopologies[0])
 
 	return nil
+}
+
+// initializeVolume creates a filesystem on given volume, so it can be used as read-only later
+func initializeVolume(cs clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
+	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock {
+		// Block volumes do not need to be initialized.
+		return
+	}
+
+	ginkgo.By(fmt.Sprintf("Initializing a filesystem on PVC %s", pvc.Name))
+	// Just create a pod with the volume as read-write. Kubernetes will create a filesystem there
+	// if it does not exist yet.
+	podConfig := e2epod.Config{
+		NS:            ns,
+		PVCs:          []*v1.PersistentVolumeClaim{pvc},
+		SeLinuxLabel:  e2epv.SELinuxLabel,
+		NodeSelection: node,
+	}
+	pod, err := e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
+	defer func() {
+		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
+	}()
+	framework.ExpectNoError(err)
 }

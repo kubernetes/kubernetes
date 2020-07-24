@@ -25,10 +25,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/keymutex"
-	utilpath "k8s.io/utils/path"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -115,10 +114,12 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		}
 	}
 
-	if output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput(); err != nil {
+	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput()
+	if err != nil {
 		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, bindSource, target, string(output))
 		return err
 	}
+	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", bindSource, target, string(output))
 
 	return nil
 }
@@ -183,19 +184,10 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	// If current file is a symlink, then it is a mountpoint.
-	if stat.Mode()&os.ModeSymlink != 0 {
-		target, err := os.Readlink(file)
-		if err != nil {
-			return true, fmt.Errorf("readlink error: %v", err)
-		}
-		exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, target)
-		if err != nil {
-			return true, err
-		}
-		return !exists, nil
-	}
 
+	if stat.Mode()&os.ModeSymlink != 0 {
+		return false, err
+	}
 	return true, nil
 }
 
@@ -242,11 +234,12 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	}
 	driverPath := driveLetter + ":"
 	target = NormalizeWindowsPath(target)
-	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, driverPath, target)
-	if output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput(); err != nil {
-		klog.Errorf("mklink failed: %v, output: %q", err, string(output))
+	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
+	if err != nil {
+		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, driverPath, err, string(output))
 		return err
 	}
+	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", driverPath, fstype, target, string(output))
 	return nil
 }
 

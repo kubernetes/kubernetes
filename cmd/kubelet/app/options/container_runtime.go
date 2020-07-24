@@ -51,7 +51,6 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		DockershimRootDirectory:    "/var/lib/dockershim",
 		PodSandboxImage:            defaultPodSandboxImage,
 		ImagePullProgressDeadline:  metav1.Duration{Duration: 1 * time.Minute},
-		ExperimentalDockershim:     false,
 
 		//Alpha feature
 		CNIBinDir:   "/opt/cni/bin",

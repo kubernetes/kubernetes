@@ -31,8 +31,9 @@ import (
 // this allows a user to specify a template format value
 // as --output=jsonpath=
 var jsonFormats = map[string]bool{
-	"jsonpath":      true,
-	"jsonpath-file": true,
+	"jsonpath":         true,
+	"jsonpath-file":    true,
+	"jsonpath-as-json": true,
 }
 
 // JSONPathPrintFlags provides default flags necessary for template printing.
@@ -105,6 +106,11 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.Resource
 	}
 
 	p.AllowMissingKeys(allowMissingKeys)
+
+	if templateFormat == "jsonpath-as-json" {
+		p.EnableJSONOutput(true)
+	}
+
 	return p, nil
 }
 

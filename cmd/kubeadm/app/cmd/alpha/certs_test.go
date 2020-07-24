@@ -27,6 +27,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/client-go/tools/clientcmd"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -39,7 +46,6 @@ func TestCommandsGenerated(t *testing.T) {
 	expectedFlags := []string{
 		"cert-dir",
 		"config",
-		"use-api",
 	}
 
 	expectedCommands := []string{
@@ -284,5 +290,187 @@ func TestRenewUsingCSR(t *testing.T) {
 
 	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.Name); err != nil {
 		t.Fatalf("couldn't load certificate %q: %v", cert.Name, err)
+	}
+}
+
+func TestRunGenCSR(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpDir)
+
+	kubeConfigDir := filepath.Join(tmpDir, "kubernetes")
+	certDir := kubeConfigDir + "/pki"
+
+	expectedCertificates := []string{
+		"apiserver",
+		"apiserver-etcd-client",
+		"apiserver-kubelet-client",
+		"front-proxy-client",
+		"etcd/healthcheck-client",
+		"etcd/peer",
+		"etcd/server",
+	}
+
+	expectedKubeConfigs := []string{
+		"admin",
+		"kubelet",
+		"controller-manager",
+		"scheduler",
+	}
+
+	config := genCSRConfig{
+		kubeConfigDir: kubeConfigDir,
+		kubeadmConfig: &kubeadmapi.InitConfiguration{
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "192.0.2.1",
+				BindPort:         443,
+			},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				Networking: kubeadmapi.Networking{
+					ServiceSubnet: "192.0.2.0/24",
+				},
+				CertificatesDir:   certDir,
+				KubernetesVersion: "v1.19.0",
+			},
+		},
+	}
+
+	err := runGenCSR(&config)
+	require.NoError(t, err, "expected runGenCSR to not fail")
+
+	t.Log("The command generates key and CSR files in the configured --cert-dir")
+	for _, name := range expectedCertificates {
+		_, err = pkiutil.TryLoadKeyFromDisk(certDir, name)
+		assert.NoErrorf(t, err, "failed to load key file: %s", name)
+
+		_, err = pkiutil.TryLoadCSRFromDisk(certDir, name)
+		assert.NoError(t, err, "failed to load CSR file: %s", name)
+	}
+
+	t.Log("The command generates kubeconfig files in the configured --kubeconfig-dir")
+	for _, name := range expectedKubeConfigs {
+		_, err = clientcmd.LoadFromFile(kubeConfigDir + "/" + name + ".conf")
+		assert.NoErrorf(t, err, "failed to load kubeconfig file: %s", name)
+
+		_, err = pkiutil.TryLoadCSRFromDisk(kubeConfigDir, name+".conf")
+		assert.NoError(t, err, "failed to load kubeconfig CSR file: %s", name)
+	}
+}
+
+func TestGenCSRConfig(t *testing.T) {
+	type assertion func(*testing.T, *genCSRConfig)
+
+	hasCertDir := func(expected string) assertion {
+		return func(t *testing.T, config *genCSRConfig) {
+			assert.Equal(t, expected, config.kubeadmConfig.CertificatesDir)
+		}
+	}
+	hasKubeConfigDir := func(expected string) assertion {
+		return func(t *testing.T, config *genCSRConfig) {
+			assert.Equal(t, expected, config.kubeConfigDir)
+		}
+	}
+	hasAdvertiseAddress := func(expected string) assertion {
+		return func(t *testing.T, config *genCSRConfig) {
+			assert.Equal(t, expected, config.kubeadmConfig.LocalAPIEndpoint.AdvertiseAddress)
+		}
+	}
+
+	// A minimal kubeadm config with just enough values to avoid triggering
+	// auto-detection of config values at runtime.
+	const kubeadmConfig = `
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 192.0.2.1
+nodeRegistration:
+  criSocket: /path/to/dockershim.sock
+---
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+certificatesDir: /custom/config/certificates-dir
+kubernetesVersion: v1.19.0
+`
+
+	tmpDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpDir)
+
+	customConfigPath := tmpDir + "/kubeadm.conf"
+
+	f, err := os.Create(customConfigPath)
+	require.NoError(t, err)
+	_, err = f.Write([]byte(kubeadmConfig))
+	require.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		flags      []string
+		assertions []assertion
+		expectErr  bool
+	}{
+		{
+			name: "default",
+			assertions: []assertion{
+				hasCertDir(kubeadmapiv1beta2.DefaultCertificatesDir),
+				hasKubeConfigDir(kubeadmconstants.KubernetesDir),
+			},
+		},
+		{
+			name:  "--cert-dir overrides default",
+			flags: []string{"--cert-dir", "/foo/bar/pki"},
+			assertions: []assertion{
+				hasCertDir("/foo/bar/pki"),
+			},
+		},
+		{
+			name:  "--config is loaded",
+			flags: []string{"--config", customConfigPath},
+			assertions: []assertion{
+				hasCertDir("/custom/config/certificates-dir"),
+				hasAdvertiseAddress("192.0.2.1"),
+			},
+		},
+		{
+			name:      "--config not found",
+			flags:     []string{"--config", "/does/not/exist"},
+			expectErr: true,
+		},
+		{
+			name: "--cert-dir overrides --config certificatesDir",
+			flags: []string{
+				"--config", customConfigPath,
+				"--cert-dir", "/foo/bar/pki",
+			},
+			assertions: []assertion{
+				hasCertDir("/foo/bar/pki"),
+				hasAdvertiseAddress("192.0.2.1"),
+			},
+		},
+		{
+			name: "--kubeconfig-dir overrides default",
+			flags: []string{
+				"--kubeconfig-dir", "/foo/bar/kubernetes",
+			},
+			assertions: []assertion{
+				hasKubeConfigDir("/foo/bar/kubernetes"),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			flagset := pflag.NewFlagSet("flags-for-gencsr", pflag.ContinueOnError)
+			config := newGenCSRConfig()
+			config.addFlagSet(flagset)
+			require.NoError(t, flagset.Parse(test.flags))
+
+			err := config.load()
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			for _, assertFunc := range test.assertions {
+				assertFunc(t, config)
+			}
+		})
 	}
 }

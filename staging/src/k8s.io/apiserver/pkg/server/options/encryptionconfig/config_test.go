@@ -148,31 +148,31 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Transforms data using one of them, and tries to untransform using the others.
 	// Repeats this for all possible combinations.
 	correctConfigWithIdentityFirst := "testdata/valid-configs/identity-first.yaml"
-	identityFirstTransformerOverrides, err := ParseEncryptionConfiguration(mustConfigReader(t, correctConfigWithIdentityFirst))
+	identityFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithIdentityFirst))
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
 	correctConfigWithAesGcmFirst := "testdata/valid-configs/aes-gcm-first.yaml"
-	aesGcmFirstTransformerOverrides, err := ParseEncryptionConfiguration(mustConfigReader(t, correctConfigWithAesGcmFirst))
+	aesGcmFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithAesGcmFirst))
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
 	}
 
 	correctConfigWithAesCbcFirst := "testdata/valid-configs/aes-cbc-first.yaml"
-	aesCbcFirstTransformerOverrides, err := ParseEncryptionConfiguration(mustConfigReader(t, correctConfigWithAesCbcFirst))
+	aesCbcFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithAesCbcFirst))
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
 	}
 
 	correctConfigWithSecretboxFirst := "testdata/valid-configs/secret-box-first.yaml"
-	secretboxFirstTransformerOverrides, err := ParseEncryptionConfiguration(mustConfigReader(t, correctConfigWithSecretboxFirst))
+	secretboxFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithSecretboxFirst))
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
 	correctConfigWithKMSFirst := "testdata/valid-configs/kms-first.yaml"
-	kmsFirstTransformerOverrides, err := ParseEncryptionConfiguration(mustConfigReader(t, correctConfigWithKMSFirst))
+	kmsFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithKMSFirst))
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
@@ -398,7 +398,7 @@ func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstP
 
 func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath string) value.Transformer {
 	t.Helper()
-	transformers, err := ParseEncryptionConfiguration(mustConfigReader(t, encryptionConfigPath))
+	transformers, err := parseEncryptionConfiguration(mustConfigReader(t, encryptionConfigPath))
 	if err != nil {
 		t.Fatal(err)
 	}

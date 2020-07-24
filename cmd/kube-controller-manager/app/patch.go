@@ -6,10 +6,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/informers"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 var InformerFactoryOverride informers.SharedInformerFactory
@@ -64,7 +64,7 @@ func ShimFlagsForOpenShift(controllerManagerOptions *options.KubeControllerManag
 	}
 
 	klog.V(1).Infof("Flags after OpenShift shims:")
-	utilflag.PrintFlags(cmd.Flags())
+	cliflag.PrintFlags(cmd.Flags())
 
 	return nil
 }

@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 )
 
@@ -51,9 +51,11 @@ type grpcTunnel struct {
 	connsLock       sync.RWMutex
 }
 
-// CreateGrpcTunnel creates a Tunnel to dial to a remote server through a
+// CreateSingleUseGrpcTunnel creates a Tunnel to dial to a remote server through a
 // gRPC based proxy service.
-func CreateGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
+// Currently, a single tunnel supports a single connection, and the tunnel is closed when the connection is terminated
+// The Dial() method of the returned tunnel should only be called once
+func CreateSingleUseGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
 	c, err := grpc.Dial(address, opts...)
 	if err != nil {
 		return nil, err
@@ -72,12 +74,14 @@ func CreateGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
 		conns:       make(map[int64]*conn),
 	}
 
-	go tunnel.serve()
+	go tunnel.serve(c)
 
 	return tunnel, nil
 }
 
-func (t *grpcTunnel) serve() {
+func (t *grpcTunnel) serve(c *grpc.ClientConn) {
+	defer c.Close()
+
 	for {
 		pkt, err := t.stream.Recv()
 		if err == io.EOF {
@@ -130,9 +134,9 @@ func (t *grpcTunnel) serve() {
 				t.connsLock.Lock()
 				delete(t.conns, resp.ConnectID)
 				t.connsLock.Unlock()
-			} else {
-				klog.Warningf("connection id %d not recognized", resp.ConnectID)
+				return
 			}
+			klog.Warningf("connection id %d not recognized", resp.ConnectID)
 		}
 	}
 }

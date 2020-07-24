@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -134,101 +132,4 @@ type RequestedToCapacityRatioArguments struct {
 	// Array of point defining priority function shape.
 	Shape     []UtilizationShapePoint `json:"shape"`
 	Resources []ResourceSpec          `json:"resources,omitempty"`
-}
-
-// UtilizationShapePoint represents single point of priority function shape
-type UtilizationShapePoint struct {
-	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int32
-	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int32
-}
-
-// ResourceSpec represents single resource for bin packing of priority RequestedToCapacityRatioArguments.
-type ResourceSpec struct {
-	// Name of the resource to be managed by RequestedToCapacityRatio function.
-	Name string
-	// Weight of the resource.
-	Weight int64
-}
-
-// ExtenderManagedResource describes the arguments of extended resources
-// managed by an extender.
-type ExtenderManagedResource struct {
-	// Name is the extended resource name.
-	Name string
-	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
-	// resource when applying predicates.
-	IgnoredByScheduler bool
-}
-
-// ExtenderTLSConfig contains settings to enable TLS with extender
-type ExtenderTLSConfig struct {
-	// Server should be accessed without verifying the TLS certificate. For testing only.
-	Insecure bool
-	// ServerName is passed to the server for SNI and is used in the client to check server
-	// certificates against. If ServerName is empty, the hostname used to contact the
-	// server is used.
-	ServerName string
-
-	// Server requires TLS client certificate authentication
-	CertFile string
-	// Server requires TLS client certificate authentication
-	KeyFile string
-	// Trusted root certificates for server
-	CAFile string
-
-	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
-	// CertData takes precedence over CertFile
-	CertData []byte
-	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
-	// KeyData takes precedence over KeyFile
-	KeyData []byte
-	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
-	// CAData takes precedence over CAFile
-	CAData []byte
-}
-
-// Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
-// it is assumed that the extender chose not to provide that extension.
-type Extender struct {
-	// URLPrefix at which the extender is available
-	URLPrefix string
-	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
-	FilterVerb string
-	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
-	PreemptVerb string
-	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
-	PrioritizeVerb string
-	// The numeric multiplier for the node scores that the prioritize call generates.
-	// The weight should be a positive integer
-	Weight int64
-	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
-	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
-	// can implement this function.
-	BindVerb string
-	// EnableHTTPS specifies whether https should be used to communicate with the extender
-	EnableHTTPS bool
-	// TLSConfig specifies the transport layer security config
-	TLSConfig *ExtenderTLSConfig
-	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
-	// timeout is ignored, k8s/other extenders priorities are used to select the node.
-	HTTPTimeout time.Duration
-	// NodeCacheCapable specifies that the extender is capable of caching node information,
-	// so the scheduler should only send minimal information about the eligible nodes
-	// assuming that the extender already cached full details of all nodes in the cluster
-	NodeCacheCapable bool
-	// ManagedResources is a list of extended resources that are managed by
-	// this extender.
-	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
-	//   (if the extender is the binder) phases iff the pod requests at least
-	//   one of the extended resources in this list. If empty or unspecified,
-	//   all pods will be sent to this extender.
-	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
-	//   will skip checking the resource in predicates.
-	// +optional
-	ManagedResources []ExtenderManagedResource
-	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
-	// fail when the extender returns an error or is not reachable.
-	Ignorable bool
 }

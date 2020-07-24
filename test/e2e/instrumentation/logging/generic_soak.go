@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -37,7 +37,7 @@ var loggingSoak struct {
 	Scale            int           `default:"1" usage:"number of waves of pods"`
 	TimeBetweenWaves time.Duration `default:"5000ms" usage:"time to wait before dumping the next wave of pods"`
 }
-var _ = config.AddOptions(&loggingSoak, "instrumentation.logging.soak")
+var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
@@ -58,14 +58,14 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 		var wg sync.WaitGroup
 		wg.Add(loggingSoak.Scale)
 		for i := 0; i < loggingSoak.Scale; i++ {
-			go func() {
+			go func(i int) {
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
 				framework.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
 				framework.Logf("Completed logging soak, wave %v", i)
-			}()
+			}(i)
 			// Niceness.
 			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}
@@ -86,7 +86,9 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 
 	appName := "logging-soak" + podname
-	podlables := f.CreatePodsPerNodeForSimpleApp(
+	podlables := e2enode.CreatePodsPerNodeForSimpleApp(
+		f.ClientSet,
+		f.Namespace.Name,
 		appName,
 		func(n v1.Node) v1.PodSpec {
 			return v1.PodSpec{

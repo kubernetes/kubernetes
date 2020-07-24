@@ -47,7 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -322,15 +322,16 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	p.Continue = options.Continue
 	list := e.NewListFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
+	storageOpts := storage.ListOptions{ResourceVersion: options.ResourceVersion, ResourceVersionMatch: options.ResourceVersionMatch, Predicate: p}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			err := e.Storage.GetToList(ctx, key, options.ResourceVersion, p, list)
+			err := e.Storage.GetToList(ctx, key, storageOpts, list)
 			return list, storeerr.InterpretListError(err, qualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), storageOpts, list)
 	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
@@ -367,7 +368,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		if !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
-		if errGet := e.Storage.Get(ctx, key, "", out, false); errGet != nil {
+		if errGet := e.Storage.Get(ctx, key, storage.GetOptions{}, out); errGet != nil {
 			return nil, err
 		}
 		accessor, errGetAcc := meta.Accessor(out)
@@ -472,6 +473,16 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		existingResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(existing)
+		if err != nil {
+			return nil, nil, err
+		}
+		if existingResourceVersion == 0 {
+			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
+				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
+			}
+		}
+
 		// Given the existing object, get the new object
 		obj, err := objInfo.UpdatedObject(ctx, existing)
 		if err != nil {
@@ -482,20 +493,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// the user does not have a resource version, then we populate it with
 		// the latest version. Else, we check that the version specified by
 		// the user matches the version of latest storage object.
-		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+		newResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 		if err != nil {
 			return nil, nil, err
 		}
-		doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
+		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
-		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
-		if err != nil {
-			return nil, nil, err
-		}
-		if version == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
-				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
-			}
+		if existingResourceVersion == 0 {
 			creating = true
 			creatingObj = obj
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -528,15 +532,15 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		} else {
 			// Check if the object's resource version matches the latest
 			// resource version.
-			if resourceVersion == 0 {
+			if newResourceVersion == 0 {
 				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
 				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
-				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), resourceVersion, "must be specified for an update")}
+				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newResourceVersion, "must be specified for an update")}
 				return nil, nil, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
-			if resourceVersion != version {
+			if newResourceVersion != existingResourceVersion {
 				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
@@ -608,7 +612,7 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 	if err != nil {
 		return nil, err
 	}
-	if err := e.Storage.Get(ctx, key, options.ResourceVersion, obj, false); err != nil {
+	if err := e.Storage.Get(ctx, key, storage.GetOptions{ResourceVersion: options.ResourceVersion}, obj); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
 	if e.Decorator != nil {
@@ -892,7 +896,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	}
 	obj := e.NewFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	if err = e.Storage.Get(ctx, key, "", obj, false); err != nil {
+	if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
 
@@ -1006,12 +1010,19 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if err != nil {
 		return nil, err
 	}
+	if len(items) == 0 {
+		// Nothing to delete, return now
+		return listObj, nil
+	}
 	// Spawn a number of goroutines, so that we can issue requests to storage
 	// in parallel to speed up deletion.
-	// TODO: Make this proportional to the number of items to delete, up to
+	// It is proportional to the number of items to delete, up to
 	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
 	// workers to delete 10 items).
 	workersNumber := e.DeleteCollectionWorkers
+	if workersNumber > len(items) {
+		workersNumber = len(items)
+	}
 	if workersNumber < 1 {
 		workersNumber = 1
 	}
@@ -1119,9 +1130,10 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 
 // WatchPredicate starts a watch for the items that matches.
 func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
+			w, err := e.Storage.Watch(ctx, key, storageOpts)
 			if err != nil {
 				return nil, err
 			}
@@ -1134,7 +1146,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		// optimization is skipped
 	}
 
-	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
+	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), storageOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -1215,6 +1227,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 	if (e.KeyRootFunc == nil) != (e.KeyFunc == nil) {
 		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.DefaultQualifiedResource.String())
+	}
+
+	if e.TableConvertor == nil {
+		return fmt.Errorf("store for %s must set TableConvertor; rest.NewDefaultTableConvertor(e.DefaultQualifiedResource) can be used to output just name/creation time", e.DefaultQualifiedResource.String())
 	}
 
 	var isNamespaced bool
@@ -1377,7 +1393,7 @@ func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, table
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
-	return rest.NewDefaultTableConvertor(e.qualifiedResourceFromContext(ctx)).ConvertToTable(ctx, object, tableOptions)
+	return rest.NewDefaultTableConvertor(e.DefaultQualifiedResource).ConvertToTable(ctx, object, tableOptions)
 }
 
 func (e *Store) StorageVersion() runtime.GroupVersioner {

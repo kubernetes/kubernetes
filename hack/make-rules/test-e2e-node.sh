@@ -46,7 +46,7 @@ extra_envs=${EXTRA_ENVS:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
-if [[ ${parallelism} -gt 1 ]]; then  
+if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
 

@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,7 +78,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	const iss = "https://foo.bar.example.com"
 	aud := authenticator.Audiences{"api"}
 
-	maxExpirationSeconds := int64(60 * 60)
+	maxExpirationSeconds := int64(60 * 60 * 2)
 	maxExpirationDuration, err := time.ParseDuration(fmt.Sprintf("%ds", maxExpirationSeconds))
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -116,6 +117,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 	masterConfig.GenericConfig.Authentication.APIAudiences = aud
+	masterConfig.ExtraConfig.ExtendExpiration = true
 
 	masterConfig.ExtraConfig.ServiceAccountIssuerURL = iss
 	masterConfig.ExtraConfig.ServiceAccountJWKSURI = ""
@@ -373,7 +375,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		coresa := core.ServiceAccount{
 			ObjectMeta: sa.ObjectMeta,
 		}
-		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, nil)
+		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, 0, nil)
 		tok, err := masterConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
 		if err != nil {
 			t.Fatalf("err signing expired token: %v", err)
@@ -381,6 +383,60 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		treq.Status.Token = tok
 		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("expiration extended token", func(t *testing.T) {
+		var requestExp int64 = 60*60 + 7
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &requestExp,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       pod.Name,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+		pod, delPod := createDeletePod(t, cs, pod)
+		defer delPod()
+		treq.Spec.BoundObjectRef.UID = pod.UID
+
+		treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treq, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		doTokenReview(t, cs, treq, false)
+
+		// Give some tolerance to avoid flakiness since we are using real time.
+		var leeway int64 = 2
+		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(24*365) * time.Hour))
+		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+		exp, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "exp"), 10, 64)
+		if err != nil {
+			t.Fatalf("error parsing exp: %v", err)
+		}
+		warnafter, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "kubernetes.io", "warnafter"), 10, 64)
+		if err != nil {
+			t.Fatalf("error parsing warnafter: %v", err)
+		}
+
+		if exp < int64(actualExpiry)-leeway || exp > int64(actualExpiry)+leeway {
+			t.Errorf("unexpected token exp %d, should within range of %d +- %d seconds", exp, actualExpiry, leeway)
+		}
+		if warnafter < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+			t.Errorf("unexpected token warnafter %d, should within range of %d +- %d seconds", warnafter, assumedExpiry, leeway)
+		}
+
+		checkExpiration(t, treq, requestExp)
+		expStatus := treq.Status.ExpirationTimestamp.Time.Unix()
+		if expStatus < int64(assumedExpiry)-leeway || warnafter > int64(assumedExpiry)+leeway {
+			t.Errorf("unexpected expiration returned in tokenrequest status %d, should within range of %d +- %d seconds", expStatus, assumedExpiry, leeway)
+		}
 	})
 
 	t.Run("a token without an api audience is invalid", func(t *testing.T) {

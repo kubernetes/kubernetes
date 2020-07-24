@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -33,7 +32,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -49,19 +49,24 @@ type Controller struct {
 
 	podLister       corelisters.PodLister
 	podListerSynced cache.InformerSynced
+	podIndexer      cache.Indexer
 
 	queue workqueue.RateLimitingInterface
 
 	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
 	storageObjectInUseProtectionEnabled bool
+
+	// allows overriding of GenericEphemeralVolume feature Enabled/Disabled for testing
+	genericEphemeralVolumeFeatureEnabled bool
 }
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
+func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled, genericEphemeralVolumeFeatureEnabled bool) (*Controller, error) {
 	e := &Controller{
-		client:                              cl,
-		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
-		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
+		client:                               cl,
+		queue:                                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		storageObjectInUseProtectionEnabled:  storageObjectInUseProtectionFeatureEnabled,
+		genericEphemeralVolumeFeatureEnabled: genericEphemeralVolumeFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("persistentvolumeclaim_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -78,6 +83,10 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
+	e.podIndexer = podInformer.Informer().GetIndexer()
+	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled)); err != nil {
+		return nil, fmt.Errorf("Could not initialize pvc protection controller: %v", err)
+	}
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.podAddedDeletedUpdated(nil, obj, false)
@@ -90,7 +99,7 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 		},
 	})
 
-	return e
+	return e, nil
 }
 
 // Run runs the controller goroutines.
@@ -231,15 +240,34 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	klog.V(4).Infof("Looking for Pods using PVC %s/%s in the Informer's cache", pvc.Namespace, pvc.Name)
 
-	pods, err := c.podLister.Pods(pvc.Namespace).List(labels.Everything())
+	// The indexer is used to find pods which might use the PVC.
+	objs, err := c.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
 	if err != nil {
 		return false, fmt.Errorf("cache-based list of pods failed while processing %s/%s: %s", pvc.Namespace, pvc.Name, err.Error())
 	}
-
-	for _, pod := range pods {
-		if podUsesPVC(pod, pvc.Name) {
-			return true, nil
+	for _, obj := range objs {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			continue
 		}
+
+		if c.genericEphemeralVolumeFeatureEnabled {
+			// We still need to look at each volume: that's redundant for volume.PersistentVolumeClaim,
+			// but for volume.Ephemeral we need to be sure that this particular PVC is the one
+			// created for the ephemeral volume.
+			if c.podUsesPVC(pod, pvc) {
+				return true, nil
+			}
+			continue
+
+		}
+
+		// This is the traditional behavior without GenericEphemeralVolume enabled.
+		if pod.Spec.NodeName == "" {
+			continue
+		}
+		// found a pod using this PVC
+		return true, nil
 	}
 
 	klog.V(4).Infof("No Pod using PVC %s/%s was found in the Informer's cache", pvc.Namespace, pvc.Name)
@@ -255,7 +283,7 @@ func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	}
 
 	for _, pod := range podsList.Items {
-		if podUsesPVC(&pod, pvc.Name) {
+		if c.podUsesPVC(&pod, pvc) {
 			return true, nil
 		}
 	}
@@ -264,19 +292,57 @@ func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	return false, nil
 }
 
-func podUsesPVC(pod *v1.Pod, pvc string) bool {
+func (c *Controller) podUsesPVC(pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool {
 	// Check whether pvc is used by pod only if pod is scheduled, because
 	// kubelet sees pods after they have been scheduled and it won't allow
 	// starting a pod referencing a PVC with a non-nil deletionTimestamp.
 	if pod.Spec.NodeName != "" {
 		for _, volume := range pod.Spec.Volumes {
-			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc {
+			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name ||
+				c.genericEphemeralVolumeFeatureEnabled && !podIsShutDown(pod) && volume.Ephemeral != nil && pod.Name+"-"+volume.Name == pvc.Name && metav1.IsControlledBy(pvc, pod) {
 				klog.V(2).Infof("Pod %s/%s uses PVC %s", pod.Namespace, pod.Name, pvc)
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// podIsShutDown returns true if kubelet is done with the pod or
+// it was force-deleted.
+func podIsShutDown(pod *v1.Pod) bool {
+	// The following text is based on how pod shutdown was
+	// initially described to me. During PR review, it was pointed out
+	// that this is not correct: "deleteGracePeriodSeconds tells
+	// kubelet when it can start force terminating the
+	// containers. Volume teardown only starts after containers
+	// are termianted. So there is an additional time period after
+	// the grace period where volume teardown is happening."
+	//
+	// TODO (https://github.com/kubernetes/enhancements/issues/1698#issuecomment-655344680):
+	// investigate what kubelet really does and if necessary,
+	// add some other signal for "kubelet is done". For now the check
+	// is used only for ephemeral volumes, because it
+	// is needed to avoid the deadlock.
+	//
+	// A pod that has a deletionTimestamp and a zero
+	// deletionGracePeriodSeconds
+	// a) has been processed by kubelet and is ready for deletion or
+	// b) was force-deleted.
+	//
+	// It's now just waiting for garbage collection. We could wait
+	// for it to actually get removed, but that may be blocked by
+	// finalizers for the pod and thus get delayed.
+	//
+	// Worse, it is possible that there is a cyclic dependency
+	// (pod finalizer waits for PVC to get removed, PVC protection
+	// controller waits for pod to get removed).  By considering
+	// the PVC unused in this case, we allow the PVC to get
+	// removed and break such a cycle.
+	//
+	// Therefore it is better to proceed with PVC removal,
+	// which is safe (case a) and/or desirable (case b).
+	return pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0
 }
 
 // pvcAddedUpdated reacts to pvc added/updated events
@@ -344,8 +410,11 @@ func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 
 	// Enqueue all PVCs that the pod uses
 	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim != nil {
+		switch {
+		case volume.PersistentVolumeClaim != nil:
 			c.queue.Add(pod.Namespace + "/" + volume.PersistentVolumeClaim.ClaimName)
+		case c.genericEphemeralVolumeFeatureEnabled && volume.Ephemeral != nil:
+			c.queue.Add(pod.Namespace + "/" + pod.Name + "-" + volume.Name)
 		}
 	}
 }

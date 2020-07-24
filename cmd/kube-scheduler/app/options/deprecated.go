@@ -18,12 +18,12 @@ package options
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
@@ -47,12 +47,12 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 		return
 	}
 
-	fs.StringVar(&o.AlgorithmProvider, "algorithm-provider", o.AlgorithmProvider, "DEPRECATED: the scheduling algorithm provider to use, one of: "+algorithmprovider.ListAlgorithmProviders())
-	fs.StringVar(&o.PolicyConfigFile, "policy-config-file", o.PolicyConfigFile, "DEPRECATED: file with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config=true")
-	usage := fmt.Sprintf("DEPRECATED: name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config=false. The config must be provided as the value of an element in 'Data' map with the key='%v'", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
+	fs.StringVar(&o.AlgorithmProvider, "algorithm-provider", o.AlgorithmProvider, "DEPRECATED: the scheduling algorithm provider to use, this sets the default plugins for component config profiles. Choose one of: "+algorithmprovider.ListAlgorithmProviders())
+	fs.StringVar(&o.PolicyConfigFile, "policy-config-file", o.PolicyConfigFile, "DEPRECATED: file with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config=true. Note: The scheduler will fail if this is combined with Plugin configs")
+	usage := fmt.Sprintf("DEPRECATED: name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config=false. The config must be provided as the value of an element in 'Data' map with the key='%v'. Note: The scheduler will fail if this is combined with Plugin configs", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
 	fs.StringVar(&o.PolicyConfigMapName, "policy-configmap", o.PolicyConfigMapName, usage)
-	fs.StringVar(&o.PolicyConfigMapNamespace, "policy-configmap-namespace", o.PolicyConfigMapNamespace, "DEPRECATED: the namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty.")
-	fs.BoolVar(&o.UseLegacyPolicyConfig, "use-legacy-policy-config", o.UseLegacyPolicyConfig, "DEPRECATED: when set to true, scheduler will ignore policy ConfigMap and uses policy config file")
+	fs.StringVar(&o.PolicyConfigMapNamespace, "policy-configmap-namespace", o.PolicyConfigMapNamespace, "DEPRECATED: the namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty. Note: The scheduler will fail if this is combined with Plugin configs")
+	fs.BoolVar(&o.UseLegacyPolicyConfig, "use-legacy-policy-config", o.UseLegacyPolicyConfig, "DEPRECATED: when set to true, scheduler will ignore policy ConfigMap and uses policy config file. Note: The scheduler will fail if this is combined with Plugin configs")
 
 	fs.BoolVar(&cfg.EnableProfiling, "profiling", cfg.EnableProfiling, "DEPRECATED: enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&cfg.EnableContentionProfiling, "contention-profiling", cfg.EnableContentionProfiling, "DEPRECATED: enable lock contention profiling, if profiling is enabled")
@@ -80,7 +80,7 @@ func (o *DeprecatedOptions) Validate() []error {
 		errs = append(errs, field.Required(field.NewPath("policyConfigFile"), "required when --use-legacy-policy-config is true"))
 	}
 
-	if err := interpodaffinity.ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinitySymmetricWeight"), o.HardPodAffinitySymmetricWeight); err != nil {
+	if err := validation.ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinitySymmetricWeight"), o.HardPodAffinitySymmetricWeight); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -131,18 +131,19 @@ func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfig
 	if o == nil {
 		return
 	}
-
 	// The following deprecated options affect the only existing profile that is
 	// added by default.
 	profile := &cfg.Profiles[0]
 	if len(o.SchedulerName) > 0 {
 		profile.SchedulerName = o.SchedulerName
 	}
-	if o.HardPodAffinitySymmetricWeight != interpodaffinity.DefaultHardPodAffinityWeight {
-		args := interpodaffinity.Args{
-			HardPodAffinityWeight: &o.HardPodAffinitySymmetricWeight,
-		}
-		profile.PluginConfig = append(profile.PluginConfig, plugins.NewPluginConfig(interpodaffinity.Name, args))
+	plCfg := kubeschedulerconfig.PluginConfig{
+		Name: interpodaffinity.Name,
+		Args: &kubeschedulerconfig.InterPodAffinityArgs{
+			HardPodAffinityWeight: o.HardPodAffinitySymmetricWeight,
+		},
 	}
+
+	profile.PluginConfig = append(profile.PluginConfig, plCfg)
 	o.ApplyAlgorithmSourceTo(cfg)
 }

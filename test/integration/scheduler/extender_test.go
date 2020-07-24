@@ -351,6 +351,8 @@ func TestSchedulerExtender(t *testing.T) {
 	policy.APIVersion = "v1"
 
 	testCtx = testutils.InitTestScheduler(t, testCtx, false, &policy)
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 	defer testutils.CleanupTest(t, testCtx)
 
 	DoTestPodScheduling(testCtx.NS, t, clientSet)

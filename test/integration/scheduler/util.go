@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,6 +39,9 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -79,15 +81,31 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	return testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil, time.Second, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil, time.Second, opts...)
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	return testCtx
 }
 
 // initTestDisablePreemption initializes a test environment and creates master and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
-	return testutils.InitTestSchedulerWithOptions(
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			PostFilter: &schedulerconfig.PluginSet{
+				Disabled: []schedulerconfig.Plugin{
+					{Name: defaultpreemption.Name},
+				},
+			},
+		},
+	}
+	testCtx := testutils.InitTestSchedulerWithOptions(
 		t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil,
-		time.Second, scheduler.WithPreemptionDisabled(true))
+		time.Second, scheduler.WithProfiles(prof))
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	return testCtx
 }
 
 // waitForReflection waits till the passFunc confirms that the object it expects
@@ -120,66 +138,17 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 	return err
 }
 
-// nodeHasLabels returns a function that checks if a node has all the given labels.
-func nodeHasLabels(cs clientset.Interface, nodeName string, labels map[string]string) wait.ConditionFunc {
-	return func() (bool, error) {
-		node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			// This could be a connection error so we want to retry.
-			return false, nil
-		}
-		for k, v := range labels {
-			if node.Labels == nil || node.Labels[k] != v {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-// waitForNodeLabels waits for the given node to have all the given labels.
-func waitForNodeLabels(cs clientset.Interface, nodeName string, labels map[string]string) error {
-	return wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, nodeHasLabels(cs, nodeName, labels))
-}
-
-// initNode returns a node with the given resource list and images. If 'res' is nil, a predefined amount of
-// resource will be used.
-func initNode(name string, res *v1.ResourceList, images []v1.ContainerImage) *v1.Node {
-	// if resource is nil, we use a default amount of resources for the node.
-	if res == nil {
-		res = &v1.ResourceList{
-			v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
-		}
-	}
-
-	n := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       v1.NodeSpec{Unschedulable: false},
-		Status: v1.NodeStatus{
-			Capacity: *res,
-			Images:   images,
-		},
-	}
-	return n
-}
-
-// createNode creates a node with the given resource list.
-func createNode(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.Node, error) {
-	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, nil), metav1.CreateOptions{})
-}
-
-// createNodeWithImages creates a node with the given resource list and images.
-func createNodeWithImages(cs clientset.Interface, name string, res *v1.ResourceList, images []v1.ContainerImage) (*v1.Node, error) {
-	return cs.CoreV1().Nodes().Create(context.TODO(), initNode(name, res, images), metav1.CreateOptions{})
+func createNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+	return cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 }
 
 // createNodes creates `numNodes` nodes. The created node names will be in the
 // form of "`prefix`-X" where X is an ordinal.
-func createNodes(cs clientset.Interface, prefix string, res *v1.ResourceList, numNodes int) ([]*v1.Node, error) {
+func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
-		node, err := createNode(cs, nodeName, res)
+		node, err := createNode(cs, wrapper.Name(nodeName).Obj())
 		if err != nil {
 			return nodes[:], err
 		}
@@ -198,12 +167,13 @@ type pausePodConfig struct {
 	NodeName                          string
 	SchedulerName                     string
 	Priority                          *int32
+	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
 }
 
 // initPausePod initializes a pod API object from the given config. It is used
 // mainly in pod creation process.
-func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
+func initPausePod(conf *pausePodConfig) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        conf.Name,
@@ -224,6 +194,7 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 			NodeName:          conf.NodeName,
 			SchedulerName:     conf.SchedulerName,
 			Priority:          conf.Priority,
+			PreemptionPolicy:  conf.PreemptionPolicy,
 			PriorityClassName: conf.PriorityClassName,
 		},
 	}
@@ -259,7 +230,7 @@ func createPausePodWithResource(cs clientset.Interface, podName string,
 			},
 		}
 	}
-	return createPausePod(cs, initPausePod(cs, &conf))
+	return createPausePod(cs, initPausePod(&conf))
 }
 
 // runPausePod creates a pod with "Pause" image and the given config and waits
@@ -392,6 +363,12 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
 }
 
+// waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
+// an error if it does not scheduled within the given timeout.
+func waitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.Poll(100*time.Millisecond, timeout, podScheduled(cs, pod.Namespace, pod.Name))
+}
+
 // waitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
 func waitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
@@ -424,7 +401,7 @@ func waitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisrupt
 // waitCachedPodsStable waits until scheduler cache has the given pods.
 func waitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error {
 	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		cachedPods, err := testCtx.Scheduler.SchedulerCache.List(labels.Everything())
+		cachedPods, err := testCtx.Scheduler.SchedulerCache.ListPods(labels.Everything())
 		if err != nil {
 			return false, err
 		}
@@ -477,5 +454,20 @@ func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
 	if err := wait.Poll(time.Second, wait.ForeverTestTimeout,
 		noPodsInNamespace(cs, ns)); err != nil {
 		t.Errorf("error while waiting for pods in namespace %v: %v", ns, err)
+	}
+}
+
+// podScheduled returns true if a node is assigned to the given pod.
+func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		if pod.Spec.NodeName == "" {
+			return false, nil
+		}
+		return true, nil
 	}
 }

@@ -17,6 +17,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "gcs_upload")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load("//build:platforms.bzl", "for_platforms")
 
 filegroup(
@@ -90,28 +91,6 @@ filegroup(
         "//cmd:all-srcs",
         "//docs:all-srcs",
         "//hack:all-srcs",
-        "//openshift-kube-apiserver/admission/admissionenablement:all-srcs",
-        "//openshift-kube-apiserver/admission/authorization/restrictusers:all-srcs",
-        "//openshift-kube-apiserver/admission/autoscaling/apis/clusterresourceoverride:all-srcs",
-        "//openshift-kube-apiserver/admission/autoscaling/apis/runonceduration:all-srcs",
-        "//openshift-kube-apiserver/admission/autoscaling/clusterresourceoverride:all-srcs",
-        "//openshift-kube-apiserver/admission/autoscaling/runonceduration:all-srcs",
-        "//openshift-kube-apiserver/admission/customresourcevalidation:all-srcs",
-        "//openshift-kube-apiserver/admission/namespaceconditions:all-srcs",
-        "//openshift-kube-apiserver/admission/network/apis/externalipranger:all-srcs",
-        "//openshift-kube-apiserver/admission/network/apis/restrictedendpoints:all-srcs",
-        "//openshift-kube-apiserver/admission/network/externalipranger:all-srcs",
-        "//openshift-kube-apiserver/admission/network/restrictedendpoints:all-srcs",
-        "//openshift-kube-apiserver/admission/route:all-srcs",
-        "//openshift-kube-apiserver/admission/scheduler/apis/podnodeconstraints:all-srcs",
-        "//openshift-kube-apiserver/admission/scheduler/nodeenv:all-srcs",
-        "//openshift-kube-apiserver/admission/scheduler/podnodeconstraints:all-srcs",
-        "//openshift-kube-apiserver/authentication/oauth:all-srcs",
-        "//openshift-kube-apiserver/authorization/browsersafe:all-srcs",
-        "//openshift-kube-apiserver/authorization/scopeauthorizer:all-srcs",
-        "//openshift-kube-apiserver/configdefault:all-srcs",
-        "//openshift-kube-apiserver/enablement:all-srcs",
-        "//openshift-kube-apiserver/openshiftkubeapiserver:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",
         "//staging:all-srcs",
@@ -145,4 +124,19 @@ platform(
       }
       {PARENT_REMOTE_EXECUTION_PROPERTIES}
     """,
+)
+
+pkg_tar(
+    name = "LICENSES",
+    srcs = glob(
+        ["LICENSES/**/LICENSE"],
+        allow_empty = False,
+        exclude_directories = 0,
+    ),
+    mode = "0755",
+    strip_prefix = "//",
+    tags = [
+        "manual",
+        "no-cache",
+    ],
 )

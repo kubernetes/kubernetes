@@ -306,11 +306,11 @@ message LinuxPodSandboxConfig {
 // PodSandbox in its user interface for better user experience. For example,
 // the runtime can construct a unique PodSandboxName based on the metadata.
 message PodSandboxMetadata {
-    // Pod name of the sandbox. Same as the pod name in the PodSpec.
+    // Pod name of the sandbox. Same as the pod name in the Pod ObjectMeta.
     string name = 1;
-    // Pod UID of the sandbox. Same as the pod UID in the PodSpec.
+    // Pod UID of the sandbox. Same as the pod UID in the Pod ObjectMeta.
     string uid = 2;
-    // Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+    // Pod namespace of the sandbox. Same as the pod namespace in the Pod ObjectMeta.
     string namespace = 3;
     // Attempt number of creating the sandbox. Default: 0.
     uint32 attempt = 4;
@@ -523,11 +523,14 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
-// ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageID or imageDigest), but in the
-// future it will include more detailed information about the different image types.
+// ImageSpec is an internal representation of an image.
 message ImageSpec {
+    // Container's Image field (e.g. imageID or imageDigest).
     string image = 1;
+    // Unstructured key-value map holding arbitrary metadata.
+    // ImageSpec Annotations can be used to help the runtime target specific
+    // images in multi-arch images.
+    map<string, string> annotations = 2;
 }
 
 message KeyValue {
@@ -782,8 +785,8 @@ message ContainerConfig {
 
     // Configuration specific to Linux containers.
     LinuxContainerConfig linux = 15;
-   // Configuration specific to Windows containers.
-   WindowsContainerConfig windows = 16;
+    // Configuration specific to Windows containers.
+    WindowsContainerConfig windows = 16;
 }
 
 message CreateContainerRequest {
@@ -1065,6 +1068,8 @@ message Image {
     // User name that will run the command(s). This is used if UID is not set
     // and no user is specified when creating container.
     string username = 6;
+    // ImageSpec for image which includes annotations
+    ImageSpec spec = 7;
 }
 
 message ListImagesResponse {

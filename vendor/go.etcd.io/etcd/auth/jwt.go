@@ -105,7 +105,7 @@ func (t *tokenJWT) assign(ctx context.Context, username string, revision uint64)
 	token, err := tk.SignedString(t.key)
 	if err != nil {
 		if t.lg != nil {
-			t.lg.Warn(
+			t.lg.Debug(
 				"failed to sign a JWT token",
 				zap.String("user-name", username),
 				zap.Uint64("revision", revision),
@@ -118,7 +118,7 @@ func (t *tokenJWT) assign(ctx context.Context, username string, revision uint64)
 	}
 
 	if t.lg != nil {
-		t.lg.Info(
+		t.lg.Debug(
 			"created/assigned a new JWT token",
 			zap.String("user-name", username),
 			zap.Uint64("revision", revision),
@@ -136,7 +136,7 @@ func newTokenProviderJWT(lg *zap.Logger, optMap map[string]string) (*tokenJWT, e
 	err = opts.ParseWithDefaults(optMap)
 	if err != nil {
 		if lg != nil {
-			lg.Warn("problem loading JWT options", zap.Error(err))
+			lg.Error("problem loading JWT options", zap.Error(err))
 		} else {
 			plog.Errorf("problem loading JWT options: %s", err)
 		}

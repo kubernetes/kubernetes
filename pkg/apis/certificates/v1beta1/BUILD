@@ -20,7 +20,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/certificates/v1beta1",
     deps = [
         "//pkg/apis/certificates:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

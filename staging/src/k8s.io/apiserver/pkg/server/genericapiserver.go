@@ -47,7 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -354,7 +354,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		Listener:   s.SecureServingInfo.Listener,
 		lateStopCh: lateStopCh,
 	}
-	lateConnectionEventf.Store(eventfFunc(s.Eventf))
+	lateConnectionEventf = s.Eventf
 
 	// close socket after delayed stopCh
 	stoppedCh, err := s.NonBlockingRun(delayedStopCh)

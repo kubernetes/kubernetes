@@ -14,10 +14,7 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "modes.go",
-        "patch.go",
-    ],
+    srcs = ["modes.go"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
     deps = ["//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )

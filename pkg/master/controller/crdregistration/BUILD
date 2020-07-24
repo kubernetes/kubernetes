@@ -8,10 +8,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "crdregistration_controller.go",
-        "patch.go",
-    ],
+    srcs = ["crdregistration_controller.go"],
     importpath = "k8s.io/kubernetes/pkg/master/controller/crdregistration",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
@@ -25,8 +22,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -16,17 +16,17 @@ package v3rpc
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/coreos/pkg/capnslog"
 	"go.etcd.io/etcd/etcdserver"
 	"go.etcd.io/etcd/etcdserver/api"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
+	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
 	"go.etcd.io/etcd/pkg/types"
 	"go.etcd.io/etcd/raft"
-
-	"github.com/coreos/pkg/capnslog"
-	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -54,6 +54,12 @@ func newUnaryInterceptor(s *etcdserver.EtcdServer) grpc.UnaryServerInterceptor {
 
 		md, ok := metadata.FromIncomingContext(ctx)
 		if ok {
+			ver, vs := "unknown", metadataGet(md, rpctypes.MetadataClientAPIVersionKey)
+			if len(vs) > 0 {
+				ver = vs[0]
+			}
+			clientRequests.WithLabelValues("unary", ver).Inc()
+
 			if ks := md[rpctypes.MetadataRequireLeaderKey]; len(ks) > 0 && ks[0] == rpctypes.MetadataHasLeader {
 				if s.Leader() == types.ID(raft.None) {
 					return nil, rpctypes.ErrGRPCNoLeader
@@ -200,6 +206,12 @@ func newStreamInterceptor(s *etcdserver.EtcdServer) grpc.StreamServerInterceptor
 
 		md, ok := metadata.FromIncomingContext(ss.Context())
 		if ok {
+			ver, vs := "unknown", metadataGet(md, rpctypes.MetadataClientAPIVersionKey)
+			if len(vs) > 0 {
+				ver = vs[0]
+			}
+			clientRequests.WithLabelValues("stream", ver).Inc()
+
 			if ks := md[rpctypes.MetadataRequireLeaderKey]; len(ks) > 0 && ks[0] == rpctypes.MetadataHasLeader {
 				if s.Leader() == types.ID(raft.None) {
 					return rpctypes.ErrGRPCNoLeader
@@ -218,7 +230,6 @@ func newStreamInterceptor(s *etcdserver.EtcdServer) grpc.StreamServerInterceptor
 					smap.mu.Unlock()
 					cancel()
 				}()
-
 			}
 		}
 
@@ -273,4 +284,9 @@ func monitorLeader(s *etcdserver.EtcdServer) *streamsMap {
 	}()
 
 	return smap
+}
+
+func metadataGet(md metadata.MD, k string) []string {
+	k = strings.ToLower(k)
+	return md[k]
 }

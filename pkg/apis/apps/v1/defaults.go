@@ -99,8 +99,10 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 	if obj.Spec.UpdateStrategy.Type == "" {
 		obj.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
 
-		// UpdateStrategy.RollingUpdate will take default values below.
-		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
+			// UpdateStrategy.RollingUpdate will take default values below.
+			obj.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+		}
 	}
 
 	if obj.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&

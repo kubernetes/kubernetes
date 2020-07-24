@@ -11,8 +11,8 @@ const (
 
 /* Bridge Flags */
 const (
-	BRIDGE_FLAGS_MASTER = iota /* Bridge command to/from master */
-	BRIDGE_FLAGS_SELF          /* Bridge command to/from lowerdev */
+	BRIDGE_FLAGS_MASTER = iota + 1 /* Bridge command to/from master */
+	BRIDGE_FLAGS_SELF              /* Bridge command to/from lowerdev */
 )
 
 /* Bridge management nested attributes

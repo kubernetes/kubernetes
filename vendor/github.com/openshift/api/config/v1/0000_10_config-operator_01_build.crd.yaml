@@ -162,7 +162,7 @@ spec:
                                 type: boolean
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
-                              metadata.namespace, metadata.labels, metadata.annotations,
+                              metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
                               status.podIP, status.podIPs.'
                             type: object

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -62,12 +61,7 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 // taking place)
 func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutator ConfigMapMutator) error {
 	var lastError error
-	err := wait.ExponentialBackoff(wait.Backoff{
-		Steps:    20,
-		Duration: 500 * time.Millisecond,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() (bool, error) {
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
 		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
 			lastError = err
 			if apierrors.IsAlreadyExists(err) {
@@ -89,22 +83,24 @@ func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutat
 // to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
 // taking place).
 func MutateConfigMap(client clientset.Interface, meta metav1.ObjectMeta, mutator ConfigMapMutator) error {
-	return clientsetretry.RetryOnConflict(wait.Backoff{
-		Steps:    20,
-		Duration: 500 * time.Millisecond,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() error {
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
 		configMap, err := client.CoreV1().ConfigMaps(meta.Namespace).Get(context.TODO(), meta.Name, metav1.GetOptions{})
 		if err != nil {
-			return err
+			lastError = err
+			return false, nil
 		}
 		if err = mutator(configMap); err != nil {
-			return errors.Wrap(err, "unable to mutate ConfigMap")
+			lastError = errors.Wrap(err, "unable to mutate ConfigMap")
+			return false, nil
 		}
-		_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
-		return err
+		_, lastError = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+		return lastError == nil, nil
 	})
+	if err == nil {
+		return nil
+	}
+	return lastError
 }
 
 // CreateOrRetainConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
@@ -205,30 +201,48 @@ func DeleteDeploymentForeground(client clientset.Interface, namespace, name stri
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
-	if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create RBAC role")
-		}
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role, metav1.CreateOptions{}); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				lastError = errors.Wrap(err, "unable to create RBAC role")
+				return false, nil
+			}
 
-		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update RBAC role")
+			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
+				lastError = errors.Wrap(err, "unable to update RBAC role")
+				return false, nil
+			}
 		}
+		return true, nil
+	})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
-	if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(context.TODO(), roleBinding, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create RBAC rolebinding")
-		}
+	var lastError error
+	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
+		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(context.TODO(), roleBinding, metav1.CreateOptions{}); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				lastError = errors.Wrap(err, "unable to create RBAC rolebinding")
+				return false, nil
+			}
 
-		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update RBAC rolebinding")
+			if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding, metav1.UpdateOptions{}); err != nil {
+				lastError = errors.Wrap(err, "unable to update RBAC rolebinding")
+				return false, nil
+			}
 		}
+		return true, nil
+	})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.

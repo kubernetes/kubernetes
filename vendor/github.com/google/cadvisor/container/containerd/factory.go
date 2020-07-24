@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
@@ -43,7 +43,7 @@ var containerdCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
 type containerdFactory struct {
 	machineInfoFactory info.MachineInfoFactory
-	client             containerdClient
+	client             ContainerdClient
 	version            string
 	// Information about the mounted cgroup subsystems.
 	cgroupSubsystems libcontainer.CgroupSubsystems
@@ -52,11 +52,11 @@ type containerdFactory struct {
 	includedMetrics container.MetricSet
 }
 
-func (self *containerdFactory) String() string {
+func (f *containerdFactory) String() string {
 	return k8sContainerdNamespace
 }
 
-func (self *containerdFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
+func (f *containerdFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := Client(*ArgContainerdEndpoint, *ArgContainerdNamespace)
 	if err != nil {
 		return
@@ -66,12 +66,12 @@ func (self *containerdFactory) NewContainerHandler(name string, inHostNamespace 
 	return newContainerdContainerHandler(
 		client,
 		name,
-		self.machineInfoFactory,
-		self.fsInfo,
-		&self.cgroupSubsystems,
+		f.machineInfoFactory,
+		f.fsInfo,
+		&f.cgroupSubsystems,
 		inHostNamespace,
 		metadataEnvs,
-		self.includedMetrics,
+		f.includedMetrics,
 	)
 }
 
@@ -95,7 +95,7 @@ func isContainerName(name string) bool {
 }
 
 // Containerd can handle and accept all containerd created containers
-func (self *containerdFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+func (f *containerdFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	// if the container is not associated with containerd, we can't handle it or accept it.
 	if !isContainerName(name) {
 		return false, false, nil
@@ -105,7 +105,7 @@ func (self *containerdFactory) CanHandleAndAccept(name string) (bool, bool, erro
 	// If container and task lookup in containerd fails then we assume
 	// that the container state is not known to containerd
 	ctx := context.Background()
-	_, err := self.client.LoadContainer(ctx, id)
+	_, err := f.client.LoadContainer(ctx, id)
 	if err != nil {
 		return false, false, fmt.Errorf("failed to load container: %v", err)
 	}
@@ -113,7 +113,7 @@ func (self *containerdFactory) CanHandleAndAccept(name string) (bool, bool, erro
 	return true, true, nil
 }
 
-func (self *containerdFactory) DebugInfo() map[string][]string {
+func (f *containerdFactory) DebugInfo() map[string][]string {
 	return map[string][]string{}
 }
 

@@ -28,8 +28,8 @@ import (
 func (in *RunOnceDurationConfig) DeepCopyInto(out *RunOnceDurationConfig) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.ActiveDeadlineSecondsLimit != nil {
-		in, out := &in.ActiveDeadlineSecondsLimit, &out.ActiveDeadlineSecondsLimit
+	if in.ActiveDeadlineSecondsOverride != nil {
+		in, out := &in.ActiveDeadlineSecondsOverride, &out.ActiveDeadlineSecondsOverride
 		*out = new(int64)
 		**out = **in
 	}

@@ -157,11 +157,17 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
 	})
 
-	ginkgo.It("should run through a ConfigMap lifecycle", func() {
+	/*
+	   Release : v1.19
+	   Testname: ConfigMap lifecycle
+	   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
+	   By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
+	*/
+	framework.ConformanceIt("should run through a ConfigMap lifecycle", func() {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
 
-		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &v1.ConfigMap{
+		testConfigMap := v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testConfigMapName,
 				Labels: map[string]string{
@@ -171,8 +177,17 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 			Data: map[string]string{
 				"valueName": "value",
 			},
-		}, metav1.CreateOptions{})
+		}
+
+		ginkgo.By("creating a ConfigMap")
+		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &testConfigMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap")
+
+		ginkgo.By("fetching the ConfigMap")
+		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get ConfigMap")
+		framework.ExpectEqual(configMap.Data["valueName"], testConfigMap.Data["valueName"])
+		framework.ExpectEqual(configMap.Labels["test-configmap-static"], testConfigMap.Labels["test-configmap-static"])
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -186,36 +201,40 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		})
 		framework.ExpectNoError(err, "failed to marshal patch data")
 
+		ginkgo.By("patching the ConfigMap")
 		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ConfigMap")
 
-		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get ConfigMap")
-		framework.ExpectEqual(configMap.Data["valueName"], "value1", "failed to patch ConfigMap")
-		framework.ExpectEqual(configMap.Labels["test-configmap"], "patched", "failed to patch ConfigMap")
-
-		// listing in all namespaces to hit the endpoint
+		ginkgo.By("listing all ConfigMaps in all namespaces with a label selector")
 		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "test-configmap-static=true",
+			LabelSelector: "test-configmap=patched",
 		})
 		framework.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
-		framework.ExpectNotEqual(len(configMapList.Items), 0, "no ConfigMaps found in ConfigMap list")
 		testConfigMapFound := false
 		for _, cm := range configMapList.Items {
-			if cm.ObjectMeta.Name == testConfigMapName &&
+			if cm.ObjectMeta.Name == testConfigMap.ObjectMeta.Name &&
 				cm.ObjectMeta.Namespace == testNamespaceName &&
-				cm.ObjectMeta.Labels["test-configmap-static"] == "true" &&
+				cm.ObjectMeta.Labels["test-configmap-static"] == testConfigMap.ObjectMeta.Labels["test-configmap-static"] &&
+				cm.ObjectMeta.Labels["test-configmap"] == "patched" &&
 				cm.Data["valueName"] == "value1" {
 				testConfigMapFound = true
 				break
 			}
 		}
-		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
+		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap by label selector")
 
+		ginkgo.By("deleting the ConfigMap by collection with a label selector")
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
 		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
+
+		ginkgo.By("listing all ConfigMaps in test namespace")
+		configMapList, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "test-configmap-static=true",
+		})
+		framework.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
+		framework.ExpectEqual(len(configMapList.Items), 0, "ConfigMap is still present after being deleted by collection")
 	})
 })
 

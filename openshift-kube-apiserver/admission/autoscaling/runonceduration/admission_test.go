@@ -25,7 +25,7 @@ func fakeNamespaceLister(projectAnnotations map[string]string) corev1listers.Nam
 
 func testConfig(n *int64) *runonceduration.RunOnceDurationConfig {
 	return &runonceduration.RunOnceDurationConfig{
-		ActiveDeadlineSecondsLimit: n,
+		ActiveDeadlineSecondsOverride: n,
 	}
 }
 
@@ -163,11 +163,11 @@ activeDeadlineSecondsOverride: 3600
 	if err != nil {
 		t.Fatalf("unexpected error reading config: %v", err)
 	}
-	if config.ActiveDeadlineSecondsLimit == nil {
+	if config.ActiveDeadlineSecondsOverride == nil {
 		t.Fatalf("nil value for ActiveDeadlineSecondsLimit")
 	}
-	if *config.ActiveDeadlineSecondsLimit != 3600 {
-		t.Errorf("unexpected value for ActiveDeadlineSecondsLimit: %d", config.ActiveDeadlineSecondsLimit)
+	if *config.ActiveDeadlineSecondsOverride != 3600 {
+		t.Errorf("unexpected value for ActiveDeadlineSecondsLimit: %d", config.ActiveDeadlineSecondsOverride)
 	}
 }
 

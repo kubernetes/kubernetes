@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
@@ -79,8 +81,14 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	}
 	versioner := etcd3.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(capacity, keyFunc, mockHandler, getAttrsFunc, versioner, indexers)
-	wc.clock = clock.NewFakeClock(time.Now())
+	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, clock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
+	// To preserve behavior of tests that assume a given capacity,
+	// resize it to th expected size.
+	wc.capacity = capacity
+	wc.cache = make([]*watchCacheEvent, capacity)
+	wc.lowerBoundCapacity = min(capacity, defaultLowerBoundCapacity)
+	wc.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
+
 	return wc
 }
 
@@ -163,6 +171,10 @@ func TestWatchCacheBasic(t *testing.T) {
 
 func TestEvents(t *testing.T) {
 	store := newTestWatchCache(5, &cache.Indexers{})
+
+	// no dynamic-size cache to fit old tests.
+	store.lowerBoundCapacity = 5
+	store.upperBoundCapacity = 5
 
 	store.Add(makeTestPod("pod", 3))
 
@@ -499,5 +511,326 @@ func TestReflectorForWatchCache(t *testing.T) {
 		if version != 10 {
 			t.Errorf("unexpected resource version: %d", version)
 		}
+	}
+}
+
+func TestDynamicCache(t *testing.T) {
+	tests := []struct {
+		name          string
+		eventCount    int
+		cacheCapacity int
+		startIndex    int
+		// interval is time duration between adjacent events.
+		lowerBoundCapacity int
+		upperBoundCapacity int
+		interval           time.Duration
+		expectCapacity     int
+		expectStartIndex   int
+	}{
+		{
+			name:               "[capacity not equals 4*n] events inside eventFreshDuration cause cache expanding",
+			eventCount:         5,
+			cacheCapacity:      5,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration / 6,
+			expectCapacity:     10,
+			expectStartIndex:   0,
+		},
+		{
+			name:               "[capacity not equals 4*n] events outside eventFreshDuration without change cache capacity",
+			eventCount:         5,
+			cacheCapacity:      5,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration / 4,
+			expectCapacity:     5,
+			expectStartIndex:   0,
+		},
+		{
+			name:               "[capacity not equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			eventCount:         5,
+			cacheCapacity:      5,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration + time.Second,
+			expectCapacity:     2,
+			expectStartIndex:   3,
+		},
+		{
+			name:               "[capacity not equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			eventCount:         5,
+			cacheCapacity:      5,
+			lowerBoundCapacity: 3,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration + time.Second,
+			expectCapacity:     3,
+			expectStartIndex:   2,
+		},
+		{
+			name:               "[capacity not equals 4*n] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			eventCount:         5,
+			cacheCapacity:      5,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 8,
+			interval:           eventFreshDuration / 6,
+			expectCapacity:     8,
+			expectStartIndex:   0,
+		},
+		{
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding",
+			eventCount:         5,
+			cacheCapacity:      5,
+			startIndex:         3,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration / 6,
+			expectCapacity:     10,
+			expectStartIndex:   3,
+		},
+		{
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] events outside eventFreshDuration without change cache capacity",
+			eventCount:         5,
+			cacheCapacity:      5,
+			startIndex:         3,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration / 4,
+			expectCapacity:     5,
+			expectStartIndex:   3,
+		},
+		{
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			eventCount:         5,
+			cacheCapacity:      5,
+			startIndex:         3,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration + time.Second,
+			expectCapacity:     2,
+			expectStartIndex:   6,
+		},
+		{
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			eventCount:         5,
+			cacheCapacity:      5,
+			startIndex:         3,
+			lowerBoundCapacity: 3,
+			upperBoundCapacity: 5 * 2,
+			interval:           eventFreshDuration + time.Second,
+			expectCapacity:     3,
+			expectStartIndex:   5,
+		},
+		{
+			name:               "[capacity not equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			eventCount:         5,
+			cacheCapacity:      5,
+			startIndex:         3,
+			lowerBoundCapacity: 5 / 2,
+			upperBoundCapacity: 8,
+			interval:           eventFreshDuration / 6,
+			expectCapacity:     8,
+			expectStartIndex:   3,
+		},
+		{
+			name:               "[capacity equals 4*n] events inside eventFreshDuration cause cache expanding",
+			eventCount:         8,
+			cacheCapacity:      8,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration / 9,
+			expectCapacity:     16,
+			expectStartIndex:   0,
+		},
+		{
+			name:               "[capacity equals 4*n] events outside eventFreshDuration without change cache capacity",
+			eventCount:         8,
+			cacheCapacity:      8,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration / 8,
+			expectCapacity:     8,
+			expectStartIndex:   0,
+		},
+		{
+			name:               "[capacity equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			eventCount:         8,
+			cacheCapacity:      8,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration/2 + time.Second,
+			expectCapacity:     4,
+			expectStartIndex:   4,
+		},
+		{
+			name:               "[capacity equals 4*n] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			eventCount:         8,
+			cacheCapacity:      8,
+			lowerBoundCapacity: 7,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration/2 + time.Second,
+			expectCapacity:     7,
+			expectStartIndex:   1,
+		},
+		{
+			name:               "[capacity equals 4*n] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			eventCount:         8,
+			cacheCapacity:      8,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 10,
+			interval:           eventFreshDuration / 9,
+			expectCapacity:     10,
+			expectStartIndex:   0,
+		},
+		{
+			name:               "[capacity equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding",
+			eventCount:         8,
+			cacheCapacity:      8,
+			startIndex:         3,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration / 9,
+			expectCapacity:     16,
+			expectStartIndex:   3,
+		},
+		{
+			name:               "[capacity equals 4*n] [startIndex not equal 0] events outside eventFreshDuration without change cache capacity",
+			eventCount:         8,
+			cacheCapacity:      8,
+			startIndex:         3,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration / 8,
+			expectCapacity:     8,
+			expectStartIndex:   3,
+		},
+		{
+			name:               "[capacity equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking",
+			eventCount:         8,
+			cacheCapacity:      8,
+			startIndex:         3,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration/2 + time.Second,
+			expectCapacity:     4,
+			expectStartIndex:   7,
+		},
+		{
+			name:               "[capacity equals 4*n] [startIndex not equal 0] quarter of recent events outside eventFreshDuration cause cache shrinking with given lowerBoundCapacity",
+			eventCount:         8,
+			cacheCapacity:      8,
+			startIndex:         3,
+			lowerBoundCapacity: 7,
+			upperBoundCapacity: 8 * 2,
+			interval:           eventFreshDuration/2 + time.Second,
+			expectCapacity:     7,
+			expectStartIndex:   4,
+		},
+		{
+			name:               "[capacity equals 4*n] [startIndex not equal 0] events inside eventFreshDuration cause cache expanding with given upperBoundCapacity",
+			eventCount:         8,
+			cacheCapacity:      8,
+			startIndex:         3,
+			lowerBoundCapacity: 8 / 2,
+			upperBoundCapacity: 10,
+			interval:           eventFreshDuration / 9,
+			expectCapacity:     10,
+			expectStartIndex:   3,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			store := newTestWatchCache(test.cacheCapacity, &cache.Indexers{})
+			store.cache = make([]*watchCacheEvent, test.cacheCapacity)
+			store.startIndex = test.startIndex
+			store.lowerBoundCapacity = test.lowerBoundCapacity
+			store.upperBoundCapacity = test.upperBoundCapacity
+			loadEventWithDuration(store, test.eventCount, test.interval)
+			nextInterval := store.clock.Now().Add(time.Duration(test.interval.Nanoseconds() * int64(test.eventCount)))
+			store.resizeCacheLocked(nextInterval)
+			if store.capacity != test.expectCapacity {
+				t.Errorf("expect capacity %d, but get %d", test.expectCapacity, store.capacity)
+			}
+
+			// check cache's startIndex, endIndex and all elements.
+			if store.startIndex != test.expectStartIndex {
+				t.Errorf("expect startIndex %d, but get %d", test.expectStartIndex, store.startIndex)
+			}
+			if store.endIndex != test.startIndex+test.eventCount {
+				t.Errorf("expect endIndex %d get %d", test.startIndex+test.eventCount, store.endIndex)
+			}
+			if !checkCacheElements(store) {
+				t.Errorf("some elements locations in cache is wrong")
+			}
+		})
+	}
+}
+
+func loadEventWithDuration(cache *watchCache, count int, interval time.Duration) {
+	for i := 0; i < count; i++ {
+		event := &watchCacheEvent{
+			Key:        fmt.Sprintf("event-%d", i+cache.startIndex),
+			RecordTime: cache.clock.Now().Add(time.Duration(interval.Nanoseconds() * int64(i))),
+		}
+		cache.cache[(i+cache.startIndex)%cache.capacity] = event
+	}
+	cache.endIndex = cache.startIndex + count
+}
+
+func checkCacheElements(cache *watchCache) bool {
+	for i := cache.startIndex; i < cache.endIndex; i++ {
+		location := i % cache.capacity
+		if cache.cache[location].Key != fmt.Sprintf("event-%d", i) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
+	store := newTestWatchCache(2, &cache.Indexers{})
+
+	now := store.clock.Now()
+	addEvent := func(key string, rv uint64, t time.Time) {
+		event := &watchCacheEvent{
+			Key:             key,
+			ResourceVersion: rv,
+			RecordTime:      t,
+		}
+		store.updateCache(event)
+	}
+
+	// Initial LIST comes from the moment of RV=10.
+	store.Replace(nil, "10")
+
+	addEvent("key1", 20, now)
+
+	// Force "key1" to rotate our of cache.
+	later := now.Add(2 * eventFreshDuration)
+	addEvent("key2", 30, later)
+	addEvent("key3", 40, later)
+
+	// Force cache resize.
+	addEvent("key4", 50, later.Add(time.Second))
+
+	_, err := store.GetAllEventsSince(15)
+	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func BenchmarkWatchCache_updateCache(b *testing.B) {
+	store := newTestWatchCache(defaultUpperBoundCapacity, &cache.Indexers{})
+	store.cache = store.cache[:0]
+	store.upperBoundCapacity = defaultUpperBoundCapacity
+	loadEventWithDuration(store, defaultUpperBoundCapacity, 0)
+	add := &watchCacheEvent{
+		Key:        fmt.Sprintf("event-%d", defaultUpperBoundCapacity),
+		RecordTime: store.clock.Now(),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.updateCache(add)
 	}
 }

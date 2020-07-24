@@ -145,6 +145,14 @@ run_role_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing role"
 
+  # Test deprecated API request output
+  # TODO(liggitt): switch this to a custom deprecated resource once CRDs support marking versions as deprecated
+  output_message=$(kubectl get roles.v1beta1.rbac.authorization.k8s.io 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'Role is deprecated'
+  output_message=$(! kubectl get roles.v1beta1.rbac.authorization.k8s.io --warnings-as-errors 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'Role is deprecated'
+  kube::test::if_has_string "${output_message}" 'Error: 1 warning received'
+
   # Dry-run create
   kubectl create "${kube_flags[@]}" role pod-admin --dry-run=client --verb=* --resource=pods
   kubectl create "${kube_flags[@]}" role pod-admin --dry-run=server --verb=* --resource=pods

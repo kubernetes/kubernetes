@@ -48,7 +48,7 @@ func TestPlugin_Validate(t *testing.T) {
 			},
 			allowed: false,
 		},
-		"allowed if the 'certificate' field has not changed": {
+		"allowed if the 'certificate' and conditions field has not changed": {
 			attributes: &testAttributes{
 				resource:    certificatesapi.Resource("certificatesigningrequests"),
 				subresource: "status",
@@ -63,7 +63,7 @@ func TestPlugin_Validate(t *testing.T) {
 			allowed:  true,
 			authzErr: errors.New("faked error"),
 		},
-		"deny request if authz lookup fails": {
+		"deny request if authz lookup fails on certificate change": {
 			allowedName: "abc.com/xyz",
 			attributes: &testAttributes{
 				resource:    certificatesapi.Resource("certificatesigningrequests"),
@@ -77,6 +77,27 @@ func TestPlugin_Validate(t *testing.T) {
 					},
 					Status: certificatesapi.CertificateSigningRequestStatus{
 						Certificate: []byte("data"),
+					},
+				},
+				operation: admission.Update,
+			},
+			authzErr: errors.New("test"),
+			allowed:  false,
+		},
+		"deny request if authz lookup fails on condition change": {
+			allowedName: "abc.com/xyz",
+			attributes: &testAttributes{
+				resource:    certificatesapi.Resource("certificatesigningrequests"),
+				subresource: "status",
+				oldObj: &certificatesapi.CertificateSigningRequest{Spec: certificatesapi.CertificateSigningRequestSpec{
+					SignerName: "abc.com/xyz",
+				}},
+				obj: &certificatesapi.CertificateSigningRequest{
+					Spec: certificatesapi.CertificateSigningRequestSpec{
+						SignerName: "abc.com/xyz",
+					},
+					Status: certificatesapi.CertificateSigningRequestStatus{
+						Conditions: []certificatesapi.CertificateSigningRequestCondition{{Type: certificatesapi.CertificateFailed}},
 					},
 				},
 				operation: admission.Update,

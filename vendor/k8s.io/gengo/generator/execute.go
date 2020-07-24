@@ -29,7 +29,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func errs2strings(errors []error) []string {

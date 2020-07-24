@@ -1,25 +1,26 @@
 package hcs
 
 import (
+	"context"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/hcsshim/internal/log"
 )
 
-func processAsyncHcsResult(err error, resultp *uint16, callbackNumber uintptr, expectedNotification hcsNotification, timeout *time.Duration) ([]ErrorEvent, error) {
-	events := processHcsResult(resultp)
+func processAsyncHcsResult(ctx context.Context, err error, resultJSON string, callbackNumber uintptr, expectedNotification hcsNotification, timeout *time.Duration) ([]ErrorEvent, error) {
+	events := processHcsResult(ctx, resultJSON)
 	if IsPending(err) {
-		return nil, waitForNotification(callbackNumber, expectedNotification, timeout)
+		return nil, waitForNotification(ctx, callbackNumber, expectedNotification, timeout)
 	}
 
 	return events, err
 }
 
-func waitForNotification(callbackNumber uintptr, expectedNotification hcsNotification, timeout *time.Duration) error {
+func waitForNotification(ctx context.Context, callbackNumber uintptr, expectedNotification hcsNotification, timeout *time.Duration) error {
 	callbackMapLock.RLock()
 	if _, ok := callbackMap[callbackNumber]; !ok {
 		callbackMapLock.RUnlock()
-		logrus.Errorf("failed to waitForNotification: callbackNumber %d does not exist in callbackMap", callbackNumber)
+		log.G(ctx).WithField("callbackNumber", callbackNumber).Error("failed to waitForNotification: callbackNumber does not exist in callbackMap")
 		return ErrHandleClose
 	}
 	channels := callbackMap[callbackNumber].channels
@@ -27,7 +28,7 @@ func waitForNotification(callbackNumber uintptr, expectedNotification hcsNotific
 
 	expectedChannel := channels[expectedNotification]
 	if expectedChannel == nil {
-		logrus.Errorf("unknown notification type in waitForNotification %x", expectedNotification)
+		log.G(ctx).WithField("type", expectedNotification).Error("unknown notification type in waitForNotification")
 		return ErrInvalidNotificationType
 	}
 

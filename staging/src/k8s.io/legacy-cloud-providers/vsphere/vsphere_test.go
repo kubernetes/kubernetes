@@ -49,7 +49,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"

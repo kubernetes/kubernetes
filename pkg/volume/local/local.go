@@ -23,7 +23,7 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -360,8 +360,7 @@ func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, devic
 	switch fileType {
 	case hostutil.FileTypeBlockDev:
 		// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
-		devicePath = spec.PersistentVolume.Spec.Local.Path
-		return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
+		return dm.mountLocalBlockDevice(spec, spec.PersistentVolume.Spec.Local.Path, deviceMountPath)
 	case hostutil.FileTypeDirectory:
 		// if the given local volume path is of already filesystem directory, return directly
 		return nil
@@ -611,8 +610,8 @@ var _ volume.BlockVolumeMapper = &localVolumeMapper{}
 var _ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
 
 // SetUpDevice prepares the volume to the node by the plugin specific way.
-func (m *localVolumeMapper) SetUpDevice() error {
-	return nil
+func (m *localVolumeMapper) SetUpDevice() (string, error) {
+	return "", nil
 }
 
 // MapPodDevice provides physical device path for the local PV.
@@ -620,6 +619,11 @@ func (m *localVolumeMapper) MapPodDevice() (string, error) {
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
 	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)
 	return globalPath, nil
+}
+
+// GetStagingPath returns
+func (m *localVolumeMapper) GetStagingPath() string {
+	return ""
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.

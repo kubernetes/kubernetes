@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -196,6 +197,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		APIRegistrationInformers:        informerFactory,
 		serviceResolver:                 c.ExtraConfig.ServiceResolver,
 		openAPIConfig:                   openAPIConfig,
+		egressSelector:                  c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent:      func() (bytes []byte, bytes2 []byte) { return nil, nil },
 	}
 

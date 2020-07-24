@@ -5,11 +5,6 @@ go_library(
     srcs = ["config.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1",
     visibility = ["//visibility:public"],
-    deps = [
-        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
-        "//pkg/kubelet/server/stats:go_default_library",
-        "//staging/src/k8s.io/component-base/metrics:go_default_library",
-    ],
 )
 
 filegroup(

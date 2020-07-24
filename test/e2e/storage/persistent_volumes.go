@@ -33,8 +33,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -123,17 +123,17 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 		var (
 			nfsServerPod *v1.Pod
-			serverIP     string
+			serverHost   string
 		)
 
 		ginkgo.BeforeEach(func() {
-			_, nfsServerPod, serverIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+			_, nfsServerPod, serverHost = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			pvConfig = e2epv.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
 				Labels:     volLabel,
 				PVSource: v1.PersistentVolumeSource{
 					NFS: &v1.NFSVolumeSource{
-						Server:   serverIP,
+						Server:   serverHost,
 						Path:     "/exports",
 						ReadOnly: false,
 					},
@@ -315,7 +315,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
 
 			ginkgo.AfterEach(func() {
-				e2esset.DeleteAllStatefulSets(c, ns)
+				e2estatefulset.DeleteAllStatefulSets(c, ns)
 			})
 
 			ginkgo.It("should be reschedulable [Slow]", func() {
@@ -355,13 +355,13 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
 				ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
-				e2esset.WaitForRunningAndReady(c, 1, ss)
+				e2estatefulset.WaitForRunningAndReady(c, 1, ss)
 
 				ginkgo.By("Deleting the StatefulSet but not the volumes")
 				// Scale down to 0 first so that the Delete is quick
-				ss, err = e2esset.Scale(c, ss, 0)
+				ss, err = e2estatefulset.Scale(c, ss, 0)
 				framework.ExpectNoError(err)
-				e2esset.WaitForStatusReplicas(c, ss, 0)
+				e2estatefulset.WaitForStatusReplicas(c, ss, 0)
 				err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 
@@ -375,7 +375,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
 				ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
-				e2esset.WaitForRunningAndReady(c, 1, ss)
+				e2estatefulset.WaitForRunningAndReady(c, 1, ss)
 			})
 		})
 	})

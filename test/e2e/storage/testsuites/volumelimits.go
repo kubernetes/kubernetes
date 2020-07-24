@@ -170,11 +170,15 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		}
 
 		ginkgo.By("Creating pod to use all PVC(s)")
-		pod := e2epod.MakeSecPod(l.ns.Name, l.pvcs, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
-		// Use affinity to schedule everything on the right node
-		selection := e2epod.NodeSelection{}
-		e2epod.SetAffinity(&selection, nodeName)
-		pod.Spec.Affinity = selection.Affinity
+		selection := e2epod.NodeSelection{Name: nodeName}
+		podConfig := e2epod.Config{
+			NS:            l.ns.Name,
+			PVCs:          l.pvcs,
+			SeLinuxLabel:  e2epv.SELinuxLabel,
+			NodeSelection: selection,
+		}
+		pod, err := e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err)
 		l.runningPod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -187,10 +191,14 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
-		pod = e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
-		// Use affinity to schedule everything on the right node
-		e2epod.SetAffinity(&selection, nodeName)
-		pod.Spec.Affinity = selection.Affinity
+		podConfig = e2epod.Config{
+			NS:            l.ns.Name,
+			PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+			SeLinuxLabel:  e2epv.SELinuxLabel,
+			NodeSelection: selection,
+		}
+		pod, err = e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err)
 		l.unschedulablePod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create an extra pod with one volume to exceed the limit")
 

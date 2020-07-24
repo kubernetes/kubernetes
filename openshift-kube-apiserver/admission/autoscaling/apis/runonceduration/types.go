@@ -13,10 +13,10 @@ import (
 type RunOnceDurationConfig struct {
 	metav1.TypeMeta
 
-	// ActiveDeadlineSecondsLimit is the maximum value to set on containers of run-once pods
+	// ActiveDeadlineSecondsOverride is the maximum value to set on containers of run-once pods
 	// Only a positive value is valid. Absence of a value means that the plugin
 	// won't make any changes to the pod
-	ActiveDeadlineSecondsLimit *int64
+	ActiveDeadlineSecondsOverride *int64
 }
 
 // ActiveDeadlineSecondsLimitAnnotation can be set on a project to limit the number of

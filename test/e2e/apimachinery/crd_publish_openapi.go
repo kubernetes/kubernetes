@@ -28,7 +28,9 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/onsi/ginkgo"
+	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -39,10 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	k8sclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/crd"
-	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -467,6 +467,34 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 	})
+
+	// Marked as flaky until https://github.com/kubernetes/kubernetes/issues/65517 is solved.
+	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func() {
+		customServiceShortName := fmt.Sprintf("ksvc-%d", time.Now().Unix()) // make short name unique
+		opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
+			crd.ObjectMeta = metav1.ObjectMeta{Name: "services." + crd.Spec.Group}
+			crd.Spec.Names = apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:     "services",
+				Singular:   "service",
+				ListKind:   "ServiceList",
+				Kind:       "Service",
+				ShortNames: []string{customServiceShortName},
+			}
+		}
+		crdSvc, err := setupCRDAndVerifySchemaWithOptions(f, schemaCustomService, schemaCustomService, "service", []string{"v1"}, opt)
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+
+		if err := verifyKubectlExplain(f.Namespace.Name, customServiceShortName+".spec", `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
+			_ = cleanupCRD(f, crdSvc) // need to remove the crd since its name is unchanged
+			framework.Failf("%v", err)
+		}
+
+		if err := cleanupCRD(f, crdSvc); err != nil {
+			framework.Failf("%v", err)
+		}
+	})
 })
 
 func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
@@ -479,7 +507,11 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 	return setupCRDAndVerifySchema(f, schema, expect, groupSuffix, versions...)
 }
 
-func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, groupSuffix string, versions ...string) (tCRD *crd.TestCrd, err error) {
+func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
+	return setupCRDAndVerifySchemaWithOptions(f, schema, expect, groupSuffix, versions)
+}
+
+func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect []byte, groupSuffix string, versions []string, options ...crd.Option) (tCRD *crd.TestCrd, err error) {
 	defer func() {
 		if err == nil {
 			framework.Logf("sleeping 45 seconds before running the actual tests, we hope that during all API servers converge during that window, see %q for more", "https://github.com/kubernetes/kubernetes/pull/90452")
@@ -498,7 +530,7 @@ func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, grou
 		}
 	}
 
-	tCRD, err = crd.CreateMultiVersionTestCRD(f, group, func(crd *apiextensionsv1.CustomResourceDefinition) {
+	options = append(options, func(crd *apiextensionsv1.CustomResourceDefinition) {
 		var apiVersions []apiextensionsv1.CustomResourceDefinitionVersion
 		for i, version := range versions {
 			version := apiextensionsv1.CustomResourceDefinitionVersion{
@@ -523,6 +555,7 @@ func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, grou
 		}
 		crd.Spec.Versions = apiVersions
 	})
+	tCRD, err = crd.CreateMultiVersionTestCRD(f, group, options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
@@ -736,6 +769,18 @@ properties:
               description: Indicates to external qux type.
               pattern: in-tree|out-of-tree
               type: string`)
+
+var schemaCustomService = []byte(`description: CustomService CRD for Testing
+type: object
+properties:
+  spec:
+    description: Specification of CustomService
+    type: object
+    properties:
+      dummy:
+        description: Dummy property.
+        type: string
+`)
 
 var schemaWaldo = []byte(`description: Waldo CRD for Testing
 type: object

@@ -38,7 +38,7 @@ in a base by specifying the `images` field in the `kustomization.yaml`.
 |-----------|--------------------------------------------------------------------------|----------| --- |
 | `name`    | Match images with this image name| `name: nginx`| |
 | `newTag`  | Override the image **tag** or **digest** for images whose image name matches `name`    | `newTag: new` | `nginx:old` -> `nginx:new` |
-| `newName` | Override the image **name** for images whose image name matches `name`   | `newImage: nginx-special` | `nginx:old` -> `nginx-special:old` |
+| `newName` | Override the image **name** for images whose image name matches `name`   | `newName: nginx-special` | `nginx:old` -> `nginx-special:old` |
 
 {% sample lang="yaml" %}
 **Input:** The `kustomization.yaml` file
@@ -111,7 +111,7 @@ spec:
 
 
 {% panel style="info", title="Replacing Images" %}
-`newImage` allows an image name to be replaced with another arbitrary image name.  e.g. you could
+`newName` allows an image name to be replaced with another arbitrary image name.  e.g. you could
 call your image `webserver` or `database` and replace it with `nginx` or `mysql`.
 
 For more information on customizing images, see [Container Images](../app_management/container_images.md).

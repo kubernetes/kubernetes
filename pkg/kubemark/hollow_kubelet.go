@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -155,7 +155,6 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 
 	// Flags struct
 	f := options.NewKubeletFlags()
-	f.EnableServer = true
 	f.RootDirectory = testRootDir
 	f.HostnameOverride = opt.NodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
@@ -165,7 +164,6 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
-	f.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -174,6 +172,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	}
 
 	c.StaticPodURL = ""
+	c.EnableServer = true
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(opt.KubeletPort)
 	c.ReadOnlyPort = int32(opt.KubeletReadOnlyPort)
@@ -189,6 +188,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.ClusterDNS = []string{}
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
+	c.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
 	c.VolumeStatsAggPeriod.Duration = time.Minute
 	c.CgroupRoot = ""
 	c.CPUCFSQuota = true

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -421,13 +422,13 @@ func (o createAuthInfoOptions) validate() error {
 			return fmt.Errorf("you must specify a --%s or --%s to embed", clientcmd.FlagCertFile, clientcmd.FlagKeyFile)
 		}
 		if certPath != "" {
-			if _, err := ioutil.ReadFile(certPath); err != nil {
-				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagCertFile, certPath, err)
+			if _, err := os.Stat(certPath); err != nil {
+				return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagCertFile, certPath, err)
 			}
 		}
 		if keyPath != "" {
-			if _, err := ioutil.ReadFile(keyPath); err != nil {
-				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
+			if _, err := os.Stat(keyPath); err != nil {
+				return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
 		}
 	}

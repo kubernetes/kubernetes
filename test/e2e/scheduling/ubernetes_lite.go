@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -113,7 +114,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones
-	zoneNames, err := framework.GetClusterZones(f.ClientSet)
+	zoneNames, err := e2enode.GetClusterZones(f.ClientSet)
 	framework.ExpectNoError(err)
 	checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
 }
@@ -131,7 +132,7 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 
 // Return the number of zones in which we have nodes in this cluster.
 func getZoneCount(c clientset.Interface) (int, error) {
-	zoneNames, err := framework.GetClusterZones(c)
+	zoneNames, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		return -1, err
 	}
@@ -227,7 +228,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, ar
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones
-	zoneNames, err := framework.GetClusterZones(f.ClientSet)
+	zoneNames, err := e2enode.GetClusterZones(f.ClientSet)
 	framework.ExpectNoError(err)
 	checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
 }

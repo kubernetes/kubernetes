@@ -12,13 +12,13 @@ func (obj *RunOnceDurationConfig) GetObjectKind() schema.ObjectKind { return &ob
 var GroupVersion = schema.GroupVersion{Group: "autoscaling.openshift.io", Version: "v1"}
 
 var (
-	schemeBuilder = runtime.NewSchemeBuilder(
+	localSchemeBuilder = runtime.NewSchemeBuilder(
 		addKnownTypes,
 		runonceduration.Install,
 
 		addConversionFuncs,
 	)
-	Install = schemeBuilder.AddToScheme
+	Install = localSchemeBuilder.AddToScheme
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {

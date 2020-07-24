@@ -43,7 +43,7 @@ const (
 func RoundUpToGiB(size resource.Quantity) (int64, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSize(requestBytes, GiB), nil
 }
@@ -52,7 +52,7 @@ func RoundUpToGiB(size resource.Quantity) (int64, error) {
 func RoundUpToMB(size resource.Quantity) (int64, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSize(requestBytes, MB), nil
 }
@@ -61,7 +61,7 @@ func RoundUpToMB(size resource.Quantity) (int64, error) {
 func RoundUpToMiB(size resource.Quantity) (int64, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSize(requestBytes, MiB), nil
 }
@@ -70,7 +70,7 @@ func RoundUpToMiB(size resource.Quantity) (int64, error) {
 func RoundUpToKB(size resource.Quantity) (int64, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSize(requestBytes, KB), nil
 }
@@ -79,7 +79,7 @@ func RoundUpToKB(size resource.Quantity) (int64, error) {
 func RoundUpToKiB(size resource.Quantity) (int64, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSize(requestBytes, KiB), nil
 }
@@ -89,7 +89,7 @@ func RoundUpToKiB(size resource.Quantity) (int64, error) {
 func RoundUpToGiBInt(size resource.Quantity) (int, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSizeInt(requestBytes, GiB)
 }
@@ -99,7 +99,7 @@ func RoundUpToGiBInt(size resource.Quantity) (int, error) {
 func RoundUpToMBInt(size resource.Quantity) (int, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSizeInt(requestBytes, MB)
 }
@@ -109,7 +109,7 @@ func RoundUpToMBInt(size resource.Quantity) (int, error) {
 func RoundUpToMiBInt(size resource.Quantity) (int, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSizeInt(requestBytes, MiB)
 }
@@ -119,7 +119,7 @@ func RoundUpToMiBInt(size resource.Quantity) (int, error) {
 func RoundUpToKBInt(size resource.Quantity) (int, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSizeInt(requestBytes, KB)
 }
@@ -136,7 +136,7 @@ func RoundUpToKiBInt(size resource.Quantity) (int, error) {
 func RoundUpToGiBInt32(size resource.Quantity) (int32, error) {
 	requestBytes, ok := size.AsInt64()
 	if !ok {
-		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	return roundUpSizeInt32(requestBytes, GiB)
 }

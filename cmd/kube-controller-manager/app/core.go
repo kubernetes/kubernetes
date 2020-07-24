@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,10 +37,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
+	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
+	routecontroller "k8s.io/cloud-provider/controllers/route"
+	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
-	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -51,12 +53,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	routecontroller "k8s.io/kubernetes/pkg/controller/route"
-	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	"k8s.io/kubernetes/pkg/controller/volume/ephemeral"
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
@@ -82,6 +83,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ComponentConfig.KubeCloudShared.ClusterName,
+		utilfeature.DefaultFeatureGate,
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.
@@ -215,7 +217,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 }
 
 func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
-	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
+	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
@@ -367,6 +369,22 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 		}
 		go expandController.Run(ctx.Stop)
+		return nil, true, nil
+	}
+	return nil, false, nil
+}
+
+func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		ephemeralController, err := ephemeral.NewController(
+			ctx.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
+			ctx.InformerFactory.Core().V1().Pods(),
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims())
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
+		}
+		// TODO (before beta at the latest): make this configurable similar to the EndpointController
+		go ephemeralController.Run(1 /* int(ctx.ComponentConfig.EphemeralController.ConcurrentEphemeralVolumeSyncs) */, ctx.Stop)
 		return nil, true, nil
 	}
 	return nil, false, nil
@@ -533,12 +551,17 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 }
 
 func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, error) {
-	go pvcprotection.NewPVCProtectionController(
+	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-	).Run(1, ctx.Stop)
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
+	}
+	go pvcProtectionController.Run(1, ctx.Stop)
 	return nil, true, nil
 }
 

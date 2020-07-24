@@ -27,6 +27,7 @@ import (
 
 var (
 	// TODO(rjnagal): Verify and fix for other architectures.
+
 	Endian = binary.LittleEndian
 )
 
@@ -42,11 +43,11 @@ type netlinkMessage struct {
 	Data      []byte
 }
 
-func (self netlinkMessage) toRawMsg() (rawmsg syscall.NetlinkMessage) {
-	rawmsg.Header = self.Header
+func (m netlinkMessage) toRawMsg() (rawmsg syscall.NetlinkMessage) {
+	rawmsg.Header = m.Header
 	w := bytes.NewBuffer([]byte{})
-	binary.Write(w, Endian, self.GenHeader)
-	w.Write(self.Data)
+	binary.Write(w, Endian, m.GenHeader)
+	w.Write(m.Data)
 	rawmsg.Data = w.Bytes()
 	return rawmsg
 }
@@ -64,9 +65,12 @@ func padding(size int, alignment int) int {
 }
 
 // Get family id for taskstats subsystem.
-func getFamilyId(conn *Connection) (uint16, error) {
+func getFamilyID(conn *Connection) (uint16, error) {
 	msg := prepareFamilyMessage()
-	conn.WriteMessage(msg.toRawMsg())
+	err := conn.WriteMessage(msg.toRawMsg())
+	if err != nil {
+		return 0, err
+	}
 
 	resp, err := conn.ReadMessage()
 	if err != nil {
@@ -164,7 +168,7 @@ func parseFamilyResp(msg syscall.NetlinkMessage) (uint16, error) {
 			return 0, err
 		}
 	}
-	return 0, fmt.Errorf("family id not found in the response.")
+	return 0, fmt.Errorf("family id not found in the response")
 }
 
 // Extract task stats from response returned by kernel.
@@ -203,7 +207,10 @@ func verifyHeader(msg syscall.NetlinkMessage) error {
 	case syscall.NLMSG_ERROR:
 		buf := bytes.NewBuffer(msg.Data)
 		var errno int32
-		binary.Read(buf, Endian, errno)
+		err := binary.Read(buf, Endian, errno)
+		if err != nil {
+			return err
+		}
 		return fmt.Errorf("netlink request failed with error %s", syscall.Errno(-errno))
 	}
 	return nil

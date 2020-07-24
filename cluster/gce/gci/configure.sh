@@ -24,12 +24,12 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION="v0.8.5"
-DEFAULT_CNI_SHA1="677d218b62c0ef941c1d0b606d6570faa5277ffd"
+DEFAULT_CNI_VERSION="v0.8.6"
+DEFAULT_CNI_SHA1="a31251105250279fe57b4474d91d2db1d4d48b5a"
 DEFAULT_NPD_VERSION="v0.8.0"
 DEFAULT_NPD_SHA1="9406c975b1b035995a137029a004622b905b4e7f"
-DEFAULT_CRICTL_VERSION="v1.17.0"
-DEFAULT_CRICTL_SHA1="5c18f4e52ab524d429063b78d086dd18b894aae7"
+DEFAULT_CRICTL_VERSION="v1.18.0"
+DEFAULT_CRICTL_SHA1="f384f594bd0a7e558a827363f54f58b45e670075"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -280,7 +280,7 @@ function install-crictl {
     local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
     local -r crictl_sha1="${DEFAULT_CRICTL_SHA1}"
   fi
-  local -r crictl="crictl-${crictl_version}-linux-amd64"
+  local -r crictl="crictl-${crictl_version}-linux-amd64.tar.gz"
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
@@ -293,10 +293,10 @@ EOF
   fi
 
   echo "Downloading crictl"
-  local -r crictl_path="https://storage.googleapis.com/kubernetes-release/crictl"
+  local -r crictl_path="https://storage.googleapis.com/k8s-artifacts-cri-tools/release/${crictl_version}"
   download-or-bust "${crictl_sha1}" "${crictl_path}/${crictl}"
-  mv "${KUBE_HOME}/${crictl}" "${KUBE_BIN}/crictl"
-  chmod a+x "${KUBE_BIN}/crictl"
+  tar xf "${crictl}"
+  mv crictl "${KUBE_BIN}/crictl"
 }
 
 function install-exec-auth-plugin {
@@ -322,7 +322,7 @@ function install-exec-auth-plugin {
   local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
   echo "Downloading gke-exec-auth-plugin license"
   download-or-bust "" "${license_url}"
-  mv "${KUBE_HOME}/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
+  mv "${KUBE_HOME}/LICENSES/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
 }
 
 function install-kube-manifests {
@@ -376,9 +376,18 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-  until timeout 30 ${LOAD_IMAGE_COMMAND:-docker load -i} "${img}"; do
+
+  if [[ "${CONTAINER_RUNTIME_NAME:-}" == "docker" ]]; then
+    load_image_command=${LOAD_IMAGE_COMMAND:-docker load -i}
+  elif [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
+    load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+  else
+    load_image_command="${LOAD_IMAGE_COMMAND:-}"
+  fi
+
+  until timeout 30 ${load_image_command} "${img}"; do
     if [[ "${attempt_num}" == "${max_attempts}" ]]; then
-      echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
+      echo "Fail to load docker image file ${img} using ${load_image_command} after ${max_attempts} retries. Exit!!"
       exit 1
     else
       attempt_num=$((attempt_num+1))
@@ -423,12 +432,14 @@ function install-docker {
     software-properties-common \
     lsb-release
 
+  release=$(lsb_release -cs)
+
   # Add the Docker apt-repository
   curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
     | apt-key add -
   add-apt-repository \
     "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-    $(lsb_release -cs) stable"
+    $release stable"
 
   # Install Docker
   apt-get update && \
@@ -462,12 +473,14 @@ function install-containerd-ubuntu {
     software-properties-common \
     lsb-release
 
+  release=$(lsb_release -cs)
+
   # Add the Docker apt-repository (as we install containerd from there)
   curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg \
     | apt-key add -
   add-apt-repository \
     "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-    $(lsb_release -cs) stable"
+    $release stable"
 
   # Install containerd from Docker repo
   apt-get update && \
@@ -477,7 +490,10 @@ function install-containerd-ubuntu {
   # Override to latest versions of containerd and runc
   systemctl stop containerd
   if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.linux-amd64.tar.gz" | tar --overwrite -xzv -C /usr/
+    # containerd versions have slightly different url(s), so try both
+    ( curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-linux-amd64.tar.gz" || \
+      curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.linux-amd64.tar.gz" ) \
+    | tar --overwrite -xzv -C /usr/
   fi
   if [[ ! -z "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
     curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.amd64" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
@@ -559,6 +575,9 @@ function install-kube-binary-config {
     mv "${src_dir}/kubelet" "${KUBE_BIN}"
     mv "${src_dir}/kubectl" "${KUBE_BIN}"
 
+    # Some older images have LICENSES baked-in as a file. Presumably they will
+    # have the directory baked-in eventually.
+    rm -rf "${KUBE_HOME}"/LICENSES
     mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
   fi

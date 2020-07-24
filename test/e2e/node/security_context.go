@@ -267,7 +267,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	_, err = client.Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 
-	err = f.WaitForPodRunning(pod.Name)
+	err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
 	// for this to work, SELinux should be in enforcing mode, so let's check that

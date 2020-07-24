@@ -6,5 +6,5 @@ approvers:
 reviewers:
 - sig-instrumentation-reviewers
 labels:
-- sig/gcp
+- area/provider/gcp
 - sig/instrumentation

@@ -183,6 +183,7 @@ var (
 	FSScaleIO                   FSType = "scaleIO"
 	FSStorageOS                 FSType = "storageOS"
 	FSTypeCSI                   FSType = "csi"
+	FSTypeEphemeral             FSType = "ephemeral"
 	FSTypeAll                   FSType = "*"
 	FSTypeNone                  FSType = "none"
 )

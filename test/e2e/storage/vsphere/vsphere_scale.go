@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 	*/
 	framework.AddCleanupAction(func() {
 		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(namespace) > 0 {
+		if len(namespace) > 0 && nodes != nil {
 			for _, node := range nodes.Items {
 				framework.RemoveLabelOffNode(client, node.Name, NodeLabelKey)
 			}

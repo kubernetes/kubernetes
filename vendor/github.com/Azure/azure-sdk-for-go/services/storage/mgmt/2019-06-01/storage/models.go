@@ -50,13 +50,15 @@ func PossibleAccessTierValues() []AccessTier {
 type AccountExpand string
 
 const (
+	// AccountExpandBlobRestoreStatus ...
+	AccountExpandBlobRestoreStatus AccountExpand = "blobRestoreStatus"
 	// AccountExpandGeoReplicationStats ...
 	AccountExpandGeoReplicationStats AccountExpand = "geoReplicationStats"
 )
 
 // PossibleAccountExpandValues returns an array of possible values for the AccountExpand const type.
 func PossibleAccountExpandValues() []AccountExpand {
-	return []AccountExpand{AccountExpandGeoReplicationStats}
+	return []AccountExpand{AccountExpandBlobRestoreStatus, AccountExpandGeoReplicationStats}
 }
 
 // AccountStatus enumerates the values for account status.
@@ -106,6 +108,23 @@ const (
 // PossibleAction1Values returns an array of possible values for the Action1 const type.
 func PossibleAction1Values() []Action1 {
 	return []Action1{Acquire, Break, Change, Release, Renew}
+}
+
+// BlobRestoreProgressStatus enumerates the values for blob restore progress status.
+type BlobRestoreProgressStatus string
+
+const (
+	// Complete ...
+	Complete BlobRestoreProgressStatus = "Complete"
+	// Failed ...
+	Failed BlobRestoreProgressStatus = "Failed"
+	// InProgress ...
+	InProgress BlobRestoreProgressStatus = "InProgress"
+)
+
+// PossibleBlobRestoreProgressStatusValues returns an array of possible values for the BlobRestoreProgressStatus const type.
+func PossibleBlobRestoreProgressStatusValues() []BlobRestoreProgressStatus {
+	return []BlobRestoreProgressStatus{Complete, Failed, InProgress}
 }
 
 // Bypass enumerates the values for bypass.
@@ -159,6 +178,51 @@ func PossibleDirectoryServiceOptionsValues() []DirectoryServiceOptions {
 	return []DirectoryServiceOptions{DirectoryServiceOptionsAADDS, DirectoryServiceOptionsAD, DirectoryServiceOptionsNone}
 }
 
+// EnabledProtocols enumerates the values for enabled protocols.
+type EnabledProtocols string
+
+const (
+	// NFS ...
+	NFS EnabledProtocols = "NFS"
+	// SMB ...
+	SMB EnabledProtocols = "SMB"
+)
+
+// PossibleEnabledProtocolsValues returns an array of possible values for the EnabledProtocols const type.
+func PossibleEnabledProtocolsValues() []EnabledProtocols {
+	return []EnabledProtocols{NFS, SMB}
+}
+
+// EncryptionScopeSource enumerates the values for encryption scope source.
+type EncryptionScopeSource string
+
+const (
+	// MicrosoftKeyVault ...
+	MicrosoftKeyVault EncryptionScopeSource = "Microsoft.KeyVault"
+	// MicrosoftStorage ...
+	MicrosoftStorage EncryptionScopeSource = "Microsoft.Storage"
+)
+
+// PossibleEncryptionScopeSourceValues returns an array of possible values for the EncryptionScopeSource const type.
+func PossibleEncryptionScopeSourceValues() []EncryptionScopeSource {
+	return []EncryptionScopeSource{MicrosoftKeyVault, MicrosoftStorage}
+}
+
+// EncryptionScopeState enumerates the values for encryption scope state.
+type EncryptionScopeState string
+
+const (
+	// Disabled ...
+	Disabled EncryptionScopeState = "Disabled"
+	// Enabled ...
+	Enabled EncryptionScopeState = "Enabled"
+)
+
+// PossibleEncryptionScopeStateValues returns an array of possible values for the EncryptionScopeState const type.
+func PossibleEncryptionScopeStateValues() []EncryptionScopeState {
+	return []EncryptionScopeState{Disabled, Enabled}
+}
+
 // GeoReplicationStatus enumerates the values for geo replication status.
 type GeoReplicationStatus string
 
@@ -174,6 +238,19 @@ const (
 // PossibleGeoReplicationStatusValues returns an array of possible values for the GeoReplicationStatus const type.
 func PossibleGeoReplicationStatusValues() []GeoReplicationStatus {
 	return []GeoReplicationStatus{GeoReplicationStatusBootstrap, GeoReplicationStatusLive, GeoReplicationStatusUnavailable}
+}
+
+// GetShareExpand enumerates the values for get share expand.
+type GetShareExpand string
+
+const (
+	// Stats ...
+	Stats GetShareExpand = "stats"
+)
+
+// PossibleGetShareExpandValues returns an array of possible values for the GetShareExpand const type.
+func PossibleGetShareExpandValues() []GetShareExpand {
+	return []GetShareExpand{Stats}
 }
 
 // HTTPProtocol enumerates the values for http protocol.
@@ -242,15 +319,30 @@ func PossibleKeyPermissionValues() []KeyPermission {
 type KeySource string
 
 const (
-	// MicrosoftKeyvault ...
-	MicrosoftKeyvault KeySource = "Microsoft.Keyvault"
-	// MicrosoftStorage ...
-	MicrosoftStorage KeySource = "Microsoft.Storage"
+	// KeySourceMicrosoftKeyvault ...
+	KeySourceMicrosoftKeyvault KeySource = "Microsoft.Keyvault"
+	// KeySourceMicrosoftStorage ...
+	KeySourceMicrosoftStorage KeySource = "Microsoft.Storage"
 )
 
 // PossibleKeySourceValues returns an array of possible values for the KeySource const type.
 func PossibleKeySourceValues() []KeySource {
-	return []KeySource{MicrosoftKeyvault, MicrosoftStorage}
+	return []KeySource{KeySourceMicrosoftKeyvault, KeySourceMicrosoftStorage}
+}
+
+// KeyType enumerates the values for key type.
+type KeyType string
+
+const (
+	// KeyTypeAccount ...
+	KeyTypeAccount KeyType = "Account"
+	// KeyTypeService ...
+	KeyTypeService KeyType = "Service"
+)
+
+// PossibleKeyTypeValues returns an array of possible values for the KeyType const type.
+func PossibleKeyTypeValues() []KeyType {
+	return []KeyType{KeyTypeAccount, KeyTypeService}
 }
 
 // Kind enumerates the values for kind.
@@ -278,15 +370,15 @@ func PossibleKindValues() []Kind {
 type LargeFileSharesState string
 
 const (
-	// Disabled ...
-	Disabled LargeFileSharesState = "Disabled"
-	// Enabled ...
-	Enabled LargeFileSharesState = "Enabled"
+	// LargeFileSharesStateDisabled ...
+	LargeFileSharesStateDisabled LargeFileSharesState = "Disabled"
+	// LargeFileSharesStateEnabled ...
+	LargeFileSharesStateEnabled LargeFileSharesState = "Enabled"
 )
 
 // PossibleLargeFileSharesStateValues returns an array of possible values for the LargeFileSharesState const type.
 func PossibleLargeFileSharesStateValues() []LargeFileSharesState {
-	return []LargeFileSharesState{Disabled, Enabled}
+	return []LargeFileSharesState{LargeFileSharesStateDisabled, LargeFileSharesStateEnabled}
 }
 
 // LeaseDuration enumerates the values for lease duration.
@@ -340,6 +432,19 @@ func PossibleLeaseStatusValues() []LeaseStatus {
 	return []LeaseStatus{LeaseStatusLocked, LeaseStatusUnlocked}
 }
 
+// ListContainersInclude enumerates the values for list containers include.
+type ListContainersInclude string
+
+const (
+	// Deleted ...
+	Deleted ListContainersInclude = "deleted"
+)
+
+// PossibleListContainersIncludeValues returns an array of possible values for the ListContainersInclude const type.
+func PossibleListContainersIncludeValues() []ListContainersInclude {
+	return []ListContainersInclude{Deleted}
+}
+
 // ListKeyExpand enumerates the values for list key expand.
 type ListKeyExpand string
 
@@ -351,6 +456,19 @@ const (
 // PossibleListKeyExpandValues returns an array of possible values for the ListKeyExpand const type.
 func PossibleListKeyExpandValues() []ListKeyExpand {
 	return []ListKeyExpand{Kerb}
+}
+
+// ListSharesExpand enumerates the values for list shares expand.
+type ListSharesExpand string
+
+const (
+	// ListSharesExpandDeleted ...
+	ListSharesExpandDeleted ListSharesExpand = "deleted"
+)
+
+// PossibleListSharesExpandValues returns an array of possible values for the ListSharesExpand const type.
+func PossibleListSharesExpandValues() []ListSharesExpand {
+	return []ListSharesExpand{ListSharesExpandDeleted}
 }
 
 // Permissions enumerates the values for permissions.
@@ -385,19 +503,19 @@ func PossiblePermissionsValues() []Permissions {
 type PrivateEndpointConnectionProvisioningState string
 
 const (
-	// Creating ...
-	Creating PrivateEndpointConnectionProvisioningState = "Creating"
-	// Deleting ...
-	Deleting PrivateEndpointConnectionProvisioningState = "Deleting"
-	// Failed ...
-	Failed PrivateEndpointConnectionProvisioningState = "Failed"
-	// Succeeded ...
-	Succeeded PrivateEndpointConnectionProvisioningState = "Succeeded"
+	// PrivateEndpointConnectionProvisioningStateCreating ...
+	PrivateEndpointConnectionProvisioningStateCreating PrivateEndpointConnectionProvisioningState = "Creating"
+	// PrivateEndpointConnectionProvisioningStateDeleting ...
+	PrivateEndpointConnectionProvisioningStateDeleting PrivateEndpointConnectionProvisioningState = "Deleting"
+	// PrivateEndpointConnectionProvisioningStateFailed ...
+	PrivateEndpointConnectionProvisioningStateFailed PrivateEndpointConnectionProvisioningState = "Failed"
+	// PrivateEndpointConnectionProvisioningStateSucceeded ...
+	PrivateEndpointConnectionProvisioningStateSucceeded PrivateEndpointConnectionProvisioningState = "Succeeded"
 )
 
 // PossiblePrivateEndpointConnectionProvisioningStateValues returns an array of possible values for the PrivateEndpointConnectionProvisioningState const type.
 func PossiblePrivateEndpointConnectionProvisioningStateValues() []PrivateEndpointConnectionProvisioningState {
-	return []PrivateEndpointConnectionProvisioningState{Creating, Deleting, Failed, Succeeded}
+	return []PrivateEndpointConnectionProvisioningState{PrivateEndpointConnectionProvisioningStateCreating, PrivateEndpointConnectionProvisioningStateDeleting, PrivateEndpointConnectionProvisioningStateFailed, PrivateEndpointConnectionProvisioningStateSucceeded}
 }
 
 // PrivateEndpointServiceConnectionStatus enumerates the values for private endpoint service connection status.
@@ -421,17 +539,17 @@ func PossiblePrivateEndpointServiceConnectionStatusValues() []PrivateEndpointSer
 type ProvisioningState string
 
 const (
-	// ProvisioningStateCreating ...
-	ProvisioningStateCreating ProvisioningState = "Creating"
-	// ProvisioningStateResolvingDNS ...
-	ProvisioningStateResolvingDNS ProvisioningState = "ResolvingDNS"
-	// ProvisioningStateSucceeded ...
-	ProvisioningStateSucceeded ProvisioningState = "Succeeded"
+	// Creating ...
+	Creating ProvisioningState = "Creating"
+	// ResolvingDNS ...
+	ResolvingDNS ProvisioningState = "ResolvingDNS"
+	// Succeeded ...
+	Succeeded ProvisioningState = "Succeeded"
 )
 
 // PossibleProvisioningStateValues returns an array of possible values for the ProvisioningState const type.
 func PossibleProvisioningStateValues() []ProvisioningState {
-	return []ProvisioningState{ProvisioningStateCreating, ProvisioningStateResolvingDNS, ProvisioningStateSucceeded}
+	return []ProvisioningState{Creating, ResolvingDNS, Succeeded}
 }
 
 // PublicAccess enumerates the values for public access.
@@ -481,6 +599,38 @@ func PossibleReasonCodeValues() []ReasonCode {
 	return []ReasonCode{NotAvailableForSubscription, QuotaID}
 }
 
+// RootSquashType enumerates the values for root squash type.
+type RootSquashType string
+
+const (
+	// AllSquash ...
+	AllSquash RootSquashType = "AllSquash"
+	// NoRootSquash ...
+	NoRootSquash RootSquashType = "NoRootSquash"
+	// RootSquash ...
+	RootSquash RootSquashType = "RootSquash"
+)
+
+// PossibleRootSquashTypeValues returns an array of possible values for the RootSquashType const type.
+func PossibleRootSquashTypeValues() []RootSquashType {
+	return []RootSquashType{AllSquash, NoRootSquash, RootSquash}
+}
+
+// RoutingChoice enumerates the values for routing choice.
+type RoutingChoice string
+
+const (
+	// InternetRouting ...
+	InternetRouting RoutingChoice = "InternetRouting"
+	// MicrosoftRouting ...
+	MicrosoftRouting RoutingChoice = "MicrosoftRouting"
+)
+
+// PossibleRoutingChoiceValues returns an array of possible values for the RoutingChoice const type.
+func PossibleRoutingChoiceValues() []RoutingChoice {
+	return []RoutingChoice{InternetRouting, MicrosoftRouting}
+}
+
 // Services enumerates the values for services.
 type Services string
 
@@ -498,6 +648,25 @@ const (
 // PossibleServicesValues returns an array of possible values for the Services const type.
 func PossibleServicesValues() []Services {
 	return []Services{B, F, Q, T}
+}
+
+// ShareAccessTier enumerates the values for share access tier.
+type ShareAccessTier string
+
+const (
+	// ShareAccessTierCool ...
+	ShareAccessTierCool ShareAccessTier = "Cool"
+	// ShareAccessTierHot ...
+	ShareAccessTierHot ShareAccessTier = "Hot"
+	// ShareAccessTierPremium ...
+	ShareAccessTierPremium ShareAccessTier = "Premium"
+	// ShareAccessTierTransactionOptimized ...
+	ShareAccessTierTransactionOptimized ShareAccessTier = "TransactionOptimized"
+)
+
+// PossibleShareAccessTierValues returns an array of possible values for the ShareAccessTier const type.
+func PossibleShareAccessTierValues() []ShareAccessTier {
+	return []ShareAccessTier{ShareAccessTierCool, ShareAccessTierHot, ShareAccessTierPremium, ShareAccessTierTransactionOptimized}
 }
 
 // SignedResource enumerates the values for signed resource.
@@ -877,6 +1046,19 @@ func (acp *AccountCreateParameters) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// AccountInternetEndpoints the URIs that are used to perform a retrieval of a public blob, file, web or
+// dfs object via a internet routing endpoint.
+type AccountInternetEndpoints struct {
+	// Blob - READ-ONLY; Gets the blob endpoint.
+	Blob *string `json:"blob,omitempty"`
+	// File - READ-ONLY; Gets the file endpoint.
+	File *string `json:"file,omitempty"`
+	// Web - READ-ONLY; Gets the web endpoint.
+	Web *string `json:"web,omitempty"`
+	// Dfs - READ-ONLY; Gets the dfs endpoint.
+	Dfs *string `json:"dfs,omitempty"`
+}
+
 // AccountKey an access key for the storage account.
 type AccountKey struct {
 	// KeyName - READ-ONLY; Name of the key.
@@ -1040,9 +1222,26 @@ func NewAccountListResultPage(getNextPage func(context.Context, AccountListResul
 	return AccountListResultPage{fn: getNextPage}
 }
 
+// AccountMicrosoftEndpoints the URIs that are used to perform a retrieval of a public blob, queue, table,
+// web or dfs object via a microsoft routing endpoint.
+type AccountMicrosoftEndpoints struct {
+	// Blob - READ-ONLY; Gets the blob endpoint.
+	Blob *string `json:"blob,omitempty"`
+	// Queue - READ-ONLY; Gets the queue endpoint.
+	Queue *string `json:"queue,omitempty"`
+	// Table - READ-ONLY; Gets the table endpoint.
+	Table *string `json:"table,omitempty"`
+	// File - READ-ONLY; Gets the file endpoint.
+	File *string `json:"file,omitempty"`
+	// Web - READ-ONLY; Gets the web endpoint.
+	Web *string `json:"web,omitempty"`
+	// Dfs - READ-ONLY; Gets the dfs endpoint.
+	Dfs *string `json:"dfs,omitempty"`
+}
+
 // AccountProperties properties of the storage account.
 type AccountProperties struct {
-	// ProvisioningState - READ-ONLY; Gets the status of the storage account at the time the operation was called. Possible values include: 'ProvisioningStateCreating', 'ProvisioningStateResolvingDNS', 'ProvisioningStateSucceeded'
+	// ProvisioningState - READ-ONLY; Gets the status of the storage account at the time the operation was called. Possible values include: 'Creating', 'ResolvingDNS', 'Succeeded'
 	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// PrimaryEndpoints - READ-ONLY; Gets the URLs that are used to perform a retrieval of a public blob, queue, or table object. Note that Standard_ZRS and Premium_LRS accounts only return the blob endpoint.
 	PrimaryEndpoints *Endpoints `json:"primaryEndpoints,omitempty"`
@@ -1078,10 +1277,14 @@ type AccountProperties struct {
 	GeoReplicationStats *GeoReplicationStats `json:"geoReplicationStats,omitempty"`
 	// FailoverInProgress - READ-ONLY; If the failover is in progress, the value will be true, otherwise, it will be null.
 	FailoverInProgress *bool `json:"failoverInProgress,omitempty"`
-	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'Disabled', 'Enabled'
+	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'LargeFileSharesStateDisabled', 'LargeFileSharesStateEnabled'
 	LargeFileSharesState LargeFileSharesState `json:"largeFileSharesState,omitempty"`
 	// PrivateEndpointConnections - READ-ONLY; List of private endpoint connection associated with the specified storage account
 	PrivateEndpointConnections *[]PrivateEndpointConnection `json:"privateEndpointConnections,omitempty"`
+	// RoutingPreference - Maintains information about the network routing choice opted by the user for data transfer
+	RoutingPreference *RoutingPreference `json:"routingPreference,omitempty"`
+	// BlobRestoreStatus - READ-ONLY; Blob restore status
+	BlobRestoreStatus *BlobRestoreStatus `json:"blobRestoreStatus,omitempty"`
 }
 
 // AccountPropertiesCreateParameters the parameters used to create the storage account.
@@ -1100,8 +1303,10 @@ type AccountPropertiesCreateParameters struct {
 	EnableHTTPSTrafficOnly *bool `json:"supportsHttpsTrafficOnly,omitempty"`
 	// IsHnsEnabled - Account HierarchicalNamespace enabled if sets to true.
 	IsHnsEnabled *bool `json:"isHnsEnabled,omitempty"`
-	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'Disabled', 'Enabled'
+	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'LargeFileSharesStateDisabled', 'LargeFileSharesStateEnabled'
 	LargeFileSharesState LargeFileSharesState `json:"largeFileSharesState,omitempty"`
+	// RoutingPreference - Maintains information about the network routing choice opted by the user for data transfer
+	RoutingPreference *RoutingPreference `json:"routingPreference,omitempty"`
 }
 
 // AccountPropertiesUpdateParameters the parameters used when updating a storage account.
@@ -1118,8 +1323,10 @@ type AccountPropertiesUpdateParameters struct {
 	EnableHTTPSTrafficOnly *bool `json:"supportsHttpsTrafficOnly,omitempty"`
 	// NetworkRuleSet - Network rule set
 	NetworkRuleSet *NetworkRuleSet `json:"networkAcls,omitempty"`
-	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'Disabled', 'Enabled'
+	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'LargeFileSharesStateDisabled', 'LargeFileSharesStateEnabled'
 	LargeFileSharesState LargeFileSharesState `json:"largeFileSharesState,omitempty"`
+	// RoutingPreference - Maintains information about the network routing choice opted by the user for data transfer
+	RoutingPreference *RoutingPreference `json:"routingPreference,omitempty"`
 }
 
 // AccountRegenerateKeyParameters the parameters used to regenerate the storage account key.
@@ -1197,6 +1404,35 @@ func (future *AccountsFailoverFuture) Result(client AccountsClient) (ar autorest
 		return
 	}
 	ar.Response = future.Response()
+	return
+}
+
+// AccountsRestoreBlobRangesFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type AccountsRestoreBlobRangesFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *AccountsRestoreBlobRangesFuture) Result(client AccountsClient) (brs BlobRestoreStatus, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "storage.AccountsRestoreBlobRangesFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("storage.AccountsRestoreBlobRangesFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if brs.Response.Response, err = future.GetResult(sender); err == nil && brs.Response.Response.StatusCode != http.StatusNoContent {
+		brs, err = client.RestoreBlobRangesResponder(brs.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "storage.AccountsRestoreBlobRangesFuture", "Result", brs.Response.Response, "Failure responding to request")
+		}
+	}
 	return
 }
 
@@ -1416,6 +1652,35 @@ func (bc *BlobContainer) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// BlobRestoreParameters blob restore parameters
+type BlobRestoreParameters struct {
+	// TimeToRestore - Restore blob to the specified time.
+	TimeToRestore *date.Time `json:"timeToRestore,omitempty"`
+	// BlobRanges - Blob ranges to restore.
+	BlobRanges *[]BlobRestoreRange `json:"blobRanges,omitempty"`
+}
+
+// BlobRestoreRange blob range
+type BlobRestoreRange struct {
+	// StartRange - Blob start range. This is inclusive. Empty means account start.
+	StartRange *string `json:"startRange,omitempty"`
+	// EndRange - Blob end range. This is exclusive. Empty means account end.
+	EndRange *string `json:"endRange,omitempty"`
+}
+
+// BlobRestoreStatus blob restore status.
+type BlobRestoreStatus struct {
+	autorest.Response `json:"-"`
+	// Status - READ-ONLY; The status of blob restore progress. Possible values are: - InProgress: Indicates that blob restore is ongoing. - Complete: Indicates that blob restore has been completed successfully. - Failed: Indicates that blob restore is failed. Possible values include: 'InProgress', 'Complete', 'Failed'
+	Status BlobRestoreProgressStatus `json:"status,omitempty"`
+	// FailureReason - READ-ONLY; Failure reason when blob restore is failed.
+	FailureReason *string `json:"failureReason,omitempty"`
+	// RestoreID - READ-ONLY; Id for tracking blob restore request.
+	RestoreID *string `json:"restoreId,omitempty"`
+	// Parameters - READ-ONLY; Blob restore request parameters.
+	Parameters *BlobRestoreParameters `json:"parameters,omitempty"`
+}
+
 // BlobServiceItems ...
 type BlobServiceItems struct {
 	autorest.Response `json:"-"`
@@ -1428,6 +1693,8 @@ type BlobServiceProperties struct {
 	autorest.Response `json:"-"`
 	// BlobServicePropertiesProperties - The properties of a storage account’s Blob service.
 	*BlobServicePropertiesProperties `json:"properties,omitempty"`
+	// Sku - READ-ONLY; Sku name and tier.
+	Sku *Sku `json:"sku,omitempty"`
 	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
 	ID *string `json:"id,omitempty"`
 	// Name - READ-ONLY; The name of the resource
@@ -1462,6 +1729,15 @@ func (bsp *BlobServiceProperties) UnmarshalJSON(body []byte) error {
 					return err
 				}
 				bsp.BlobServicePropertiesProperties = &blobServiceProperties
+			}
+		case "sku":
+			if v != nil {
+				var sku Sku
+				err = json.Unmarshal(*v, &sku)
+				if err != nil {
+					return err
+				}
+				bsp.Sku = &sku
 			}
 		case "id":
 			if v != nil {
@@ -1502,12 +1778,18 @@ type BlobServicePropertiesProperties struct {
 	Cors *CorsRules `json:"cors,omitempty"`
 	// DefaultServiceVersion - DefaultServiceVersion indicates the default version to use for requests to the Blob service if an incoming request’s version is not specified. Possible values include version 2008-10-27 and all more recent versions.
 	DefaultServiceVersion *string `json:"defaultServiceVersion,omitempty"`
-	// DeleteRetentionPolicy - The blob service properties for soft delete.
+	// DeleteRetentionPolicy - The blob service properties for blob soft delete.
 	DeleteRetentionPolicy *DeleteRetentionPolicy `json:"deleteRetentionPolicy,omitempty"`
-	// AutomaticSnapshotPolicyEnabled - Automatic Snapshot is enabled if set to true.
+	// IsVersioningEnabled - Versioning is enabled if set to true.
+	IsVersioningEnabled *bool `json:"isVersioningEnabled,omitempty"`
+	// AutomaticSnapshotPolicyEnabled - Deprecated in favor of isVersioningEnabled property.
 	AutomaticSnapshotPolicyEnabled *bool `json:"automaticSnapshotPolicyEnabled,omitempty"`
 	// ChangeFeed - The blob service properties for change feed events.
 	ChangeFeed *ChangeFeed `json:"changeFeed,omitempty"`
+	// RestorePolicy - The blob service properties for blob restore policy.
+	RestorePolicy *RestorePolicyProperties `json:"restorePolicy,omitempty"`
+	// ContainerDeleteRetentionPolicy - The blob service properties for container soft delete.
+	ContainerDeleteRetentionPolicy *DeleteRetentionPolicy `json:"containerDeleteRetentionPolicy,omitempty"`
 }
 
 // ChangeFeed the blob service properties for change feed events.
@@ -1546,6 +1828,18 @@ type CloudErrorBody struct {
 
 // ContainerProperties the properties of a container.
 type ContainerProperties struct {
+	// Version - READ-ONLY; The version of the deleted blob container.
+	Version *string `json:"version,omitempty"`
+	// Deleted - READ-ONLY; Indicates whether the blob container was deleted.
+	Deleted *bool `json:"deleted,omitempty"`
+	// DeletedTime - READ-ONLY; Blob container deletion time.
+	DeletedTime *date.Time `json:"deletedTime,omitempty"`
+	// RemainingRetentionDays - READ-ONLY; Remaining retention days for soft deleted blob container.
+	RemainingRetentionDays *int32 `json:"remainingRetentionDays,omitempty"`
+	// DefaultEncryptionScope - Default the container to use specified encryption scope for all writes.
+	DefaultEncryptionScope *string `json:"defaultEncryptionScope,omitempty"`
+	// DenyEncryptionScopeOverride - Block override of encryption scope from the container default.
+	DenyEncryptionScopeOverride *bool `json:"denyEncryptionScopeOverride,omitempty"`
 	// PublicAccess - Specifies whether data in the container may be accessed publicly and the level of access. Possible values include: 'PublicAccessContainer', 'PublicAccessBlob', 'PublicAccessNone'
 	PublicAccess PublicAccess `json:"publicAccess,omitempty"`
 	// LastModifiedTime - READ-ONLY; Returns the date and time the container was last modified.
@@ -1571,6 +1865,12 @@ type ContainerProperties struct {
 // MarshalJSON is the custom marshaler for ContainerProperties.
 func (cp ContainerProperties) MarshalJSON() ([]byte, error) {
 	objectMap := make(map[string]interface{})
+	if cp.DefaultEncryptionScope != nil {
+		objectMap["defaultEncryptionScope"] = cp.DefaultEncryptionScope
+	}
+	if cp.DenyEncryptionScopeOverride != nil {
+		objectMap["denyEncryptionScopeOverride"] = cp.DenyEncryptionScopeOverride
+	}
 	if cp.PublicAccess != "" {
 		objectMap["publicAccess"] = cp.PublicAccess
 	}
@@ -1620,11 +1920,19 @@ type DateAfterModification struct {
 	DaysAfterModificationGreaterThan *float64 `json:"daysAfterModificationGreaterThan,omitempty"`
 }
 
-// DeleteRetentionPolicy the blob service properties for soft delete.
+// DeletedShare the deleted share to be restored.
+type DeletedShare struct {
+	// DeletedShareName - Required. Identify the name of the deleted share that will be restored.
+	DeletedShareName *string `json:"deletedShareName,omitempty"`
+	// DeletedShareVersion - Required. Identify the version of the deleted share that will be restored.
+	DeletedShareVersion *string `json:"deletedShareVersion,omitempty"`
+}
+
+// DeleteRetentionPolicy the service properties for soft delete.
 type DeleteRetentionPolicy struct {
-	// Enabled - Indicates whether DeleteRetentionPolicy is enabled for the Blob service.
+	// Enabled - Indicates whether DeleteRetentionPolicy is enabled.
 	Enabled *bool `json:"enabled,omitempty"`
-	// Days - Indicates the number of days that the deleted blob should be retained. The minimum specified value can be 1 and the maximum value can be 365.
+	// Days - Indicates the number of days that the deleted item should be retained. The minimum specified value can be 1 and the maximum value can be 365.
 	Days *int32 `json:"days,omitempty"`
 }
 
@@ -1640,10 +1948,253 @@ type Dimension struct {
 type Encryption struct {
 	// Services - List of services which support encryption.
 	Services *EncryptionServices `json:"services,omitempty"`
-	// KeySource - The encryption keySource (provider). Possible values (case-insensitive):  Microsoft.Storage, Microsoft.Keyvault. Possible values include: 'MicrosoftStorage', 'MicrosoftKeyvault'
+	// KeySource - The encryption keySource (provider). Possible values (case-insensitive):  Microsoft.Storage, Microsoft.Keyvault. Possible values include: 'KeySourceMicrosoftStorage', 'KeySourceMicrosoftKeyvault'
 	KeySource KeySource `json:"keySource,omitempty"`
+	// RequireInfrastructureEncryption - A boolean indicating whether or not the service applies a secondary layer of encryption with platform managed keys for data at rest.
+	RequireInfrastructureEncryption *bool `json:"requireInfrastructureEncryption,omitempty"`
 	// KeyVaultProperties - Properties provided by key vault.
 	KeyVaultProperties *KeyVaultProperties `json:"keyvaultproperties,omitempty"`
+}
+
+// EncryptionScope the Encryption Scope resource.
+type EncryptionScope struct {
+	autorest.Response `json:"-"`
+	// EncryptionScopeProperties - Properties of the encryption scope.
+	*EncryptionScopeProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for EncryptionScope.
+func (es EncryptionScope) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if es.EncryptionScopeProperties != nil {
+		objectMap["properties"] = es.EncryptionScopeProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for EncryptionScope struct.
+func (es *EncryptionScope) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var encryptionScopeProperties EncryptionScopeProperties
+				err = json.Unmarshal(*v, &encryptionScopeProperties)
+				if err != nil {
+					return err
+				}
+				es.EncryptionScopeProperties = &encryptionScopeProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				es.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				es.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				es.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// EncryptionScopeKeyVaultProperties the key vault properties for the encryption scope. This is a required
+// field if encryption scope 'source' attribute is set to 'Microsoft.KeyVault'.
+type EncryptionScopeKeyVaultProperties struct {
+	// KeyURI - The object identifier for a key vault key object. When applied, the encryption scope will use the key referenced by the identifier to enable customer-managed key support on this encryption scope.
+	KeyURI *string `json:"keyUri,omitempty"`
+}
+
+// EncryptionScopeListResult list of encryption scopes requested, and if paging is required, a URL to the
+// next page of encryption scopes.
+type EncryptionScopeListResult struct {
+	autorest.Response `json:"-"`
+	// Value - READ-ONLY; List of encryption scopes requested.
+	Value *[]EncryptionScope `json:"value,omitempty"`
+	// NextLink - READ-ONLY; Request URL that can be used to query next page of encryption scopes. Returned when total number of requested encryption scopes exceeds the maximum page size.
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// EncryptionScopeListResultIterator provides access to a complete listing of EncryptionScope values.
+type EncryptionScopeListResultIterator struct {
+	i    int
+	page EncryptionScopeListResultPage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *EncryptionScopeListResultIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/EncryptionScopeListResultIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *EncryptionScopeListResultIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter EncryptionScopeListResultIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter EncryptionScopeListResultIterator) Response() EncryptionScopeListResult {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter EncryptionScopeListResultIterator) Value() EncryptionScope {
+	if !iter.page.NotDone() {
+		return EncryptionScope{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the EncryptionScopeListResultIterator type.
+func NewEncryptionScopeListResultIterator(page EncryptionScopeListResultPage) EncryptionScopeListResultIterator {
+	return EncryptionScopeListResultIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (eslr EncryptionScopeListResult) IsEmpty() bool {
+	return eslr.Value == nil || len(*eslr.Value) == 0
+}
+
+// encryptionScopeListResultPreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (eslr EncryptionScopeListResult) encryptionScopeListResultPreparer(ctx context.Context) (*http.Request, error) {
+	if eslr.NextLink == nil || len(to.String(eslr.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(eslr.NextLink)))
+}
+
+// EncryptionScopeListResultPage contains a page of EncryptionScope values.
+type EncryptionScopeListResultPage struct {
+	fn   func(context.Context, EncryptionScopeListResult) (EncryptionScopeListResult, error)
+	eslr EncryptionScopeListResult
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *EncryptionScopeListResultPage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/EncryptionScopeListResultPage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.eslr)
+	if err != nil {
+		return err
+	}
+	page.eslr = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *EncryptionScopeListResultPage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page EncryptionScopeListResultPage) NotDone() bool {
+	return !page.eslr.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page EncryptionScopeListResultPage) Response() EncryptionScopeListResult {
+	return page.eslr
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page EncryptionScopeListResultPage) Values() []EncryptionScope {
+	if page.eslr.IsEmpty() {
+		return nil
+	}
+	return *page.eslr.Value
+}
+
+// Creates a new instance of the EncryptionScopeListResultPage type.
+func NewEncryptionScopeListResultPage(getNextPage func(context.Context, EncryptionScopeListResult) (EncryptionScopeListResult, error)) EncryptionScopeListResultPage {
+	return EncryptionScopeListResultPage{fn: getNextPage}
+}
+
+// EncryptionScopeProperties properties of the encryption scope.
+type EncryptionScopeProperties struct {
+	// Source - The provider for the encryption scope. Possible values (case-insensitive):  Microsoft.Storage, Microsoft.KeyVault. Possible values include: 'MicrosoftStorage', 'MicrosoftKeyVault'
+	Source EncryptionScopeSource `json:"source,omitempty"`
+	// State - The state of the encryption scope. Possible values (case-insensitive):  Enabled, Disabled. Possible values include: 'Enabled', 'Disabled'
+	State EncryptionScopeState `json:"state,omitempty"`
+	// CreationTime - READ-ONLY; Gets the creation date and time of the encryption scope in UTC.
+	CreationTime *date.Time `json:"creationTime,omitempty"`
+	// LastModifiedTime - READ-ONLY; Gets the last modification date and time of the encryption scope in UTC.
+	LastModifiedTime *date.Time `json:"lastModifiedTime,omitempty"`
+	// KeyVaultProperties - The key vault properties for the encryption scope. This is a required field if encryption scope 'source' attribute is set to 'Microsoft.KeyVault'.
+	KeyVaultProperties *EncryptionScopeKeyVaultProperties `json:"keyVaultProperties,omitempty"`
 }
 
 // EncryptionService a service that allows server-side encryption to be used.
@@ -1652,6 +2203,8 @@ type EncryptionService struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// LastEnabledTime - READ-ONLY; Gets a rough estimate of the date/time when the encryption was last enabled by the user. Only returned when encryption is enabled. There might be some unencrypted blobs which were written after this time, as it is just a rough estimate.
 	LastEnabledTime *date.Time `json:"lastEnabledTime,omitempty"`
+	// KeyType - Encryption key type to be used for the encryption service. 'Account' key type implies that an account-scoped encryption key will be used. 'Service' key type implies that a default service key is used. Possible values include: 'KeyTypeService', 'KeyTypeAccount'
+	KeyType KeyType `json:"keyType,omitempty"`
 }
 
 // EncryptionServices a list of services that support encryption.
@@ -1660,9 +2213,9 @@ type EncryptionServices struct {
 	Blob *EncryptionService `json:"blob,omitempty"`
 	// File - The encryption function of the file storage service.
 	File *EncryptionService `json:"file,omitempty"`
-	// Table - READ-ONLY; The encryption function of the table storage service.
+	// Table - The encryption function of the table storage service.
 	Table *EncryptionService `json:"table,omitempty"`
-	// Queue - READ-ONLY; The encryption function of the queue storage service.
+	// Queue - The encryption function of the queue storage service.
 	Queue *EncryptionService `json:"queue,omitempty"`
 }
 
@@ -1681,6 +2234,10 @@ type Endpoints struct {
 	Web *string `json:"web,omitempty"`
 	// Dfs - READ-ONLY; Gets the dfs endpoint.
 	Dfs *string `json:"dfs,omitempty"`
+	// MicrosoftEndpoints - Gets the microsoft routing storage endpoints.
+	MicrosoftEndpoints *AccountMicrosoftEndpoints `json:"microsoftEndpoints,omitempty"`
+	// InternetEndpoints - Gets the internet routing storage endpoints
+	InternetEndpoints *AccountInternetEndpoints `json:"internetEndpoints,omitempty"`
 }
 
 // ErrorResponse an error response from the storage resource provider.
@@ -1703,6 +2260,8 @@ type FileServiceProperties struct {
 	autorest.Response `json:"-"`
 	// FileServicePropertiesProperties - The properties of File services in storage account.
 	*FileServicePropertiesProperties `json:"properties,omitempty"`
+	// Sku - READ-ONLY; Sku name and tier.
+	Sku *Sku `json:"sku,omitempty"`
 	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
 	ID *string `json:"id,omitempty"`
 	// Name - READ-ONLY; The name of the resource
@@ -1737,6 +2296,15 @@ func (fsp *FileServiceProperties) UnmarshalJSON(body []byte) error {
 					return err
 				}
 				fsp.FileServicePropertiesProperties = &fileServiceProperties
+			}
+		case "sku":
+			if v != nil {
+				var sku Sku
+				err = json.Unmarshal(*v, &sku)
+				if err != nil {
+					return err
+				}
+				fsp.Sku = &sku
 			}
 		case "id":
 			if v != nil {
@@ -1775,6 +2343,8 @@ func (fsp *FileServiceProperties) UnmarshalJSON(body []byte) error {
 type FileServicePropertiesProperties struct {
 	// Cors - Specifies CORS rules for the File service. You can include up to five CorsRule elements in the request. If no CorsRule elements are included in the request body, all CORS rules will be deleted, and CORS will be disabled for the File service.
 	Cors *CorsRules `json:"cors,omitempty"`
+	// ShareDeleteRetentionPolicy - The file service properties for share soft delete.
+	ShareDeleteRetentionPolicy *DeleteRetentionPolicy `json:"shareDeleteRetentionPolicy,omitempty"`
 }
 
 // FileShare properties of the file share, including Id, resource name, resource type, Etag.
@@ -2097,8 +2667,28 @@ type FileShareProperties struct {
 	LastModifiedTime *date.Time `json:"lastModifiedTime,omitempty"`
 	// Metadata - A name-value pair to associate with the share as metadata.
 	Metadata map[string]*string `json:"metadata"`
-	// ShareQuota - The maximum size of the share, in gigabytes. Must be greater than 0, and less than or equal to 5TB (5120).
+	// ShareQuota - The maximum size of the share, in gigabytes. Must be greater than 0, and less than or equal to 5TB (5120). For Large File Shares, the maximum size is 102400.
 	ShareQuota *int32 `json:"shareQuota,omitempty"`
+	// EnabledProtocols - The authentication protocol that is used for the file share. Can only be specified when creating a share. Possible values include: 'SMB', 'NFS'
+	EnabledProtocols EnabledProtocols `json:"enabledProtocols,omitempty"`
+	// RootSquash - The property is for NFS share only. The default is NoRootSquash. Possible values include: 'NoRootSquash', 'RootSquash', 'AllSquash'
+	RootSquash RootSquashType `json:"rootSquash,omitempty"`
+	// Version - READ-ONLY; The version of the share.
+	Version *string `json:"version,omitempty"`
+	// Deleted - READ-ONLY; Indicates whether the share was deleted.
+	Deleted *bool `json:"deleted,omitempty"`
+	// DeletedTime - READ-ONLY; The deleted time if the share was deleted.
+	DeletedTime *date.Time `json:"deletedTime,omitempty"`
+	// RemainingRetentionDays - READ-ONLY; Remaining retention days for share that was soft deleted.
+	RemainingRetentionDays *int32 `json:"remainingRetentionDays,omitempty"`
+	// AccessTier - Access tier for specific share. GpV2 account can choose between TransactionOptimized (default), Hot, and Cool. FileStorage account can choose Premium. Possible values include: 'ShareAccessTierTransactionOptimized', 'ShareAccessTierHot', 'ShareAccessTierCool', 'ShareAccessTierPremium'
+	AccessTier ShareAccessTier `json:"accessTier,omitempty"`
+	// AccessTierChangeTime - READ-ONLY; Indicates the last modification time for share access tier.
+	AccessTierChangeTime *date.Time `json:"accessTierChangeTime,omitempty"`
+	// AccessTierStatus - READ-ONLY; Indicates if there is a pending transition for access tier.
+	AccessTierStatus *string `json:"accessTierStatus,omitempty"`
+	// ShareUsageBytes - READ-ONLY; The approximate size of the data stored on the share. Note that this value may not include all recently created or recently resized files.
+	ShareUsageBytes *int64 `json:"shareUsageBytes,omitempty"`
 }
 
 // MarshalJSON is the custom marshaler for FileShareProperties.
@@ -2109,6 +2699,15 @@ func (fsp FileShareProperties) MarshalJSON() ([]byte, error) {
 	}
 	if fsp.ShareQuota != nil {
 		objectMap["shareQuota"] = fsp.ShareQuota
+	}
+	if fsp.EnabledProtocols != "" {
+		objectMap["enabledProtocols"] = fsp.EnabledProtocols
+	}
+	if fsp.RootSquash != "" {
+		objectMap["rootSquash"] = fsp.RootSquash
+	}
+	if fsp.AccessTier != "" {
+		objectMap["accessTier"] = fsp.AccessTier
 	}
 	return json.Marshal(objectMap)
 }
@@ -2286,6 +2885,8 @@ type ImmutabilityPolicyProperty struct {
 	ImmutabilityPeriodSinceCreationInDays *int32 `json:"immutabilityPeriodSinceCreationInDays,omitempty"`
 	// State - READ-ONLY; The ImmutabilityPolicy state of a blob container, possible values include: Locked and Unlocked. Possible values include: 'Locked', 'Unlocked'
 	State ImmutabilityPolicyState `json:"state,omitempty"`
+	// AllowProtectedAppendWrites - This property can only be changed for unlocked time-based retention policies. When enabled, new blocks can be written to an append blob while maintaining immutability protection and compliance. Only new blocks can be added and any existing blocks cannot be modified or deleted. This property cannot be changed with ExtendImmutabilityPolicy API
+	AllowProtectedAppendWrites *bool `json:"allowProtectedAppendWrites,omitempty"`
 }
 
 // IPRule IP rule with specific IP or IP range in CIDR format.
@@ -2304,6 +2905,10 @@ type KeyVaultProperties struct {
 	KeyVersion *string `json:"keyversion,omitempty"`
 	// KeyVaultURI - The Uri of KeyVault.
 	KeyVaultURI *string `json:"keyvaulturi,omitempty"`
+	// CurrentVersionedKeyIdentifier - READ-ONLY; The object identifier of the current versioned Key Vault Key in use.
+	CurrentVersionedKeyIdentifier *string `json:"currentVersionedKeyIdentifier,omitempty"`
+	// LastKeyRotationTimestamp - READ-ONLY; Timestamp of last rotation of the Key Vault Key.
+	LastKeyRotationTimestamp *date.Time `json:"lastKeyRotationTimestamp,omitempty"`
 }
 
 // LeaseContainerRequest lease Container request schema.
@@ -2583,11 +3188,404 @@ func NewListContainerItemsPage(getNextPage func(context.Context, ListContainerIt
 	return ListContainerItemsPage{fn: getNextPage}
 }
 
+// ListQueue ...
+type ListQueue struct {
+	// ListQueueProperties - List Queue resource properties.
+	*ListQueueProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ListQueue.
+func (lq ListQueue) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if lq.ListQueueProperties != nil {
+		objectMap["properties"] = lq.ListQueueProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for ListQueue struct.
+func (lq *ListQueue) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var queueProperties ListQueueProperties
+				err = json.Unmarshal(*v, &queueProperties)
+				if err != nil {
+					return err
+				}
+				lq.ListQueueProperties = &queueProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				lq.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				lq.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				lq.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// ListQueueProperties ...
+type ListQueueProperties struct {
+	// Metadata - A name-value pair that represents queue metadata.
+	Metadata map[string]*string `json:"metadata"`
+}
+
+// MarshalJSON is the custom marshaler for ListQueueProperties.
+func (lqp ListQueueProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if lqp.Metadata != nil {
+		objectMap["metadata"] = lqp.Metadata
+	}
+	return json.Marshal(objectMap)
+}
+
+// ListQueueResource response schema. Contains list of queues returned
+type ListQueueResource struct {
+	autorest.Response `json:"-"`
+	// Value - READ-ONLY; List of queues returned.
+	Value *[]ListQueue `json:"value,omitempty"`
+	// NextLink - READ-ONLY; Request URL that can be used to list next page of queues
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// ListQueueResourceIterator provides access to a complete listing of ListQueue values.
+type ListQueueResourceIterator struct {
+	i    int
+	page ListQueueResourcePage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *ListQueueResourceIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ListQueueResourceIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *ListQueueResourceIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter ListQueueResourceIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter ListQueueResourceIterator) Response() ListQueueResource {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter ListQueueResourceIterator) Value() ListQueue {
+	if !iter.page.NotDone() {
+		return ListQueue{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the ListQueueResourceIterator type.
+func NewListQueueResourceIterator(page ListQueueResourcePage) ListQueueResourceIterator {
+	return ListQueueResourceIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (lqr ListQueueResource) IsEmpty() bool {
+	return lqr.Value == nil || len(*lqr.Value) == 0
+}
+
+// listQueueResourcePreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (lqr ListQueueResource) listQueueResourcePreparer(ctx context.Context) (*http.Request, error) {
+	if lqr.NextLink == nil || len(to.String(lqr.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(lqr.NextLink)))
+}
+
+// ListQueueResourcePage contains a page of ListQueue values.
+type ListQueueResourcePage struct {
+	fn  func(context.Context, ListQueueResource) (ListQueueResource, error)
+	lqr ListQueueResource
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *ListQueueResourcePage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ListQueueResourcePage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.lqr)
+	if err != nil {
+		return err
+	}
+	page.lqr = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *ListQueueResourcePage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page ListQueueResourcePage) NotDone() bool {
+	return !page.lqr.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page ListQueueResourcePage) Response() ListQueueResource {
+	return page.lqr
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page ListQueueResourcePage) Values() []ListQueue {
+	if page.lqr.IsEmpty() {
+		return nil
+	}
+	return *page.lqr.Value
+}
+
+// Creates a new instance of the ListQueueResourcePage type.
+func NewListQueueResourcePage(getNextPage func(context.Context, ListQueueResource) (ListQueueResource, error)) ListQueueResourcePage {
+	return ListQueueResourcePage{fn: getNextPage}
+}
+
+// ListQueueServices ...
+type ListQueueServices struct {
+	autorest.Response `json:"-"`
+	// Value - READ-ONLY; List of queue services returned.
+	Value *[]QueueServiceProperties `json:"value,omitempty"`
+}
+
 // ListServiceSasResponse the List service SAS credentials operation response.
 type ListServiceSasResponse struct {
 	autorest.Response `json:"-"`
 	// ServiceSasToken - READ-ONLY; List service SAS credentials of specific resource.
 	ServiceSasToken *string `json:"serviceSasToken,omitempty"`
+}
+
+// ListTableResource response schema. Contains list of tables returned
+type ListTableResource struct {
+	autorest.Response `json:"-"`
+	// Value - READ-ONLY; List of tables returned.
+	Value *[]Table `json:"value,omitempty"`
+	// NextLink - READ-ONLY; Request URL that can be used to query next page of tables
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// ListTableResourceIterator provides access to a complete listing of Table values.
+type ListTableResourceIterator struct {
+	i    int
+	page ListTableResourcePage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *ListTableResourceIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ListTableResourceIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *ListTableResourceIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter ListTableResourceIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter ListTableResourceIterator) Response() ListTableResource {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter ListTableResourceIterator) Value() Table {
+	if !iter.page.NotDone() {
+		return Table{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the ListTableResourceIterator type.
+func NewListTableResourceIterator(page ListTableResourcePage) ListTableResourceIterator {
+	return ListTableResourceIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (ltr ListTableResource) IsEmpty() bool {
+	return ltr.Value == nil || len(*ltr.Value) == 0
+}
+
+// listTableResourcePreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (ltr ListTableResource) listTableResourcePreparer(ctx context.Context) (*http.Request, error) {
+	if ltr.NextLink == nil || len(to.String(ltr.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(ltr.NextLink)))
+}
+
+// ListTableResourcePage contains a page of Table values.
+type ListTableResourcePage struct {
+	fn  func(context.Context, ListTableResource) (ListTableResource, error)
+	ltr ListTableResource
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *ListTableResourcePage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/ListTableResourcePage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.ltr)
+	if err != nil {
+		return err
+	}
+	page.ltr = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *ListTableResourcePage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page ListTableResourcePage) NotDone() bool {
+	return !page.ltr.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page ListTableResourcePage) Response() ListTableResource {
+	return page.ltr
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page ListTableResourcePage) Values() []Table {
+	if page.ltr.IsEmpty() {
+		return nil
+	}
+	return *page.ltr.Value
+}
+
+// Creates a new instance of the ListTableResourcePage type.
+func NewListTableResourcePage(getNextPage func(context.Context, ListTableResource) (ListTableResource, error)) ListTableResourcePage {
+	return ListTableResourcePage{fn: getNextPage}
+}
+
+// ListTableServices ...
+type ListTableServices struct {
+	autorest.Response `json:"-"`
+	// Value - READ-ONLY; List of table services returned.
+	Value *[]TableServiceProperties `json:"value,omitempty"`
 }
 
 // ManagementPolicy the Get Storage Account ManagementPolicies operation response.
@@ -2697,6 +3695,8 @@ type ManagementPolicyFilter struct {
 	PrefixMatch *[]string `json:"prefixMatch,omitempty"`
 	// BlobTypes - An array of predefined enum values. Only blockBlob is supported.
 	BlobTypes *[]string `json:"blobTypes,omitempty"`
+	// BlobIndexMatch - An array of blob index tag based filters, there can be at most 10 tag filters
+	BlobIndexMatch *[]TagFilter `json:"blobIndexMatch,omitempty"`
 }
 
 // ManagementPolicyProperties the Storage Account ManagementPolicy properties.
@@ -2764,6 +3764,123 @@ type NetworkRuleSet struct {
 	IPRules *[]IPRule `json:"ipRules,omitempty"`
 	// DefaultAction - Specifies the default action of allow or deny when no other rules match. Possible values include: 'DefaultActionAllow', 'DefaultActionDeny'
 	DefaultAction DefaultAction `json:"defaultAction,omitempty"`
+}
+
+// ObjectReplicationPolicies list storage account object replication policies.
+type ObjectReplicationPolicies struct {
+	autorest.Response `json:"-"`
+	// Value - The replication policy between two storage accounts.
+	Value *[]ObjectReplicationPolicy `json:"value,omitempty"`
+}
+
+// ObjectReplicationPolicy the replication policy between two storage accounts. Multiple rules can be
+// defined in one policy.
+type ObjectReplicationPolicy struct {
+	autorest.Response `json:"-"`
+	// ObjectReplicationPolicyProperties - Returns the Storage Account Object Replication Policy.
+	*ObjectReplicationPolicyProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ObjectReplicationPolicy.
+func (orp ObjectReplicationPolicy) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if orp.ObjectReplicationPolicyProperties != nil {
+		objectMap["properties"] = orp.ObjectReplicationPolicyProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for ObjectReplicationPolicy struct.
+func (orp *ObjectReplicationPolicy) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var objectReplicationPolicyProperties ObjectReplicationPolicyProperties
+				err = json.Unmarshal(*v, &objectReplicationPolicyProperties)
+				if err != nil {
+					return err
+				}
+				orp.ObjectReplicationPolicyProperties = &objectReplicationPolicyProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				orp.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				orp.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				orp.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// ObjectReplicationPolicyFilter filters limit replication to a subset of blobs within the storage account.
+// A logical OR is performed on values in the filter. If multiple filters are defined, a logical AND is
+// performed on all filters.
+type ObjectReplicationPolicyFilter struct {
+	// PrefixMatch - Optional. Filters the results to replicate only blobs whose names begin with the specified prefix.
+	PrefixMatch *[]string `json:"prefixMatch,omitempty"`
+	// MinCreationTime - Blobs created after the time will be replicated to the destination. It must be in datetime format 'yyyy-MM-ddTHH:mm:ssZ'. Example: 2020-02-19T16:05:00Z
+	MinCreationTime *string `json:"minCreationTime,omitempty"`
+}
+
+// ObjectReplicationPolicyProperties the Storage Account ObjectReplicationPolicy properties.
+type ObjectReplicationPolicyProperties struct {
+	// PolicyID - READ-ONLY; A unique id for object replication policy.
+	PolicyID *string `json:"policyId,omitempty"`
+	// EnabledTime - READ-ONLY; Indicates when the policy is enabled on the source account.
+	EnabledTime *date.Time `json:"enabledTime,omitempty"`
+	// SourceAccount - Required. Source account name.
+	SourceAccount *string `json:"sourceAccount,omitempty"`
+	// DestinationAccount - Required. Destination account name.
+	DestinationAccount *string `json:"destinationAccount,omitempty"`
+	// Rules - The storage account object replication rules.
+	Rules *[]ObjectReplicationPolicyRule `json:"rules,omitempty"`
+}
+
+// ObjectReplicationPolicyRule the replication policy rule between two containers.
+type ObjectReplicationPolicyRule struct {
+	// RuleID - Rule Id is auto-generated for each new rule on destination account. It is required for put policy on source account.
+	RuleID *string `json:"ruleId,omitempty"`
+	// SourceContainer - Required. Source container name.
+	SourceContainer *string `json:"sourceContainer,omitempty"`
+	// DestinationContainer - Required. Destination container name.
+	DestinationContainer *string `json:"destinationContainer,omitempty"`
+	// Filters - Optional. An object that defines the filter set.
+	Filters *ObjectReplicationPolicyFilter `json:"filters,omitempty"`
 }
 
 // Operation storage REST API operation definition.
@@ -2952,13 +4069,21 @@ func (pec *PrivateEndpointConnection) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// PrivateEndpointConnectionListResult list of private endpoint connection associated with the specified
+// storage account
+type PrivateEndpointConnectionListResult struct {
+	autorest.Response `json:"-"`
+	// Value - Array of private endpoint connections
+	Value *[]PrivateEndpointConnection `json:"value,omitempty"`
+}
+
 // PrivateEndpointConnectionProperties properties of the PrivateEndpointConnectProperties.
 type PrivateEndpointConnectionProperties struct {
 	// PrivateEndpoint - The resource of private end point.
 	PrivateEndpoint *PrivateEndpoint `json:"privateEndpoint,omitempty"`
 	// PrivateLinkServiceConnectionState - A collection of information about the state of the connection between service consumer and provider.
 	PrivateLinkServiceConnectionState *PrivateLinkServiceConnectionState `json:"privateLinkServiceConnectionState,omitempty"`
-	// ProvisioningState - The provisioning state of the private endpoint connection resource. Possible values include: 'Succeeded', 'Creating', 'Deleting', 'Failed'
+	// ProvisioningState - The provisioning state of the private endpoint connection resource. Possible values include: 'PrivateEndpointConnectionProvisioningStateSucceeded', 'PrivateEndpointConnectionProvisioningStateCreating', 'PrivateEndpointConnectionProvisioningStateDeleting', 'PrivateEndpointConnectionProvisioningStateFailed'
 	ProvisioningState PrivateEndpointConnectionProvisioningState `json:"provisioningState,omitempty"`
 }
 
@@ -3073,6 +4198,175 @@ type ProxyResource struct {
 	Type *string `json:"type,omitempty"`
 }
 
+// Queue ...
+type Queue struct {
+	autorest.Response `json:"-"`
+	// QueueProperties - Queue resource properties.
+	*QueueProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for Queue.
+func (q Queue) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if q.QueueProperties != nil {
+		objectMap["properties"] = q.QueueProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for Queue struct.
+func (q *Queue) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var queueProperties QueueProperties
+				err = json.Unmarshal(*v, &queueProperties)
+				if err != nil {
+					return err
+				}
+				q.QueueProperties = &queueProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				q.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				q.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				q.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// QueueProperties ...
+type QueueProperties struct {
+	// Metadata - A name-value pair that represents queue metadata.
+	Metadata map[string]*string `json:"metadata"`
+	// ApproximateMessageCount - READ-ONLY; Integer indicating an approximate number of messages in the queue. This number is not lower than the actual number of messages in the queue, but could be higher.
+	ApproximateMessageCount *int32 `json:"approximateMessageCount,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for QueueProperties.
+func (qp QueueProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if qp.Metadata != nil {
+		objectMap["metadata"] = qp.Metadata
+	}
+	return json.Marshal(objectMap)
+}
+
+// QueueServiceProperties the properties of a storage account’s Queue service.
+type QueueServiceProperties struct {
+	autorest.Response `json:"-"`
+	// QueueServicePropertiesProperties - The properties of a storage account’s Queue service.
+	*QueueServicePropertiesProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for QueueServiceProperties.
+func (qsp QueueServiceProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if qsp.QueueServicePropertiesProperties != nil {
+		objectMap["properties"] = qsp.QueueServicePropertiesProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for QueueServiceProperties struct.
+func (qsp *QueueServiceProperties) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var queueServiceProperties QueueServicePropertiesProperties
+				err = json.Unmarshal(*v, &queueServiceProperties)
+				if err != nil {
+					return err
+				}
+				qsp.QueueServicePropertiesProperties = &queueServiceProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				qsp.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				qsp.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				qsp.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// QueueServicePropertiesProperties the properties of a storage account’s Queue service.
+type QueueServicePropertiesProperties struct {
+	// Cors - Specifies CORS rules for the Queue service. You can include up to five CorsRule elements in the request. If no CorsRule elements are included in the request body, all CORS rules will be deleted, and CORS will be disabled for the Queue service.
+	Cors *CorsRules `json:"cors,omitempty"`
+}
+
 // Resource ...
 type Resource struct {
 	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
@@ -3083,6 +4377,16 @@ type Resource struct {
 	Type *string `json:"type,omitempty"`
 }
 
+// RestorePolicyProperties the blob service properties for blob restore policy
+type RestorePolicyProperties struct {
+	// Enabled - Blob restore is enabled if set to true.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Days - how long this blob can be restored. It should be great than zero and less than DeleteRetentionPolicy.days.
+	Days *int32 `json:"days,omitempty"`
+	// LastEnabledTime - READ-ONLY; Returns the date and time the restore policy was last enabled.
+	LastEnabledTime *date.Time `json:"lastEnabledTime,omitempty"`
+}
+
 // Restriction the restriction because of which SKU cannot be used.
 type Restriction struct {
 	// Type - READ-ONLY; The type of restrictions. As of now only possible value for this is location.
@@ -3091,6 +4395,17 @@ type Restriction struct {
 	Values *[]string `json:"values,omitempty"`
 	// ReasonCode - The reason for the restriction. As of now this can be "QuotaId" or "NotAvailableForSubscription". Quota Id is set when the SKU has requiredQuotas parameter as the subscription does not belong to that quota. The "NotAvailableForSubscription" is related to capacity at DC. Possible values include: 'QuotaID', 'NotAvailableForSubscription'
 	ReasonCode ReasonCode `json:"reasonCode,omitempty"`
+}
+
+// RoutingPreference routing preference defines the type of network, either microsoft or internet routing
+// to be used to deliver the user data, the default option is microsoft routing
+type RoutingPreference struct {
+	// RoutingChoice - Routing Choice defines the kind of network routing opted by the user. Possible values include: 'MicrosoftRouting', 'InternetRouting'
+	RoutingChoice RoutingChoice `json:"routingChoice,omitempty"`
+	// PublishMicrosoftEndpoints - A boolean flag which indicates whether microsoft routing storage endpoints are to be published
+	PublishMicrosoftEndpoints *bool `json:"publishMicrosoftEndpoints,omitempty"`
+	// PublishInternetEndpoints - A boolean flag which indicates whether internet routing storage endpoints are to be published
+	PublishInternetEndpoints *bool `json:"publishInternetEndpoints,omitempty"`
 }
 
 // ServiceSasParameters the parameters to list service SAS credentials of a specific resource.
@@ -3141,9 +4456,26 @@ type ServiceSpecification struct {
 
 // Sku the SKU of the storage account.
 type Sku struct {
-	// Name - Gets or sets the SKU name. Required for account creation; optional for update. Note that in older versions, SKU name was called accountType. Possible values include: 'StandardLRS', 'StandardGRS', 'StandardRAGRS', 'StandardZRS', 'PremiumLRS', 'PremiumZRS', 'StandardGZRS', 'StandardRAGZRS'
+	// Name - Possible values include: 'StandardLRS', 'StandardGRS', 'StandardRAGRS', 'StandardZRS', 'PremiumLRS', 'PremiumZRS', 'StandardGZRS', 'StandardRAGZRS'
 	Name SkuName `json:"name,omitempty"`
-	// Tier - READ-ONLY; Gets the SKU tier. This is based on the SKU name. Possible values include: 'Standard', 'Premium'
+	// Tier - Possible values include: 'Standard', 'Premium'
+	Tier SkuTier `json:"tier,omitempty"`
+}
+
+// SKUCapability the capability information in the specified SKU, including file encryption, network ACLs,
+// change notification, etc.
+type SKUCapability struct {
+	// Name - READ-ONLY; The name of capability, The capability information in the specified SKU, including file encryption, network ACLs, change notification, etc.
+	Name *string `json:"name,omitempty"`
+	// Value - READ-ONLY; A string value to indicate states of given capability. Possibly 'true' or 'false'.
+	Value *string `json:"value,omitempty"`
+}
+
+// SkuInformation storage SKU and its properties
+type SkuInformation struct {
+	// Name - Possible values include: 'StandardLRS', 'StandardGRS', 'StandardRAGRS', 'StandardZRS', 'PremiumLRS', 'PremiumZRS', 'StandardGZRS', 'StandardRAGZRS'
+	Name SkuName `json:"name,omitempty"`
+	// Tier - Possible values include: 'Standard', 'Premium'
 	Tier SkuTier `json:"tier,omitempty"`
 	// ResourceType - READ-ONLY; The type of the resource, usually it is 'storageAccounts'.
 	ResourceType *string `json:"resourceType,omitempty"`
@@ -3157,20 +4489,179 @@ type Sku struct {
 	Restrictions *[]Restriction `json:"restrictions,omitempty"`
 }
 
-// SKUCapability the capability information in the specified SKU, including file encryption, network ACLs,
-// change notification, etc.
-type SKUCapability struct {
-	// Name - READ-ONLY; The name of capability, The capability information in the specified SKU, including file encryption, network ACLs, change notification, etc.
-	Name *string `json:"name,omitempty"`
-	// Value - READ-ONLY; A string value to indicate states of given capability. Possibly 'true' or 'false'.
-	Value *string `json:"value,omitempty"`
-}
-
 // SkuListResult the response from the List Storage SKUs operation.
 type SkuListResult struct {
 	autorest.Response `json:"-"`
 	// Value - READ-ONLY; Get the list result of storage SKUs and their properties.
-	Value *[]Sku `json:"value,omitempty"`
+	Value *[]SkuInformation `json:"value,omitempty"`
+}
+
+// Table properties of the table, including Id, resource name, resource type.
+type Table struct {
+	autorest.Response `json:"-"`
+	// TableProperties - Table resource properties.
+	*TableProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for Table.
+func (t Table) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if t.TableProperties != nil {
+		objectMap["properties"] = t.TableProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for Table struct.
+func (t *Table) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var tableProperties TableProperties
+				err = json.Unmarshal(*v, &tableProperties)
+				if err != nil {
+					return err
+				}
+				t.TableProperties = &tableProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				t.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				t.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				t.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// TableProperties ...
+type TableProperties struct {
+	// TableName - READ-ONLY; Table name under the specified account
+	TableName *string `json:"tableName,omitempty"`
+}
+
+// TableServiceProperties the properties of a storage account’s Table service.
+type TableServiceProperties struct {
+	autorest.Response `json:"-"`
+	// TableServicePropertiesProperties - The properties of a storage account’s Table service.
+	*TableServicePropertiesProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for TableServiceProperties.
+func (tsp TableServiceProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if tsp.TableServicePropertiesProperties != nil {
+		objectMap["properties"] = tsp.TableServicePropertiesProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for TableServiceProperties struct.
+func (tsp *TableServiceProperties) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var tableServiceProperties TableServicePropertiesProperties
+				err = json.Unmarshal(*v, &tableServiceProperties)
+				if err != nil {
+					return err
+				}
+				tsp.TableServicePropertiesProperties = &tableServiceProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				tsp.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				tsp.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				tsp.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// TableServicePropertiesProperties the properties of a storage account’s Table service.
+type TableServicePropertiesProperties struct {
+	// Cors - Specifies CORS rules for the Table service. You can include up to five CorsRule elements in the request. If no CorsRule elements are included in the request body, all CORS rules will be deleted, and CORS will be disabled for the Table service.
+	Cors *CorsRules `json:"cors,omitempty"`
+}
+
+// TagFilter blob index tag based filtering for blob objects
+type TagFilter struct {
+	// Name - This is the filter tag name, it can have 1 - 128 characters
+	Name *string `json:"name,omitempty"`
+	// Op - This is the comparison operator which is used for object comparison and filtering. Only == (equality operator) is currently supported
+	Op *string `json:"op,omitempty"`
+	// Value - This is the filter tag value field used for tag based filtering, it can have 0 - 256 characters
+	Value *string `json:"value,omitempty"`
 }
 
 // TagProperty a tag of the LegalHold of a blob container.

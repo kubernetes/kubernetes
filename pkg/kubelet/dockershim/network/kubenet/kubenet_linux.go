@@ -1,4 +1,4 @@
-// +build linux
+// +build linux,!dockerless
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -35,7 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -122,8 +122,8 @@ type kubenetNetworkPlugin struct {
 
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	execer := utilexec.New()
-	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIpv4)
-	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIpv6)
+	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIPv4)
+	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIPv6)
 	return &kubenetNetworkPlugin{
 		podIPs:            make(map[kubecontainer.ContainerID]utilsets.String),
 		execer:            utilexec.New(),

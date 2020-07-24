@@ -40,7 +40,7 @@ go_library(
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/google/cadvisor/container/common:go_default_library",

@@ -20,16 +20,23 @@ import (
 	"net"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
+
+var defaultResourceSpec = []v1beta1.ResourceSpec{
+	{Name: string(corev1.ResourceCPU), Weight: 1},
+	{Name: string(corev1.ResourceMemory), Weight: 1},
+}
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -51,7 +58,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port
 	// 3. If splitting the value fails, check if the value is even a valid IP. If so, use that with the default port.
 	// Otherwise use the default bind address
-	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
+	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(config.DefaultInsecureSchedulerPort))
 	if obj.HealthzBindAddress == nil {
 		obj.HealthzBindAddress = &defaultBindAddress
 	} else {
@@ -65,7 +72,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 			// Something went wrong splitting the host/port, could just be a missing port so check if the
 			// existing value is a valid IP address. If so, use that with the default scheduler port
 			if host := net.ParseIP(*obj.HealthzBindAddress); host != nil {
-				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(ports.InsecureSchedulerPort))
+				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.HealthzBindAddress = &hostPort
 			} else {
 				// TODO: in v1beta1 we should let this error instead of stomping with a default value
@@ -87,18 +94,13 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 			// Something went wrong splitting the host/port, could just be a missing port so check if the
 			// existing value is a valid IP address. If so, use that with the default scheduler port
 			if host := net.ParseIP(*obj.MetricsBindAddress); host != nil {
-				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(ports.InsecureSchedulerPort))
+				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.MetricsBindAddress = &hostPort
 			} else {
 				// TODO: in v1beta1 we should let this error instead of stomping with a default value
 				obj.MetricsBindAddress = &defaultBindAddress
 			}
 		}
-	}
-
-	if obj.DisablePreemption == nil {
-		disablePreemption := false
-		obj.DisablePreemption = &disablePreemption
 	}
 
 	if obj.PercentageOfNodesToScore == nil {
@@ -128,12 +130,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	}
 
 	// Use the default LeaderElectionConfiguration options
-	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
-
-	if obj.BindTimeoutSeconds == nil {
-		val := int64(600)
-		obj.BindTimeoutSeconds = &val
-	}
+	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 
 	if obj.PodInitialBackoffSeconds == nil {
 		val := int64(1)
@@ -155,5 +152,63 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
 		enableContentionProfiling := true
 		obj.EnableContentionProfiling = &enableContentionProfiling
+	}
+}
+
+func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
+	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
+	// DeprecatedOptions#ApplyTo.
+	// Update that object if a new default field is added here.
+	if obj.HardPodAffinityWeight == nil {
+		obj.HardPodAffinityWeight = pointer.Int32Ptr(1)
+	}
+}
+
+func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1beta1.NodeResourcesLeastAllocatedArgs) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, used the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
+	}
+}
+
+func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1beta1.NodeResourcesMostAllocatedArgs) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, used the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
+	}
+}
+
+func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta1.RequestedToCapacityRatioArgs) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, used the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
+	}
+}
+
+func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
+	if obj.BindTimeoutSeconds == nil {
+		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
+	}
+}
+
+func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
+	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+		// When feature is disabled, the default spreading is done by legacy
+		// SelectorSpread plugin.
+		return
+	}
+	if obj.DefaultConstraints == nil {
+		obj.DefaultConstraints = []corev1.TopologySpreadConstraint{
+			{
+				TopologyKey:       corev1.LabelHostname,
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				MaxSkew:           3,
+			},
+			{
+				TopologyKey:       corev1.LabelZoneFailureDomainStable,
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				MaxSkew:           5,
+			},
+		}
 	}
 }

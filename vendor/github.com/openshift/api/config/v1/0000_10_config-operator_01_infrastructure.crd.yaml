@@ -151,15 +151,17 @@ spec:
           type: object
           properties:
             apiServerInternalURI:
-              description: apiServerInternalURL is a valid URI with scheme(http/https),
-                address and port.  apiServerInternalURL can be used by components
-                like kubelets, to contact the Kubernetes API server using the infrastructure
-                provider rather than Kubernetes networking.
+              description: apiServerInternalURL is a valid URI with scheme 'https',
+                address and optionally a port (defaulting to 443).  apiServerInternalURL
+                can be used by components like kubelets, to contact the Kubernetes
+                API server using the infrastructure provider rather than Kubernetes
+                networking.
               type: string
             apiServerURL:
-              description: apiServerURL is a valid URI with scheme(http/https), address
-                and port.  apiServerURL can be used by components like the web console
-                to tell users where to find the Kubernetes API.
+              description: apiServerURL is a valid URI with scheme 'https', address
+                and optionally a port (defaulting to 443).  apiServerURL can be used
+                by components like the web console to tell users where to find the
+                Kubernetes API.
               type: string
             etcdDiscoveryDomain:
               description: 'etcdDiscoveryDomain is the domain used to fetch the SRV
@@ -353,13 +355,8 @@ spec:
                         a wildcard DNS record used to resolve default route host names.
                       type: string
                     nodeDNSIP:
-                      description: nodeDNSIP is the IP address for the internal DNS
-                        used by the nodes. Unlike the one managed by the DNS operator,
-                        `NodeDNSIP` provides name resolution for the nodes themselves.
-                        There is no DNS-as-a-service for oVirt deployments. In order
-                        to minimize necessary changes to the datacenter DNS, a DNS
-                        service is hosted as a static pod to serve those hostnames
-                        to the nodes in the cluster.
+                      description: 'deprecated: as of 4.6, this field is no longer
+                        set or honored.  It will be removed in a future release.'
                       type: string
                 type:
                   description: "type is the underlying infrastructure provider for

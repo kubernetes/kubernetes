@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,11 +33,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/test/e2e/system"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -296,7 +296,7 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
 
@@ -371,6 +371,29 @@ const (
 	MasterAndDNSNodes NodesSet = 2
 )
 
+// nodeHasControlPlanePods returns true if specified node has control plane pods
+// (kube-scheduler and/or kube-controller-manager).
+func nodeHasControlPlanePods(c clientset.Interface, nodeName string) (bool, error) {
+	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
+	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
+
+	podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("spec.nodeName", nodeName).String(),
+	})
+	if err != nil {
+		return false, err
+	}
+	if len(podList.Items) < 1 {
+		Logf("Can't find any pods in namespace %s to grab metrics from", metav1.NamespaceSystem)
+	}
+	for _, pod := range podList.Items {
+		if regKubeScheduler.MatchString(pod.Name) || regKubeControllerManager.MatchString(pod.Name) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // NewResourceUsageGatherer returns a new ContainerResourceGatherer.
 func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*ContainerResourceGatherer, error) {
 	g := ContainerResourceGatherer{
@@ -405,11 +428,23 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	}
 	dnsNodes := make(map[string]bool)
 	for _, pod := range pods.Items {
-		if (options.Nodes == MasterNodes) && !system.DeprecatedMightBeMasterNode(pod.Spec.NodeName) {
-			continue
+		if options.Nodes == MasterNodes {
+			isControlPlane, err := nodeHasControlPlanePods(c, pod.Spec.NodeName)
+			if err != nil {
+				return nil, err
+			}
+			if !isControlPlane {
+				continue
+			}
 		}
-		if (options.Nodes == MasterAndDNSNodes) && !system.DeprecatedMightBeMasterNode(pod.Spec.NodeName) && pod.Labels["k8s-app"] != "kube-dns" {
-			continue
+		if options.Nodes == MasterAndDNSNodes {
+			isControlPlane, err := nodeHasControlPlanePods(c, pod.Spec.NodeName)
+			if err != nil {
+				return nil, err
+			}
+			if !isControlPlane && pod.Labels["k8s-app"] != "kube-dns" {
+				continue
+			}
 		}
 		for _, container := range pod.Status.InitContainerStatuses {
 			g.containerIDs = append(g.containerIDs, container.Name)
@@ -428,7 +463,11 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	}
 
 	for _, node := range nodeList.Items {
-		if options.Nodes == AllNodes || system.DeprecatedMightBeMasterNode(node.Name) || dnsNodes[node.Name] {
+		isControlPlane, err := nodeHasControlPlanePods(c, node.Name)
+		if err != nil {
+			return nil, err
+		}
+		if options.Nodes == AllNodes || isControlPlane || dnsNodes[node.Name] {
 			g.workerWg.Add(1)
 			g.workers = append(g.workers, resourceGatherWorker{
 				c:                           c,

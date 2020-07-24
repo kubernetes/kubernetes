@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // PluginName indicates name of admission plugin.

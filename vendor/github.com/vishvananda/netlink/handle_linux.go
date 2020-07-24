@@ -91,7 +91,7 @@ func (h *Handle) GetSocketReceiveBufferSize() ([]int, error) {
 	return results, nil
 }
 
-// NewHandle returns a netlink handle on the network namespace
+// NewHandleAt returns a netlink handle on the network namespace
 // specified by ns. If ns=netns.None(), current network namespace
 // will be assumed
 func NewHandleAt(ns netns.NsHandle, nlFamilies ...int) (*Handle, error) {

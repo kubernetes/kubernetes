@@ -41,13 +41,14 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // This file contains the controller base functionality, i.e. framework to
@@ -76,7 +77,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
-		broadcaster.StartLogging(klog.Infof)
+		broadcaster.StartStructuredLogging(0)
 		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: p.KubeClient.CoreV1().Events("")})
 		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}
@@ -126,9 +127,16 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
 	controller.podLister = p.PodInformer.Lister()
+	controller.podIndexer = p.PodInformer.Informer().GetIndexer()
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
 	controller.NodeLister = p.NodeInformer.Lister()
 	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
+
+	// This custom indexer will index pods by its PVC keys. Then we don't need
+	// to iterate all pods every time to find pods which reference given PVC.
+	if err := common.AddPodPVCIndexerIfNotPresent(controller.podIndexer); err != nil {
+		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+	}
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator

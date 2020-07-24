@@ -163,14 +163,18 @@ func NewStore(lg *zap.Logger, b backend.Backend, le lease.Lessor, ig ConsistentI
 
 func (s *store) compactBarrier(ctx context.Context, ch chan struct{}) {
 	if ctx == nil || ctx.Err() != nil {
-		s.mu.Lock()
 		select {
 		case <-s.stopc:
 		default:
+			// fix deadlock in mvcc,for more information, please refer to pr 11817.
+			// s.stopc is only updated in restore operation, which is called by apply
+			// snapshot call, compaction and apply snapshot requests are serialized by
+			// raft, and do not happen at the same time.
+			s.mu.Lock()
 			f := func(ctx context.Context) { s.compactBarrier(ctx, ch) }
 			s.fifoSched.Schedule(f)
+			s.mu.Unlock()
 		}
-		s.mu.Unlock()
 		return
 	}
 	close(ch)
@@ -271,15 +275,15 @@ func (s *store) updateCompactRev(rev int64) (<-chan struct{}, error) {
 }
 
 func (s *store) compact(trace *traceutil.Trace, rev int64) (<-chan struct{}, error) {
-	start := time.Now()
-	keep := s.kvindex.Compact(rev)
-	trace.Step("compact in-memory index tree")
 	ch := make(chan struct{})
 	var j = func(ctx context.Context) {
 		if ctx.Err() != nil {
 			s.compactBarrier(ctx, ch)
 			return
 		}
+		start := time.Now()
+		keep := s.kvindex.Compact(rev)
+		indexCompactionPauseMs.Observe(float64(time.Since(start) / time.Millisecond))
 		if !s.scheduleCompaction(rev, keep) {
 			s.compactBarrier(nil, ch)
 			return
@@ -288,8 +292,6 @@ func (s *store) compact(trace *traceutil.Trace, rev int64) (<-chan struct{}, err
 	}
 
 	s.fifoSched.Schedule(j)
-
-	indexCompactionPauseMs.Observe(float64(time.Since(start) / time.Millisecond))
 	trace.Step("schedule compaction")
 	return ch, nil
 }

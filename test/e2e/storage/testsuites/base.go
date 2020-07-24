@@ -40,11 +40,11 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
-	"k8s.io/kubernetes/test/e2e/framework/podlogs"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -59,6 +59,38 @@ func init() {
 }
 
 type opCounts map[string]int64
+
+// migrationOpCheck validates migrated metrics.
+type migrationOpCheck struct {
+	cs         clientset.Interface
+	pluginName string
+	skipCheck  bool
+
+	// The old ops are not set if skipCheck is true.
+	oldInTreeOps   opCounts
+	oldMigratedOps opCounts
+}
+
+// BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
+var BaseSuites = []func() TestSuite{
+	InitVolumesTestSuite,
+	InitVolumeIOTestSuite,
+	InitVolumeModeTestSuite,
+	InitSubPathTestSuite,
+	InitProvisioningTestSuite,
+	InitMultiVolumeTestSuite,
+	InitVolumeExpandTestSuite,
+	InitDisruptiveTestSuite,
+	InitVolumeLimitsTestSuite,
+	InitTopologyTestSuite,
+	InitStressTestSuite,
+}
+
+// CSISuites is a list of storage test suites that work only for CSI drivers
+var CSISuites = append(BaseSuites,
+	InitEphemeralTestSuite,
+	InitSnapshottableTestSuite,
+)
 
 // TestSuite represents an interface for a set of tests which works with TestDriver
 type TestSuite interface {
@@ -77,7 +109,7 @@ type TestSuiteInfo struct {
 	Name               string                     // name of the TestSuite
 	FeatureTag         string                     // featureTag for the TestSuite
 	TestPatterns       []testpatterns.TestPattern // Slice of TestPattern for the TestSuite
-	SupportedSizeRange volume.SizeRange           // Size range supported by the test suite
+	SupportedSizeRange e2evolume.SizeRange        // Size range supported by the test suite
 }
 
 func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
@@ -136,7 +168,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 			_, isSupported = driver.(InlineVolumeTestDriver)
 		case testpatterns.PreprovisionedPV:
 			_, isSupported = driver.(PreprovisionedPVTestDriver)
-		case testpatterns.DynamicPV:
+		case testpatterns.DynamicPV, testpatterns.GenericEphemeralVolume:
 			_, isSupported = driver.(DynamicPVTestDriver)
 		case testpatterns.CSIInlineVolume:
 			_, isSupported = driver.(EphemeralTestDriver)
@@ -181,7 +213,7 @@ type VolumeResource struct {
 
 // CreateVolumeResource constructs a VolumeResource for the current test. It knows how to deal with
 // different test pattern volume types.
-func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, testVolumeSizeRange volume.SizeRange) *VolumeResource {
+func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, testVolumeSizeRange e2evolume.SizeRange) *VolumeResource {
 	r := VolumeResource{
 		Config:  config,
 		Pattern: pattern,
@@ -208,7 +240,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 				r.VolSource = createVolumeSource(r.Pvc.Name, false /* readOnly */)
 			}
 		}
-	case testpatterns.DynamicPV:
+	case testpatterns.DynamicPV, testpatterns.GenericEphemeralVolume:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			var err error
@@ -230,10 +262,16 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			if r.Sc != nil {
+			switch pattern.VolType {
+			case testpatterns.DynamicPV:
 				r.Pv, r.Pvc = createPVCPVFromDynamicProvisionSC(
 					f, dInfo.Name, claimSize, r.Sc, pattern.VolMode, dInfo.RequiredAccessModes)
 				r.VolSource = createVolumeSource(r.Pvc.Name, false /* readOnly */)
+			case testpatterns.GenericEphemeralVolume:
+				driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+				claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, dInfo.RequiredAccessModes, claimSize, false /* readOnly */)
 			}
 		}
 	case testpatterns.CSIInlineVolume:
@@ -265,7 +303,28 @@ func createVolumeSource(pvcName string, readOnly bool) *v1.VolumeSource {
 			ReadOnly:  readOnly,
 		},
 	}
+}
 
+func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolumeAccessMode, claimSize string, readOnly bool) *v1.VolumeSource {
+	if len(accessModes) == 0 {
+		accessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+	return &v1.VolumeSource{
+		Ephemeral: &v1.EphemeralVolumeSource{
+			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: &scName,
+					AccessModes:      accessModes,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse(claimSize),
+						},
+					},
+				},
+			},
+			ReadOnly: readOnly,
+		},
+	}
 }
 
 // CleanupResource cleans up VolumeResource
@@ -287,15 +346,37 @@ func (r *VolumeResource) CleanupResource() error {
 					r.Pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.Pvc != nil {
+				cs := f.ClientSet
+				pv := r.Pv
+				if pv == nil && r.Pvc.Name != "" {
+					// This happens for late binding. Check whether we have a volume now that we need to wait for.
+					pvc, err := cs.CoreV1().PersistentVolumeClaims(r.Pvc.Namespace).Get(context.TODO(), r.Pvc.Name, metav1.GetOptions{})
+					switch {
+					case err == nil:
+						if pvc.Spec.VolumeName != "" {
+							pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+							if err != nil {
+								cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+							}
+						}
+					case apierrors.IsNotFound(err):
+						// Without the PVC, we cannot locate the corresponding PV. Let's
+						// hope that it is gone.
+					default:
+						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PVC %v", r.Pvc.Name))
+					}
+				}
+
 				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.Pvc.Name, f.Namespace.Name)
 				if err != nil {
 					cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete PVC %v", r.Pvc.Name))
 				}
-				if r.Pv != nil {
-					err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.Pv.Name, 5*time.Second, 5*time.Minute)
+
+				if pv != nil {
+					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, 5*time.Minute)
 					if err != nil {
 						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err,
-							"Persistent Volume %v not deleted by dynamic provisioner", r.Pv.Name))
+							"Persistent Volume %v not deleted by dynamic provisioner", pv.Name))
 					}
 				}
 			}
@@ -423,12 +504,12 @@ func deleteStorageClass(cs clientset.Interface, className string) error {
 // the testsuites package whereas volume.TestConfig is merely
 // an implementation detail. It contains fields that have no effect,
 // which makes it unsuitable for use in the testsuits public API.
-func convertTestConfig(in *PerTestConfig) volume.TestConfig {
+func convertTestConfig(in *PerTestConfig) e2evolume.TestConfig {
 	if in.ServerConfig != nil {
 		return *in.ServerConfig
 	}
 
-	return volume.TestConfig{
+	return e2evolume.TestConfig{
 		Namespace:           in.Framework.Namespace.Name,
 		Prefix:              in.Prefix,
 		ClientNodeSelection: in.ClientNodeSelection,
@@ -439,7 +520,7 @@ func convertTestConfig(in *PerTestConfig) volume.TestConfig {
 // intersection of the intervals (if it exists) and return the minimum of the intersection
 // to be used as the claim size for the test.
 // if value not set, that means there's no minimum or maximum size limitation and we set default size for it.
-func getSizeRangesIntersection(first volume.SizeRange, second volume.SizeRange) (string, error) {
+func getSizeRangesIntersection(first e2evolume.SizeRange, second e2evolume.SizeRange) (string, error) {
 	var firstMin, firstMax, secondMin, secondMax resource.Quantity
 	var err error
 
@@ -524,14 +605,24 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
 		test := ginkgo.CurrentGinkgoTestDescription()
+		// Clean up each individual component text such that
+		// it contains only characters that are valid as file
+		// name.
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
+		var components []string
+		for _, component := range test.ComponentTexts {
+			components = append(components, reg.ReplaceAllString(component, "_"))
+		}
 		// We end the prefix with a slash to ensure that all logs
 		// end up in a directory named after the current test.
 		//
-		// TODO: use a deeper directory hierarchy once gubernator
-		// supports that (https://github.com/kubernetes/test-infra/issues/10289).
+		// Each component name maps to a directory. This
+		// avoids cluttering the root artifact directory and
+		// keeps each directory name smaller (the full test
+		// name at one point exceeded 256 characters, which was
+		// too much for some filesystems).
 		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
-			reg.ReplaceAllString(test.FullTestText, "_") + "/"
+			strings.Join(components, "/") + "/"
 	}
 	podlogs.CopyAllLogs(ctx, cs, ns, to)
 
@@ -576,13 +667,13 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 
 	nodeLimit := 25
 
-	metricsGrabber, err := metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
+	metricsGrabber, err := e2emetrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
 
 	if err != nil {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}
 
-	if !metricsGrabber.HasRegisteredMaster() {
+	if !metricsGrabber.HasControlPlanePods() {
 		framework.Logf("Warning: Environment does not support getting controller-manager metrics")
 		return opCounts{}
 	}
@@ -644,24 +735,18 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 	return opCounts{}, opCounts{}
 }
 
-func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, oldInTreeOps, oldMigratedOps opCounts) {
+func newMigrationOpCheck(cs clientset.Interface, pluginName string) *migrationOpCheck {
+	moc := migrationOpCheck{
+		cs:         cs,
+		pluginName: pluginName,
+	}
 	if len(pluginName) == 0 {
 		// This is a native CSI Driver and we don't check ops
-		return
+		moc.skipCheck = true
+		return &moc
 	}
 
-	if sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
-		// If this plugin is migrated based on the test flag storage.migratedPlugins
-		newInTreeOps, _ := getMigrationVolumeOpCounts(cs, pluginName)
-
-		for op, count := range newInTreeOps {
-			if count != oldInTreeOps[op] {
-				framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
-			}
-		}
-		// We don't check for migrated metrics because some negative test cases
-		// may not do any volume operations and therefore not emit any metrics
-	} else {
+	if !sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
 		// In-tree plugin is not migrated
 		framework.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
 
@@ -678,7 +763,27 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 		// and native CSI Driver metrics. This way we can check the counts for
 		// migrated version of the driver for stronger negative test case
 		// guarantees (as well as more informative metrics).
+		moc.skipCheck = true
+		return &moc
 	}
+	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, pluginName)
+	return &moc
+}
+
+func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
+	if moc.skipCheck {
+		return
+	}
+
+	newInTreeOps, _ := getMigrationVolumeOpCounts(moc.cs, moc.pluginName)
+
+	for op, count := range newInTreeOps {
+		if count != moc.oldInTreeOps[op] {
+			framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", moc.pluginName, count-moc.oldInTreeOps[op], op)
+		}
+	}
+	// We don't check for migrated metrics because some negative test cases
+	// may not do any volume operations and therefore not emit any metrics
 }
 
 // Skip skipVolTypes patterns if the driver supports dynamic provisioning

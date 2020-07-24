@@ -200,6 +200,8 @@ func (o *ClusterInfoDumpOptions) Run() error {
 				metav1.NamespaceSystem,
 				o.Namespace,
 			}
+		} else {
+			namespaces = o.Namespaces
 		}
 	}
 	for _, namespace := range namespaces {

@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

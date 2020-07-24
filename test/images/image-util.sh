@@ -21,6 +21,11 @@ set -o pipefail
 TASK=$1
 WHAT=$2
 
+# Connecting to a Remote Docker requires certificates for authentication, which can be found
+# at this path. By default, they can be found in the ${HOME} folder. We're expecting to find
+# here ".docker-${os_version}" folders which contains the necessary certificates.
+DOCKER_CERT_BASE_PATH="${DOCKER_CERT_BASE_PATH:-${HOME}}"
+
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
@@ -32,6 +37,33 @@ declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["pp
 listOsArchs() {
   image=$1
   cut -d "=" -f 1 "${image}"/BASEIMAGE
+}
+
+splitOsArch() {
+    image=$1
+    os_arch=$2
+
+    if [[ $os_arch =~ .*/.*/.* ]]; then
+      # for Windows, we have to support both LTS and SAC channels, so we're building multiple Windows images.
+      # the format for this case is: OS/ARCH/OS_VERSION.
+      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+      arch=$(echo "$os_arch" | cut -d "/" -f 2)
+      os_version=$(echo "$os_arch" | cut -d "/" -f 3)
+      suffix="$os_name-$arch-$os_version"
+
+      # currently, GCE does not have Hyper-V support, which means that the same node cannot be used to build
+      # multiple versions of Windows images. Which is why we have $REMOTE_DOCKER_URL_$os_version URLs configured.
+      # TODO(claudiub): once Hyper-V support has been added to GCE, revert this to just $REMOTE_DOCKER_URL.
+      remote_docker_url_name="REMOTE_DOCKER_URL_$os_version"
+      REMOTE_DOCKER_URL=$(eval echo "\${${remote_docker_url_name}:-}")
+    elif [[ $os_arch =~ .*/.* ]]; then
+      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+      arch=$(echo "$os_arch" | cut -d "/" -f 2)
+      suffix="$os_name-$arch"
+    else
+      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
+      exit 1
+    fi
 }
 
 # Returns baseimage need to used in Dockerfile for any given architecture
@@ -56,24 +88,12 @@ build() {
   kube::util::ensure-gnu-sed
 
   for os_arch in ${os_archs}; do
-    if [[ $os_arch =~ .*/.*/.* ]]; then
-      # for Windows, we have to support both LTS and SAC channels, so we're building multiple Windows images.
-      # the format for this case is: OS/ARCH/OS_VERSION.
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-      os_version=$(echo "$os_arch" | cut -d "/" -f 3)
-
-      # currently, GCE does not have Hyper-V support, which means that the same node cannot be used to build
-      # multiple versions of Windows images. Which is why we have $REMOTE_DOCKER_URL_$os_version URLs configured.
-      # TODO(claudiub): once Hyper-V support has been added to GCE, revert this to just $REMOTE_DOCKER_URL.
-      remote_docker_url_name="REMOTE_DOCKER_URL_$os_version"
-      REMOTE_DOCKER_URL=$(eval echo "\${${remote_docker_url_name}:-}")
-    elif [[ $os_arch =~ .*/.* ]]; then
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-    else
-      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
-      exit 1
+    splitOsArch "${image}" "${os_arch}"
+    if [[ "${os_name}" == "windows" && -z "${REMOTE_DOCKER_URL}" ]]; then
+      # If we have a Windows os_arch entry but no Remote Docker Daemon for it,
+      # we should skip it, so we don't have to build any binaries for it.
+      echo "Cannot build the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_$os_version should be set, containing the URL to a Windows docker daemon."
+      continue
     fi
 
     echo "Building image for ${image} OS/ARCH: ${os_arch}..."
@@ -135,12 +155,10 @@ build() {
       # The node requires TLS authentication, and thus it is expected that the
       # ca.pem, cert.pem, key.pem files can be found in the ${HOME}/.docker-${os_version} folder.
       # TODO(claudiub): add "build --isolation=hyperv" once GCE introduces Hyper-V support.
-      docker --tlsverify --tlscacert "${HOME}/.docker-${os_version}/ca.pem" \
-        --tlscert "${HOME}/.docker-${os_version}/cert.pem" --tlskey "${HOME}/.docker-${os_version}/key.pem" \
+      docker --tlsverify --tlscacert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/ca.pem" \
+        --tlscert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/cert.pem" --tlskey "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/key.pem" \
         -H "${REMOTE_DOCKER_URL}" build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}" \
         --build-arg BASEIMAGE="${BASEIMAGE}" -f $dockerfile_name .
-    else
-      echo "Cannot build the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_$os_version should be set, containing the URL to a Windows docker daemon."
     fi
     popd
   done
@@ -168,44 +186,21 @@ push() {
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
   fi
   for os_arch in ${os_archs}; do
-    if [[ $os_arch =~ .*/.*/.* ]]; then
-      # for Windows, we have to support both LTS and SAC channels, so we're building multiple Windows images.
-      # the format for this case is: OS/ARCH/OS_VERSION.
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-      os_version=$(echo "$os_arch" | cut -d "/" -f 3)
-
-      # currently, GCE does not have Hyper-V support, which means that the same node cannot be used to build
-      # multiple versions of Windows images. Which is why we have $REMOTE_DOCKER_URL_$os_version URLs configured.
-      # TODO(claudiub): once Hyper-V support has been added to GCE, revert this to just $REMOTE_DOCKER_URL.
-      remote_docker_url_name="REMOTE_DOCKER_URL_$os_version"
-      REMOTE_DOCKER_URL=$(eval echo "\${${remote_docker_url_name}:-}")
-    elif [[ $os_arch =~ .*/.* ]]; then
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-    else
-      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
-      exit 1
-    fi
+    splitOsArch "${image}" "${os_arch}"
 
     if [[ "$os_name" = "linux" ]]; then
       docker push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
     elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
       # NOTE(claudiub): We're pushing the image we built on the remote Windows node.
-      docker --tlsverify --tlscacert "${HOME}/.docker-${os_version}/ca.pem" \
-        --tlscert "${HOME}/.docker-${os_version}/cert.pem" --tlskey "${HOME}/.docker-${os_version}/key.pem" \
+      docker --tlsverify --tlscacert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/ca.pem" \
+        --tlscert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/cert.pem" --tlskey "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/key.pem" \
         -H "${REMOTE_DOCKER_URL}" push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}"
     else
       echo "Cannot push the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_${os_version} should be set, containing the URL to a Windows docker daemon."
+      # we should exclude this image from the manifest list as well, we couldn't build / push it.
+      os_archs=$(printf "%s\n" "$os_archs" | grep -v "$os_arch" || true)
     fi
   done
-
-  # NOTE(claudiub): if the REMOTE_DOCKER_URL var is not set, or it is an empty string, we mustn't include
-  # Windows images into the manifest list.
-  if test -z "${REMOTE_DOCKER_URL:-}" && printf "%s\n" "$os_archs" | grep -q '^windows'; then
-    echo "Skipping pushing the image '${image}' for Windows. REMOTE_DOCKER_URL_\${os_version} should be set, containing the URL to a Windows docker daemon."
-    os_archs=$(printf "%s\n" "$os_archs" | grep -v "^windows" || true)
-  fi
 
   if test -z "${os_archs}"; then
     # this can happen for Windows-only images if they have been skipped entirely.
@@ -223,21 +218,7 @@ push() {
   while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$os_archs" | ${SED} "s~\/~-~g" | ${SED} -e "s~[^ ]*~$REGISTRY\/$image:$TAG\-&~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
   for os_arch in ${os_archs}; do
-    if [[ $os_arch =~ .*/.*/.* ]]; then
-      # for Windows, we have to support both LTS and SAC channels, so we're building multiple Windows images.
-      # the format for this case is: OS/ARCH/OS_VERSION.
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-      os_version=$(echo "$os_arch" | cut -d "/" -f 3)
-      suffix="$os_name-$arch-$os_version"
-    elif [[ $os_arch =~ .*/.* ]]; then
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-      suffix="$os_name-$arch"
-    else
-      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
-      exit 1
-    fi
+    splitOsArch "${image}" "${os_arch}"
     docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
   done
   docker manifest push --purge "${REGISTRY}/${image}:${TAG}"

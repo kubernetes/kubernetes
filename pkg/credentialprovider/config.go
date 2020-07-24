@@ -29,19 +29,19 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
 	maxReadLength = 10 * 1 << 20 // 10MB
 )
 
-// DockerConfigJson represents ~/.docker/config.json file info
+// DockerConfigJSON represents ~/.docker/config.json file info
 // see https://github.com/docker/docker/pull/12009
-type DockerConfigJson struct {
+type DockerConfigJSON struct {
 	Auths DockerConfig `json:"auths"`
 	// +optional
-	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
+	HTTPHeaders map[string]string `json:"HttpHeaders,omitempty"`
 }
 
 // DockerConfig represents the config file used by the docker CLI.
@@ -49,6 +49,7 @@ type DockerConfigJson struct {
 // when pulling images from specific image repositories.
 type DockerConfig map[string]DockerConfigEntry
 
+// DockerConfigEntry wraps a docker config as a entry
 type DockerConfigEntry struct {
 	Username string
 	Password string
@@ -62,19 +63,21 @@ var (
 	workingDirPath    = ""
 	homeDirPath, _    = os.UserHomeDir()
 	rootDirPath       = "/"
-	homeJsonDirPath   = filepath.Join(homeDirPath, ".docker")
-	rootJsonDirPath   = filepath.Join(rootDirPath, ".docker")
+	homeJSONDirPath   = filepath.Join(homeDirPath, ".docker")
+	rootJSONDirPath   = filepath.Join(rootDirPath, ".docker")
 
 	configFileName     = ".dockercfg"
-	configJsonFileName = "config.json"
+	configJSONFileName = "config.json"
 )
 
+// SetPreferredDockercfgPath set preferred docker config path
 func SetPreferredDockercfgPath(path string) {
 	preferredPathLock.Lock()
 	defer preferredPathLock.Unlock()
 	preferredPath = path
 }
 
+// GetPreferredDockercfgPath get preferred docker config path
 func GetPreferredDockercfgPath() string {
 	preferredPathLock.Lock()
 	defer preferredPathLock.Unlock()
@@ -88,7 +91,7 @@ func DefaultDockercfgPaths() []string {
 
 //DefaultDockerConfigJSONPaths returns default search paths of .docker/config.json
 func DefaultDockerConfigJSONPaths() []string {
-	return []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
+	return []string{GetPreferredDockercfgPath(), workingDirPath, homeJSONDirPath, rootJSONDirPath}
 }
 
 // ReadDockercfgFile attempts to read a legacy dockercfg file from the given paths.
@@ -129,36 +132,37 @@ func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error
 		searchPaths = DefaultDockerConfigJSONPaths()
 	}
 	for _, configPath := range searchPaths {
-		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
+		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJSONFileName))
 		if err != nil {
 			klog.Errorf("while trying to canonicalize %s: %v", configPath, err)
 			continue
 		}
-		klog.V(4).Infof("looking for %s at %s", configJsonFileName, absDockerConfigFileLocation)
-		cfg, err = ReadSpecificDockerConfigJsonFile(absDockerConfigFileLocation)
+		klog.V(4).Infof("looking for %s at %s", configJSONFileName, absDockerConfigFileLocation)
+		cfg, err = ReadSpecificDockerConfigJSONFile(absDockerConfigFileLocation)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				klog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
 			}
 			continue
 		}
-		klog.V(4).Infof("found valid %s at %s", configJsonFileName, absDockerConfigFileLocation)
+		klog.V(4).Infof("found valid %s at %s", configJSONFileName, absDockerConfigFileLocation)
 		return cfg, nil
 	}
-	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configJsonFileName, searchPaths)
+	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configJSONFileName, searchPaths)
 
 }
 
-//ReadSpecificDockerConfigJsonFile attempts to read docker configJSON from a given file path.
-func ReadSpecificDockerConfigJsonFile(filePath string) (cfg DockerConfig, err error) {
+//ReadSpecificDockerConfigJSONFile attempts to read docker configJSON from a given file path.
+func ReadSpecificDockerConfigJSONFile(filePath string) (cfg DockerConfig, err error) {
 	var contents []byte
 
 	if contents, err = ioutil.ReadFile(filePath); err != nil {
 		return nil, err
 	}
-	return readDockerConfigJsonFileFromBytes(contents)
+	return readDockerConfigJSONFileFromBytes(contents)
 }
 
+// ReadDockerConfigFile read a docker config file from default path
 func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 	if cfg, err := ReadDockerConfigJSONFile(nil); err == nil {
 		return cfg, nil
@@ -167,19 +171,20 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 	return ReadDockercfgFile(nil)
 }
 
-// HttpError wraps a non-StatusOK error code as an error.
-type HttpError struct {
+// HTTPError wraps a non-StatusOK error code as an error.
+type HTTPError struct {
 	StatusCode int
-	Url        string
+	URL        string
 }
 
 // Error implements error
-func (he *HttpError) Error() string {
+func (he *HTTPError) Error() string {
 	return fmt.Sprintf("http status code: %d while fetching url %s",
-		he.StatusCode, he.Url)
+		he.StatusCode, he.URL)
 }
 
-func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte, err error) {
+// ReadURL read contents from given url
+func ReadURL(url string, client *http.Client, header *http.Header) (body []byte, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -195,9 +200,9 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 
 	if resp.StatusCode != http.StatusOK {
 		klog.V(2).Infof("body of failing http response: %v", resp.Body)
-		return nil, &HttpError{
+		return nil, &HTTPError{
 			StatusCode: resp.StatusCode,
-			Url:        url,
+			URL:        url,
 		}
 	}
 
@@ -214,12 +219,13 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 	return contents, nil
 }
 
-func ReadDockerConfigFileFromUrl(url string, client *http.Client, header *http.Header) (cfg DockerConfig, err error) {
-	if contents, err := ReadUrl(url, client, header); err != nil {
-		return nil, err
-	} else {
+// ReadDockerConfigFileFromURL read a docker config file from the given url
+func ReadDockerConfigFileFromURL(url string, client *http.Client, header *http.Header) (cfg DockerConfig, err error) {
+	if contents, err := ReadURL(url, client, header); err == nil {
 		return readDockerConfigFileFromBytes(contents)
 	}
+
+	return nil, err
 }
 
 func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
@@ -230,13 +236,13 @@ func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error
 	return
 }
 
-func readDockerConfigJsonFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
-	var cfgJson DockerConfigJson
-	if err = json.Unmarshal(contents, &cfgJson); err != nil {
+func readDockerConfigJSONFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
+	var cfgJSON DockerConfigJSON
+	if err = json.Unmarshal(contents, &cfgJSON); err != nil {
 		klog.Errorf("while trying to parse blob %q: %v", contents, err)
 		return nil, err
 	}
-	cfg = cfgJson.Auths
+	cfg = cfgJSON.Auths
 	return
 }
 
@@ -253,6 +259,7 @@ type dockerConfigEntryWithAuth struct {
 	Auth string `json:"auth,omitempty"`
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface.
 func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
 	var tmp dockerConfigEntryWithAuth
 	err := json.Unmarshal(data, &tmp)
@@ -272,6 +279,7 @@ func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+// MarshalJSON implements the json.Marshaler interface.
 func (ident DockerConfigEntry) MarshalJSON() ([]byte, error) {
 	toEncode := dockerConfigEntryWithAuth{ident.Username, ident.Password, ident.Email, ""}
 	toEncode.Auth = encodeDockerConfigFieldAuth(ident.Username, ident.Password)
@@ -301,7 +309,7 @@ func decodeDockerConfigFieldAuth(field string) (username, password string, err e
 
 	parts := strings.SplitN(string(decoded), ":", 2)
 	if len(parts) != 2 {
-		err = fmt.Errorf("unable to parse auth field")
+		err = fmt.Errorf("unable to parse auth field, must be formatted as base64(username:password)")
 		return
 	}
 

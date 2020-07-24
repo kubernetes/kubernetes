@@ -31,7 +31,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,11 +98,15 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
-	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do(context.TODO())
+func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) (bool, error) {
+	res := client.CoreV1().RESTClient().Get().RequestURI(path).Do(context.TODO())
 	var status int
 	res.StatusCode(&status)
-	return status == http.StatusOK
+	_, err := res.Raw()
+	if err != nil {
+		return false, err
+	}
+	return status == http.StatusOK, nil
 }
 
 func TestLivezAndReadyz(t *testing.T) {
@@ -114,11 +117,11 @@ func TestLivezAndReadyz(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !endpointReturnsStatusOK(client, "/livez") {
-		t.Fatalf("livez should be healthy")
+	if statusOK, err := endpointReturnsStatusOK(client, "/livez"); err != nil || !statusOK {
+		t.Fatalf("livez should be healthy, got %v and error %v", statusOK, err)
 	}
-	if !endpointReturnsStatusOK(client, "/readyz") {
-		t.Fatalf("readyz should be healthy")
+	if statusOK, err := endpointReturnsStatusOK(client, "/readyz"); err != nil || !statusOK {
+		t.Fatalf("readyz should be healthy, got %v and error %v", statusOK, err)
 	}
 }
 
@@ -158,7 +161,7 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 	}
 
 	matchedExtension := false
-	extensionsPrefix := "/apis/" + apiextensions.GroupName
+	extensionsPrefix := "/apis/" + apiextensionsv1beta1.GroupName
 
 	matchedRegistration := false
 	registrationPrefix := "/apis/" + apiregistration.GroupName

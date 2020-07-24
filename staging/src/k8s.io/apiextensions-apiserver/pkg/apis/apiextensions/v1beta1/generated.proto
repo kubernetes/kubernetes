@@ -130,7 +130,7 @@ message CustomResourceConversion {
 
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
-// Deprecated in v1.16, planned for removal in v1.19. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
+// Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 message CustomResourceDefinition {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -309,6 +309,19 @@ message CustomResourceDefinitionVersion {
   // storage indicates this version should be used when persisting custom resources to storage.
   // There must be exactly one version with storage=true.
   optional bool storage = 3;
+
+  // deprecated indicates this version of the custom resource API is deprecated.
+  // When set to true, API requests to this version receive a warning header in the server response.
+  // Defaults to false.
+  // +optional
+  optional bool deprecated = 7;
+
+  // deprecationWarning overrides the default warning returned to API clients.
+  // May only be set when `deprecated` is true.
+  // The default warning indicates this version is deprecated and recommends use
+  // of the newest served version of equal or greater stability, if one exists.
+  // +optional
+  optional string deprecationWarning = 8;
 
   // schema describes the schema used for validation and pruning of this version of the custom resource.
   // Top-level and per-version schemas are mutually exclusive.

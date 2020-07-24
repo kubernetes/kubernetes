@@ -37,7 +37,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type TopPodOptions struct {
@@ -49,8 +49,6 @@ type TopPodOptions struct {
 	PrintContainers bool
 	NoHeaders       bool
 	PodClient       corev1client.PodsGetter
-	HeapsterOptions HeapsterTopOptions
-	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
 	MetricsClient   metricsclientset.Interface
@@ -108,7 +106,6 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
-	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
 
@@ -140,7 +137,6 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 
 	o.PodClient = clientset.CoreV1()
-	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
 	return nil
@@ -175,17 +171,12 @@ func (o TopPodOptions) RunTopPod() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	var metrics *metricsapi.PodMetricsList
-	if metricsAPIAvailable {
-		metrics, err = getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
-		if err != nil {
-			return err
-		}
-	} else {
-		metrics, err = o.Client.GetPodMetrics(o.Namespace, o.ResourceName, o.AllNamespaces, selector)
-		if err != nil {
-			return err
-		}
+	if !metricsAPIAvailable {
+		return errors.New("Metrics API not available")
+	}
+	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+	if err != nil {
+		return err
 	}
 
 	// TODO: Refactor this once Heapster becomes the API server.
