@@ -49,14 +49,14 @@ All Docker names are suffixed with a hash derived from the file path (to allow c
 
 If you are behind a proxy and you are letting these scripts use `docker-machine` to set up your local VM for you on macOS, you need to export proxy settings for Kubernetes build, the following environment variables should be defined.
 
-```
+```bash
 export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
 export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
 ```
 
 Optionally, you can specify addresses of no proxy for Kubernetes build, for example
 
-```
+```bash
 export KUBERNETES_NO_PROXY=127.0.0.1
 ```
 
@@ -67,7 +67,8 @@ If you are using sudo to make Kubernetes build for example make quick-release, y
 It is possible to use a Docker Engine that is running remotely (under your desk or in the cloud).  Docker must be configured to connect to that machine and the local rsync port must be forwarded (via SSH or nc) from localhost to the remote machine.
 
 To do this easily with GCE and `docker-machine`, do something like this:
-```
+
+```bash
 # Create the remote docker machine on GCE.  This is a pretty beefy machine with SSD disk.
 KUBE_BUILD_VM=k8s-build
 KUBE_BUILD_GCE_PROJECT=<project>
