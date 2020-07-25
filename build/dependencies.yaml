@@ -92,15 +92,15 @@ dependencies:
     - path: build/debian-iptables/Makefile
       match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-base-\$\(ARCH\)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables"
     version: 12.1.0
@@ -137,7 +137,7 @@ dependencies:
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
-      match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/kube-cross:v\d+\.\d+\.\d+-\d+
+      match: k8s\.gcr\.io\/build-image\/kube-cross:v\d+\.\d+\.\d+-\d+
 
   - name: "k8s.gcr.io/pause"
     version: 3.3

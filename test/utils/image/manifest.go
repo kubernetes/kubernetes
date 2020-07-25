@@ -37,8 +37,6 @@ type RegistryList struct {
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
-	// TODO: The last consumer of this has been removed and it should be deprecated
-	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 	K8sCSI                  string `yaml:"k8sCSI"`
@@ -73,14 +71,11 @@ func initReg() RegistryList {
 		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
-		// TODO: After the domain flip, this should instead be k8s.gcr.io/k8s-artifacts-prod/e2e-test-images
-		PromoterE2eRegistry: "us.gcr.io/k8s-artifacts-prod/e2e-test-images",
-		BuildImageRegistry:  "us.gcr.io/k8s-artifacts-prod/build-image",
-		InvalidRegistry:     "invalid.com/invalid",
-		GcRegistry:          "k8s.gcr.io",
-		GcrReleaseRegistry:  "gcr.io/gke-release",
-		// TODO: The last consumer of this has been removed and it should be deleted
-		GoogleContainerRegistry: "gcr.io/google-containers",
+		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
+		BuildImageRegistry:      "k8s.gcr.io/build-image",
+		InvalidRegistry:         "invalid.com/invalid",
+		GcRegistry:              "k8s.gcr.io",
+		GcrReleaseRegistry:      "gcr.io/gke-release",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		K8sCSI:                  "gcr.io/k8s-staging-csi",

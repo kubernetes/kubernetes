@@ -164,7 +164,7 @@ spec:
           hostPath:
             path: /etc/srv/kubernetes/pki/konnectivity-agent
       containers:
-        - image: gcr.io/google-containers/proxy-agent:v0.0.3
+        - image: k8s.gcr.io/proxy-agent:v0.0.3
           name: proxy-agent
           command: ["/proxy-agent"]
           args: ["--caCert=/etc/srv/kubernetes/pki/proxy-agent/ca.crt", "--agentCert=/etc/srv/kubernetes/pki/proxy-agent/client.crt", "--agentKey=/etc/srv/kubernetes/pki/proxy-agent/client.key", "--proxyServerHost=127.0.0.1", "--proxyServerPort=8132"]
