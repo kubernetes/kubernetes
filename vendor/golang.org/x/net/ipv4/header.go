@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	Version      = 4  // protocol version
-	HeaderLen    = 20 // header length without extension headers
-	maxHeaderLen = 60 // sensible default, revisit if later RFCs define new usage of version and header length fields
+	Version   = 4  // protocol version
+	HeaderLen = 20 // header length without extension headers
 )
 
 type HeaderFlags int
