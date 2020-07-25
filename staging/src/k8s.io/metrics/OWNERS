@@ -4,4 +4,3 @@ approvers:
 - sig-instrumentation-approvers
 labels:
 - sig/instrumentation
-- triage/needs-information
