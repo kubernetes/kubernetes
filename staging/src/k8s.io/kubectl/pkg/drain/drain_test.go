@@ -196,7 +196,7 @@ func createPods(ifCreateNewPods bool) (map[string]corev1.Pod, []corev1.Pod) {
 	for i := 0; i < 8; i++ {
 		var uid types.UID
 		if ifCreateNewPods {
-			uid = types.UID(i)
+			uid = types.UID(strconv.Itoa(i))
 		} else {
 			uid = types.UID(strconv.Itoa(i) + strconv.Itoa(i))
 		}
