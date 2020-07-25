@@ -117,10 +117,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	// initialize ipsetList with all sets we needed
-	ipsetList := make(map[string]*IPSet)
-	for _, is := range ipsetInfo {
-		ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, false, is.comment)
-	}
+	ipsetManager := newIPSetManager(false, setInfoList, ipset)
 	p := &Proxier{
 		exec:                  fexec,
 		serviceMap:            make(proxy.ServiceMap),
@@ -130,7 +127,6 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
-		ipset:                 ipset,
 		strictARP:             false,
 		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
 		hostname:              testHostname,
@@ -146,7 +142,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		filterChains:          bytes.NewBuffer(nil),
 		filterRules:           bytes.NewBuffer(nil),
 		netlinkHandle:         netlinktest.NewFakeNetlinkHandle(),
-		ipsetList:             ipsetList,
+		ipsetManager:          ipsetManager,
 		nodePortAddresses:     make([]string, 0),
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
@@ -3302,8 +3298,8 @@ func checkIptables(t *testing.T, ipt *iptablestest.FakeIPTables, epIpt netlinkte
 // checkIPSet to check expected ipset and entries
 func checkIPSet(t *testing.T, fp *Proxier, ipSet netlinktest.ExpectedIPSet) {
 	for set, entries := range ipSet {
-		ents, err := fp.ipset.ListEntries(set)
-		if err != nil || len(ents) != len(entries) {
+		ents, found := fp.ipsetManager.activeEntries[set]
+		if !found || len(ents) != len(entries) {
 			t.Errorf("Check ipset entries failed for ipset: %q, expect %d, got %d", set, len(entries), len(ents))
 			continue
 		}
@@ -3311,9 +3307,10 @@ func checkIPSet(t *testing.T, fp *Proxier, ipSet netlinktest.ExpectedIPSet) {
 		for _, entry := range entries {
 			expectedEntries = append(expectedEntries, entry.String())
 		}
-		sort.Strings(ents)
+		entries := ents.List()
+		sort.Strings(entries)
 		sort.Strings(expectedEntries)
-		if !reflect.DeepEqual(ents, expectedEntries) {
+		if !reflect.DeepEqual(entries, expectedEntries) {
 			t.Errorf("Check ipset entries failed for ipset: %q", set)
 		}
 	}
@@ -3863,8 +3860,8 @@ func TestEndpointSliceE2E(t *testing.T) {
 	fp.syncProxyRules()
 
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
-	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
-	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+	assert.NotNil(t, fp.ipsetManager.getIPSet("KUBE-LOOP-BACK"))
+	activeEntries1 := fp.ipsetManager.activeEntries["KUBE-LOOP-BACK"]
 	assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
 	assert.Equal(t, true, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
 	virtualServers1, vsErr1 := ipvs.GetVirtualServers()
@@ -3881,8 +3878,8 @@ func TestEndpointSliceE2E(t *testing.T) {
 	fp.syncProxyRules()
 
 	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
-	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
-	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+	assert.NotNil(t, fp.ipsetManager.getIPSet("KUBE-LOOP-BACK"))
+	activeEntries2 := fp.ipsetManager.activeEntries["KUBE-LOOP-BACK"]
 	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
 	virtualServers2, vsErr2 := ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr2, "Expected no error getting virtual servers")

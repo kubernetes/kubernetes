@@ -17,14 +17,15 @@ limitations under the License.
 package ipvs
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-
+	"bytes"
 	"fmt"
 	"strings"
 
 	"k8s.io/klog/v2"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 )
 
 const (
@@ -75,6 +76,10 @@ const (
 
 	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local with type 'hash ip:port'"
 	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP-HASH"
+
+	addCommand    = "add"
+	deleteCommand = "del"
+	createCommand = "create"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -83,17 +88,38 @@ type IPSetVersioner interface {
 	GetVersion() (string, error)
 }
 
-// IPSet wraps util/ipset which is used by IPVS proxier.
-type IPSet struct {
-	utilipset.IPSet
-	// activeEntries is the current active entries of the ipset.
-	activeEntries sets.String
-	// handle is the util ipset interface handle.
-	handle utilipset.Interface
+type ipsetInfo struct {
+	name    string
+	setType utilipset.Type
+	comment string
 }
 
-// NewIPSet initialize a new IPSet struct
-func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, isIPv6 bool, comment string) *IPSet {
+// ipsetManager wraps util/ipset which is used by IPVS proxier.
+type ipsetManager struct {
+	// setList a map of current sets list, with key of set name and value of set content
+	setList map[string]*utilipset.IPSet
+	// activeEntries is a map of current active entries, with key of set name and value of set entries
+	activeEntries map[string]sets.String
+	// handler is the util ipset interface handler.
+	handler utilipset.Interface
+}
+
+func newIPSetManager(isIPv6 bool, setInfoList []ipsetInfo, ipset utilipset.Interface) *ipsetManager {
+	m := &ipsetManager{
+		setList:       make(map[string]*utilipset.IPSet, len(setInfoList)),
+		activeEntries: make(map[string]sets.String, len(setInfoList)),
+		handler:       ipset,
+	}
+	for _, info := range setInfoList {
+		set := newIPSet(info.name, info.setType, isIPv6, info.comment)
+		m.setList[info.name] = set
+		m.activeEntries[info.name] = sets.NewString()
+	}
+	return m
+}
+
+// newIPSet initialize a new IPSet
+func newIPSet(name string, setType utilipset.Type, isIPv6 bool, comment string) *utilipset.IPSet {
 	hashFamily := utilipset.ProtocolFamilyIPV4
 	if isIPv6 {
 		hashFamily = utilipset.ProtocolFamilyIPV6
@@ -112,76 +138,83 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 			}
 		}
 	}
-	set := &IPSet{
-		IPSet: utilipset.IPSet{
-			Name:       name,
-			SetType:    setType,
-			HashFamily: hashFamily,
-			Comment:    comment,
-		},
-		activeEntries: sets.NewString(),
-		handle:        handle,
+	set := &utilipset.IPSet{
+		Name:       name,
+		SetType:    setType,
+		HashFamily: hashFamily,
+		Comment:    comment,
 	}
+	set.SetIPSetDefaults()
 	return set
 }
 
-func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
-	return entry.Validate(&set.IPSet)
+func (s *ipsetManager) isSetEmpty(setName string) bool {
+	return s.activeEntries[setName].Len() == 0
 }
 
-func (set *IPSet) isEmpty() bool {
-	return len(set.activeEntries.UnsortedList()) == 0
+func (s *ipsetManager) getSetComment(setName string) string {
+	return fmt.Sprintf("\"%s\"", s.setList[setName].Comment)
 }
 
-func (set *IPSet) getComment() string {
-	return fmt.Sprintf("\"%s\"", set.Comment)
-}
-
-func (set *IPSet) resetEntries() {
-	set.activeEntries = sets.NewString()
-}
-
-func (set *IPSet) syncIPSetEntries() {
-	appliedEntries, err := set.handle.ListEntries(set.Name)
-	if err != nil {
-		klog.Errorf("Failed to list ip set entries, error: %v", err)
-		return
-	}
-
-	// currentIPSetEntries represents Endpoints watched from API Server.
-	currentIPSetEntries := sets.NewString()
-	for _, appliedEntry := range appliedEntries {
-		currentIPSetEntries.Insert(appliedEntry)
-	}
-
-	if !set.activeEntries.Equal(currentIPSetEntries) {
-		// Clean legacy entries
-		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
-			if err := set.handle.DelEntry(entry, set.Name); err != nil {
-				if !utilipset.IsNotFoundError(err) {
-					klog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
-				}
-			} else {
-				klog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
-			}
-		}
-		// Create active entries
-		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
-			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				klog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
-			} else {
-				klog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
-			}
-		}
+func (s *ipsetManager) resetEntries() {
+	for setName := range s.activeEntries {
+		s.activeEntries[setName] = sets.NewString()
 	}
 }
 
-func ensureIPSet(set *IPSet) error {
-	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-		klog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
-		return err
+func (s *ipsetManager) entryValid(setName string, entry *utilipset.Entry) bool {
+	if s.setList[setName] == nil {
+		return false
 	}
+	return entry.Validate(s.setList[setName])
+}
+
+func (s *ipsetManager) insertIPSetEntry(setName string, entry *utilipset.Entry) error {
+	if !s.entryValid(setName, entry) {
+		return fmt.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, setName))
+	}
+	s.activeEntries[setName].Insert(entry.String())
 	return nil
+}
+
+func (s *ipsetManager) getIPSet(setName string) *utilipset.IPSet {
+	return s.setList[setName]
+}
+
+func (s *ipsetManager) syncIPSetEntries() {
+	existingIPSetEntries := make(map[string]sets.String)
+	buf := bytes.NewBuffer(nil)
+	data, err := s.handler.SaveAllSets()
+	if err != nil {
+		klog.Errorf("Failed to exec ipset save, syncing all set entries: %v", err)
+	} else {
+		existingIPSetEntries = readSetsEntries(data)
+	}
+	// make sure ip sets exists in the system.
+	for _, set := range s.setList {
+		writeCreateSet(buf, set)
+	}
+
+	// cleanup ip sets entries and add new entries
+	for set, entries := range s.activeEntries {
+		if existingEntries, found := existingIPSetEntries[set]; found {
+			for entry := range existingEntries.Difference(entries) {
+				writeDelEntry(buf, set, entry)
+			}
+			for entry := range entries.Difference(existingEntries) {
+				writeAddEntry(buf, set, entry)
+			}
+		} else {
+			for entry := range entries {
+				writeAddEntry(buf, set, entry)
+			}
+		}
+	}
+
+	klog.V(5).Infof("Restoring ipset sets and entries: %s", buf.Bytes())
+	if err := s.handler.RestoreSets(buf.Bytes()); err != nil {
+		klog.Errorf("Failed to exec ipset restore, sync all set entries err: %v", err)
+	}
 }
 
 // checkMinVersion checks if ipset current version satisfies required min version
@@ -198,4 +231,48 @@ func checkMinVersion(vstring string) bool {
 		return false
 	}
 	return !version.LessThan(minVersion)
+}
+
+func readSetsEntries(data []byte) map[string]sets.String {
+	buffer := bytes.NewBuffer(data)
+	setEntries := make(map[string]sets.String)
+	for {
+		line, err := buffer.ReadString('\n')
+		if err != nil || len(line) == 0 {
+			break
+		}
+		line = strings.TrimSuffix(line, "\n")
+		if strings.HasPrefix(line, addCommand) {
+			entrySlices := strings.Split(line, " ")
+			if len(entrySlices) < 3 {
+				klog.Errorf("Read set entries, got invalid entry: %s", line)
+				continue
+			}
+			set, entry := entrySlices[1], entrySlices[2]
+			if setEntries[set] == nil {
+				setEntries[set] = sets.NewString(entry)
+			} else {
+				setEntries[set].Insert(entry)
+			}
+		}
+	}
+	return setEntries
+}
+
+func writeCreateSet(buf *bytes.Buffer, set *utilipset.IPSet) {
+	line := strings.Join([]string{createCommand, set.String(), "-exist"}, " ")
+	buf.WriteString(line)
+	buf.WriteByte('\n')
+}
+
+func writeAddEntry(buf *bytes.Buffer, setName, entry string) {
+	line := strings.Join([]string{addCommand, setName, entry, "-exist"}, " ")
+	buf.WriteString(line)
+	buf.WriteByte('\n')
+}
+
+func writeDelEntry(buf *bytes.Buffer, setName, entry string) {
+	line := strings.Join([]string{deleteCommand, setName, entry}, " ")
+	buf.WriteString(line)
+	buf.WriteByte('\n')
 }
