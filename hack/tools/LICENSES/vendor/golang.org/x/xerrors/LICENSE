@@ -1,6 +1,6 @@
-= vendor/golang.org/x/crypto licensed under: =
+= vendor/golang.org/x/xerrors licensed under: =
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright (c) 2019 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -28,4 +28,4 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-= vendor/golang.org/x/crypto/LICENSE 5d4950ecb7b26d2c5e4e7b4e0dd74707
+= vendor/golang.org/x/xerrors/LICENSE a413d6b3884e141783f23d00d5838777

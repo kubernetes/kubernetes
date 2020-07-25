@@ -7,6 +7,14 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+            "//vendor/google.golang.org/grpc:go_default_library",
+            "//vendor/google.golang.org/grpc/codes:go_default_library",
+            "//vendor/google.golang.org/grpc/status:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
@@ -39,7 +47,23 @@ go_library(
             "//vendor/google.golang.org/grpc/status:go_default_library",
             "//vendor/k8s.io/klog/v2:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+            "//vendor/google.golang.org/grpc:go_default_library",
+            "//vendor/google.golang.org/grpc/codes:go_default_library",
+            "//vendor/google.golang.org/grpc/status:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+            "//vendor/google.golang.org/grpc:go_default_library",
+            "//vendor/google.golang.org/grpc/codes:go_default_library",
+            "//vendor/google.golang.org/grpc/status:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
             "//vendor/google.golang.org/grpc:go_default_library",

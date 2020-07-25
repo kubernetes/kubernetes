@@ -45,6 +45,11 @@ go_library(
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//pkg/kubelet/cadvisor:go_default_library",
+            "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/api/v1/resource:go_default_library",
             "//pkg/apis/core/v1/helper:go_default_library",
@@ -92,7 +97,17 @@ go_library(
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//pkg/kubelet/cadvisor:go_default_library",
+            "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/kubelet/cadvisor:go_default_library",
+            "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//pkg/kubelet/cadvisor:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",

@@ -20,6 +20,9 @@ go_library(
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/k8s.io/utils/io:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/k8s.io/utils/io:go_default_library",
         ],
@@ -32,7 +35,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/k8s.io/utils/io:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/k8s.io/utils/io:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/k8s.io/utils/io:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/k8s.io/utils/io:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

@@ -17,6 +17,9 @@ go_library(
     importpath = "github.com/coreos/pkg/capnslog",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
         ],
@@ -29,7 +32,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

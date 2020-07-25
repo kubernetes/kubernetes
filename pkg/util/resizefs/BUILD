@@ -9,6 +9,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/resizefs",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/k8s.io/klog/v2:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
@@ -22,7 +25,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
