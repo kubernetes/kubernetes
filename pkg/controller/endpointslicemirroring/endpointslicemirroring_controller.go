@@ -285,6 +285,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	endpoints, err := c.endpointsLister.Endpoints(namespace).Get(name)
 	if err != nil || !c.shouldMirror(endpoints) {
 		if apierrors.IsNotFound(err) || !c.shouldMirror(endpoints) {
+			c.endpointSliceTracker.DeleteService(namespace, name)
 			return c.reconciler.deleteEndpoints(namespace, name, endpointSlices)
 		}
 		return err
@@ -389,7 +390,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceAdd() expected type discovery.EndpointSlice, got %T", obj))
 		return
 	}
-	if managedByController(endpointSlice) && c.endpointSliceTracker.stale(endpointSlice) {
+	if managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
@@ -405,7 +406,7 @@ func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
 		return
 	}
-	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.stale(endpointSlice)) {
+	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice)) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
@@ -419,7 +420,7 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceDelete() expected type discovery.EndpointSlice, got %T", obj))
 		return
 	}
-	if managedByController(endpointSlice) && c.endpointSliceTracker.has(endpointSlice) {
+	if managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
