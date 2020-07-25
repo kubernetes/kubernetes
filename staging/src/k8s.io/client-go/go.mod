@@ -2,7 +2,7 @@
 
 module k8s.io/client-go
 
-go 1.13
+go 1.15
 
 require (
 	cloud.google.com/go v0.51.0 // indirect
