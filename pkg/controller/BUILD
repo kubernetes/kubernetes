@@ -134,6 +134,7 @@ filegroup(
         "//pkg/controller/ttl:all-srcs",
         "//pkg/controller/ttlafterfinished:all-srcs",
         "//pkg/controller/util/endpoint:all-srcs",
+        "//pkg/controller/util/endpointslice:all-srcs",
         "//pkg/controller/util/node:all-srcs",
         "//pkg/controller/volume/attachdetach:all-srcs",
         "//pkg/controller/volume/common:all-srcs",

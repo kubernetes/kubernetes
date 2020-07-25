@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "endpointset.go",
-        "endpointslice_tracker.go",
         "endpointslicemirroring_controller.go",
         "events.go",
         "reconciler.go",
@@ -18,6 +17,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/endpointslicemirroring/metrics:go_default_library",
         "//pkg/controller/util/endpoint:go_default_library",
+        "//pkg/controller/util/endpointslice:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -49,7 +49,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "endpointslice_tracker_test.go",
         "endpointslicemirroring_controller_test.go",
         "reconciler_helpers_test.go",
         "reconciler_test.go",
@@ -59,6 +58,7 @@ go_test(
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/endpointslicemirroring/metrics:go_default_library",
+        "//pkg/controller/util/endpointslice:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

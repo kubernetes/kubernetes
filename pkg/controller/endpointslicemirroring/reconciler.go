@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -41,7 +42,7 @@ type reconciler struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointslice.Tracker
 
 	// eventRecorder allows reconciler to record an event if it finds an invalid
 	// IP address in an Endpoints resource.
@@ -246,7 +247,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 				}
 				errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Endpoints %s/%s: %v", endpoints.Namespace, endpoints.Name, err))
 			} else {
-				r.endpointSliceTracker.update(createdSlice)
+				r.endpointSliceTracker.Update(createdSlice)
 				metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 			}
 		}
@@ -257,7 +258,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err))
 		} else {
-			r.endpointSliceTracker.update(updatedSlice)
+			r.endpointSliceTracker.Update(updatedSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 		}
 	}
@@ -267,7 +268,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err))
 		} else {
-			r.endpointSliceTracker.delete(endpointSlice)
+			r.endpointSliceTracker.Delete(endpointSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 		}
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func TestEndpointSliceTrackerUpdate(t *testing.T) {
+func TestTrackerUpdate(t *testing.T) {
 	epSlice1 := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "example-1",
@@ -50,14 +50,14 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 		checksParam                     *discovery.EndpointSlice
 		expectHas                       bool
 		expectStale                     bool
-		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+		expectResourceVersionsByService map[types.NamespacedName]ResourceVersionsByName
 	}{
 		"same slice": {
 			updateParam: epSlice1,
 			checksParam: epSlice1,
 			expectHas:   true,
 			expectStale: false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{
 				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
 					epSlice1.Name: epSlice1.ResourceVersion,
 				},
@@ -68,7 +68,7 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 			checksParam: epSlice1DifferentNS,
 			expectHas:   false,
 			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{
 				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
 					epSlice1.Name: epSlice1.ResourceVersion,
 				},
@@ -79,7 +79,7 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 			checksParam: epSlice1DifferentService,
 			expectHas:   false,
 			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{
 				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
 					epSlice1.Name: epSlice1.ResourceVersion,
 				},
@@ -90,7 +90,7 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 			checksParam: epSlice1DifferentRV,
 			expectHas:   true,
 			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{
 				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
 					epSlice1.Name: epSlice1.ResourceVersion,
 				},
@@ -100,7 +100,7 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esTracker := newEndpointSliceTracker()
+			esTracker := NewTracker()
 			esTracker.Update(tc.updateParam)
 			if esTracker.Has(tc.checksParam) != tc.expectHas {
 				t.Errorf("tc.tracker.Has(%+v) == %t, expected %t", tc.checksParam, esTracker.Has(tc.checksParam), tc.expectHas)
@@ -113,7 +113,7 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 	}
 }
 
-func TestEndpointSliceTrackerDelete(t *testing.T) {
+func TestTrackerDelete(t *testing.T) {
 	epSlice1 := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "example-1",
@@ -184,7 +184,7 @@ func TestEndpointSliceTrackerDelete(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esTracker := newEndpointSliceTracker()
+			esTracker := NewTracker()
 			esTracker.Update(epSlice1)
 
 			esTracker.Delete(tc.deleteParam)
@@ -198,7 +198,7 @@ func TestEndpointSliceTrackerDelete(t *testing.T) {
 	}
 }
 
-func TestEndpointSliceTrackerDeleteService(t *testing.T) {
+func TestTrackerDeleteService(t *testing.T) {
 	svcName1, svcNS1 := "svc1", "ns1"
 	svcName2, svcNS2 := "svc2", "ns2"
 	epSlice1 := &discovery.EndpointSlice{
@@ -215,21 +215,21 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 		deleteServiceParam              *types.NamespacedName
 		expectHas                       bool
 		expectStale                     bool
-		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+		expectResourceVersionsByService map[types.NamespacedName]ResourceVersionsByName
 	}{
 		"same service": {
 			updateParam:                     epSlice1,
 			deleteServiceParam:              &types.NamespacedName{Namespace: svcNS1, Name: svcName1},
 			expectHas:                       false,
 			expectStale:                     true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{},
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{},
 		},
 		"different namespace": {
 			updateParam:        epSlice1,
 			deleteServiceParam: &types.NamespacedName{Namespace: svcNS2, Name: svcName1},
 			expectHas:          true,
 			expectStale:        false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{
 				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
 					epSlice1.Name: epSlice1.ResourceVersion,
 				},
@@ -240,7 +240,7 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 			deleteServiceParam: &types.NamespacedName{Namespace: svcNS1, Name: svcName2},
 			expectHas:          true,
 			expectStale:        false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+			expectResourceVersionsByService: map[types.NamespacedName]ResourceVersionsByName{
 				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
 					epSlice1.Name: epSlice1.ResourceVersion,
 				},
@@ -250,7 +250,7 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esTracker := newEndpointSliceTracker()
+			esTracker := NewTracker()
 			esTracker.Update(tc.updateParam)
 			esTracker.DeleteService(tc.deleteServiceParam.Namespace, tc.deleteServiceParam.Name)
 			if esTracker.Has(tc.updateParam) != tc.expectHas {

@@ -38,6 +38,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
+	"k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -914,7 +915,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		client:               client,
 		nodeLister:           corelisters.NewNodeLister(indexer),
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
-		endpointSliceTracker: newEndpointSliceTracker(),
+		endpointSliceTracker: endpointslice.NewTracker(),
 		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
 	}
 }
@@ -982,8 +983,8 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 	}
 }
 
-func expectTrackedResourceVersion(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedRV string) {
-	rrv, _ := tracker.relatedResourceVersions(slice)
+func expectTrackedResourceVersion(t *testing.T, tracker *endpointslice.Tracker, slice *discovery.EndpointSlice, expectedRV string) {
+	rrv, _ := tracker.RelatedResourceVersions(slice)
 	rv, tracked := rrv[slice.Name]
 	if !tracked {
 		t.Fatalf("Expected EndpointSlice %s to be tracked", slice.Name)

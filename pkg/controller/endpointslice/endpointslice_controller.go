@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 const (
@@ -138,7 +139,7 @@ func NewController(podInformer coreinformers.PodInformer,
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
-	c.endpointSliceTracker = newEndpointSliceTracker()
+	c.endpointSliceTracker = endpointslice.NewTracker()
 
 	c.maxEndpointsPerSlice = maxEndpointsPerSlice
 
@@ -189,7 +190,7 @@ type Controller struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Service. It can help determine if a
 	// cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointslice.Tracker
 
 	// nodeLister is able to list/get nodes and is populated by the
 	// shared informer passed to NewController

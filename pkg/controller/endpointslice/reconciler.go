@@ -33,6 +33,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -41,7 +42,7 @@ type reconciler struct {
 	client               clientset.Interface
 	nodeLister           corelisters.NodeLister
 	maxEndpointsPerSlice int32
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointslice.Tracker
 	metricsCache         *metrics.Cache
 }
 
