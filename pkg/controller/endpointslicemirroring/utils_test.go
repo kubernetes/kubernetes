@@ -39,7 +39,11 @@ func TestNewEndpointSlice(t *testing.T) {
 	addrType := discovery.AddressTypeIPv4
 
 	endpoints := v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "test",
+			Labels:    map[string]string{"foo": "bar"},
+		},
 		Subsets: []v1.EndpointSubset{{
 			Ports: []v1.EndpointPort{{Port: 80}},
 		}},
@@ -51,6 +55,7 @@ func TestNewEndpointSlice(t *testing.T) {
 	expectedSlice := discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
+				"foo":                      "bar",
 				discovery.LabelServiceName: endpoints.Name,
 				discovery.LabelManagedBy:   controllerName,
 			},
@@ -65,6 +70,10 @@ func TestNewEndpointSlice(t *testing.T) {
 	generatedSlice := newEndpointSlice(&endpoints, ports, addrType, "")
 
 	assert.EqualValues(t, expectedSlice, *generatedSlice)
+
+	if len(endpoints.Labels) > 1 {
+		t.Errorf("Expected Endpoints labels to not be modified, got %+v", endpoints.Labels)
+	}
 }
 
 // Test helpers
