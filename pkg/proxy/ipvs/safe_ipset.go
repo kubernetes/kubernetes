@@ -96,6 +96,20 @@ func (s *safeIpset) ListSets() ([]string, error) {
 	return s.ipset.ListSets()
 }
 
+// SaveAllSets is part of Interface.
+func (s *safeIpset) SaveAllSets() ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ipset.SaveAllSets()
+}
+
+// RestoreSets is part of Interface.
+func (s *safeIpset) RestoreSets(data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ipset.RestoreSets(data)
+}
+
 // GetVersion returns the "X.Y" version string for ipset.
 func (s *safeIpset) GetVersion() (string, error) {
 	s.mu.Lock()

@@ -17,7 +17,9 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/ipset"
@@ -28,7 +30,7 @@ type FakeIPSet struct {
 	// version of ipset util
 	Version string
 	// The key of Sets map is the ip set name
-	Sets map[string]*ipset.IPSet
+	Sets map[string]string
 	// The key of Entries map is the ip set name where the entries exists
 	Entries map[string]sets.String
 }
@@ -37,7 +39,7 @@ type FakeIPSet struct {
 func NewFake(version string) *FakeIPSet {
 	return &FakeIPSet{
 		Version: version,
-		Sets:    make(map[string]*ipset.IPSet),
+		Sets:    make(map[string]string),
 		Entries: make(map[string]sets.String),
 	}
 }
@@ -79,14 +81,14 @@ func (f *FakeIPSet) DestroyAllSets() error {
 
 // CreateSet is part of interface.
 func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
-	if f.Sets[set.Name] != nil {
+	if f.Sets[set.Name] != "" {
 		if !ignoreExistErr {
 			// already exists
 			return fmt.Errorf("Set cannot be created: set with the same name already exists")
 		}
 		return nil
 	}
-	f.Sets[set.Name] = set
+	f.Sets[set.Name] = set.String()
 	// initialize entry map
 	f.Entries[set.Name] = sets.NewString()
 	return nil
@@ -138,6 +140,75 @@ func (f *FakeIPSet) ListSets() ([]string, error) {
 		res = append(res, set)
 	}
 	return res, nil
+}
+
+// SaveAllSets is part of Interface.
+func (f *FakeIPSet) SaveAllSets() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	for setName, setLine := range f.Sets {
+		buf.WriteString(strings.Join([]string{"create", setLine}, " "))
+		buf.WriteByte('\n')
+		for entry := range f.Entries[setName] {
+			buf.WriteString(strings.Join([]string{"add", setName, entry}, " "))
+			buf.WriteByte('\n')
+		}
+	}
+	return buf.Bytes(), nil
+}
+
+// RestoreSets is part of Interface.
+func (f *FakeIPSet) RestoreSets(data []byte) error {
+	buf := bytes.NewBuffer(data)
+	for {
+		line, err := buf.ReadString('\n')
+		if err != nil && line == "" {
+			break
+		}
+		line = strings.TrimSuffix(line, "\n")
+		ignoreExist := false
+		if strings.Contains(line, " -exist") {
+			ignoreExist = true
+			line = strings.Trim(line, " -exist")
+		}
+		strArr := strings.Split(line, " ")
+		if len(strArr) == 0 {
+			return fmt.Errorf("restore sets err, err line: %q", line)
+		}
+		switch strArr[0] {
+		case "create":
+			if len(strArr) < 3 {
+				return fmt.Errorf("restore sets err, err line: %q", line)
+			}
+			setName, set := strArr[1], strings.Join(strArr[1:], " ")
+			if f.Sets[setName] == "" {
+				f.Sets[setName] = set
+				f.Entries[setName] = sets.NewString()
+			} else {
+				if !ignoreExist {
+					return fmt.Errorf("restore sets err, set %q exist", setName)
+				}
+			}
+		case "add":
+			if len(strArr) != 3 {
+				return fmt.Errorf("restore sets err, err line: %q", line)
+			}
+			setName, entry := strArr[1], strArr[2]
+			if f.Entries[setName].Has(entry) {
+				if !ignoreExist {
+					return fmt.Errorf("restore sets err, entry %s/%s exist", setName, entry)
+				}
+			} else {
+				f.Entries[setName].Insert(entry)
+			}
+		case "del":
+			if len(strArr) != 3 {
+				return fmt.Errorf("restore sets err, err line: %q", line)
+			}
+			setName, entry := strArr[1], strArr[2]
+			f.Entries[setName].Delete(entry)
+		}
+	}
+	return nil
 }
 
 var _ = ipset.Interface(&FakeIPSet{})

@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -130,7 +131,7 @@ func TestSetEntry(t *testing.T) {
 	if err := fake.DestroySet(set.Name); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if fake.Sets[set.Name] != nil {
+	if fake.Sets[set.Name] != "" {
 		t.Errorf("Unexpected set: %v", fake.Sets[set.Name])
 	}
 	if fake.Entries[set.Name] != nil {
@@ -146,6 +147,57 @@ func TestSetEntry(t *testing.T) {
 	}
 	if len(fake.Entries) != 0 {
 		t.Errorf("Expected 0 entries, got %d, entries: %v", len(fake.Entries), fake.Entries)
+	}
+}
+
+func TestSaveAllSets(t *testing.T) {
+	fake := NewFake(testVersion)
+
+	// build fake set and entry
+	set1 := &ipset.IPSet{
+		Name:       "foo1",
+		SetType:    ipset.HashIPPort,
+		HashFamily: ipset.ProtocolFamilyIPV4,
+	}
+	set2 := &ipset.IPSet{
+		Name:       "foo2",
+		SetType:    ipset.HashIPPortIP,
+		HashFamily: ipset.ProtocolFamilyIPV4,
+	}
+	set1.SetIPSetDefaults()
+	set2.SetIPSetDefaults()
+	set1Entry1 := "192.168.0.1,udp:8080"
+	set1Entry2 := "192.168.0.2,tcp:8081"
+	set2Entry1 := "192.168.0.3,tcp:8080,192.168.0.1"
+
+	fake.CreateSet(set1, false)
+	fake.CreateSet(set2, false)
+	fake.AddEntry(set1Entry1, set1, false)
+	fake.AddEntry(set1Entry2, set1, false)
+	fake.AddEntry(set2Entry1, set2, false)
+
+	expectSaveData := sets.NewString(
+		"create foo1 hash:ip,port family inet hashsize 1024 maxelem 65536",
+		"add foo1 192.168.0.1,udp:8080",
+		"add foo1 192.168.0.2,tcp:8081",
+		"create foo2 hash:ip,port,ip family inet hashsize 1024 maxelem 65536",
+		"add foo2 192.168.0.3,tcp:8080,192.168.0.1",
+	)
+
+	data, err := fake.SaveAllSets()
+	if err != nil {
+		t.Errorf("fake ipvs save sets err: %v", err)
+	}
+	buf := bytes.NewBuffer(data)
+	for {
+		line, err := buf.ReadBytes('\n')
+		if err != nil && line == nil {
+			break
+		}
+		line = bytes.TrimSuffix(line, []byte("\n"))
+		if !expectSaveData.Has(string(line)) {
+			t.Errorf("test save sets err, got unexpect line %q", line)
+		}
 	}
 }
 

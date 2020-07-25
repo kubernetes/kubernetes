@@ -204,8 +204,8 @@ func TestCreateSet(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 1 {
 		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "create", "FOOBAR", "hash:ip,port", "family", "inet", "hashsize", "1024", "maxelem", "65536") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "create", testSet.String()) {
+		t.Errorf("wrong CombinedOutput() log, got %q", fcmd.CombinedOutputLog[0])
 	}
 	// Create with ignoreExistErr = true, expect success
 	err = runner.CreateSet(&testSet, true)
@@ -215,8 +215,8 @@ func TestCreateSet(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 2 {
 		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("ipset", "create", "FOOBAR", "hash:ip,port", "family", "inet", "hashsize", "1024", "maxelem", "65536", "-exist") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("ipset", "create", testSet.String(), "-exist") {
+		t.Errorf("wrong CombinedOutput() log, got %q", fcmd.CombinedOutputLog[1])
 	}
 	// Create with ignoreExistErr = false, expect failure
 	err = runner.CreateSet(&testSet, false)
@@ -990,7 +990,7 @@ func Test_setIPSetDefaults(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			test.set.setIPSetDefaults()
+			test.set.SetIPSetDefaults()
 			if !reflect.DeepEqual(test.set, test.expect) {
 				t.Errorf("expected ipset struct: %v, got ipset struct: %v", test.expect, test.set)
 			}
