@@ -246,7 +246,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 				}
 				errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Endpoints %s/%s: %v", endpoints.Namespace, endpoints.Name, err))
 			} else {
-				r.endpointSliceTracker.update(createdSlice)
+				r.endpointSliceTracker.Update(createdSlice)
 				metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 			}
 		}
@@ -257,7 +257,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err))
 		} else {
-			r.endpointSliceTracker.update(updatedSlice)
+			r.endpointSliceTracker.Update(updatedSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 		}
 	}
@@ -267,7 +267,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err))
 		} else {
-			r.endpointSliceTracker.delete(endpointSlice)
+			r.endpointSliceTracker.Delete(endpointSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 		}
 	}
