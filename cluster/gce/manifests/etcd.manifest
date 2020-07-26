@@ -9,23 +9,19 @@
   }
 },
 "spec":{
+"restartPolicy": "Never",
 "priorityClassName": "system-node-critical",
 "priority": 2000001000,
 "hostNetwork": true,
-"containers":[
+"initContainers":[
     {
-    "name": "etcd-container",
+    "name": "etcd{{ suffix }}-migrate-container",
     "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.4.9-1') }}",
-    "resources": {
-      "requests": {
-        "cpu": {{ cpulimit }}
-      }
-    },
     "command": [
-              "/bin/sh",
-              "-c",
-              "set -o errexit; if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /usr/local/bin/migrate-if-needed.sh 1>>/var/log/etcd{{ suffix }}.log 2>&1; fi; exec /usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls {{ etcd_protocol }}://{{ host_ip }}:{{ server_port }} --initial-advertise-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --advertise-client-urls {{ etcd_apiserver_protocol }}://127.0.0.1:{{ port }} --listen-client-urls {{ etcd_apiserver_protocol }}://{{ listen_client_ip }}:{{ port }} {{ quota_bytes }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} {{ etcd_creds }} {{ etcd_apiserver_creds }} {{ etcd_extra_args }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
-            ],
+        "/bin/sh",
+	"-c",
+        "set -o errexit; if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /usr/local/bin/migrate-if-needed.sh 1>>/var/log/etcd{{ suffix }}.log 2>&1; fi;"
+    ],
     "env": [
       { "name": "TARGET_STORAGE",
         "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
@@ -57,7 +53,62 @@
       { "name": "ETCD_HOSTNAME",
         "value": "{{ hostname }}"
       }
-        ],
+    ],
+    "volumeMounts": [
+      { "name": "varetcd",
+        "mountPath": "/var/etcd",
+        "readOnly": false
+      },
+      { "name": "varlogetcd",
+        "mountPath": "/var/log/etcd{{ suffix }}.log",
+        "readOnly": false
+      },
+      { "name": "etc",
+        "mountPath": "/etc/srv/kubernetes",
+        "readOnly": false
+      }
+    ]
+    },
+    {
+    "name": "etcd{{ suffix }}-init-container-2",
+    "image": "k8s.gcr.io/debian-base:v2.0.0",
+    "command": [
+      "/bin/sh",
+      "-c",
+      "chown -R {{runAsUser}}:{{runAsGroup}} /var/etcd/"
+    ],
+    "volumeMounts": [
+      { "name": "varetcd",
+        "mountPath": "/var/etcd",
+        "readOnly": false
+      }
+    ]
+    }
+],
+"containers":[
+    {
+    "name": "etcd{{ suffix }}-container",
+    "securityContext": {
+      "runAsUser": {{runAsUser}},
+      "runAsGroup": {{runAsGroup}},
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+	  "all"
+	]
+      }
+    },
+    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.4.9-1') }}",
+    "resources": {
+      "requests": {
+        "cpu": {{ cpulimit }}
+      }
+    },
+    "command": [
+      "/bin/sh",
+      "-c",
+      "set -o errexit; exec /usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls {{ etcd_protocol }}://{{ host_ip }}:{{ server_port }} --initial-advertise-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --advertise-client-urls {{ etcd_apiserver_protocol }}://127.0.0.1:{{ port }} --listen-client-urls {{ etcd_apiserver_protocol }}://{{ listen_client_ip }}:{{ port }} {{ quota_bytes }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} {{ etcd_creds }} {{ etcd_apiserver_creds }} {{ etcd_extra_args }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
+    ],
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
