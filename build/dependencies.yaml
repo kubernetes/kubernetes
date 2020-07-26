@@ -1,4 +1,14 @@
 dependencies:
+  # Bazel
+  - name: "repo-infra"
+    version: 0.0.10
+    refPaths:
+    - path: build/root/WORKSPACE
+      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
+    - path: build/root/WORKSPACE
+      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
+
+  # CNI plugins
   - name: "cni"
     version: 0.8.6
     refPaths:
@@ -11,6 +21,7 @@ dependencies:
     - path: test/e2e_node/remote/utils.go
       match: cniVersion[\t\n\f\r ]*=
 
+  # CoreDNS
   - name: "coredns-kube-up"
     version: 1.7.0
     refPaths:
@@ -27,6 +38,7 @@ dependencies:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
 
+  # CRI Tools
   - name: "crictl"
     version: 1.18.0
     refPaths:
@@ -37,12 +49,14 @@ dependencies:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
 
+  # Docker
   - name: "docker"
     version: 19.03
     refPaths:
     - path: vendor/k8s.io/system-validators/validators/docker_validator.go
       match: latestValidatedDockerVersion
 
+  # etcd
   - name: "etcd"
     version: 3.4.9
     refPaths:
@@ -67,15 +81,28 @@ dependencies:
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate/options.go
 
+  # Golang
   - name: "golang"
-    version: 1.14.6
+    version: 1.15.0-rc.1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
-      match: go_version = "\d+\.\d+\.\d+"
-    - path: test/images/Makefile
-      match: GOLANG_VERSION
+      match: (override_)?go_version = "((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"
 
+  - name: "golang: upstream container image"
+    version: 1.15rc1
+    refPaths:
+    - path: test/images/Makefile
+      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)\d+
+
+  - name: "k8s.gcr.io/kube-cross: dependents"
+    version: v1.15.0-rc.1-1
+    refPaths:
+    - path: build/build-image/cross/VERSION
+    - path: test/images/sample-apiserver/Dockerfile
+      match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+
+  # Base images
   - name: "k8s.gcr.io/debian-base"
     version: 2.1.0
     refPaths:
@@ -131,13 +158,6 @@ dependencies:
       match: go_runner_version=
     - path: build/workspace.bzl
       match: tag =
-
-  - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.14.6-1
-    refPaths:
-    - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Dockerfile
-      match: k8s\.gcr\.io\/build-image\/kube-cross:v\d+\.\d+\.\d+-\d+
 
   - name: "k8s.gcr.io/pause"
     version: 3.3
@@ -196,11 +216,3 @@ dependencies:
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
-
-  - name: "repo-infra"
-    version: 0.0.8
-    refPaths:
-    - path: build/root/WORKSPACE
-      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
-    - path: build/root/WORKSPACE
-      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz

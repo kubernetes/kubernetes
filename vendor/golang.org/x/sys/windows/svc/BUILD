@@ -10,6 +10,7 @@ go_library(
         "service.go",
         "sys_386.s",
         "sys_amd64.s",
+        "sys_arm.s",
     ],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/sys/windows/svc",
     importpath = "golang.org/x/sys/windows/svc",

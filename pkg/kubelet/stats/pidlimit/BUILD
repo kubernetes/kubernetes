@@ -12,6 +12,9 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -25,7 +28,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
