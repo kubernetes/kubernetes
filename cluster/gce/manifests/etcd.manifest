@@ -9,6 +9,10 @@
   }
 },
 "spec":{
+"securityContext":{
+  "runAsUser": {{runAsUser}},
+  "runAsGroup": {{runAsGroup}}
+},
 "priorityClassName": "system-node-critical",
 "priority": 2000001000,
 "hostNetwork": true,
@@ -16,6 +20,14 @@
     {
     "name": "etcd-container",
     "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.4.9-1') }}",
+    "securityContext": {
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+          "all"
+        ]
+      }
+    },
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
