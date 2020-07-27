@@ -7,7 +7,7 @@ import (
 
 	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
 	"github.com/openshift/library-go/pkg/config/configdefaults"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ResolveDirectoriesForSATokenVerification takes our config (which allows directories) and navigates one level of
