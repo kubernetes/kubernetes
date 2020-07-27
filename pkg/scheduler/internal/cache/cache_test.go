@@ -1090,7 +1090,11 @@ func TestNodeOperators(t *testing.T) {
 			if !found {
 				t.Errorf("Failed to find node %v in internalcache.", node.Name)
 			}
-			if cache.nodeTree.numNodes != 1 || cache.nodeTree.next() != node.Name {
+			nodesList, err := cache.nodeTree.list()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cache.nodeTree.numNodes != 1 || nodesList[len(nodesList)-1] != node.Name {
 				t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
 			}
 
@@ -1134,7 +1138,11 @@ func TestNodeOperators(t *testing.T) {
 				t.Errorf("Failed to update node in schedulertypes:\n got: %+v \nexpected: %+v", got, expected)
 			}
 			// Check nodeTree after update
-			if cache.nodeTree.numNodes != 1 || cache.nodeTree.next() != node.Name {
+			nodesList, err = cache.nodeTree.list()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cache.nodeTree.numNodes != 1 || nodesList[len(nodesList)-1] != node.Name {
 				t.Errorf("unexpected cache.nodeTree after updating node: %v", node.Name)
 			}
 
@@ -1147,8 +1155,12 @@ func TestNodeOperators(t *testing.T) {
 			} else if n != nil {
 				t.Errorf("The node object for %v should be nil", node.Name)
 			}
-			// Check node is removed from nodeTree.
-			if cache.nodeTree.numNodes != 0 || cache.nodeTree.next() != "" {
+			// Check node is removed from nodeTree as well.
+			nodesList, err = cache.nodeTree.list()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cache.nodeTree.numNodes != 0 || len(nodesList) != 0 {
 				t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 			}
 			// Pods are still in the pods cache.
@@ -1306,7 +1318,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	updateSnapshot := func() operation {
 		return func() {
 			cache.UpdateSnapshot(snapshot)
-			if err := compareCacheWithNodeInfoSnapshot(cache, snapshot); err != nil {
+			if err := compareCacheWithNodeInfoSnapshot(t, cache, snapshot); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1487,14 +1499,14 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			if err := cache.UpdateSnapshot(snapshot); err != nil {
 				t.Error(err)
 			}
-			if err := compareCacheWithNodeInfoSnapshot(cache, snapshot); err != nil {
+			if err := compareCacheWithNodeInfoSnapshot(t, cache, snapshot); err != nil {
 				t.Error(err)
 			}
 		})
 	}
 }
 
-func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *Snapshot) error {
+func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *schedulerCache, snapshot *Snapshot) error {
 	// Compare the map.
 	if len(snapshot.nodeInfoMap) != len(cache.nodes) {
 		return fmt.Errorf("unexpected number of nodes in the snapshot. Expected: %v, got: %v", len(cache.nodes), len(snapshot.nodeInfoMap))
@@ -1512,8 +1524,11 @@ func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *Snapshot)
 
 	expectedNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	expectedHavePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
-	for i := 0; i < cache.nodeTree.numNodes; i++ {
-		nodeName := cache.nodeTree.next()
+	nodesList, err := cache.nodeTree.list()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, nodeName := range nodesList {
 		if n := snapshot.nodeInfoMap[nodeName]; n != nil {
 			expectedNodeInfoList = append(expectedNodeInfoList, n)
 			if len(n.PodsWithAffinity) > 0 {
@@ -1576,7 +1591,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 
 	updateSnapshot := func(t *testing.T) {
 		cache.updateNodeInfoSnapshotList(snapshot, true)
-		if err := compareCacheWithNodeInfoSnapshot(cache, snapshot); err != nil {
+		if err := compareCacheWithNodeInfoSnapshot(t, cache, snapshot); err != nil {
 			t.Error(err)
 		}
 	}
@@ -1672,7 +1687,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 
 			// Always update the snapshot at the end of operations and compare it.
 			cache.updateNodeInfoSnapshotList(snapshot, true)
-			if err := compareCacheWithNodeInfoSnapshot(cache, snapshot); err != nil {
+			if err := compareCacheWithNodeInfoSnapshot(t, cache, snapshot); err != nil {
 				t.Error(err)
 			}
 			nodeNames := make([]string, len(snapshot.nodeInfoList))
