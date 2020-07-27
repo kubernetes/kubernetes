@@ -129,8 +129,13 @@ github.com/armon/circbuf
 =======
 # github.com/armon/consul-api => github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6
 # github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
+## explicit
 github.com/armon/go-socks5
+<<<<<<< HEAD
 >>>>>>> run ./hack/update-vendor.sh after build/tools.go patch to suppport vendoring test-only submodule dependency
+=======
+# github.com/armon/go-socks5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
+>>>>>>> run hack/update-vendor.sh after rebase
 # github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 github.com/asaskevich/govalidator
 # github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
