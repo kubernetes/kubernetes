@@ -325,12 +325,15 @@ func (ep *endpointsInfo) Cleanup() {
 	// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
 	// Remove only remote endpoints created by this service
 	if (ep.refCount == nil || *ep.refCount <= 0) && !ep.GetIsLocal() {
-		klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
-		err := ep.hns.deleteEndpoint(ep.hnsID)
-		if err == nil {
-			ep.hnsID = ""
-		} else {
-			klog.Errorf("Endpoint deletion failed for %v: %v", ep.IP(), err)
+		// Do not delete hnsendpoint, if it is still in use.
+		if proxier != nil && !proxier.IsHnsEndpointStillUsed(ep.hnsID) {
+			klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
+			err := ep.hns.deleteEndpoint(ep.hnsID)
+			if err == nil {
+				ep.hnsID = ""
+			} else {
+				klog.Errorf("Endpoint deletion failed for %v: %v", ep.IP(), err)
+			}
 		}
 	}
 }
@@ -472,7 +475,7 @@ type closeable interface {
 }
 
 // Proxier implements proxy.Provider
-var _ proxy.Provider = &Proxier{}
+var proxier *Proxier = nil
 
 // NewProxier returns a new Proxier
 func NewProxier(
@@ -580,7 +583,7 @@ func NewProxier(
 
 	isIPv6 := utilnet.IsIPv6(nodeIP)
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying)
-	proxier := &Proxier{
+	proxier = &Proxier{
 		endPointsRefCount:   make(endPointsReferenceCountMap),
 		portsMap:            make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:          make(proxy.ServiceMap),
@@ -1246,4 +1249,20 @@ func (proxier *Proxier) syncProxyRules() {
 			delete(proxier.endPointsRefCount, hnsID)
 		}
 	}
+}
+
+func (proxier *Proxier) IsHnsEndpointStillUsed(hnsID string) bool {
+	for svcName, eps := range proxier.endpointsMap {
+		for _, epInfo := range eps {
+			ep, ok := epInfo.(*endpointsInfo)
+			if !ok {
+				klog.Errorf("Failed to cast endpointsInfo %q", svcName.String())
+				continue
+			}
+			if ep.hnsID == hnsID {
+				return true
+			}
+		}
+	}
+	return false
 }
