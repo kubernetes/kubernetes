@@ -76,7 +76,7 @@ const (
 	deprecatedLabelNodeRolePrefix = "node-role.kubernetes.io/"
 
 	// nodeLabelRole specifies the role of a node
-	nodeLabelRole           = "kubelet.kubernetes.io/role"
+	nodeLabelRole           = "role.kubelet.kubernetes.io/role"
 	deprecatedNodeLabelRole = "kubernetes.io/role"
 )
 
@@ -1541,7 +1541,7 @@ func getNodeInternalIP(node *api.Node) string {
 // findNodeRoles returns the roles of a given node.
 // The roles are determined by looking for:
 // * a role.node.kubernetes.io/<role>="" label
-// * a kubelet.kubernetes.io/role="<role>" label
+// * a role.kubelet.kubernetes.io/role="<role>" label
 // Compatible for old kubelet version:
 // * a node-role.kubernetes.io/<role>="" label
 // * a kubernetes.io/role="<role>" label
