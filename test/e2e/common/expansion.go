@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: Environment variables, expansion
 		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should allow composing env vars into new env vars [NodeConformance]", func() {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "FOO",
@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command expansion
 		Description: Create a Pod with environment variables and container command using them. Container command using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should allow substituting values in a container's command [NodeConformance]", func() {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -86,7 +86,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command argument expansion
 		Description: Create a Pod with environment variables and container command arguments using them. Container command arguments using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should allow substituting values in a container's args [NodeConformance]", func() {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath expansion
 		Description: Make sure a container's subpath can be set using an expansion of environment variables.
 	*/
-	framework.ConformanceIt("should allow substituting values in a volume subpath [sig-storage]", func() {
+	framework.ConformanceIt("Base", "should allow substituting values in a volume subpath [sig-storage]", func() {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",
@@ -146,7 +146,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with backticks
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when backticks are supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks [sig-storage][Slow]", func() {
+	framework.ConformanceIt("Base", "should fail substituting values in a volume subpath with backticks [sig-storage][Slow]", func() {
 
 		envVars := []v1.EnvVar{
 			{
@@ -180,7 +180,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath with absolute path
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
-	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [sig-storage][Slow]", func() {
+	framework.ConformanceIt("Base", "should fail substituting values in a volume subpath with absolute path [sig-storage][Slow]", func() {
 
 		envVars := []v1.EnvVar{
 			{
@@ -214,7 +214,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Testname: VolumeSubpathEnvExpansion, subpath ready from failed state
 		Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
-	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][Slow]", func() {
+	framework.ConformanceIt("Base", "should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][Slow]", func() {
 
 		envVars := []v1.EnvVar{
 			{
@@ -283,7 +283,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		3.	successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
-	framework.ConformanceIt("should succeed in writing subpaths in container [sig-storage][Slow]", func() {
+	framework.ConformanceIt("Base", "should succeed in writing subpaths in container [sig-storage][Slow]", func() {
 
 		envVars := []v1.EnvVar{
 			{

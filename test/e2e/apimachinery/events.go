@@ -45,7 +45,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 		           The event is patched with a new message, the check MUST have the update message.
 		           The event is deleted and MUST NOT show up when listing all events.
 	*/
-	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func() {
+	framework.ConformanceIt("Base", "should ensure that an event can be fetched, patched, deleted, and listed", func() {
 		eventTestName := "event-test"
 
 		ginkgo.By("creating a test event")
@@ -129,7 +129,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 	   Description: A set of events is created with a label selector which MUST be found when listed.
 	   The set of events is deleted and MUST NOT show up when listed by its label selector.
 	*/
-	framework.ConformanceIt("should delete a collection of events", func() {
+	framework.ConformanceIt("Base", "should delete a collection of events", func() {
 		eventTestNames := []string{"test-event-1", "test-event-2", "test-event-3"}
 
 		ginkgo.By("Create set of events")

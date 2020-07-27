@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Testname: Projected Volume, Secrets, volume mode default
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume [NodeConformance]", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with permission mode set to 0x400 on the Pod. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key. The volume has permission mode set to 0440, fsgroup set to 1001 and user set to non-root uid of 1000. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--r-----.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Testname: Projected Volume, Secrets, mapped
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------on the mapped volume.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doProjectedSecretE2EWithMapping(f, nil)
 	})
 
@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with permission mode set to 0400. The secret is also mapped to a specific name. Pod MUST be able to read the content of the key successfully and the mode MUST be -r-------- on the mapped volume.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doProjectedSecretE2EWithMapping(f, &mode)
 	})
@@ -113,7 +113,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Testname: Projected Volume, Secrets, mapped, multiple paths
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key. The secret is mapped to two different volume mounts. Pod MUST be able to read the content of the key successfully from the two volume mounts and the mode MUST be -r-------- on the mapped volumes.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in a pod [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable in multiple volumes in a pod [NodeConformance]", func() {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Testname: Projected Volume, Secrets, create, update delete
 	   Description: Create a Pod with three containers with secrets namely a create, update and delete container. Create Container when started MUST no have a secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true

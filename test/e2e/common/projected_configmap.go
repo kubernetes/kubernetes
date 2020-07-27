@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, volume mode default
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, false, 0, nil)
 	})
 
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with permission mode set to 0400. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, non-root user
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume as non-root [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, true, 0, nil)
 	})
 
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, mapped
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithMappings(f, false, 0, nil)
 	})
 
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with permission mode set to 0400. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doProjectedConfigMapE2EWithMappings(f, false, 0, &mode)
 	})
@@ -103,7 +103,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, mapped, non-root user
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithMappings(f, true, 0, nil)
 	})
 
@@ -118,7 +118,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, update
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the confgiMap to value-2.
 	*/
-	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -206,7 +206,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, create, update and delete
 	   Description: Create a Pod with three containers with ConfigMaps namely a create, update and delete container. Create Container when started MUST not have configMap, update and delete containers MUST be created with a ConfigMap value as 'value-1'. Create a configMap in the create container, the Pod MUST be able to read the configMap from the create container. Update the configMap in the update container, Pod MUST be able to read the updated configMap value. Delete the configMap in the delete container. Pod MUST fail to read the configMap from the delete container.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -407,7 +407,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Testname: Projected Volume, ConfigMap, multiple volume paths
 	   Description: A Pod is created with a projected volume source 'ConfigMap' to store a configMap. The configMap is mapped to two different volume mounts. Pod MUST be able to read the content of the configMap successfully from the two volume mounts.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in the same pod [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable in multiple volumes in the same pod [NodeConformance]", func() {
 		var (
 			name             = "projected-configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "projected-configmap-volume"

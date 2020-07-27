@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("Container Runtime", func() {
 				Testname: Container Runtime, Restart Policy, Pod Phases
 				Description: If the restart policy is set to 'Always', Pod MUST be restarted when terminated, If restart policy is 'OnFailure', Pod MUST be started only if it is terminated with non-zero exit code. If the restart policy is 'Never', Pod MUST never be restarted. All these three test cases MUST verify the restart counts accordingly.
 			*/
-			framework.ConformanceIt("should run with the expected status [NodeConformance]", func() {
+			framework.ConformanceIt("Base", "should run with the expected status [NodeConformance]", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := v1.Container{
@@ -193,7 +193,7 @@ while true; do sleep 1; done
 				Description: Create a pod with a container to run it as a non-root user with a custom TerminationMessagePath set. Pod redirects the output to the provided path successfully. When the container is terminated, the termination message MUST match the expected output logged in the provided custom path.
 				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
-			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
+			framework.ConformanceIt("Base", "should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
 				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
 				// container runtime on Windows
 				container := v1.Container{
@@ -217,7 +217,7 @@ while true; do sleep 1; done
 				Description: Create a pod with an container. Container's output is recorded in log and container exits with an error. When container is terminated, termination message MUST match the expected output recorded from container's log.
 				[LinuxOnly]: Cannot mount files in Windows Containers.
 			*/
-			framework.ConformanceIt("should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
+			framework.ConformanceIt("Base", "should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                    framework.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
@@ -234,7 +234,7 @@ while true; do sleep 1; done
 				Description: Create a pod with an container. Container's output is recorded in log and container exits successfully without an error. When container is terminated, terminationMessage MUST have no content as container succeed.
 				[LinuxOnly]: Cannot mount files in Windows Containers.
 			*/
-			framework.ConformanceIt("should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
+			framework.ConformanceIt("Base", "should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                    framework.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
@@ -251,7 +251,7 @@ while true; do sleep 1; done
 				Description: Create a pod with an container. Container's output is recorded in a file and the container exits successfully without an error. When container is terminated, terminationMessage MUST match with the content from file.
 				[LinuxOnly]: Cannot mount files in Windows Containers.
 			*/
-			framework.ConformanceIt("should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
+			framework.ConformanceIt("Base", "should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                    framework.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},

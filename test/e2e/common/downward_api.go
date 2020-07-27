@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	   Testname: DownwardAPI, environment for name, namespace and ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify Pod Name, namespace and IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should provide pod name, namespace and IP address as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	   Testname: DownwardAPI, environment for host ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should provide host IP as an env var [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -161,7 +161,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	   Testname: DownwardAPI, environment for CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory request set through environment variables at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -212,7 +212,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	   Testname: DownwardAPI, environment for default CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory limits set through environment variables at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should provide default limits.cpu/memory from node allocatable [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -262,7 +262,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	   Testname: DownwardAPI, environment for Pod UID
 	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should provide pod UID as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{

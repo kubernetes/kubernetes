@@ -1,6 +1,6 @@
 - testname: Pod Lifecycle, post start exec hook
   codename: '[k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook
-    should execute poststart exec hook properly [NodeConformance] [Conformance]'
+    should execute poststart exec hook properly [NodeConformance] [Conformance] [Profile:Base]'
   description: When a post start handler is specified in the container lifecycle using
     a 'Exec' action, then the handler MUST be invoked after the start of the container.
     A server pod is created that will serve http requests, create a second pod with
@@ -10,7 +10,7 @@
   file: test/e2e/common/lifecycle_hook.go
 - testname: Pod Lifecycle, post start http hook
   codename: '[k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook
-    should execute poststart http hook properly [NodeConformance] [Conformance]'
+    should execute poststart http hook properly [NodeConformance] [Conformance] [Profile:Base]'
   description: When a post start handler is specified in the container lifecycle using
     a HttpGet action, then the handler MUST be invoked after the start of the container.
     A server pod is created that will serve http requests, create a second pod with
@@ -20,7 +20,7 @@
   file: test/e2e/common/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop exec hook
   codename: '[k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook
-    should execute prestop exec hook properly [NodeConformance] [Conformance]'
+    should execute prestop exec hook properly [NodeConformance] [Conformance] [Profile:Base]'
   description: When a pre-stop handler is specified in the container lifecycle using
     a 'Exec' action, then the handler MUST be invoked before the container is terminated.
     A server pod is created that will serve http requests, create a second pod with
@@ -30,7 +30,7 @@
   file: test/e2e/common/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop http hook
   codename: '[k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook
-    should execute prestop http hook properly [NodeConformance] [Conformance]'
+    should execute prestop http hook properly [NodeConformance] [Conformance] [Profile:Base]'
   description: When a pre-stop handler is specified in the container lifecycle using
     a 'HttpGet' action, then the handler MUST be invoked before the container is terminated.
     A server pod is created that will serve http requests, create a second pod with
@@ -41,7 +41,7 @@
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance] [Profile:Base]'
   description: 'Create a pod with an container. Container''s output is recorded in
     log and container exits successfully without an error. When container is terminated,
     terminationMessage MUST have no content as container succeed. [LinuxOnly]: Cannot
@@ -51,7 +51,7 @@
 - testname: Container Runtime, TerminationMessage, from file of succeeding container
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance] [Profile:Base]'
   description: 'Create a pod with an container. Container''s output is recorded in
     a file and the container exits successfully without an error. When container is
     terminated, terminationMessage MUST match with the content from file. [LinuxOnly]:
@@ -62,7 +62,7 @@
     failing container
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] from log output if TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance] [Profile:Base]'
   description: 'Create a pod with an container. Container''s output is recorded in
     log and container exits with an error. When container is terminated, termination
     message MUST match the expected output recorded from container''s log. [LinuxOnly]:
@@ -73,7 +73,7 @@
     path
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] if TerminationMessagePath is set as non-root
-    user and at a non-default path [NodeConformance] [Conformance]'
+    user and at a non-default path [NodeConformance] [Conformance] [Profile:Base]'
   description: 'Create a pod with a container to run it as a non-root user with a
     custom TerminationMessagePath set. Pod redirects the output to the provided path
     successfully. When the container is terminated, the termination message MUST match
@@ -83,7 +83,7 @@
   file: test/e2e/common/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
   codename: '[k8s.io] Container Runtime blackbox test when starting a container that
-    exits should run with the expected status [NodeConformance] [Conformance]'
+    exits should run with the expected status [NodeConformance] [Conformance] [Profile:Base]'
   description: If the restart policy is set to 'Always', Pod MUST be restarted when
     terminated, If restart policy is 'OnFailure', Pod MUST be started only if it is
     terminated with non-zero exit code. If the restart policy is 'Never', Pod MUST
@@ -93,7 +93,7 @@
   file: test/e2e/common/runtime.go
 - testname: Docker containers, with arguments
   codename: '[k8s.io] Docker Containers should be able to override the image''s default
-    arguments (docker cmd) [NodeConformance] [Conformance]'
+    arguments (docker cmd) [NodeConformance] [Conformance] [Profile:Base]'
   description: Default command and  from the docker image entrypoint MUST be used
     when Pod does not specify the container command but the arguments from Pod spec
     MUST override when specified.
@@ -101,7 +101,7 @@
   file: test/e2e/common/docker_containers.go
 - testname: Docker containers, with command
   codename: '[k8s.io] Docker Containers should be able to override the image''s default
-    command (docker entrypoint) [NodeConformance] [Conformance]'
+    command (docker entrypoint) [NodeConformance] [Conformance] [Profile:Base]'
   description: Default command from the docker image entrypoint MUST NOT be used when
     Pod specifies the container command.  Command from Pod spec MUST override the
     command in the image.
@@ -109,7 +109,7 @@
   file: test/e2e/common/docker_containers.go
 - testname: Docker containers, with command and arguments
   codename: '[k8s.io] Docker Containers should be able to override the image''s default
-    command and arguments [NodeConformance] [Conformance]'
+    command and arguments [NodeConformance] [Conformance] [Profile:Base]'
   description: Default command and arguments from the docker image entrypoint MUST
     NOT be used when Pod specifies the container command and arguments.  Command and
     arguments from Pod spec MUST override the command and arguments in the image.
@@ -117,14 +117,14 @@
   file: test/e2e/common/docker_containers.go
 - testname: Docker containers, without command and arguments
   codename: '[k8s.io] Docker Containers should use the image defaults if command and
-    args are blank [NodeConformance] [Conformance]'
+    args are blank [NodeConformance] [Conformance] [Profile:Base]'
   description: Default command and arguments from the docker image entrypoint MUST
     be used when Pod does not specify the container command
   release: v1.9
   file: test/e2e/common/docker_containers.go
 - testname: init-container-starts-app-restartalways-pod
   codename: '[k8s.io] InitContainer [NodeConformance] should invoke init containers
-    on a RestartAlways pod [Conformance]'
+    on a RestartAlways pod [Conformance] [Profile:Base]'
   description: Ensure that all InitContainers are started and all containers in pod
     started and at least one container is still running or is in the process of being
     restarted when Pod has restart policy as RestartAlways.
@@ -132,7 +132,7 @@
   file: test/e2e/common/init_container.go
 - testname: init-container-starts-app-restartnever-pod
   codename: '[k8s.io] InitContainer [NodeConformance] should invoke init containers
-    on a RestartNever pod [Conformance]'
+    on a RestartNever pod [Conformance] [Profile:Base]'
   description: Ensure that all InitContainers are started and all containers in pod
     are voluntarily terminated with exit status 0, and the system is not going to
     restart any of these containers when Pod has restart policy as RestartNever.
@@ -140,14 +140,14 @@
   file: test/e2e/common/init_container.go
 - testname: init-container-fails-stops-app-restartnever-pod
   codename: '[k8s.io] InitContainer [NodeConformance] should not start app containers
-    and fail the pod if init containers fail on a RestartNever pod [Conformance]'
+    and fail the pod if init containers fail on a RestartNever pod [Conformance] [Profile:Base]'
   description: Ensure that app container is not started when at least one InitContainer
     fails to start and Pod has restart policy as RestartNever.
   release: v1.12
   file: test/e2e/common/init_container.go
 - testname: init-container-fails-stops-app-restartalways-pod
   codename: '[k8s.io] InitContainer [NodeConformance] should not start app containers
-    if init containers fail on a RestartAlways pod [Conformance]'
+    if init containers fail on a RestartAlways pod [Conformance] [Profile:Base]'
   description: Ensure that app container is not started when all InitContainers failed
     to start and Pod has restarted for few occurrences and pod has restart policy
     as RestartAlways.
@@ -155,7 +155,7 @@
   file: test/e2e/common/init_container.go
 - testname: Kubelet, hostAliases
   codename: '[k8s.io] Kubelet when scheduling a busybox Pod with hostAliases should
-    write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance]'
+    write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with hostAliases and a container with command to output
     /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases
     to the output of /etc/hosts entries. Kubernetes mounts the /etc/hosts file into
@@ -165,28 +165,28 @@
   file: test/e2e/common/kubelet.go
 - testname: Kubelet, log output, default
   codename: '[k8s.io] Kubelet when scheduling a busybox command in a pod should print
-    the output to logs [NodeConformance] [Conformance]'
+    the output to logs [NodeConformance] [Conformance] [Profile:Base]'
   description: By default the stdout and stderr from the process being executed in
     a pod MUST be sent to the pod's logs.
   release: v1.13
   file: test/e2e/common/kubelet.go
 - testname: Kubelet, failed pod, delete
   codename: '[k8s.io] Kubelet when scheduling a busybox command that always fails
-    in a pod should be possible to delete [NodeConformance] [Conformance]'
+    in a pod should be possible to delete [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with terminated state. This terminated pod MUST be able
     to be deleted.
   release: v1.13
   file: test/e2e/common/kubelet.go
 - testname: Kubelet, failed pod, terminated reason
   codename: '[k8s.io] Kubelet when scheduling a busybox command that always fails
-    in a pod should have an terminated reason [NodeConformance] [Conformance]'
+    in a pod should have an terminated reason [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with terminated state. Pod MUST have only one container.
     Container MUST be in terminated state and MUST have an terminated reason.
   release: v1.13
   file: test/e2e/common/kubelet.go
 - testname: Kubelet, pod with read only root file system
   codename: '[k8s.io] Kubelet when scheduling a read only busybox container should
-    not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance]'
+    not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with security context set with ReadOnlyRootFileSystem
     set to true. The Pod then tries to write to the /file on the root, write operation
     to the root filesystem MUST fail as expected. This test is marked LinuxOnly since
@@ -195,7 +195,7 @@
   file: test/e2e/common/kubelet.go
 - testname: Kubelet, managed etc hosts
   codename: '[k8s.io] KubeletManagedEtcHosts should test kubelet managed /etc/hosts
-    file [LinuxOnly] [NodeConformance] [Conformance]'
+    file [LinuxOnly] [NodeConformance] [Conformance] [Profile:Privileged]'
   description: Create a Pod with containers with hostNetwork set to false, one of
     the containers mounts the /etc/hosts file form the host. Create a second Pod with
     hostNetwork set to true. 1. The Pod with hostNetwork=false MUST have /etc/hosts
@@ -207,7 +207,7 @@
   release: v1.9
   file: test/e2e/common/kubelet_etc_hosts.go
 - testname: lease API should be available
-  codename: '[k8s.io] Lease lease API should be available [Conformance]'
+  codename: '[k8s.io] Lease lease API should be available [Conformance] [Profile:Base]'
   description: "Create Lease object, and get it; create and get MUST be successful
     and Spec of the read Lease MUST match Spec of original Lease. Update the Lease
     and get it; update and get MUST be successful\tand Spec of the read Lease MUST
@@ -222,14 +222,15 @@
   file: test/e2e/common/lease.go
 - testname: Pods, ActiveDeadlineSeconds
   codename: '[k8s.io] Pods should allow activeDeadlineSeconds to be updated [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a Pod with a unique label. Query for the Pod with the label
     as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds
     set on the Pod spec. Pod MUST terminate of the specified time elapses.
   release: v1.9
   file: test/e2e/common/pods.go
 - testname: Pods, lifecycle
-  codename: '[k8s.io] Pods should be submitted and removed [NodeConformance] [Conformance]'
+  codename: '[k8s.io] Pods should be submitted and removed [NodeConformance] [Conformance]
+    [Profile:Base]'
   description: A Pod is created with a unique label. Pod MUST be accessible when queried
     using the label selector upon creation. Add a watch, check if the Pod is running.
     Pod then deleted, The pod deletion timestamp is observed. The watch MUST return
@@ -238,7 +239,7 @@
   release: v1.9
   file: test/e2e/common/pods.go
 - testname: Pods, update
-  codename: '[k8s.io] Pods should be updated [NodeConformance] [Conformance]'
+  codename: '[k8s.io] Pods should be updated [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with a unique label. Query for the Pod with the label
     as selector MUST be successful. Update the pod to change the value of the Label.
     Query for the Pod with the new value for the label MUST be successful.
@@ -249,7 +250,7 @@
   - pod/spec/label/patch
 - testname: Pods, service environment variables
   codename: '[k8s.io] Pods should contain environment variables for services [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a server Pod listening on port 9376. A Service called fooservice
     is created for the server Pod listening on port 8765 targeting port 8080. If a
     new Pod is created in the cluster then the Pod MUST have the fooservice environment
@@ -260,14 +261,14 @@
   release: v1.9
   file: test/e2e/common/pods.go
 - testname: Pods, assigned hostip
-  codename: '[k8s.io] Pods should get a host IP [NodeConformance] [Conformance]'
+  codename: '[k8s.io] Pods should get a host IP [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod. Pod status MUST return successfully and contains a valid
     IP address.
   release: v1.9
   file: test/e2e/common/pods.go
 - testname: Pods, remote command execution over websocket
   codename: '[k8s.io] Pods should support remote command execution over websockets
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created. Websocket is created to retrieve exec command output
     from this pod. Message retrieved form Websocket MUST match with expected exec
     command output.
@@ -275,14 +276,14 @@
   file: test/e2e/common/pods.go
 - testname: Pods, logs from websockets
   codename: '[k8s.io] Pods should support retrieving logs from the container over
-    websockets [NodeConformance] [Conformance]'
+    websockets [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created. Websocket is created to retrieve log of a container
     from this pod. Message retrieved form Websocket MUST match with container's output.
   release: v1.13
   file: test/e2e/common/pods.go
 - testname: Pod liveness probe, using http endpoint, failure
   codename: '[k8s.io] Probing container should *not* be restarted with a /healthz
-    http liveness probe [NodeConformance] [Conformance]'
+    http liveness probe [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with liveness probe on http endpoint '/'. Liveness
     probe on this endpoint will not fail. When liveness probe does not fail then the
     restart count MUST remain zero.
@@ -290,7 +291,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod liveness probe, using local file, no restart
   codename: '[k8s.io] Probing container should *not* be restarted with a exec "cat
-    /tmp/health" liveness probe [NodeConformance] [Conformance]'
+    /tmp/health" liveness probe [NodeConformance] [Conformance] [Profile:Base]'
   description: Pod is created with liveness probe that uses 'exec' command to cat
     /temp/health file. Liveness probe MUST not fail to check health and the restart
     count should remain 0.
@@ -298,7 +299,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod liveness probe, using tcp socket, no restart
   codename: '[k8s.io] Probing container should *not* be restarted with a tcp:8080
-    liveness probe [NodeConformance] [Conformance]'
+    liveness probe [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with liveness probe on tcp socket 8080. The http handler
     on port 8080 will return http errors after 10 seconds, but the socket will remain
     open. Liveness probe MUST not fail to check health and the restart count should
@@ -307,7 +308,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod liveness probe, using http endpoint, restart
   codename: '[k8s.io] Probing container should be restarted with a /healthz http liveness
-    probe [NodeConformance] [Conformance]'
+    probe [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with liveness probe on http endpoint /healthz. The
     http handler on the /healthz will return a http error after 10 seconds since the
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
@@ -316,7 +317,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod liveness probe, using local file, restart
   codename: '[k8s.io] Probing container should be restarted with a exec "cat /tmp/health"
-    liveness probe [NodeConformance] [Conformance]'
+    liveness probe [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with liveness probe that uses ExecAction handler to cat
     /temp/health file. The Container deletes the file /temp/health after 10 second,
     triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing
@@ -325,7 +326,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
   codename: '[k8s.io] Probing container should have monotonically increasing restart
-    count [NodeConformance] [Conformance]'
+    count [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with liveness probe on http endpoint /healthz. The
     http handler on the /healthz will return a http error after 10 seconds since the
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
@@ -337,7 +338,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod readiness probe, with initial delay
   codename: '[k8s.io] Probing container with readiness probe should not be ready before
-    initial delay and never restart [NodeConformance] [Conformance]'
+    initial delay and never restart [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod that is configured with a initial delay set on the readiness
     probe. Check the Pod Start time to compare to the initial delay. The Pod MUST
     be ready only after the specified initial delay.
@@ -345,7 +346,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Pod readiness probe, failure
   codename: '[k8s.io] Probing container with readiness probe that fails should never
-    be ready and never restart [NodeConformance] [Conformance]'
+    be ready and never restart [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with a readiness probe that fails consistently. When this
     Pod is created, then the Pod MUST never be ready, never be running and restart
     count MUST be zero.
@@ -353,7 +354,7 @@
   file: test/e2e/common/container_probe.go
 - testname: Security Context, runAsUser=65534
   codename: '[k8s.io] Security Context When creating a container with runAsUser should
-    run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]'
+    run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: 'Container is created with runAsUser option by passing uid 65534 to
     run as unpriviledged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
     is marked as LinuxOnly since Windows does not support running as UID / GID.'
@@ -361,7 +362,8 @@
   file: test/e2e/common/security_context.go
 - testname: Security Context, privileged=false.
   codename: '[k8s.io] Security Context When creating a pod with privileged should
-    run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]'
+    run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]
+    [Profile:Base]'
   description: 'Create a container to run in unprivileged mode by setting pod''s SecurityContext
     Privileged option as false. Pod MUST be in Succeeded phase. [LinuxOnly]: This
     test is marked as LinuxOnly since it runs a Linux-specific command.'
@@ -370,7 +372,7 @@
 - testname: Security Context, readOnlyRootFilesystem=false.
   codename: '[k8s.io] Security Context When creating a pod with readOnlyRootFilesystem
     should run the container with writable rootfs when readOnlyRootFilesystem=false
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Container is configured to run with readOnlyRootFilesystem to false.
     Write operation MUST be allowed and Pod MUST be in Succeeded state.
   release: v1.15
@@ -378,7 +380,7 @@
 - testname: Security Context, allowPrivilegeEscalation=false.
   codename: '[k8s.io] Security Context when creating containers with AllowPrivilegeEscalation
     should not allow privilege escalation when false [LinuxOnly] [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: 'Configuring the allowPrivilegeEscalation to false, does not allow
     the privilege escalation operation. A container is configured with allowPrivilegeEscalation=false
     and a given uid (1000) which is not 0. When the container is run, container''s
@@ -389,14 +391,14 @@
   file: test/e2e/common/security_context.go
 - testname: Environment variables, expansion
   codename: '[k8s.io] Variable Expansion should allow composing env vars into new
-    env vars [NodeConformance] [Conformance]'
+    env vars [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with environment variables. Environment variables defined
     using previously defined environment variables MUST expand to proper values.
   release: v1.9
   file: test/e2e/common/expansion.go
 - testname: Environment variables, command argument expansion
   codename: '[k8s.io] Variable Expansion should allow substituting values in a container''s
-    args [NodeConformance] [Conformance]'
+    args [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with environment variables and container command arguments
     using them. Container command arguments using the  defined environment variables
     MUST expand to proper values.
@@ -404,7 +406,7 @@
   file: test/e2e/common/expansion.go
 - testname: Environment variables, command expansion
   codename: '[k8s.io] Variable Expansion should allow substituting values in a container''s
-    command [NodeConformance] [Conformance]'
+    command [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with environment variables and container command using
     them. Container command using the  defined environment variables MUST expand to
     proper values.
@@ -412,28 +414,28 @@
   file: test/e2e/common/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath expansion
   codename: '[k8s.io] Variable Expansion should allow substituting values in a volume
-    subpath [sig-storage] [Conformance]'
+    subpath [sig-storage] [Conformance] [Profile:Base]'
   description: Make sure a container's subpath can be set using an expansion of environment
     variables.
   release: v1.19
   file: test/e2e/common/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with absolute path
   codename: '[k8s.io] Variable Expansion should fail substituting values in a volume
-    subpath with absolute path [sig-storage][Slow] [Conformance]'
+    subpath with absolute path [sig-storage][Slow] [Conformance] [Profile:Base]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when absolute path is supplied.
   release: v1.19
   file: test/e2e/common/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with backticks
   codename: '[k8s.io] Variable Expansion should fail substituting values in a volume
-    subpath with backticks [sig-storage][Slow] [Conformance]'
+    subpath with backticks [sig-storage][Slow] [Conformance] [Profile:Base]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when backticks are supplied.
   release: v1.19
   file: test/e2e/common/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath test writes
   codename: '[k8s.io] Variable Expansion should succeed in writing subpaths in container
-    [sig-storage][Slow] [Conformance]'
+    [sig-storage][Slow] [Conformance] [Profile:Base]'
   description: "Verify that a subpath expansion can be used to write files into subpaths.
     1.\tvalid subpathexpr starts a container running 2.\ttest for valid subpath writes
     3.\tsuccessful expansion of the subpathexpr isn't required for volume cleanup"
@@ -441,14 +443,15 @@
   file: test/e2e/common/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath ready from failed state
   codename: '[k8s.io] Variable Expansion should verify that a failing subpath expansion
-    can be modified during the lifecycle of a container [sig-storage][Slow] [Conformance]'
+    can be modified during the lifecycle of a container [sig-storage][Slow] [Conformance]
+    [Profile:Base]'
   description: Verify that a failing subpath expansion can be modified during the
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/expansion.go
 - testname: Pod events, verify event from Scheduler and Kubelet
   codename: '[k8s.io] [sig-node] Events should be sent by kubelets and the scheduler
-    about pods scheduling and running  [Conformance]'
+    about pods scheduling and running  [Conformance] [Profile:Base]'
   description: Create a Pod, make sure that the Pod can be queried. Create a event
     selector for the kind=Pod and the source is the Scheduler. List of the events
     MUST be at least one. Create a event selector for kind=Pod and the source is the
@@ -458,21 +461,22 @@
   file: test/e2e/node/events.go
 - testname: Pod Eviction, Toleration limits
   codename: '[k8s.io] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts
-    pods with minTolerationSeconds [Disruptive] [Conformance]'
+    pods with minTolerationSeconds [Disruptive] [Conformance] [Profile:Privileged]'
   description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted
     as per the toleration time limit.
   release: v1.16
   file: test/e2e/node/taints.go
 - testname: Taint, Pod Eviction on taint removal
   codename: '[k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] removing
-    taint cancels eviction [Disruptive] [Conformance]'
+    taint cancels eviction [Disruptive] [Conformance] [Profile:Privileged]'
   description: The Pod with toleration timeout scheduled on a tainted Node MUST not
     be evicted if the taint is removed before toleration time ends.
   release: v1.16
   file: test/e2e/node/taints.go
 - testname: Pods, QOS
   codename: '[k8s.io] [sig-node] Pods Extended [k8s.io] Pods Set QOS Class should
-    be set on Pods with matching resource requests and limits for memory and cpu [Conformance]'
+    be set on Pods with matching resource requests and limits for memory and cpu [Conformance]
+    [Profile:Base]'
   description: Create a Pod with CPU and Memory request and limits. Pod status MUST
     have QOSClass set to PodQOSGuaranteed.
   release: v1.9
@@ -480,7 +484,8 @@
   behaviors:
   - pod/spec/container/resources
 - testname: Pods, prestop hook
-  codename: '[k8s.io] [sig-node] PreStop should call prestop when killing a pod  [Conformance]'
+  codename: '[k8s.io] [sig-node] PreStop should call prestop when killing a pod  [Conformance]
+    [Profile:Base]'
   description: Create a server pod with a rest endpoint '/write' that changes state.Received
     field. Create a Pod with a pre-stop handle that posts to the /write endpoint on
     the server Pod. Verify that the Pod with pre-stop hook is running. Delete the
@@ -491,7 +496,7 @@
   file: test/e2e/node/pre_stop.go
 - testname: Admission webhook, list mutating webhooks
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing
-    mutating webhooks should work [Conformance]'
+    mutating webhooks should work [Conformance] [Profile:Privileged]'
   description: Create 10 mutating webhook configurations, all with a label. Attempt
     to list the webhook configurations matching the label; all the created webhook
     configurations MUST be present. Attempt to create an object; the object MUST be
@@ -502,7 +507,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, list validating webhooks
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing
-    validating webhooks should work [Conformance]'
+    validating webhooks should work [Conformance] [Profile:Privileged]'
   description: Create 10 validating webhook configurations, all with a label. Attempt
     to list the webhook configurations matching the label; all the created webhook
     configurations MUST be present. Attempt to create an object; the create MUST be
@@ -513,7 +518,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, update mutating webhook
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating
-    a mutating webhook should work [Conformance]'
+    a mutating webhook should work [Conformance] [Profile:Privileged]'
   description: Register a mutating admission webhook configuration. Update the webhook
     to not apply to the create operation and attempt to create an object; the webhook
     MUST NOT mutate the object. Patch the webhook to apply to the create operation
@@ -522,7 +527,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, update validating webhook
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating
-    a validating webhook should work [Conformance]'
+    a validating webhook should work [Conformance] [Profile:Privileged]'
   description: Register a validating admission webhook configuration. Update the webhook
     to not apply to the create operation and attempt to create an object; the webhook
     MUST NOT deny the create. Patch the webhook to apply to the create operation again
@@ -531,14 +536,14 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny attach
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    be able to deny attaching pod [Conformance]'
+    be able to deny attaching pod [Conformance] [Profile:Privileged]'
   description: Register an admission webhook configuration that denies connecting
     to a pod's attach sub-resource. Attempts to attach MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny custom resource create and delete
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    be able to deny custom resource creation, update and deletion [Conformance]'
+    be able to deny custom resource creation, update and deletion [Conformance] [Profile:Privileged]'
   description: Register an admission webhook configuration that denies creation, update
     and deletion of custom resources. Attempts to create, update and delete custom
     resources MUST be denied.
@@ -546,7 +551,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny create
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    be able to deny pod and configmap creation [Conformance]'
+    be able to deny pod and configmap creation [Conformance] [Profile:Privileged]'
   description: Register an admission webhook configuration that admits pod and configmap.
     Attempts to create non-compliant pods and configmaps, or update/patch compliant
     pods and configmaps to be non-compliant MUST be denied. An attempt to create a
@@ -557,14 +562,14 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny custom resource definition
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    deny crd creation [Conformance]'
+    deny crd creation [Conformance] [Profile:Privileged]'
   description: Register a webhook that denies custom resource definition create. Attempt
     to create a custom resource definition; the create request MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, honor timeout
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    honor timeout [Conformance]'
+    honor timeout [Conformance] [Profile:Privileged]'
   description: Using a webhook that waits 5 seconds before admitting objects, configure
     the webhook with combinations of timeouts and failure policy values. Attempt to
     create a config map with each combination. Requests MUST timeout if the configured
@@ -575,7 +580,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, discovery document
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    include webhook resources in discovery documents [Conformance]'
+    include webhook resources in discovery documents [Conformance] [Profile:Privileged]'
   description: The admissionregistration.k8s.io API group MUST exists in the /apis
     discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
     exists in the /apis discovery document. The mutatingwebhookconfigurations and
@@ -585,7 +590,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, ordered mutation
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    mutate configmap [Conformance]'
+    mutate configmap [Conformance] [Profile:Privileged]'
   description: Register a mutating webhook configuration with two webhooks that admit
     configmaps, one that adds a data key if the configmap already has a specific key,
     and another that adds a key if the key added by the first webhook is present.
@@ -594,14 +599,14 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutate custom resource
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    mutate custom resource [Conformance]'
+    mutate custom resource [Conformance] [Profile:Privileged]'
   description: Register a webhook that mutates a custom resource. Attempt to create
     custom resource object; the custom resource MUST be mutated.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutate custom resource with different stored version
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    mutate custom resource with different stored version [Conformance]'
+    mutate custom resource with different stored version [Conformance] [Profile:Privileged]'
   description: Register a webhook that mutates custom resources on create and update.
     Register a custom resource definition using v1 as stored version. Create a custom
     resource. Patch the custom resource definition to use v2 as the stored version.
@@ -611,7 +616,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutate custom resource with pruning
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    mutate custom resource with pruning [Conformance]'
+    mutate custom resource with pruning [Conformance] [Profile:Privileged]'
   description: Register mutating webhooks that adds fields to custom objects. Register
     a custom resource definition with a schema that includes only one of the data
     keys added by the webhooks. Attempt to a custom resource; the fields included
@@ -621,7 +626,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutation with defaulting
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    mutate pod and apply defaults after mutation [Conformance]'
+    mutate pod and apply defaults after mutation [Conformance] [Profile:Privileged]'
   description: Register a mutating webhook that adds an InitContainer to pods. Attempt
     to create a pod; the InitContainer MUST be added the TerminationMessagePolicy
     MUST be defaulted.
@@ -630,7 +635,8 @@
 - testname: Admission webhook, admission control not allowed on webhook configuration
     objects
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    not be able to mutate or prevent deletion of webhook configuration objects [Conformance]'
+    not be able to mutate or prevent deletion of webhook configuration objects [Conformance]
+    [Profile:Privileged]'
   description: Register webhooks that mutate and deny deletion of webhook configuration
     objects. Attempt to create and delete a webhook configuration object; both operations
     MUST be allowed and the webhook configuration object MUST NOT be mutated the webhooks.
@@ -638,7 +644,7 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, fail closed
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
-    unconditionally reject operations on fail closed webhook [Conformance]'
+    unconditionally reject operations on fail closed webhook [Conformance] [Profile:Privileged]'
   description: Register a webhook with a fail closed policy and without CA bundle
     so that it cannot be called. Attempt operations that require the admission webhook;
     all MUST be denied.
@@ -646,14 +652,14 @@
   file: test/e2e/apimachinery/webhook.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
-    API Server using the current Aggregator [Conformance]'
+    API Server using the current Aggregator [Conformance] [Profile:Privileged]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
     1.17 will work on the current Aggregator/API-Server.
   release: ""
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
-    should be able to convert a non homogeneous list of CRs [Conformance]'
+    should be able to convert a non homogeneous list of CRs [Conformance] [Profile:Privileged]'
   description: Register a conversion webhook and a custom resource definition. Create
     a custom resource stored at v1. Change the custom resource definition storage
     to v2. Create a custom resource stored at v2. Attempt to list the custom resources
@@ -662,14 +668,15 @@
   file: test/e2e/apimachinery/crd_conversion_webhook.go
 - testname: Custom Resource Definition Conversion Webhook, conversion custom resource
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
-    should be able to convert from CR v1 to CR v2 [Conformance]'
+    should be able to convert from CR v1 to CR v2 [Conformance] [Profile:Privileged]'
   description: Register a conversion webhook and a custom resource definition. Create
     a v1 custom resource. Attempts to read it at v2 MUST succeed.
   release: v1.16
   file: test/e2e/apimachinery/crd_conversion_webhook.go
 - testname: Custom Resource Definition, watch
   codename: '[sig-api-machinery] CustomResourceDefinition Watch [Privileged:ClusterAdmin]
-    CustomResourceDefinition Watch watch on custom resource definition objects [Conformance]'
+    CustomResourceDefinition Watch watch on custom resource definition objects [Conformance]
+    [Profile:Privileged]'
   description: Create a Custom Resource Definition. Attempt to watch it; the watch
     MUST observe create, modify and delete events.
   release: v1.16
@@ -677,7 +684,7 @@
 - testname: Custom Resource Definition, create
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition creating/deleting custom resource definition objects
-    works  [Conformance]'
+    works  [Conformance] [Profile:Privileged]'
   description: Create a API extension client and define a random custom resource definition.
     Create the custom resource definition and then delete it. The creation and deletion
     MUST be successful.
@@ -686,7 +693,7 @@
 - testname: Custom Resource Definition, status sub-resource
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition getting/updating/patching custom resource definition
-    status sub-resource works  [Conformance]'
+    status sub-resource works  [Conformance] [Profile:Privileged]'
   description: Create a custom resource definition. Attempt to read, update and patch
     its status sub-resource; all mutating sub-resource operations MUST be visible
     to subsequent reads.
@@ -694,7 +701,8 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: Custom Resource Definition, list
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
-    Simple CustomResourceDefinition listing custom resource definition objects works  [Conformance]'
+    Simple CustomResourceDefinition listing custom resource definition objects works  [Conformance]
+    [Profile:Privileged]'
   description: Create a API extension client, define 10 labeled custom resource definitions
     and list them using a label selector; the list result MUST contain only the labeled
     custom resource definitions. Delete the labeled custom resource definitions via
@@ -704,7 +712,8 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: Custom Resource Definition, defaulting
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
-    custom resource defaulting for requests and from storage works  [Conformance]'
+    custom resource defaulting for requests and from storage works  [Conformance]
+    [Profile:Privileged]'
   description: Create a custom resource definition without default. Create CR. Add
     default and read CR until the default is applied. Create another CR. Remove default,
     add default for another field and read CR until new field is defaulted, but old
@@ -713,7 +722,8 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: Custom Resource Definition, discovery
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
-    should include custom resource definition resources in discovery documents [Conformance]'
+    should include custom resource definition resources in discovery documents [Conformance]
+    [Profile:Privileged]'
   description: Fetch /apis, /apis/apiextensions.k8s.io, and /apis/apiextensions.k8s.io/v1
     discovery documents, and ensure they indicate CustomResourceDefinition apiextensions.k8s.io/v1
     resources are available.
@@ -721,7 +731,8 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: Custom Resource OpenAPI Publish, stop serving version
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    removes definition from spec when one version gets changed to not be served [Conformance]'
+    removes definition from spec when one version gets changed to not be served [Conformance]
+    [Profile:Privileged]'
   description: Register a custom resource definition with multiple versions. OpenAPI
     definitions MUST be published for custom resource definitions. Update the custom
     resource definition to not serve one of the versions. OpenAPI definitions MUST
@@ -730,7 +741,7 @@
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, version rename
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    updates the published spec when one version gets renamed [Conformance]'
+    updates the published spec when one version gets renamed [Conformance] [Profile:Privileged]'
   description: Register a custom resource definition with multiple versions; OpenAPI
     definitions MUST be published for custom resource definitions. Rename one of the
     versions of the custom resource definition via a patch; OpenAPI definitions MUST
@@ -739,7 +750,7 @@
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields at root
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for CRD preserving unknown fields at the schema root [Conformance]'
+    works for CRD preserving unknown fields at the schema root [Conformance] [Profile:Privileged]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the schema root. Attempt to create and apply a change a custom resource, via
     kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
@@ -749,7 +760,7 @@
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded
     object
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for CRD preserving unknown fields in an embedded object [Conformance]'
+    works for CRD preserving unknown fields in an embedded object [Conformance] [Profile:Privileged]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in an embedded object. Attempt to create and apply a change a custom resource,
     via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
@@ -759,7 +770,7 @@
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with validation schema
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for CRD with validation schema [Conformance]'
+    works for CRD with validation schema [Conformance] [Profile:Privileged]'
   description: Register a custom resource definition with a validating schema consisting
     of objects, arrays and primitives. Attempt to create and apply a change a custom
     resource using valid properties, via kubectl; client-side validation MUST pass.
@@ -772,7 +783,7 @@
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for CRD without validation schema [Conformance]'
+    works for CRD without validation schema [Conformance] [Profile:Privileged]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the top level object. Attempt to create and apply a change a custom resource,
     via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
@@ -781,14 +792,15 @@
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, varying groups
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for multiple CRDs of different groups [Conformance]'
+    works for multiple CRDs of different groups [Conformance] [Profile:Privileged]'
   description: Register multiple custom resource definitions spanning different groups
     and versions; OpenAPI definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, varying kinds
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for multiple CRDs of same group and version but different kinds [Conformance]'
+    works for multiple CRDs of same group and version but different kinds [Conformance]
+    [Profile:Privileged]'
   description: Register multiple custom resource definitions in the same group and
     version but spanning different kinds; OpenAPI definitions MUST be published for
     custom resource definitions.
@@ -796,13 +808,14 @@
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, varying versions
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
-    works for multiple CRDs of same group but different versions [Conformance]'
+    works for multiple CRDs of same group but different versions [Conformance] [Profile:Privileged]'
   description: Register a custom resource definition with multiple versions; OpenAPI
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Event, delete a collection
-  codename: '[sig-api-machinery] Events should delete a collection of events [Conformance]'
+  codename: '[sig-api-machinery] Events should delete a collection of events [Conformance]
+    [Profile:Base]'
   description: A set of events is created with a label selector which MUST be found
     when listed. The set of events is deleted and MUST NOT show up when listed by
     its label selector.
@@ -810,7 +823,7 @@
   file: test/e2e/apimachinery/events.go
 - testname: Event resource lifecycle
   codename: '[sig-api-machinery] Events should ensure that an event can be fetched,
-    patched, deleted, and listed [Conformance]'
+    patched, deleted, and listed [Conformance] [Profile:Base]'
   description: Create an event, the event MUST exist. The event is patched with a
     new message, the check MUST have the update message. The event is deleted and
     MUST NOT show up when listing all events.
@@ -818,7 +831,7 @@
   file: test/e2e/apimachinery/events.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
-    when not orphaning [Conformance]'
+    when not orphaning [Conformance] [Profile:Base]'
   description: Create a deployment with a replicaset. Once replicaset is created ,
     delete the deployment  with deleteOptions.PropagationPolicy set to Background.
     Deleting the deployment MUST delete the replicaset created by the deployment and
@@ -827,7 +840,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete pods created by rc
-    when not orphaning [Conformance]'
+    when not orphaning [Conformance] [Profile:Base]'
   description: Create a replication controller with 2 Pods. Once RC is created and
     the first Pod is created, delete RC with deleteOptions.PropagationPolicy set to
     Background. Deleting the Replication Controller MUST cause pods created by that
@@ -836,7 +849,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, after owned pods
   codename: '[sig-api-machinery] Garbage collector should keep the rc around until
-    all its pods are deleted if the deleteOptions says so [Conformance]'
+    all its pods are deleted if the deleteOptions says so [Conformance] [Profile:Base]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication
@@ -845,7 +858,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, dependency cycle
   codename: '[sig-api-machinery] Garbage collector should not be blocked by dependency
-    circle [Conformance]'
+    circle [Conformance] [Profile:Base]'
   description: Create three pods, patch them with Owner references such that pod1
     has pod3, pod2 has pod1 and pod3 has pod2 as owner references respectively. Delete
     pod1 MUST delete all pods. The dependency cycle MUST not block the garbage collection.
@@ -853,7 +866,8 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, multiple owners
   codename: '[sig-api-machinery] Garbage collector should not delete dependents that
-    have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]'
+    have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]
+    [Profile:Base]'
   description: Create a replication controller RC1, with maximum allocatable Pods
     between 10 and 100 replicas. Create second replication controller RC2 and set
     RC2 as owner for half of those replicas. Once RC1 is created and the all Pods
@@ -865,7 +879,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete deployment, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan RS created by deployment
-    when deleteOptions.PropagationPolicy is Orphan [Conformance]'
+    when deleteOptions.PropagationPolicy is Orphan [Conformance] [Profile:Base]'
   description: Create a deployment with a replicaset. Once replicaset is created ,
     delete the deployment  with deleteOptions.PropagationPolicy set to Orphan. Deleting
     the deployment MUST cause the replicaset created by the deployment to be orphaned,
@@ -874,7 +888,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan pods created by rc
-    if delete options say so [Conformance]'
+    if delete options say so [Conformance] [Profile:Base]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller
@@ -883,27 +897,28 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: namespace-deletion-removes-pods
   codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all pods are
-    removed when a namespace is deleted [Conformance]'
+    removed when a namespace is deleted [Conformance] [Profile:Base]'
   description: Ensure that if a namespace is deleted then all pods are removed from
     that namespace.
   release: ""
   file: test/e2e/apimachinery/namespace.go
 - testname: namespace-deletion-removes-services
   codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all services
-    are removed when a namespace is deleted [Conformance]'
+    are removed when a namespace is deleted [Conformance] [Profile:Base]'
   description: Ensure that if a namespace is deleted then all services are removed
     from that namespace.
   release: ""
   file: test/e2e/apimachinery/namespace.go
 - testname: Namespace patching
-  codename: '[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]'
+  codename: '[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]
+    [Profile:Base]'
   description: A Namespace is created. The Namespace is patched. The Namespace and
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
 - testname: ResourceQuota, update and delete
   codename: '[sig-api-machinery] ResourceQuota should be able to update and delete
-    ResourceQuota. [Conformance]'
+    ResourceQuota. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota for CPU and Memory quota limits. Creation MUST
     be successful. When ResourceQuota is updated to modify CPU and Memory quota limits,
     update MUST succeed with updated values for CPU and Memory limits. When ResourceQuota
@@ -912,7 +927,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, configmap
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture
-    the life of a configMap. [Conformance]'
+    the life of a configMap. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
     Create a ConfigMap. Its creation MUST be successful and resource usage count against
@@ -923,7 +938,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, pod
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture
-    the life of a pod. [Conformance]'
+    the life of a pod. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
     Create a Pod with resource request count for CPU, Memory, EphemeralStorage and
@@ -939,7 +954,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, replicaSet
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture
-    the life of a replica set. [Conformance]'
+    the life of a replica set. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
     Create a ReplicaSet. Its creation MUST be successful and resource usage count
@@ -950,7 +965,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, replicationController
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture
-    the life of a replication controller. [Conformance]'
+    the life of a replication controller. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
     Create a ReplicationController. Its creation MUST be successful and resource usage
@@ -962,7 +977,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, secret
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture
-    the life of a secret. [Conformance]'
+    the life of a secret. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
     Create a Secret. Its creation MUST be successful and resource usage count against
@@ -974,7 +989,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, service
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and capture
-    the life of a service. [Conformance]'
+    the life of a service. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
     Create a Service. Its creation MUST be successful and resource usage count against
@@ -986,14 +1001,14 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, object count quota, resourcequotas
   codename: '[sig-api-machinery] ResourceQuota should create a ResourceQuota and ensure
-    its status is promptly calculated. [Conformance]'
+    its status is promptly calculated. [Conformance] [Profile:Privileged]'
   description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
   release: v1.16
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, quota scope, BestEffort and NotBestEffort scope
   codename: '[sig-api-machinery] ResourceQuota should verify ResourceQuota with best
-    effort scope. [Conformance]'
+    effort scope. [Conformance] [Profile:Privileged]'
   description: Create two ResourceQuotas, one with 'BestEffort' scope and another
     with 'NotBestEffort' scope. Creation MUST be successful and their ResourceQuotaStatus
     MUST match to expected used and total allowed resource quota count within namespace.
@@ -1011,7 +1026,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, quota scope, Terminating and NotTerminating scope
   codename: '[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating
-    scopes. [Conformance]'
+    scopes. [Conformance] [Profile:Privileged]'
   description: Create two ResourceQuotas, one with 'Terminating' scope and another
     'NotTerminating' scope. Request and the limit counts for CPU and Memory resources
     are set for the ResourceQuota. Creation MUST be successful and their ResourceQuotaStatus
@@ -1031,7 +1046,7 @@
   file: test/e2e/apimachinery/resource_quota.go
 - testname: Secrets, pod environment field
   codename: '[sig-api-machinery] Secrets should be consumable from pods in env vars
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with Container that declares a environment
     variable which references the secret created to extract a key value from the secret.
     Pod MUST have the environment variable that contains proper value for the key
@@ -1040,7 +1055,7 @@
   file: test/e2e/common/secrets.go
 - testname: Secrets, pod environment from source
   codename: '[sig-api-machinery] Secrets should be consumable via the environment
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with Container that declares a environment
     variable using 'EnvFrom' which references the secret created to extract a key
     value from the secret. Pod MUST have the environment variable that contains proper
@@ -1049,12 +1064,12 @@
   file: test/e2e/common/secrets.go
 - testname: Secrets, with empty-key
   codename: '[sig-api-machinery] Secrets should fail to create secret due to empty
-    secret key [Conformance]'
+    secret key [Conformance] [Profile:Base]'
   description: Attempt to create a Secret with an empty key. The creation MUST fail.
   release: v1.15
   file: test/e2e/common/secrets.go
 - testname: Secret patching
-  codename: '[sig-api-machinery] Secrets should patch a secret [Conformance]'
+  codename: '[sig-api-machinery] Secrets should patch a secret [Conformance] [Profile:Base]'
   description: A Secret is created. Listing all Secrets MUST return an empty list.
     Given the patching and fetching of the Secret, the fields MUST equal the new values.
     The Secret is deleted by it's static Label. Secrets are listed finally, the list
@@ -1063,14 +1078,14 @@
   file: test/e2e/common/secrets.go
 - testname: API metadata HTTP return
   codename: '[sig-api-machinery] Servers with support for Table transformation should
-    return a 406 for a backend which does not implement metadata [Conformance]'
+    return a 406 for a backend which does not implement metadata [Conformance] [Profile:Base]'
   description: Issue a HTTP request to the API. HTTP request MUST return a HTTP status
     code of 406.
   release: v1.16
   file: test/e2e/apimachinery/table_conversion.go
 - testname: watch-configmaps-closed-and-restarted
   codename: '[sig-api-machinery] Watchers should be able to restart watching from
-    the last resource version observed by the previous watch [Conformance]'
+    the last resource version observed by the previous watch [Conformance] [Profile:Base]'
   description: Ensure that a watch can be reopened from the last resource version
     observed by the previous watch, and it will continue delivering notifications
     from that point in time.
@@ -1078,14 +1093,14 @@
   file: test/e2e/apimachinery/watch.go
 - testname: watch-configmaps-from-resource-version
   codename: '[sig-api-machinery] Watchers should be able to start watching from a
-    specific resource version [Conformance]'
+    specific resource version [Conformance] [Profile:Base]'
   description: Ensure that a watch can be opened from a particular resource version
     in the past and only notifications happening after that resource version are observed.
   release: ""
   file: test/e2e/apimachinery/watch.go
 - testname: watch-configmaps-with-multiple-watchers
   codename: '[sig-api-machinery] Watchers should observe add, update, and delete watch
-    notifications on configmaps [Conformance]'
+    notifications on configmaps [Conformance] [Profile:Base]'
   description: Ensure that multiple watchers are able to receive all add, update,
     and delete notifications on configmaps that match a label selector and do not
     receive notifications for configmaps which do not match that label selector.
@@ -1093,7 +1108,7 @@
   file: test/e2e/apimachinery/watch.go
 - testname: watch-configmaps-label-changed
   codename: '[sig-api-machinery] Watchers should observe an object deletion if it
-    stops meeting the requirements of the selector [Conformance]'
+    stops meeting the requirements of the selector [Conformance] [Profile:Base]'
   description: Ensure that a watched object stops meeting the requirements of a watch's
     selector, the watch will observe a delete, and will not observe notifications
     for that object until it meets the selector's requirements again.
@@ -1101,7 +1116,7 @@
   file: test/e2e/apimachinery/watch.go
 - testname: watch-consistency
   codename: '[sig-api-machinery] Watchers should receive events on concurrent watches
-    in same order [Conformance]'
+    in same order [Conformance] [Profile:Base]'
   description: Ensure that concurrent watches are consistent with each other by initiating
     an additional watch for events received from the first watch, initiated at the
     resource version of the event, and checking that all resource versions of all
@@ -1109,33 +1124,36 @@
   release: v1.15
   file: test/e2e/apimachinery/watch.go
 - testname: Confirm a server version
-  codename: '[sig-api-machinery] server version should find the server version [Conformance]'
+  codename: '[sig-api-machinery] server version should find the server version [Conformance]
+    [Profile:Base]'
   description: Ensure that an API server version can be retrieved. Both the major
     and minor versions MUST only be an integer.
   release: v1.19
   file: test/e2e/apimachinery/server_version.go
 - testname: DaemonSet-FailedPodCreation
   codename: '[sig-apps] Daemon set [Serial] should retry creating failed daemon pods
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: A conformant Kubernetes distribution MUST create new DaemonSet Pods
     when they fail.
   release: ""
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-Rollback
   codename: '[sig-apps] Daemon set [Serial] should rollback without unnecessary restarts
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support automated, minimally
     disruptive rollback of updates to a DaemonSet.
   release: ""
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-NodeSelection
-  codename: '[sig-apps] Daemon set [Serial] should run and stop complex daemon [Conformance]'
+  codename: '[sig-apps] Daemon set [Serial] should run and stop complex daemon [Conformance]
+    [Profile:Privileged]'
   description: A conformant Kubernetes distribution MUST support DaemonSet Pod node
     selection via label selectors.
   release: ""
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-Creation
-  codename: '[sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]'
+  codename: '[sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]
+    [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support the creation of DaemonSets.
     When a DaemonSet Pod is deleted, the DaemonSet controller MUST create a replacement
     Pod.
@@ -1143,40 +1161,42 @@
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-RollingUpdate
   codename: '[sig-apps] Daemon set [Serial] should update pod when spec was updated
-    and update strategy is RollingUpdate [Conformance]'
+    and update strategy is RollingUpdate [Conformance] [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
   release: ""
   file: test/e2e/apps/daemon_set.go
 - testname: Deployment Recreate
   codename: '[sig-apps] Deployment RecreateDeployment should delete old pods and create
-    new ones [Conformance]'
+    new ones [Conformance] [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support the Deployment with
     Recreate strategy.
   release: ""
   file: test/e2e/apps/deployment.go
 - testname: Deployment RollingUpdate
   codename: '[sig-apps] Deployment RollingUpdateDeployment should delete old pods
-    and create new ones [Conformance]'
+    and create new ones [Conformance] [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support the Deployment with
     RollingUpdate strategy.
   release: ""
   file: test/e2e/apps/deployment.go
 - testname: Deployment RevisionHistoryLimit
-  codename: '[sig-apps] Deployment deployment should delete old replica sets [Conformance]'
+  codename: '[sig-apps] Deployment deployment should delete old replica sets [Conformance]
+    [Profile:Base]'
   description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets
     based on the Deployment's `.spec.revisionHistoryLimit`.
   release: ""
   file: test/e2e/apps/deployment.go
 - testname: Deployment Proportional Scaling
   codename: '[sig-apps] Deployment deployment should support proportional scaling
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support Deployment proportional
     scaling, i.e. proportionally scale a Deployment's ReplicaSets when a Deployment
     is scaled.
   release: ""
   file: test/e2e/apps/deployment.go
 - testname: Deployment Rollover
-  codename: '[sig-apps] Deployment deployment should support rollover [Conformance]'
+  codename: '[sig-apps] Deployment deployment should support rollover [Conformance]
+    [Profile:Base]'
   description: A conformant Kubernetes distribution MUST support Deployment rollover,
     i.e. allow arbitrary number of changes to desired state during rolling update
     before the rollout finishes.
@@ -1184,28 +1204,28 @@
   file: test/e2e/apps/deployment.go
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
-    pods [Conformance]'
+    pods [Conformance] [Profile:Base]'
   description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
     Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
 - testname: Jobs, active pods, graceful termination
-  codename: '[sig-apps] Job should delete a job [Conformance]'
+  codename: '[sig-apps] Job should delete a job [Conformance] [Profile:Base]'
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
   file: test/e2e/apps/job.go
 - testname: Jobs, completion after task failure
   codename: '[sig-apps] Job should run a job to completion when tasks sometimes fail
-    and are locally restarted [Conformance]'
+    and are locally restarted [Conformance] [Profile:Base]'
   description: Explicitly cause the tasks to fail once initially. After restarting,
     the Job MUST execute to completion.
   release: v1.16
   file: test/e2e/apps/job.go
 - testname: Replica Set, adopt matching pods and release non matching pods
   codename: '[sig-apps] ReplicaSet should adopt matching pods on creation and release
-    no longer matching pods [Conformance]'
+    no longer matching pods [Conformance] [Profile:Base]'
   description: A Pod is created, then a Replica Set (RS) whose label selector will
     match the Pod. The RS MUST either adopt the Pod or delete and replace it with
     a new Pod. When the labels on one of the Pods owned by the RS change to no longer
@@ -1215,14 +1235,14 @@
   file: test/e2e/apps/replica_set.go
 - testname: Replica Set, run basic image
   codename: '[sig-apps] ReplicaSet should serve a basic image on each replica with
-    a public image  [Conformance]'
+    a public image  [Conformance] [Profile:Base]'
   description: Create a ReplicaSet with a Pod and a single Container. Make sure that
     the Pod is running. Pod SHOULD send a valid response when queried.
   release: v1.9
   file: test/e2e/apps/replica_set.go
 - testname: Replication Controller, adopt matching pods
   codename: '[sig-apps] ReplicationController should adopt matching pods on creation
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: An ownerless Pod is created, then a Replication Controller (RC) is
     created whose label selector will match the Pod. The RC MUST either adopt the
     Pod or delete and replace it with a new Pod
@@ -1230,7 +1250,7 @@
   file: test/e2e/apps/rc.go
 - testname: Replication Controller, release pods
   codename: '[sig-apps] ReplicationController should release no longer matching pods
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: A Replication Controller (RC) is created, and its Pods are created.
     When the labels on one of the Pods change to no longer match the RC's label selector,
     the RC MUST release the Pod and update the Pod's owner references.
@@ -1238,7 +1258,7 @@
   file: test/e2e/apps/rc.go
 - testname: Replication Controller, run basic image
   codename: '[sig-apps] ReplicationController should serve a basic image on each replica
-    with a public image  [Conformance]'
+    with a public image  [Conformance] [Profile:Base]'
   description: Replication Controller MUST create a Pod with Basic Image and MUST
     run the service with the provided image. Image MUST be tested by dialing into
     the service listening through TCP, UDP and HTTP.
@@ -1246,14 +1266,15 @@
   file: test/e2e/apps/rc.go
 - testname: Replication Controller, check for issues like exceeding allocated quota
   codename: '[sig-apps] ReplicationController should surface a failure condition on
-    a common issue like exceeded quota [Conformance]'
+    a common issue like exceeded quota [Conformance] [Profile:Base]'
   description: Attempt to create a Replication Controller with pods exceeding the
     namespace quota. The creation MUST fail
   release: v1.15
   file: test/e2e/apps/rc.go
 - testname: StatefulSet, Burst Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
-    Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]'
+    Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]
+    [Profile:Base]'
   description: StatefulSet MUST support the Parallel PodManagementPolicy for burst
     scaling. This test does not depend on a preexisting default StorageClass or a
     dynamic provisioner.
@@ -1262,7 +1283,7 @@
 - testname: StatefulSet, Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     Scaling should happen in predictable order and halt if any stateful pod is unhealthy
-    [Slow] [Conformance]'
+    [Slow] [Conformance] [Profile:Base]'
   description: StatefulSet MUST create Pods in ascending order by ordinal index when
     scaling up, and delete Pods in descending order when scaling down. Scaling up
     or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This
@@ -1271,7 +1292,7 @@
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Recreate Failed Pod
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
-    Should recreate evicted statefulset [Conformance]'
+    Should recreate evicted statefulset [Conformance] [Profile:Privileged]'
   description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed
     state, such as when they are rejected or evicted by a Node. This test does not
     depend on a preexisting default StorageClass or a dynamic provisioner.
@@ -1279,7 +1300,7 @@
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet resource Replica scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
-    should have a working scale subresource [Conformance]'
+    should have a working scale subresource [Conformance] [Profile:Base]'
   description: Create a StatefulSet resource. Newly created StatefulSet resource MUST
     have a scale of one. Bring the scale of the StatefulSet resource up to two. StatefulSet
     scale MUST be at two replicas.
@@ -1288,7 +1309,7 @@
 - testname: StatefulSet, Rolling Update with Partition
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     should perform canary updates and phased rolling updates of template modifications
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter
     for canaries and phased rollouts. If a Pod is deleted while a rolling update is
     in progress, StatefulSet MUST restore the Pod without violating the Partition.
@@ -1297,7 +1318,8 @@
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Rolling Update
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
-    should perform rolling updates and roll backs of template modifications [Conformance]'
+    should perform rolling updates and roll backs of template modifications [Conformance]
+    [Profile:Base]'
   description: StatefulSet MUST support the RollingUpdate strategy to automatically
     replace Pods one at a time when the Pod template changes. The StatefulSet's status
     MUST indicate the CurrentRevision and UpdateRevision. If the template is changed
@@ -1308,7 +1330,7 @@
   file: test/e2e/apps/statefulset.go
 - testname: CertificateSigningRequest API
   codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
-    CSR API operations [Conformance]'
+    CSR API operations [Conformance] [Profile:Privileged]'
   description: ' The certificates.k8s.io API group MUST exists in the /apis discovery
     document. The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io
     discovery document. The certificatesigningrequests, certificatesigningrequests/approval,
@@ -1320,7 +1342,8 @@
   release: v1.19
   file: test/e2e/auth/certificates.go
 - testname: Service account tokens auto mount optionally
-  codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]'
+  codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]
+    [Profile:Base]'
   description: Ensure that Service Account keys are mounted into the Pod only when
     AutoMountServiceToken is not set to false. We test the following scenarios here.
     1. Create Pod, Pod Spec has AutomountServiceAccountToken set to nil a) Service
@@ -1340,7 +1363,8 @@
   release: v1.9
   file: test/e2e/auth/service_accounts.go
 - testname: Service Account Tokens Must AutoMount
-  codename: '[sig-auth] ServiceAccounts should mount an API token into pods  [Conformance]'
+  codename: '[sig-auth] ServiceAccounts should mount an API token into pods  [Conformance]
+    [Profile:Base]'
   description: Ensure that Service Account keys are mounted into the Container. Pod
     contains three containers each will read Service Account token, root CA and default
     namespace respectively from the default API Token Mount path. All these three
@@ -1350,7 +1374,7 @@
   file: test/e2e/auth/service_accounts.go
 - testname: ServiceAccount lifecycle test
   codename: '[sig-auth] ServiceAccounts should run through the lifecycle of a ServiceAccount
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Creates a ServiceAccount with a static Label MUST be added as shown
     in watch event. Patching the ServiceAccount MUST return it's new property. Listing
     the ServiceAccounts MUST return the test ServiceAccount with it's patched values.
@@ -1359,7 +1383,7 @@
   file: test/e2e/auth/service_accounts.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
-    a working application  [Conformance]'
+    a working application  [Conformance] [Profile:Base]'
   description: Create Guestbook application that contains an agnhost primary server,
     2 agnhost replicas, frontend application, frontend service and agnhost primary
     service and agnhost replica service. Using frontend service, the test will write
@@ -1370,21 +1394,21 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, check version v1
   codename: '[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in
-    available api versions  [Conformance]'
+    available api versions  [Conformance] [Profile:Base]'
   description: Run kubectl to get api versions, output MUST contain returned versions
     with 'v1' listed.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, cluster info
   codename: '[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes
-    master services is included in cluster-info  [Conformance]'
+    master services is included in cluster-info  [Conformance] [Profile:Base]'
   description: Call kubectl to get cluster-info, output MUST contain cluster-info
     returned and Kubernetes Master SHOULD be running.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, describe pod or rc
   codename: '[sig-cli] Kubectl client Kubectl describe should check if kubectl describe
-    prints relevant information for rc and pods  [Conformance]'
+    prints relevant information for rc and pods  [Conformance] [Profile:Base]'
   description: Deploy an agnhost controller and an agnhost service. Kubectl describe
     pods SHOULD return the name, namespace, labels, state and other information as
     expected. Kubectl describe on rc, service, node and namespace SHOULD also return
@@ -1393,14 +1417,15 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, diff Deployment
   codename: '[sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds
-    a difference for Deployments [Conformance]'
+    a difference for Deployments [Conformance] [Profile:Base]'
   description: Create a Deployment with httpd image. Declare the same Deployment with
     a different image, busybox. Diff of live Deployment with declared Deployment MUST
     include the difference between live and declared image.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, create service, replication controller
-  codename: '[sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]'
+  codename: '[sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]
+    [Profile:Base]'
   description: Create a Pod running agnhost listening to port 6379. Using kubectl
     expose the agnhost primary replication controllers at port 1234. Validate that
     the replication controller is listening on port 1234 and the target port is set
@@ -1410,7 +1435,8 @@
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, label update
-  codename: '[sig-cli] Kubectl client Kubectl label should update the label on a resource  [Conformance]'
+  codename: '[sig-cli] Kubectl client Kubectl label should update the label on a resource  [Conformance]
+    [Profile:Base]'
   description: When a Pod is running, update a Label using 'kubectl label' command.
     The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the
     container MUST verify that the label can be read back. Use 'kubectl label label-'
@@ -1420,7 +1446,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, logs
   codename: '[sig-cli] Kubectl client Kubectl logs should be able to retrieve and
-    filter logs  [Conformance]'
+    filter logs  [Conformance] [Profile:Base]'
   description: When a Pod is running then it MUST generate logs. Starting a Pod should
     have a expected log line. Also log command options MUST work as expected and described
     below. 'kubectl logs -tail=1' should generate a output of one line, the last line
@@ -1432,7 +1458,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, patch to annotate
   codename: '[sig-cli] Kubectl client Kubectl patch should add annotations for pods
-    in rc  [Conformance]'
+    in rc  [Conformance] [Profile:Base]'
   description: Start running agnhost and a replication controller. When the pod is
     running, using 'kubectl patch' command add annotations. The annotation MUST be
     added to running pods and SHOULD be able to read added annotations from each of
@@ -1441,7 +1467,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, replace
   codename: '[sig-cli] Kubectl client Kubectl replace should update a single-container
-    pod''s image  [Conformance]'
+    pod''s image  [Conformance] [Profile:Base]'
   description: Command 'kubectl replace' on a existing Pod with a new spec MUST update
     the image of the container running in the Pod. A -f option to 'kubectl replace'
     SHOULD force to re-create the resource. The new Pod SHOULD have the container
@@ -1450,7 +1476,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, run pod
   codename: '[sig-cli] Kubectl client Kubectl run pod should create a pod from an
-    image when restart is Never  [Conformance]'
+    image when restart is Never  [Conformance] [Profile:Base]'
   description: Command 'kubectl run' MUST create a pod, when a image name is specified
     in the run command. After the run command there SHOULD be a pod that should exist
     with one container running the specified image.
@@ -1458,7 +1484,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, server-side dry-run Pod
   codename: '[sig-cli] Kubectl client Kubectl server-side dry-run should check if
-    kubectl can dry-run update Pods [Conformance]'
+    kubectl can dry-run update Pods [Conformance] [Profile:Base]'
   description: The command 'kubectl run' must create a pod with the specified image
     name. After, the command 'kubectl replace --dry-run=server' should update the
     Pod with the new image name and server-side dry-run enabled. The image name must
@@ -1467,13 +1493,14 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, version
   codename: '[sig-cli] Kubectl client Kubectl version should check is all data is
-    printed  [Conformance]'
+    printed  [Conformance] [Profile:Base]'
   description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit,
     etc of the Client and the Server that the kubectl is configured to connect to.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, proxy socket
-  codename: '[sig-cli] Kubectl client Proxy server should support --unix-socket=/path  [Conformance]'
+  codename: '[sig-cli] Kubectl client Proxy server should support --unix-socket=/path  [Conformance]
+    [Profile:Base]'
   description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some
     path>. Call the proxy server by requesting api versions from  http://locahost:0/api.
     The proxy server MUST provide at least one version string
@@ -1481,7 +1508,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, proxy port zero
   codename: '[sig-cli] Kubectl client Proxy server should support proxy with --port
-    0  [Conformance]'
+    0  [Conformance] [Profile:Base]'
   description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0.
     Call the proxy server by requesting api versions from unix socket. The proxy server
     MUST provide at least one version string.
@@ -1489,14 +1516,15 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, replication controller
   codename: '[sig-cli] Kubectl client Update Demo should create and stop a replication
-    controller  [Conformance]'
+    controller  [Conformance] [Profile:Base]'
   description: Create a Pod and a container with a given image. Configure replication
     controller to run 2 replicas. The number of running instances of the Pod MUST
     equal the number of replicas set on the replication controller which is 2.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, scale replication controller
-  codename: '[sig-cli] Kubectl client Update Demo should scale a replication controller  [Conformance]'
+  codename: '[sig-cli] Kubectl client Update Demo should scale a replication controller  [Conformance]
+    [Profile:Base]'
   description: Create a Pod and a container with a given image. Configure replication
     controller to run 2 replicas. The number of running instances of the Pod MUST
     equal the number of replicas set on the replication controller which is 2. Update
@@ -1506,14 +1534,14 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: New Event resource lifecycle, testing a list of events
   codename: '[sig-instrumentation] Events API should delete a collection of events
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a list of events, the events MUST exist. The events are deleted
     and MUST NOT show up when listing all events.
   release: v1.19
   file: test/e2e/instrumentation/events.go
 - testname: New Event resource lifecycle, testing a single event
   codename: '[sig-instrumentation] Events API should ensure that an event can be fetched,
-    patched, deleted, and listed [Conformance]'
+    patched, deleted, and listed [Conformance] [Profile:Base]'
   description: Create an event, the event MUST exist. The event is patched with a
     new note, the check MUST have the update note. The event is updated with a new
     series, the check MUST have the update series. The event is deleted and MUST NOT
@@ -1522,13 +1550,14 @@
   file: test/e2e/instrumentation/events.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via /etc/hosts.
   release: v1.14
   file: test/e2e/network/dns.go
 - testname: DNS, for ExternalName Services
-  codename: '[sig-network] DNS should provide DNS for ExternalName services [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for ExternalName services [Conformance]
+    [Profile:Base]'
   description: Create a service with externalName. Pod MUST be able to resolve the
     address for this service via CNAME. When externalName of this service is changed,
     Pod MUST resolve to new DNS entry for the service. Change the service type from
@@ -1537,7 +1566,7 @@
   file: test/e2e/network/dns.go
 - testname: DNS, resolve the hostname
   codename: '[sig-network] DNS should provide DNS for pods for Hostname [LinuxOnly]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a headless service with label. Create a Pod with label to match
     service's label, with hostname and a subdomain same as service name. Pod MUST
     be able to resolve its fully qualified domain name as well as hostname by serving
@@ -1545,7 +1574,8 @@
   release: v1.15
   file: test/e2e/network/dns.go
 - testname: DNS, resolve the subdomain
-  codename: '[sig-network] DNS should provide DNS for pods for Subdomain [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for pods for Subdomain [Conformance]
+    [Profile:Base]'
   description: Create a headless service with label. Create a Pod with label to match
     service's label, with hostname and a subdomain same as service name. Pod MUST
     be able to resolve its fully qualified domain name as well as subdomain by serving
@@ -1553,7 +1583,7 @@
   release: v1.15
   file: test/e2e/network/dns.go
 - testname: DNS, services
-  codename: '[sig-network] DNS should provide DNS for services  [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for services  [Conformance] [Profile:Base]'
   description: When a headless service is created, the service MUST be able to resolve
     all the required service endpoints. When the service is created, any pod in the
     same namespace must be able to resolve the service by all of the expected DNS
@@ -1561,14 +1591,14 @@
   release: v1.9
   file: test/e2e/network/dns.go
 - testname: DNS, cluster
-  codename: '[sig-network] DNS should provide DNS for the cluster  [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for the cluster  [Conformance] [Profile:Base]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via DNS.
   release: v1.9
   file: test/e2e/network/dns.go
 - testname: DNS, PQDN for services
   codename: '[sig-network] DNS should resolve DNS of partial qualified names for services
-    [LinuxOnly] [Conformance]'
+    [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a headless service and normal service. Both the services MUST
     be able to resolve partial qualified DNS entries of their service endpoints by
     serving A records and SRV records. [LinuxOnly]: As Windows currently does not
@@ -1576,7 +1606,8 @@
   release: v1.17
   file: test/e2e/network/dns.go
 - testname: DNS, custom dnsConfig
-  codename: '[sig-network] DNS should support configurable pod DNS nameservers [Conformance]'
+  codename: '[sig-network] DNS should support configurable pod DNS nameservers [Conformance]
+    [Profile:Base]'
   description: Create a Pod with DNSPolicy as None and custom DNS configuration, specifying
     nameservers and search path entries. Pod creation MUST be successful and provided
     DNS configuration MUST be configured in the Pod.
@@ -1584,7 +1615,7 @@
   file: test/e2e/network/dns.go
 - testname: Ingress API
   codename: '[sig-network] Ingress API should support creating Ingress API operations
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: ' The networking.k8s.io API group MUST exist in the /apis discovery
     document. The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
     discovery document. The ingresses resources MUST exist in the /apis/networking.k8s.io/v1
@@ -1595,7 +1626,7 @@
   file: test/e2e/network/ingress.go
 - testname: IngressClass API
   codename: '[sig-network] IngressClass API  should support creating IngressClass
-    API operations [Conformance]'
+    API operations [Conformance] [Profile:Base]'
   description: ' - The networking.k8s.io API group MUST exist in the /apis discovery
     document. - The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
     discovery document. - The ingressclasses resource MUST exist in the /apis/networking.k8s.io/v1
@@ -1605,7 +1636,7 @@
   file: test/e2e/network/ingressclass.go
 - testname: Networking, intra pod http
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
-    communication: http [NodeConformance] [Conformance]'
+    communication: http [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1617,7 +1648,7 @@
   file: test/e2e/common/networking.go
 - testname: Networking, intra pod udp
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
-    communication: udp [NodeConformance] [Conformance]'
+    communication: udp [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1629,7 +1660,7 @@
   file: test/e2e/common/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: http [LinuxOnly] [NodeConformance] [Conformance]'
+    communication: http [LinuxOnly] [NodeConformance] [Conformance] [Profile:Privileged]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1643,7 +1674,7 @@
   file: test/e2e/common/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: udp [LinuxOnly] [NodeConformance] [Conformance]'
+    communication: udp [LinuxOnly] [NodeConformance] [Conformance] [Profile:Privileged]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1656,13 +1687,15 @@
   release: v1.9
   file: test/e2e/common/networking.go
 - testname: Proxy, logs service endpoint
-  codename: '[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]'
+  codename: '[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]
+    [Profile:Base]'
   description: Select any node in the cluster to invoke  /logs endpoint  using the
     /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
   release: v1.9
   file: test/e2e/network/proxy.go
 - testname: Service endpoint latency, thresholds
-  codename: '[sig-network] Service endpoints latency should not be very high  [Conformance]'
+  codename: '[sig-network] Service endpoints latency should not be very high  [Conformance]
+    [Profile:Base]'
   description: Run 100 iterations of create service with the Pod running the pause
     image, measure the time it takes for creating the service and the endpoint with
     the service name is available. These durations are captured for 100 iterations,
@@ -1673,7 +1706,7 @@
   file: test/e2e/network/service_latency.go
 - testname: Service, change type, ClusterIP to ExternalName
   codename: '[sig-network] Services should be able to change the type from ClusterIP
-    to ExternalName [Conformance]'
+    to ExternalName [Conformance] [Profile:Base]'
   description: Create a service of type ClusterIP. Service creation MUST be successful
     by assigning ClusterIP to the service. Update service type from ClusterIP to ExternalName
     by setting CNAME entry as externalName. Service update MUST be successful and
@@ -1683,7 +1716,7 @@
   file: test/e2e/network/service.go
 - testname: Service, change type, ExternalName to ClusterIP
   codename: '[sig-network] Services should be able to change the type from ExternalName
-    to ClusterIP [Conformance]'
+    to ClusterIP [Conformance] [Profile:Base]'
   description: Create a service of type ExternalName, pointing to external DNS. ClusterIP
     MUST not be assigned to the service. Update the service from ExternalName to ClusterIP
     by removing ExternalName entry, assigning port 80 as service port and TCP as protocol.
@@ -1693,7 +1726,7 @@
   file: test/e2e/network/service.go
 - testname: Service, change type, ExternalName to NodePort
   codename: '[sig-network] Services should be able to change the type from ExternalName
-    to NodePort [Conformance]'
+    to NodePort [Conformance] [Profile:Base]'
   description: Create a service of type ExternalName, pointing to external DNS. ClusterIP
     MUST not be assigned to the service. Update the service from ExternalName to NodePort,
     assigning port 80 as service port and, TCP as protocol. service update MUST be
@@ -1705,7 +1738,7 @@
   file: test/e2e/network/service.go
 - testname: Service, change type, NodePort to ExternalName
   codename: '[sig-network] Services should be able to change the type from NodePort
-    to ExternalName [Conformance]'
+    to ExternalName [Conformance] [Profile:Base]'
   description: Create a service of type NodePort. Service creation MUST be successful
     by exposing service on every node's IP on dynamically assigned NodePort and, ClusterIP
     MUST be assigned to route service requests. Update the service type from NodePort
@@ -1717,7 +1750,7 @@
   file: test/e2e/network/service.go
 - testname: Service, NodePort Service
   codename: '[sig-network] Services should be able to create a functioning NodePort
-    service [Conformance]'
+    service [Conformance] [Profile:Base]'
   description: Create a TCP NodePort service, and test reachability from a client
     Pod. The client Pod MUST be able to access the NodePort service by service name
     and cluster IP on the service port, and on nodes' internal and external IPs on
@@ -1726,7 +1759,7 @@
   file: test/e2e/network/service.go
 - testname: Service, NodePort type, session affinity to None
   codename: '[sig-network] Services should be able to switch session affinity for
-    NodePort service [LinuxOnly] [Conformance]'
+    NodePort service [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a service of type "NodePort" and provide service port and protocol.
     Service''s sessionAffinity is set to "ClientIP". Service creation MUST be successful
     by assigning a "ClusterIP" to the service and allocating NodePort on all the nodes.
@@ -1744,7 +1777,7 @@
   file: test/e2e/network/service.go
 - testname: Service, ClusterIP type, session affinity to None
   codename: '[sig-network] Services should be able to switch session affinity for
-    service with type clusterIP [LinuxOnly] [Conformance]'
+    service with type clusterIP [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a service of type "ClusterIP". Service''s sessionAffinity is
     set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP"
     to the service. Create a Replication Controller to ensure that 3 pods are running
@@ -1760,14 +1793,14 @@
   file: test/e2e/network/service.go
 - testname: Find Kubernetes Service in default Namespace
   codename: '[sig-network] Services should find a service from listing all namespaces
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: List all Services in all Namespaces, response MUST include a Service
     named Kubernetes with the Namespace of default.
   release: v1.18
   file: test/e2e/network/service.go
 - testname: Service, NodePort type, session affinity to ClientIP with timeout
   codename: '[sig-network] Services should have session affinity timeout work for
-    NodePort service [LinuxOnly] [Conformance]'
+    NodePort service [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a service of type "NodePort" and provide service port and protocol.
     Service''s sessionAffinity is set to "ClientIP" and session affinity timeout is
     set. Service creation MUST be successful by assigning a "ClusterIP" to service
@@ -1784,7 +1817,7 @@
   file: test/e2e/network/service.go
 - testname: Service, ClusterIP type, session affinity to ClientIP with timeout
   codename: '[sig-network] Services should have session affinity timeout work for
-    service with type clusterIP [LinuxOnly] [Conformance]'
+    service with type clusterIP [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a service of type "ClusterIP". Service''s sessionAffinity is
     set to "ClientIP" and session affinity timeout is set. Service creation MUST be
     successful by assigning "ClusterIP" to the service. Create a Replication Controller
@@ -1799,7 +1832,7 @@
   file: test/e2e/network/service.go
 - testname: Service, NodePort type, session affinity to ClientIP
   codename: '[sig-network] Services should have session affinity work for NodePort
-    service [LinuxOnly] [Conformance]'
+    service [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a service of type "NodePort" and provide service port and protocol.
     Service''s sessionAffinity is set to "ClientIP". Service creation MUST be successful
     by assigning a "ClusterIP" to service and allocating NodePort on all nodes. Create
@@ -1814,7 +1847,7 @@
   file: test/e2e/network/service.go
 - testname: Service, ClusterIP type, session affinity to ClientIP
   codename: '[sig-network] Services should have session affinity work for service
-    with type clusterIP [LinuxOnly] [Conformance]'
+    with type clusterIP [LinuxOnly] [Conformance] [Profile:Base]'
   description: 'Create a service of type "ClusterIP". Service''s sessionAffinity is
     set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP"
     to the service. Create a Replication Controller to ensure that 3 pods are running
@@ -1826,13 +1859,15 @@
   release: v1.19
   file: test/e2e/network/service.go
 - testname: Kubernetes Service
-  codename: '[sig-network] Services should provide secure master service  [Conformance]'
+  codename: '[sig-network] Services should provide secure master service  [Conformance]
+    [Profile:Base]'
   description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
     service running in the cluster.
   release: v1.9
   file: test/e2e/network/service.go
 - testname: Service, endpoints
-  codename: '[sig-network] Services should serve a basic endpoint from pods  [Conformance]'
+  codename: '[sig-network] Services should serve a basic endpoint from pods  [Conformance]
+    [Profile:Base]'
   description: Create a service with a endpoint without any Pods, the service MUST
     run and show empty endpoints. Add a pod to the service and the service MUST validate
     to show all the endpoints for the ports exposed by the Pod. Add another Pod then
@@ -1843,7 +1878,8 @@
   release: v1.9
   file: test/e2e/network/service.go
 - testname: Service, endpoints with multiple ports
-  codename: '[sig-network] Services should serve multiport endpoints from pods  [Conformance]'
+  codename: '[sig-network] Services should serve multiport endpoints from pods  [Conformance]
+    [Profile:Base]'
   description: Create a service with two ports but no Pods are added to the service
     yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first
     port, service MUST list one endpoint for the Pod on that port. Add another Pod
@@ -1854,26 +1890,28 @@
   file: test/e2e/network/service.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a Pod with an environment variable value set using a value from
     ConfigMap. A ConfigMap value MUST be accessible in the container environment.
   release: v1.9
   file: test/e2e/common/configmap.go
 - testname: ConfigMap, from environment variables
   codename: '[sig-node] ConfigMap should be consumable via the environment [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a Pod with a environment source from ConfigMap. All ConfigMap
     values MUST be available as environment variables in the container.
   release: v1.9
   file: test/e2e/common/configmap.go
 - testname: ConfigMap, with empty-key
-  codename: '[sig-node] ConfigMap should fail to create ConfigMap with empty key [Conformance]'
+  codename: '[sig-node] ConfigMap should fail to create ConfigMap with empty key [Conformance]
+    [Profile:Base]'
   description: Attempt to create a ConfigMap with an empty key. The creation MUST
     fail.
   release: v1.14
   file: test/e2e/common/configmap.go
 - testname: ConfigMap lifecycle
-  codename: '[sig-node] ConfigMap should run through a ConfigMap lifecycle [Conformance]'
+  codename: '[sig-node] ConfigMap should run through a ConfigMap lifecycle [Conformance]
+    [Profile:Base]'
   description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching
     the ConfigMap MUST reflect changes. By fetching all the ConfigMaps via a Label
     selector it MUST find the ConfigMap by it's static label and updated value. The
@@ -1882,21 +1920,21 @@
   file: test/e2e/common/configmap.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
-    and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
+    and requests.cpu/memory as env vars [NodeConformance] [Conformance] [Profile:Base]'
   description: Downward API MUST expose CPU request and Memory request set through
     environment variables at runtime in the container.
   release: v1.9
   file: test/e2e/common/downward_api.go
 - testname: DownwardAPI, environment for default CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide default limits.cpu/memory from
-    node allocatable [NodeConformance] [Conformance]'
+    node allocatable [NodeConformance] [Conformance] [Profile:Base]'
   description: Downward API MUST expose CPU request and Memory limits set through
     environment variables at runtime in the container.
   release: v1.9
   file: test/e2e/common/downward_api.go
 - testname: DownwardAPI, environment for host ip
   codename: '[sig-node] Downward API should provide host IP as an env var [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Downward API MUST expose Pod and Container fields as environment variables.
     Specify host IP as environment variable in the Pod Spec are visible at runtime
     in the container.
@@ -1904,28 +1942,30 @@
   file: test/e2e/common/downward_api.go
 - testname: DownwardAPI, environment for Pod UID
   codename: '[sig-node] Downward API should provide pod UID as env vars [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Downward API MUST expose Pod UID set through environment variables
     at runtime in the container.
   release: v1.9
   file: test/e2e/common/downward_api.go
 - testname: DownwardAPI, environment for name, namespace and ip
   codename: '[sig-node] Downward API should provide pod name, namespace and IP address
-    as env vars [NodeConformance] [Conformance]'
+    as env vars [NodeConformance] [Conformance] [Profile:Base]'
   description: Downward API MUST expose Pod and Container fields as environment variables.
     Specify Pod Name, namespace and IP as environment variable in the Pod Spec are
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/downward_api.go
 - testname: PodTemplate, delete a collection
-  codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
+  codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]
+    [Profile:Base]'
   description: A set of Pod Templates is created with a label selector which MUST
     be found when listed. The set of Pod Templates is deleted and MUST NOT show up
     when listed by its label selector.
   release: v1.19
   file: test/e2e/common/podtemplates.go
 - testname: PodTemplate lifecycle
-  codename: '[sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]'
+  codename: '[sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]
+    [Profile:Base]'
   description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching
     the PodTemplate MUST reflect changes. By fetching all the PodTemplates via a Label
     selector it MUST find the PodTemplate by it's static label and updated value.
@@ -1934,7 +1974,7 @@
   file: test/e2e/common/podtemplates.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
-    and ensure pod has those defaults applied. [Conformance]'
+    and ensure pod has those defaults applied. [Conformance] [Profile:Base]'
   description: Creating a Limitrange and verifying the creation of Limitrange, updating
     the Limitrange and validating the Limitrange. Creating Pods with resources and
     validate the pod resources are applied to the Limitrange
@@ -1942,13 +1982,13 @@
   file: test/e2e/scheduling/limit_range.go
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
-    of pods that are allowed to run  [Conformance]'
+    of pods that are allowed to run  [Conformance] [Profile:Privileged]'
   description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
-    is respected if matching  [Conformance]'
+    is respected if matching  [Conformance] [Profile:Privileged]'
   description: 'Create a label on the node {k: v}. Then create a Pod with a NodeSelector
     set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches
     then Pod MUST be scheduled on that node.'
@@ -1956,7 +1996,7 @@
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector not matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
-    is respected if not matching  [Conformance]'
+    is respected if not matching  [Conformance] [Profile:Privileged]'
   description: Create a Pod with a NodeSelector set to a value that does not match
     a node in the cluster. Since there are no nodes matching the criteria the Pod
     MUST not be scheduled.
@@ -1966,7 +2006,7 @@
     default HostIP (0.0.0.0)
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there exists
     conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP
-    [Conformance]'
+    [Conformance] [Profile:Privileged]'
   description: Pods with the same HostPort and Protocol, but different HostIPs, MUST
     NOT schedule to the same node if one of those IPs is the default HostIP of 0.0.0.0,
     which represents all IPs on the host.
@@ -1975,14 +2015,14 @@
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there is
     no conflict between pods with same hostPort but different hostIP and protocol
-    [Conformance]'
+    [Conformance] [Profile:Privileged]'
   description: Pods with the same HostPort value MUST be able to be scheduled to the
     same node if the HostIP or Protocol is different.
   release: v1.16
   file: test/e2e/scheduling/predicates.go
 - testname: Pod preemption verification
   codename: '[sig-scheduling] SchedulerPreemption [Serial] PreemptionExecutionPath
-    runs ReplicaSets to verify preemption running path [Conformance]'
+    runs ReplicaSets to verify preemption running path [Conformance] [Profile:Privileged]'
   description: Four levels of Pods in ReplicaSets with different levels of Priority,
     restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first
     followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected
@@ -1991,7 +2031,7 @@
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Basic Preemption
   codename: '[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption
-    works [Conformance]'
+    works [Conformance] [Profile:Privileged]'
   description: When a higher priority pod is created and no node with enough resources
     is found, the scheduler MUST preempt a lower priority pod and schedule the high
     priority pod.
@@ -1999,7 +2039,7 @@
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Preemption for critical pod
   codename: '[sig-scheduling] SchedulerPreemption [Serial] validates lower priority
-    pod preemption by critical pod [Conformance]'
+    pod preemption by critical pod [Conformance] [Profile:Privileged]'
   description: When a critical pod is created and no node with enough resources is
     found, the scheduler MUST preempt a lower priority pod to schedule the critical
     pod.
@@ -2007,7 +2047,7 @@
   file: test/e2e/scheduling/preemption.go
 - testname: ConfigMap Volume, text data, binary data
   codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: The ConfigMap that is created with text data and binary data MUST be
     accessible to read from the newly created Pod using the volume mount that is mapped
     to custom path in the Pod. ConfigMap's text data and binary data MUST be verified
@@ -2016,7 +2056,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, create, update and delete
   codename: '[sig-storage] ConfigMap optional updates should be reflected in volume
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: The ConfigMap that is created MUST be accessible to read from the newly
     created Pod using the volume mount that is mapped to custom path in the Pod. When
     the config map is updated the change to the config map MUST be verified by reading
@@ -2026,7 +2066,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, without mapping
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. The ConfigMap that is created MUST
     be accessible to read from the newly created Pod using the volume mount. The data
@@ -2036,7 +2076,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, without mapping, non-root user
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume as non-root
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Pod is run as a non-root user with
     uid=1000. The ConfigMap that is created MUST be accessible to read from the newly
@@ -2046,7 +2086,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, without mapping, volume mode set
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
+    defaultMode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. File mode is changed to a custom
     value of '0x400'. The ConfigMap that is created MUST be accessible to read from
@@ -2058,7 +2098,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, with mapping
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    mappings [NodeConformance] [Conformance]'
+    mappings [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Files are mapped to a path in the
     volume. The ConfigMap that is created MUST be accessible to read from the newly
@@ -2068,7 +2108,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, with mapping, volume mode set
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Files are mapped to a path in the
     volume. File mode is changed to a custom value of '0x400'. The ConfigMap that
@@ -2080,7 +2120,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, with mapping, non-root user
   codename: '[sig-storage] ConfigMap should be consumable from pods in volume with
-    mappings as non-root [NodeConformance] [Conformance]'
+    mappings as non-root [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a ConfigMap, create a Pod that mounts a volume and populates
     the volume with data stored in the ConfigMap. Files are mapped to a path in the
     volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created
@@ -2090,7 +2130,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, multiple volume maps
   codename: '[sig-storage] ConfigMap should be consumable in multiple volumes in the
-    same pod [NodeConformance] [Conformance]'
+    same pod [NodeConformance] [Conformance] [Profile:Base]'
   description: The ConfigMap that is created MUST be accessible to read from the newly
     created Pod using the volume mount that is mapped to multiple paths in the Pod.
     The content MUST be accessible from all the mapped volume mounts.
@@ -2098,7 +2138,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, update
   codename: '[sig-storage] ConfigMap updates should be reflected in volume [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: The ConfigMap that is created MUST be accessible to read from the newly
     created Pod using the volume mount that is mapped to custom path in the Pod. When
     the ConfigMap is updated the change to the config map MUST be verified by reading
@@ -2107,7 +2147,7 @@
   file: test/e2e/common/configmap_volume.go
 - testname: DownwardAPI volume, CPU limits
   codename: '[sig-storage] Downward API volume should provide container''s cpu limit
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the CPU limits. The container runtime MUST be able to access
     CPU limits from the specified path on the mounted volume.
@@ -2115,7 +2155,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, CPU request
   codename: '[sig-storage] Downward API volume should provide container''s cpu request
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the CPU request. The container runtime MUST be able to access
     CPU request from the specified path on the mounted volume.
@@ -2123,7 +2163,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, memory limits
   codename: '[sig-storage] Downward API volume should provide container''s memory
-    limit [NodeConformance] [Conformance]'
+    limit [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the memory limits. The container runtime MUST be able to access
     memory limits from the specified path on the mounted volume.
@@ -2131,7 +2171,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, memory request
   codename: '[sig-storage] Downward API volume should provide container''s memory
-    request [NodeConformance] [Conformance]'
+    request [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the memory request. The container runtime MUST be able to
     access memory request from the specified path on the mounted volume.
@@ -2139,7 +2179,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, CPU limit, default node allocatable
   codename: '[sig-storage] Downward API volume should provide node allocatable (cpu)
-    as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
+    as default cpu limit if the limit is not set [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the CPU limits. CPU limits is not specified for the container.
     The container runtime MUST be able to access CPU limits from the specified path
@@ -2148,7 +2188,8 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, memory limit, default node allocatable
   codename: '[sig-storage] Downward API volume should provide node allocatable (memory)
-    as default memory limit if the limit is not set [NodeConformance] [Conformance]'
+    as default memory limit if the limit is not set [NodeConformance] [Conformance]
+    [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the memory limits. memory limits is not specified for the
     container. The container runtime MUST be able to access memory limits from the
@@ -2157,7 +2198,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, pod name
   codename: '[sig-storage] Downward API volume should provide podname only [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the Pod name. The container runtime MUST be able to access
     Pod name from the specified path on the mounted volume.
@@ -2165,7 +2206,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, volume mode 0400
   codename: '[sig-storage] Downward API volume should set DefaultMode on files [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource with the volumesource
     mode set to -r-------- and DownwardAPIVolumeFiles contains a item for the Pod
     name. The container runtime MUST be able to access Pod name from the specified
@@ -2175,7 +2216,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, file mode 0400
   codename: '[sig-storage] Downward API volume should set mode on item file [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains a item for the Pod name with the file mode set to -r--------. The container
     runtime MUST be able to access Pod name from the specified path on the mounted
@@ -2185,7 +2226,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, update annotations
   codename: '[sig-storage] Downward API volume should update annotations on modification
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains list of items for each of the Pod annotations. The container runtime
     MUST be able to access Pod annotations from the specified path on the mounted
@@ -2195,7 +2236,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: DownwardAPI volume, update label
   codename: '[sig-storage] Downward API volume should update labels on modification
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
     contains list of items for each of the Pod labels. The container runtime MUST
     be able to access Pod labels from the specified path on the mounted volume. Update
@@ -2205,7 +2246,7 @@
   file: test/e2e/common/downwardapi_volume.go
 - testname: EmptyDir, Shared volumes between containers
   codename: '[sig-storage] EmptyDir volumes pod should support shared volumes between
-    containers [Conformance]'
+    containers [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, should share volumes between
     the containeres in the pod. The two busybox image containers shoud share the volumes
     mounted to the pod. The main container shoud wait until the sub container drops
@@ -2214,7 +2255,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0644,default)
-    [LinuxOnly] [NodeConformance] [Conformance]'
+    [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644.
     Volume is mounted into the container where container is run as a non-root user.
     The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents
@@ -2224,7 +2265,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0644, non-root user
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0644,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0644. Volume is mounted into the container where container
     is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type
@@ -2235,7 +2276,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0666
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0666,default)
-    [LinuxOnly] [NodeConformance] [Conformance]'
+    [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666.
     Volume is mounted into the container where container is run as a non-root user.
     The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents
@@ -2245,7 +2286,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0666,, non-root user
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0666,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0666. Volume is mounted into the container where container
     is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type
@@ -2256,7 +2297,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0777
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0777,default)
-    [LinuxOnly] [NodeConformance] [Conformance]'
+    [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.
     Volume is mounted into the container where container is run as a non-root user.
     The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents
@@ -2266,7 +2307,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0777, non-root user
   codename: '[sig-storage] EmptyDir volumes should support (non-root,0777,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0777. Volume is mounted into the container where container
     is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type
@@ -2277,7 +2318,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
   codename: '[sig-storage] EmptyDir volumes should support (root,0644,default) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644.
     The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents
     MUST be readable. This test is marked LinuxOnly since Windows does not support
@@ -2286,7 +2327,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0644
   codename: '[sig-storage] EmptyDir volumes should support (root,0644,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set
     to tmpfs and the contents MUST be readable. This test is marked LinuxOnly since
@@ -2296,7 +2337,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0666
   codename: '[sig-storage] EmptyDir volumes should support (root,0666,default) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666.
     The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents
     MUST be readable. This test is marked LinuxOnly since Windows does not support
@@ -2305,7 +2346,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0666
   codename: '[sig-storage] EmptyDir volumes should support (root,0666,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set
     to tmpfs and the contents MUST be readable. This test is marked LinuxOnly since
@@ -2315,7 +2356,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0777
   codename: '[sig-storage] EmptyDir volumes should support (root,0777,default) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.  The
     volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents
     MUST be readable. This test is marked LinuxOnly since Windows does not support
@@ -2324,7 +2365,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0777
   codename: '[sig-storage] EmptyDir volumes should support (root,0777,tmpfs) [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount
     type set to tmpfs and the contents MUST be readable. This test is marked LinuxOnly
@@ -2334,7 +2375,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium default, volume mode default
   codename: '[sig-storage] EmptyDir volumes volume on default medium should have the
-    correct mode [LinuxOnly] [NodeConformance] [Conformance]'
+    correct mode [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume, the volume MUST have mode
     set as -rwxrwxrwx and mount type set to tmpfs. This test is marked LinuxOnly since
     Windows does not support setting specific file permissions.
@@ -2342,7 +2383,7 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode default
   codename: '[sig-storage] EmptyDir volumes volume on tmpfs should have the correct
-    mode [LinuxOnly] [NodeConformance] [Conformance]'
+    mode [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the
     volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs. This test
     is marked LinuxOnly since Windows does not support setting specific file permissions,
@@ -2351,20 +2392,21 @@
   file: test/e2e/common/empty_dir.go
 - testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
   codename: '[sig-storage] EmptyDir wrapper volumes should not cause race condition
-    when used for configmaps [Serial] [Conformance]'
+    when used for configmaps [Serial] [Conformance] [Profile:Privileged]'
   description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes
     mounted. Pod MUST NOT fail waiting for Volumes.
   release: v1.13
   file: test/e2e/storage/empty_dir_wrapper.go
 - testname: EmptyDir Wrapper Volume, Secret and ConfigMap volumes, no conflict
-  codename: '[sig-storage] EmptyDir wrapper volumes should not conflict [Conformance]'
+  codename: '[sig-storage] EmptyDir wrapper volumes should not conflict [Conformance]
+    [Profile:Base]'
   description: Secret volume and ConfigMap volume is created with data. Pod MUST be
     able to start with Secret and ConfigMap volumes mounted into the container.
   release: v1.13
   file: test/e2e/storage/empty_dir_wrapper.go
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
-    up the projection API [Projection][NodeConformance] [Conformance]'
+    up the projection API [Projection][NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for secrets, configMap
     and downwardAPI with pod name, cpu and memory limits and cpu and memory requests.
     Pod MUST be able to read the secrets, configMap values and the cpu and memory
@@ -2373,7 +2415,7 @@
   file: test/e2e/common/projected_combined.go
 - testname: Projected Volume, ConfigMap, create, update and delete
   codename: '[sig-storage] Projected configMap optional updates should be reflected
-    in volume [NodeConformance] [Conformance]'
+    in volume [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with three containers with ConfigMaps namely a create,
     update and delete container. Create Container when started MUST not have configMap,
     update and delete containers MUST be created with a ConfigMap value as 'value-1'.
@@ -2385,7 +2427,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, volume mode default
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with default permission mode. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
@@ -2393,7 +2435,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, non-root user
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    as non-root [NodeConformance] [Conformance]'
+    as non-root [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap as non-root user with uid 1000. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
@@ -2401,7 +2443,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, volume mode 0400
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with defaultMode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with permission mode set to 0400. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -r--------. This
@@ -2411,7 +2453,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with mappings [NodeConformance] [Conformance]'
+    with mappings [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with default permission mode. The ConfigMap is also mapped to a custom
     path. Pod MUST be able to read the content of the ConfigMap from the custom location
@@ -2420,7 +2462,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped, volume mode 0400
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap with permission mode set to 0400. The ConfigMap is also mapped to
     a custom path. Pod MUST be able to read the content of the ConfigMap from the
@@ -2431,7 +2473,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped, non-root user
   codename: '[sig-storage] Projected configMap should be consumable from pods in volume
-    with mappings as non-root [NodeConformance] [Conformance]'
+    with mappings as non-root [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a
     custom path. Pod MUST be able to read the content of the ConfigMap from the custom
@@ -2440,7 +2482,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, multiple volume paths
   codename: '[sig-storage] Projected configMap should be consumable in multiple volumes
-    in the same pod [NodeConformance] [Conformance]'
+    in the same pod [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source 'ConfigMap' to store
     a configMap. The configMap is mapped to two different volume mounts. Pod MUST
     be able to read the content of the configMap successfully from the two volume
@@ -2449,7 +2491,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, ConfigMap, update
   codename: '[sig-storage] Projected configMap updates should be reflected in volume
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with projected volume source 'ConfigMap' to store
     a configMap and performs a create and update to new value. Pod MUST be able to
     create the configMap with value-1. Pod MUST be able to update the value in the
@@ -2458,7 +2500,7 @@
   file: test/e2e/common/projected_configmap.go
 - testname: Projected Volume, DownwardAPI, CPU limits
   codename: '[sig-storage] Projected downwardAPI should provide container''s cpu limit
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the cpu limits from the mounted DownwardAPIVolumeFiles.
@@ -2466,7 +2508,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, CPU request
   codename: '[sig-storage] Projected downwardAPI should provide container''s cpu request
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the cpu request from the mounted DownwardAPIVolumeFiles.
@@ -2474,7 +2516,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory limits
   codename: '[sig-storage] Projected downwardAPI should provide container''s memory
-    limit [NodeConformance] [Conformance]'
+    limit [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the memory limits from the mounted DownwardAPIVolumeFiles.
@@ -2482,7 +2524,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory request
   codename: '[sig-storage] Projected downwardAPI should provide container''s memory
-    request [NodeConformance] [Conformance]'
+    request [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the memory request from the mounted DownwardAPIVolumeFiles.
@@ -2490,7 +2532,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, CPU limit, node allocatable
   codename: '[sig-storage] Projected downwardAPI should provide node allocatable (cpu)
-    as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
+    as default cpu limit if the limit is not set [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory
     resources for requests and limits are NOT specified for the container. Pod MUST
@@ -2499,7 +2541,8 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory limit, node allocatable
   codename: '[sig-storage] Projected downwardAPI should provide node allocatable (memory)
-    as default memory limit if the limit is not set [NodeConformance] [Conformance]'
+    as default memory limit if the limit is not set [NodeConformance] [Conformance]
+    [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory
     resources for requests and limits are NOT specified for the container. Pod MUST
@@ -2508,7 +2551,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, pod name
   codename: '[sig-storage] Projected downwardAPI should provide podname only [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the pod name from the mounted DownwardAPIVolumeFiles.
@@ -2516,7 +2559,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, volume mode 0400
   codename: '[sig-storage] Projected downwardAPI should set DefaultMode on files [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. The default mode
     for the volume mount is set to 0400. Pod MUST be able to read the pod name from
@@ -2527,7 +2570,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, volume mode 0400
   codename: '[sig-storage] Projected downwardAPI should set mode on item file [LinuxOnly]
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests. The default mode
     for the volume mount is set to 0400. Pod MUST be able to read the pod name from
@@ -2538,7 +2581,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, update annotation
   codename: '[sig-storage] Projected downwardAPI should update annotations on modification
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests and annotation items.
     Pod MUST be able to read the annotations from the mounted DownwardAPIVolumeFiles.
@@ -2548,7 +2591,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, update labels
   codename: '[sig-storage] Projected downwardAPI should update labels on modification
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source for downwardAPI with
     pod name, cpu and memory limits and cpu and memory requests and label items. Pod
     MUST be able to read the labels from the mounted DownwardAPIVolumeFiles. Labels
@@ -2557,7 +2600,7 @@
   file: test/e2e/common/projected_downwardapi.go
 - testname: Projected Volume, Secrets, create, update delete
   codename: '[sig-storage] Projected secret optional updates should be reflected in
-    volume [NodeConformance] [Conformance]'
+    volume [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with three containers with secrets namely a create, update
     and delete container. Create Container when started MUST no have a secret, update
     and delete containers MUST be created with a secret value. Create a secret in
@@ -2569,7 +2612,7 @@
   file: test/e2e/common/projected_secret.go
 - testname: Projected Volume, Secrets, volume mode default
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with default permission mode. Pod MUST be able to
     read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
@@ -2577,7 +2620,8 @@
   file: test/e2e/common/projected_secret.go
 - testname: Project Volume, Secrets, non-root, custom fsGroup
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance]'
+    as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance]
+    [Profile:Base]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key. The volume has permission mode set to 0440, fsgroup
     set to 1001 and user set to non-root uid of 1000. Pod MUST be able to read the
@@ -2588,7 +2632,7 @@
   file: test/e2e/common/projected_secret.go
 - testname: Projected Volume, Secrets, volume mode 0400
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with defaultMode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with permission mode set to 0x400 on the Pod. Pod
     MUST be able to read the content of the key successfully and the mode MUST be
@@ -2598,7 +2642,7 @@
   file: test/e2e/common/projected_secret.go
 - testname: Projected Volume, Secrets, mapped
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    with mappings [NodeConformance] [Conformance]'
+    with mappings [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with default permission mode. The secret is also mapped
     to a custom path. Pod MUST be able to read the content of the key successfully
@@ -2607,7 +2651,7 @@
   file: test/e2e/common/projected_secret.go
 - testname: Projected Volume, Secrets, mapped, volume mode 0400
   codename: '[sig-storage] Projected secret should be consumable from pods in volume
-    with mappings and Item Mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    with mappings and Item Mode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key with permission mode set to 0400. The secret is also
     mapped to a specific name. Pod MUST be able to read the content of the key successfully
@@ -2617,7 +2661,7 @@
   file: test/e2e/common/projected_secret.go
 - testname: Projected Volume, Secrets, mapped, multiple paths
   codename: '[sig-storage] Projected secret should be consumable in multiple volumes
-    in a pod [NodeConformance] [Conformance]'
+    in a pod [NodeConformance] [Conformance] [Profile:Base]'
   description: A Pod is created with a projected volume source 'secret' to store a
     secret with a specified key. The secret is mapped to two different volume mounts.
     Pod MUST be able to read the content of the key successfully from the two volume
@@ -2626,7 +2670,7 @@
   file: test/e2e/common/projected_secret.go
 - testname: Secrets Volume, create, update and delete
   codename: '[sig-storage] Secrets optional updates should be reflected in volume
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a Pod with three containers with secrets volume sources namely
     a create, update and delete container. Create Container when started MUST not
     have secret, update and delete containers MUST be created with a secret value.
@@ -2640,7 +2684,7 @@
     namespace
   codename: '[sig-storage] Secrets should be able to mount in a volume regardless
     of a different secret existing with same name in different namespace [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a secret with same name in two namespaces. Create a Pod with
     secret volume source configured into the container. Pod MUST be able to read the
     secrets from the mounted volume from the container runtime and only secrets which
@@ -2650,7 +2694,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: Secrets Volume, default
   codename: '[sig-storage] Secrets should be consumable from pods in volume [NodeConformance]
-    [Conformance]'
+    [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container. Pod MUST be able to read the secret from the mounted volume
     from the container runtime and the file mode of the secret MUST be -rw-r--r--
@@ -2659,7 +2703,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: Secrets Volume, volume mode 0440, fsGroup 1001 and uid 1000
   codename: '[sig-storage] Secrets should be consumable from pods in volume as non-root
-    with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance]'
+    with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with file mode set to 0x440 as a non-root user with uid 1000
     and fsGroup id 1001. Pod MUST be able to read the secret from the mounted volume
@@ -2670,7 +2714,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: Secrets Volume, volume mode 0400
   codename: '[sig-storage] Secrets should be consumable from pods in volume with defaultMode
-    set [LinuxOnly] [NodeConformance] [Conformance]'
+    set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with file mode set to 0x400. Pod MUST be able to read the secret
     from the mounted volume from the container runtime and the file mode of the secret
@@ -2680,7 +2724,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: Secrets Volume, mapping
   codename: '[sig-storage] Secrets should be consumable from pods in volume with mappings
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with a custom path. Pod MUST be able to read the secret from
     the mounted volume from the specified custom path. The file mode of the secret
@@ -2689,7 +2733,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: Secrets Volume, mapping, volume mode 0400
   codename: '[sig-storage] Secrets should be consumable from pods in volume with mappings
-    and Item Mode set [LinuxOnly] [NodeConformance] [Conformance]'
+    and Item Mode set [LinuxOnly] [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with secret volume source configured
     into the container with a custom path and file mode set to 0x400. Pod MUST be
     able to read the secret from the mounted volume from the specified custom path.
@@ -2699,7 +2743,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: Secrets Volume, mapping multiple volume paths
   codename: '[sig-storage] Secrets should be consumable in multiple volumes in a pod
-    [NodeConformance] [Conformance]'
+    [NodeConformance] [Conformance] [Profile:Base]'
   description: Create a secret. Create a Pod with two secret volume sources configured
     into the container in to two different custom paths. Pod MUST be able to read
     the secret from the both the mounted volumes from the two specified custom paths.
@@ -2707,7 +2751,7 @@
   file: test/e2e/common/secrets_volume.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod [LinuxOnly] [Conformance]'
+    configmap pod [LinuxOnly] [Conformance] [Profile:Base]'
   description: Containers in a pod can read content from a configmap mounted volume
     which was configured with a subpath. This test is marked LinuxOnly since Windows
     cannot mount individual files in Containers.
@@ -2715,7 +2759,7 @@
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod with mountPath of existing file [LinuxOnly] [Conformance]'
+    configmap pod with mountPath of existing file [LinuxOnly] [Conformance] [Profile:Base]'
   description: Containers in a pod can read content from a configmap mounted volume
     which was configured with a subpath and also using a mountpath that is a specific
     file. This test is marked LinuxOnly since Windows cannot mount individual files
@@ -2724,7 +2768,7 @@
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a downwardAPI volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    downward pod [LinuxOnly] [Conformance]'
+    downward pod [LinuxOnly] [Conformance] [Profile:Base]'
   description: Containers in a pod can read content from a downwardAPI mounted volume
     which was configured with a subpath. This test is marked LinuxOnly since Windows
     cannot mount individual files in Containers.
@@ -2732,7 +2776,7 @@
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a projected volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    projected pod [LinuxOnly] [Conformance]'
+    projected pod [LinuxOnly] [Conformance] [Profile:Base]'
   description: Containers in a pod can read content from a projected mounted volume
     which was configured with a subpath. This test is marked LinuxOnly since Windows
     cannot mount individual files in Containers.
@@ -2740,7 +2784,7 @@
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a secret volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    secret pod [LinuxOnly] [Conformance]'
+    secret pod [LinuxOnly] [Conformance] [Profile:Base]'
   description: Containers in a pod can read content from a secret mounted volume which
     was configured with a subpath. This test is marked LinuxOnly since Windows cannot
     mount individual files in Containers.

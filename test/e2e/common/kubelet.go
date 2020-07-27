@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Testname: Kubelet, log output, default
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
-		framework.ConformanceIt("should print the output to logs [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should print the output to logs [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Testname: Kubelet, failed pod, terminated reason
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
-		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should have an terminated reason [NodeConformance]", func() {
 			gomega.Eventually(func() error {
 				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {
@@ -129,7 +129,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Testname: Kubelet, failed pod, delete
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
-		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should be possible to delete [NodeConformance]", func() {
 			err := podClient.Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
 			Kubernetes mounts the /etc/hosts file into its containers, however, mounting individual files is not supported on Windows Containers. For this reason, this test is marked LinuxOnly.
 		*/
-		framework.ConformanceIt("should write entries to /etc/hosts [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should write entries to /etc/hosts [LinuxOnly] [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 			This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		framework.ConformanceIt("should not write to root filesystem [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should not write to root filesystem [LinuxOnly] [NodeConformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

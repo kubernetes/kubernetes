@@ -183,7 +183,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		The certificatesigningrequests/approval resource must support get, update, patch.
 		The certificatesigningrequests/status resource must support get, update, patch.
 	*/
-	framework.ConformanceIt("should support CSR API operations", func() {
+	framework.ConformanceIt("Privileged", "should support CSR API operations", func() {
 
 		// Setup
 		csrVersion := "v1"

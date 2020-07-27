@@ -169,7 +169,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Behaviors:
 			- pod/spec/container/resources
 		*/
-		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
+		framework.ConformanceIt("Base", "should be set on Pods with matching resource requests and limits for memory and cpu", func() {
 			ginkgo.By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{

@@ -62,7 +62,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		Testname: EmptyDir Wrapper Volume, Secret and ConfigMap volumes, no conflict
 		Description: Secret volume and ConfigMap volume is created with data. Pod MUST be able to start with Secret and ConfigMap volumes mounted into the container.
 	*/
-	framework.ConformanceIt("should not conflict", func() {
+	framework.ConformanceIt("Base", "should not conflict", func() {
 		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -184,7 +184,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		Testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
 		Description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
 	*/
-	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial]", func() {
+	framework.ConformanceIt("Privileged", "should not cause race condition when used for configmaps [Serial]", func() {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)

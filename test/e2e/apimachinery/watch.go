@@ -51,7 +51,7 @@ var _ = SIGDescribe("Watchers", func() {
 			update, and delete notifications on configmaps that match a label selector and do
 			not receive notifications for configmaps which do not match that label selector.
 	*/
-	framework.ConformanceIt("should observe add, update, and delete watch notifications on configmaps", func() {
+	framework.ConformanceIt("Base", "should observe add, update, and delete watch notifications on configmaps", func() {
 		c := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -136,7 +136,7 @@ var _ = SIGDescribe("Watchers", func() {
 		    Description: Ensure that a watch can be opened from a particular resource version
 			in the past and only notifications happening after that resource version are observed.
 	*/
-	framework.ConformanceIt("should be able to start watching from a specific resource version", func() {
+	framework.ConformanceIt("Base", "should be able to start watching from a specific resource version", func() {
 		c := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -184,7 +184,7 @@ var _ = SIGDescribe("Watchers", func() {
 			observed by the previous watch, and it will continue delivering notifications from
 			that point in time.
 	*/
-	framework.ConformanceIt("should be able to restart watching from the last resource version observed by the previous watch", func() {
+	framework.ConformanceIt("Base", "should be able to restart watching from the last resource version observed by the previous watch", func() {
 		c := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -249,7 +249,7 @@ var _ = SIGDescribe("Watchers", func() {
 			a watch's selector, the watch will observe a delete, and will not observe
 			notifications for that object until it meets the selector's requirements again.
 	*/
-	framework.ConformanceIt("should observe an object deletion if it stops meeting the requirements of the selector", func() {
+	framework.ConformanceIt("Base", "should observe an object deletion if it stops meeting the requirements of the selector", func() {
 		c := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -326,7 +326,7 @@ var _ = SIGDescribe("Watchers", func() {
 	   for events received from the first watch, initiated at the resource version of the event, and checking that all
 	   resource versions of all events match. Events are produced from writes on a background goroutine.
 	*/
-	framework.ConformanceIt("should receive events on concurrent watches in same order", func() {
+	framework.ConformanceIt("Base", "should receive events on concurrent watches in same order", func() {
 		c := f.ClientSet
 		ns := f.Namespace.Name
 

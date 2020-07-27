@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		Testname: ConfigMap, from environment field
 		Description: Create a Pod with an environment variable value set using a value from ConfigMap. A ConfigMap value MUST be accessible in the container environment.
 	*/
-	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable via environment variable [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		Testname: ConfigMap, from environment variables
 		Description: Create a Pod with a environment source from ConfigMap. All ConfigMap values MUST be available as environment variables in the container.
 	*/
-	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable via the environment [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newEnvFromConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	   Testname: ConfigMap, with empty-key
 	   Description: Attempt to create a ConfigMap with an empty key. The creation MUST fail.
 	*/
-	framework.ConformanceIt("should fail to create ConfigMap with empty key", func() {
+	framework.ConformanceIt("Base", "should fail to create ConfigMap with empty key", func() {
 		configMap, err := newConfigMapWithEmptyKey(f)
 		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
@@ -163,7 +163,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
 	   By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
 	*/
-	framework.ConformanceIt("should run through a ConfigMap lifecycle", func() {
+	framework.ConformanceIt("Base", "should run through a ConfigMap lifecycle", func() {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
 

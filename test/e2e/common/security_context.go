@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(65534)
 		})
 
@@ -219,7 +219,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			Description: Container is configured to run with readOnlyRootFilesystem to false.
 			Write operation MUST be allowed and Pod MUST be in Succeeded state.
 		*/
-		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
 			createAndWaitUserPod(false)
 		})
 	})
@@ -261,7 +261,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			Description: Create a container to run in unprivileged mode by setting pod's SecurityContext Privileged option as false. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since it runs a Linux-specific command.
 		*/
-		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
 			podName := createAndWaitUserPod(false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -342,7 +342,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			When the container is run, container's output MUST match with expected output verifying container ran with given uid i.e. uid=1000.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("Base", "should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, fmt.Sprintf("Effective uid: %d", nonRootTestUserID), &apeFalse, nonRootTestUserID); err != nil {

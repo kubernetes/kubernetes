@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		Testname: Secrets, pod environment field
 		Description: Create a secret. Create a Pod with Container that declares a environment variable which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
-	framework.ConformanceIt("should be consumable from pods in env vars [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in env vars [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		Testname: Secrets, pod environment from source
 		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
-	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable via the environment [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	   Testname: Secrets, with empty-key
 	   Description: Attempt to create a Secret with an empty key. The creation MUST fail.
 	*/
-	framework.ConformanceIt("should fail to create secret due to empty secret key", func() {
+	framework.ConformanceIt("Base", "should fail to create secret due to empty secret key", func() {
 		secret, err := createEmptyKeySecretForTest(f)
 		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
@@ -148,7 +148,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		           The Secret is deleted by it's static Label.
 		           Secrets are listed finally, the list MUST NOT include the originally created Secret.
 	*/
-	framework.ConformanceIt("should patch a secret", func() {
+	framework.ConformanceIt("Base", "should patch a secret", func() {
 		ginkgo.By("creating a secret")
 
 		secretTestName := "test-secret-" + string(uuid.NewUUID())

@@ -593,8 +593,8 @@ func KubeDescribe(text string, body func()) bool {
 }
 
 // ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
-func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
-	return ginkgo.It(text+" [Conformance]", body, timeout...)
+func ConformanceIt(profile, text string, body interface{}, timeout ...float64) bool {
+	return ginkgo.It(text+" [Conformance] [Profile:" + profile +"]", body, timeout...)
 }
 
 // PodStateVerification represents a verification of pod state.

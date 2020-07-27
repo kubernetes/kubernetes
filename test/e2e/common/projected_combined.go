@@ -38,7 +38,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 	   Testname: Projected Volume, multiple projections
 	   Description: A Pod is created with a projected volume source for secrets, configMap and downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the secrets, configMap values and the cpu and memory limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should project all components that make up the projection API [Projection][NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should project all components that make up the projection API [Projection][NodeConformance]", func() {
 		var err error
 		podName := "projected-volume-" + string(uuid.NewUUID())
 		secretName := "secret-projected-all-test-volume-" + string(uuid.NewUUID())

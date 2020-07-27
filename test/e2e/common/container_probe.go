@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod readiness probe, with initial delay
 		Description: Create a Pod that is configured with a initial delay set on the readiness probe. Check the Pod Start time to compare to the initial delay. The Pod MUST be ready only after the specified initial delay.
 	*/
-	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
 		containerName := "test-webserver"
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
 		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Description: Create a Pod with a readiness probe that fails consistently. When this Pod is created,
 			then the Pod MUST never be ready, never be running and restart count MUST be zero.
 	*/
-	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
 		p := podClient.Create(testWebServerPodSpec(probe.withFailing().build(), nil, "test-webserver", 80))
 		gomega.Consistently(func() (bool, error) {
 			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
@@ -119,7 +119,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using local file, restart
 		Description: Create a Pod with liveness probe that uses ExecAction handler to cat /temp/health file. The Container deletes the file /temp/health after 10 second, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	framework.ConformanceIt("should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"}
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"cat", "/tmp/health"}),
@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using local file, no restart
 		Description:  Pod is created with liveness probe that uses 'exec' command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"}
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"cat", "/tmp/health"}),
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using http endpoint, restart
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	framework.ConformanceIt("should be restarted with a /healthz http liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be restarted with a /healthz http liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             httpGetHandler("/healthz", 8080),
 			InitialDelaySeconds: 15,
@@ -166,7 +166,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using tcp socket, no restart
 		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but the socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             tcpSocketHandler(8080),
 			InitialDelaySeconds: 15,
@@ -181,7 +181,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment everytime health check fails, measure upto 5 restart.
 	*/
-	framework.ConformanceIt("should have monotonically increasing restart count [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should have monotonically increasing restart count [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             httpGetHandler("/healthz", 8080),
 			InitialDelaySeconds: 5,
@@ -196,7 +196,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using http endpoint, failure
 		Description: A Pod is created with liveness probe on http endpoint '/'. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             httpGetHandler("/", 80),
 			InitialDelaySeconds: 15,

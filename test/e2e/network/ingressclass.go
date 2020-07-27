@@ -157,7 +157,7 @@ var _ = SIGDescribe("IngressClass API", func() {
 		- The ingressclasses resource MUST exist in the /apis/networking.k8s.io/v1 discovery document.
 		- The ingressclass resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt(" should support creating IngressClass API operations", func() {
+	framework.ConformanceIt("Base", " should support creating IngressClass API operations", func() {
 
 		// Setup
 		icClient := f.ClientSet.NetworkingV1().IngressClasses()

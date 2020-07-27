@@ -117,7 +117,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		resources is found, the scheduler MUST preempt a lower priority pod and
 		schedule the high priority pod.
 	*/
-	framework.ConformanceIt("validates basic preemption works", func() {
+	framework.ConformanceIt("Privileged", "validates basic preemption works", func() {
 		var podRes v1.ResourceList
 
 		// Create one pod per node that uses a lot of the node's resources.
@@ -205,7 +205,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		resources is found, the scheduler MUST preempt a lower priority pod to
 		schedule the critical pod.
 	*/
-	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func() {
+	framework.ConformanceIt("Privileged", "validates lower priority pod preemption by critical pod", func() {
 		var podRes v1.ResourceList
 
 		ginkgo.By("Create pods that use 2/3 of node resources.")
@@ -530,7 +530,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Testname: Pod preemption verification
 			Description: Four levels of Pods in ReplicaSets with different levels of Priority, restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected number of Replicas.
 		*/
-		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func() {
+		framework.ConformanceIt("Privileged", "runs ReplicaSets to verify preemption running path", func() {
 			podNamesSeen := []int32{0, 0, 0}
 			stopCh := make(chan struct{})
 

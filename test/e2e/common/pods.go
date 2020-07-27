@@ -187,7 +187,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Testname: Pods, assigned hostip
 		Description: Create a Pod. Pod status MUST return successfully and contains a valid IP address.
 	*/
-	framework.ConformanceIt("should get a host IP [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should get a host IP [NodeConformance]", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(podClient, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -209,7 +209,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Testname: Pods, lifecycle
 		Description: A Pod is created with a unique label. Pod MUST be accessible when queried using the label selector upon creation. Add a watch, check if the Pod is running. Pod then deleted, The pod deletion timestamp is observed. The watch MUST return the pod deleted event. Query with the original selector for the Pod MUST return empty list.
 	*/
-	framework.ConformanceIt("should be submitted and removed [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be submitted and removed [NodeConformance]", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -343,7 +343,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		- pod/spec/label/create
 		- pod/spec/label/patch
 	*/
-	framework.ConformanceIt("should be updated [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be updated [NodeConformance]", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -397,7 +397,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Testname: Pods, ActiveDeadlineSeconds
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds set on the Pod spec. Pod MUST terminate of the specified time elapses.
 	*/
-	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should allow activeDeadlineSeconds to be updated [NodeConformance]", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -443,7 +443,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Testname: Pods, service environment variables
 		Description: Create a server Pod listening on port 9376. A Service called fooservice is created for the server Pod listening on port 8765 targeting port 8080. If a new Pod is created in the cluster then the Pod MUST have the fooservice environment variables available from this new Pod. The new create Pod MUST have environment variables such as FOOSERVICE_SERVICE_HOST, FOOSERVICE_SERVICE_PORT, FOOSERVICE_PORT, FOOSERVICE_PORT_8765_TCP_PORT, FOOSERVICE_PORT_8765_TCP_PROTO, FOOSERVICE_PORT_8765_TCP and FOOSERVICE_PORT_8765_TCP_ADDR that are populated with proper values.
 	*/
-	framework.ConformanceIt("should contain environment variables for services [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should contain environment variables for services [NodeConformance]", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
 		serverName := "server-envvars-" + string(uuid.NewUUID())
@@ -535,7 +535,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Description: A Pod is created. Websocket is created to retrieve exec command output from this pod.
 		Message retrieved form Websocket MUST match with expected exec command output.
 	*/
-	framework.ConformanceIt("should support remote command execution over websockets [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support remote command execution over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "unable to get base config")
 
@@ -617,7 +617,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Description: A Pod is created. Websocket is created to retrieve log of a container from this pod.
 		Message retrieved form Websocket MUST match with container's output.
 	*/
-	framework.ConformanceIt("should support retrieving logs from the container over websockets [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support retrieving logs from the container over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "unable to get base config")
 

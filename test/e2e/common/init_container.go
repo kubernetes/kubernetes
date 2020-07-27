@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		and the system is not going to restart any of these containers
 		when Pod has restart policy as RestartNever.
 	*/
-	framework.ConformanceIt("should invoke init containers on a RestartNever pod", func() {
+	framework.ConformanceIt("Base", "should invoke init containers on a RestartNever pod", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -247,7 +247,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		and at least one container is still running or is in the process of being restarted
 		when Pod has restart policy as RestartAlways.
 	*/
-	framework.ConformanceIt("should invoke init containers on a RestartAlways pod", func() {
+	framework.ConformanceIt("Base", "should invoke init containers on a RestartAlways pod", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -324,7 +324,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		and Pod has restarted for few occurrences
 		and pod has restart policy as RestartAlways.
 	*/
-	framework.ConformanceIt("should not start app containers if init containers fail on a RestartAlways pod", func() {
+	framework.ConformanceIt("Base", "should not start app containers if init containers fail on a RestartAlways pod", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -448,7 +448,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		Description: Ensure that app container is not started
 		when at least one InitContainer fails to start and Pod has restart policy as RestartNever.
 	*/
-	framework.ConformanceIt("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
+	framework.ConformanceIt("Base", "should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
 		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())

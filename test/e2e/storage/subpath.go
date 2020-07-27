@@ -56,7 +56,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a secret mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
-		framework.ConformanceIt("should support subpaths with secret pod [LinuxOnly]", func() {
+		framework.ConformanceIt("Base", "should support subpaths with secret pod [LinuxOnly]", func() {
 			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "secret-value", pod)
@@ -68,7 +68,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
-		framework.ConformanceIt("should support subpaths with configmap pod [LinuxOnly]", func() {
+		framework.ConformanceIt("Base", "should support subpaths with configmap pod [LinuxOnly]", func() {
 			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath and also using a mountpath that is a specific file.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
-		framework.ConformanceIt("should support subpaths with configmap pod with mountPath of existing file [LinuxOnly]", func() {
+		framework.ConformanceIt("Base", "should support subpaths with configmap pod with mountPath of existing file [LinuxOnly]", func() {
 			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
@@ -94,7 +94,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a downwardAPI mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
-		framework.ConformanceIt("should support subpaths with downward pod [LinuxOnly]", func() {
+		framework.ConformanceIt("Base", "should support subpaths with downward pod [LinuxOnly]", func() {
 			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
@@ -110,7 +110,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  Description: Containers in a pod can read content from a projected mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
-		framework.ConformanceIt("should support subpaths with projected pod [LinuxOnly]", func() {
+		framework.ConformanceIt("Base", "should support subpaths with projected pod [LinuxOnly]", func() {
 			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "projected/configmap-key", "projected", &v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{

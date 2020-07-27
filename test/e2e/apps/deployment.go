@@ -86,14 +86,14 @@ var _ = SIGDescribe("Deployment", func() {
 	  Testname: Deployment RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with RollingUpdate strategy.
 	*/
-	framework.ConformanceIt("RollingUpdateDeployment should delete old pods and create new ones", func() {
+	framework.ConformanceIt("Base", "RollingUpdateDeployment should delete old pods and create new ones", func() {
 		testRollingUpdateDeployment(f)
 	})
 	/*
 	  Testname: Deployment Recreate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with Recreate strategy.
 	*/
-	framework.ConformanceIt("RecreateDeployment should delete old pods and create new ones", func() {
+	framework.ConformanceIt("Base", "RecreateDeployment should delete old pods and create new ones", func() {
 		testRecreateDeployment(f)
 	})
 	/*
@@ -101,7 +101,7 @@ var _ = SIGDescribe("Deployment", func() {
 	  Description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets based on
 	  the Deployment's `.spec.revisionHistoryLimit`.
 	*/
-	framework.ConformanceIt("deployment should delete old replica sets", func() {
+	framework.ConformanceIt("Base", "deployment should delete old replica sets", func() {
 		testDeploymentCleanUpPolicy(f)
 	})
 	/*
@@ -110,7 +110,7 @@ var _ = SIGDescribe("Deployment", func() {
 	    i.e. allow arbitrary number of changes to desired state during rolling update
 	    before the rollout finishes.
 	*/
-	framework.ConformanceIt("deployment should support rollover", func() {
+	framework.ConformanceIt("Base", "deployment should support rollover", func() {
 		testRolloverDeployment(f)
 	})
 	ginkgo.It("iterative rollouts should eventually progress", func() {
@@ -125,7 +125,7 @@ var _ = SIGDescribe("Deployment", func() {
 	    proportional scaling, i.e. proportionally scale a Deployment's ReplicaSets
 	    when a Deployment is scaled.
 	*/
-	framework.ConformanceIt("deployment should support proportional scaling", func() {
+	framework.ConformanceIt("Base", "deployment should support proportional scaling", func() {
 		testProportionalScalingDeployment(f)
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {

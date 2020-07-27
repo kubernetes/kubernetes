@@ -150,7 +150,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
 	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
 	*/
-	framework.ConformanceIt("should run and stop simple daemon", func() {
+	framework.ConformanceIt("Base", "should run and stop simple daemon", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 	  selectors.
 	*/
-	framework.ConformanceIt("should run and stop complex daemon", func() {
+	framework.ConformanceIt("Privileged", "should run and stop complex daemon", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon %q with a node selector", dsName)
@@ -276,7 +276,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-FailedPodCreation
 	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 	*/
-	framework.ConformanceIt("should retry creating failed daemon pods", func() {
+	framework.ConformanceIt("Base", "should retry creating failed daemon pods", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		ginkgo.By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
@@ -355,7 +355,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
 	*/
-	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func() {
+	framework.ConformanceIt("Base", "should update pod when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
@@ -412,7 +412,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
 	  rollback of updates to a DaemonSet.
 	*/
-	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
+	framework.ConformanceIt("Base", "should rollback without unnecessary restarts", func() {
 		schedulableNodes, err := e2enode.GetReadySchedulableNodes(c)
 		framework.ExpectNoError(err)
 		gomega.Expect(len(schedulableNodes.Items)).To(gomega.BeNumerically(">", 1), "Conformance test suite needs a cluster with at least 2 nodes.")

@@ -954,7 +954,7 @@ var _ = SIGDescribe("Ingress API", func() {
 		The ingresses/status resource must support update and patch
 	*/
 
-	framework.ConformanceIt("should support creating Ingress API operations", func() {
+	framework.ConformanceIt("Base", "should support creating Ingress API operations", func() {
 		// Setup
 		ns := f.Namespace.Name
 		ingVersion := "v1"

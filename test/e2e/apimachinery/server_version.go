@@ -33,7 +33,7 @@ var _ = SIGDescribe("server version", func() {
 	   Description: Ensure that an API server version can be retrieved.
 	   Both the major and minor versions MUST only be an integer.
 	*/
-	framework.ConformanceIt("should find the server version", func() {
+	framework.ConformanceIt("Base", "should find the server version", func() {
 
 		ginkgo.By("Request ServerVersion")
 

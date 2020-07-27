@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Testname: Secrets Volume, default
 		Description: Create a secret. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -rw-r--r-- by default.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume [NodeConformance]", func() {
 		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container with file mode set to 0x400. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -r-------- by default.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
@@ -62,7 +62,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container with file mode set to 0x440 as a non-root user with uid 1000 and fsGroup id 1001. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -r--r-----by default.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Testname: Secrets Volume, mapping
 		Description: Create a secret. Create a Pod with secret volume source configured into the container with a custom path. Pod MUST be able to read the secret from the mounted volume from the specified custom path. The file mode of the secret MUST be -rw-r--r-- by default.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doSecretE2EWithMapping(f, nil)
 	})
 
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container with a custom path and file mode set to 0x400. Pod MUST be able to read the secret from the mounted volume from the specified custom path. The file mode of the secret MUST be -r--r--r--.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doSecretE2EWithMapping(f, &mode)
 	})
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Testname: Secrets Volume, volume mode default, secret with same name in different namespace
 		Description: Create a secret with same name in two namespaces. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secrets from the mounted volume from the container runtime and only secrets which are associated with namespace where pod is created. The file mode of the secret MUST be -rw-r--r-- by default.
 	*/
-	framework.ConformanceIt("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
 		var (
 			namespace2  *v1.Namespace
 			err         error
@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Testname: Secrets Volume, mapping multiple volume paths
 		Description: Create a secret. Create a Pod with two secret volume sources configured into the container in to two different custom paths. Pod MUST be able to read the secret from the both the mounted volumes from the two specified custom paths.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in a pod [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable in multiple volumes in a pod [NodeConformance]", func() {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.
@@ -199,7 +199,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Testname: Secrets Volume, create, update and delete
 		Description: Create a Pod with three containers with secrets volume sources namely a create, update and delete container. Create Container when started MUST not have secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true

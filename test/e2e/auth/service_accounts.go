@@ -172,7 +172,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	                Token Mount path. All these three files MUST exist and the Service
 	                Account mount path MUST be auto mounted to the Container.
 	*/
-	framework.ConformanceIt("should mount an API token into pods ", func() {
+	framework.ConformanceIt("Base", "should mount an API token into pods ", func() {
 		var rootCAContent string
 
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}}, metav1.CreateOptions{})
@@ -278,7 +278,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   include test cases 1a,1b,2a,2b and 2c.
 	   In the test cases 1c,3a,3b and 3c the ServiceTokenVolume MUST not be auto mounted.
 	*/
-	framework.ConformanceIt("should allow opting out of API token automount ", func() {
+	framework.ConformanceIt("Base", "should allow opting out of API token automount ", func() {
 
 		var err error
 		trueValue := true
@@ -753,7 +753,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		                        Listing the ServiceAccounts MUST return the test ServiceAccount with it's patched values.
 		                        ServiceAccount will be deleted and MUST find a deleted watch event.
 	*/
-	framework.ConformanceIt("should run through the lifecycle of a ServiceAccount", func() {
+	framework.ConformanceIt("Base", "should run through the lifecycle of a ServiceAccount", func() {
 		testNamespaceName := f.Namespace.Name
 		testServiceAccountName := "testserviceaccount"
 		testServiceAccountStaticLabels := map[string]string{"test-serviceaccount-static": "true"}

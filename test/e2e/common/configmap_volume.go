@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, without mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume [NodeConformance]", func() {
 		doConfigMapE2EWithoutMappings(f, false, 0, nil)
 	})
 
@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume as non-root [NodeConformance]", func() {
 		doConfigMapE2EWithoutMappings(f, true, 0, nil)
 	})
 
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, with mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doConfigMapE2EWithMappings(f, false, 0, nil)
 	})
 
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, false, 0, &mode)
 	})
@@ -103,7 +103,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
 		doConfigMapE2EWithMappings(f, true, 0, nil)
 	})
 
@@ -118,7 +118,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, update
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the ConfigMap is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod.
 	*/
-	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, text data, binary data
 		Description: The ConfigMap that is created with text data and binary data MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. ConfigMap's text data and binary data MUST be verified by reading the content from the mounted files in the Pod.
 	*/
-	framework.ConformanceIt("binary data should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "binary data should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -297,7 +297,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, create, update and delete
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -480,7 +480,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Testname: ConfigMap Volume, multiple volume maps
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to multiple paths in the Pod. The content MUST be accessible from all the mapped volume mounts.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in the same pod [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should be consumable in multiple volumes in the same pod [NodeConformance]", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"

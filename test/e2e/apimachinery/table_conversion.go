@@ -151,7 +151,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				Description: Issue a HTTP request to the API.
 		        HTTP request MUST return a HTTP status code of 406.
 	*/
-	framework.ConformanceIt("should return a 406 for a backend which does not implement metadata", func() {
+	framework.ConformanceIt("Base", "should return a 406 for a backend which does not implement metadata", func() {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}

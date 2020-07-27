@@ -318,7 +318,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Testname: Kubectl, replication controller
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2.
 		*/
-		framework.ConformanceIt("should create and stop a replication controller ", func() {
+		framework.ConformanceIt("Base", "should create and stop a replication controller ", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
@@ -331,7 +331,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Testname: Kubectl, scale replication controller
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Update the replicaset to 1. Number of running instances of the Pod MUST be 1. Update the replicaset to 2. Number of running instances of the Pod MUST be 2.
 		*/
-		framework.ConformanceIt("should scale a replication controller ", func() {
+		framework.ConformanceIt("Base", "should scale a replication controller ", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
@@ -373,7 +373,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Testname: Kubectl, guestbook application
 			Description: Create Guestbook application that contains an agnhost primary server, 2 agnhost replicas, frontend application, frontend service and agnhost primary service and agnhost replica service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
-		framework.ConformanceIt("should create and stop a working application ", func() {
+		framework.ConformanceIt("Base", "should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
 				cleanupKubectlInputs(contents, ns)
 			})
@@ -781,7 +781,7 @@ metadata:
 			Testname: Kubectl, check version v1
 			Description: Run kubectl to get api versions, output MUST contain returned versions with 'v1' listed.
 		*/
-		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
+		framework.ConformanceIt("Base", "should check if v1 is in available api versions ", func() {
 			ginkgo.By("validating api versions")
 			output := framework.RunKubectlOrDie(ns, "api-versions")
 			if !strings.Contains(output, "v1") {
@@ -891,7 +891,7 @@ metadata:
 			Testname: Kubectl, diff Deployment
 			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
 		*/
-		framework.ConformanceIt("should check if kubectl diff finds a difference for Deployments", func() {
+		framework.ConformanceIt("Base", "should check if kubectl diff finds a difference for Deployments", func() {
 			ginkgo.By("create deployment with httpd image")
 			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
 			framework.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
@@ -922,7 +922,7 @@ metadata:
 			Testname: Kubectl, server-side dry-run Pod
 			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl replace --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
-		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func() {
+		framework.ConformanceIt("Base", "should check if kubectl can dry-run update Pods", func() {
 			ginkgo.By("running the image " + httpdImage)
 			podName := "e2e-test-httpd-pod"
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -1082,7 +1082,7 @@ metadata:
 			Testname: Kubectl, cluster info
 			Description: Call kubectl to get cluster-info, output MUST contain cluster-info returned and Kubernetes Master SHOULD be running.
 		*/
-		framework.ConformanceIt("should check if Kubernetes master services is included in cluster-info ", func() {
+		framework.ConformanceIt("Base", "should check if Kubernetes master services is included in cluster-info ", func() {
 			ginkgo.By("validating cluster-info")
 			output := framework.RunKubectlOrDie(ns, "cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
@@ -1108,7 +1108,7 @@ metadata:
 			Testname: Kubectl, describe pod or rc
 			Description: Deploy an agnhost controller and an agnhost service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
-		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
+		framework.ConformanceIt("Base", "should check if kubectl describe prints relevant information for rc and pods ", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 
@@ -1249,7 +1249,7 @@ metadata:
 			Testname: Kubectl, create service, replication controller
 			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost primary replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost primary is listening. Using kubectl expose the agnhost primary as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost primary is listening.
 		*/
-		framework.ConformanceIt("should create services for rc ", func() {
+		framework.ConformanceIt("Base", "should create services for rc ", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
@@ -1346,7 +1346,7 @@ metadata:
 			Testname: Kubectl, label update
 			Description: When a Pod is running, update a Label using 'kubectl label' command. The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the container MUST verify that the label can be read back. Use 'kubectl label label-' to remove the label. 'kubectl get pod' with -l option SHOULD not list the deleted label as the label is removed.
 		*/
-		framework.ConformanceIt("should update the label on a resource ", func() {
+		framework.ConformanceIt("Base", "should update the label on a resource ", func() {
 			labelName := "testing-label"
 			labelValue := "testing-label-value"
 
@@ -1433,7 +1433,7 @@ metadata:
 				'kubectl --since=1s' should output logs that are only 1 second older from now
 				'kubectl --since=24h' should output logs that are only 1 day older from now
 		*/
-		framework.ConformanceIt("should be able to retrieve and filter logs ", func() {
+		framework.ConformanceIt("Base", "should be able to retrieve and filter logs ", func() {
 			// Split("something\n", "\n") returns ["something", ""], so
 			// strip trailing newline first
 			lines := func(out string) []string {
@@ -1493,7 +1493,7 @@ metadata:
 			Testname: Kubectl, patch to annotate
 			Description: Start running agnhost and a replication controller. When the pod is running, using 'kubectl patch' command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
-		framework.ConformanceIt("should add annotations for pods in rc ", func() {
+		framework.ConformanceIt("Base", "should add annotations for pods in rc ", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			ginkgo.By("creating Agnhost RC")
@@ -1527,7 +1527,7 @@ metadata:
 			Testname: Kubectl, version
 			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
-		framework.ConformanceIt("should check is all data is printed ", func() {
+		framework.ConformanceIt("Base", "should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie(ns, "version")
 			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
 			for _, item := range requiredItems {
@@ -1556,7 +1556,7 @@ metadata:
 			Testname: Kubectl, run pod
 			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
-		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
+		framework.ConformanceIt("Base", "should create a pod from an image when restart is Never ", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie(ns, "run", podName, "--restart=Never", "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the pod " + podName + " was created")
@@ -1592,7 +1592,7 @@ metadata:
 			Testname: Kubectl, replace
 			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
-		framework.ConformanceIt("should update a single-container pod's image ", func() {
+		framework.ConformanceIt("Base", "should update a single-container pod's image ", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, "--labels=run="+podName, nsFlag)
 
@@ -1632,7 +1632,7 @@ metadata:
 			Testname: Kubectl, proxy port zero
 			Description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
 		*/
-		framework.ConformanceIt("should support proxy with --port 0 ", func() {
+		framework.ConformanceIt("Base", "should support proxy with --port 0 ", func() {
 			ginkgo.By("starting the proxy server")
 			port, cmd, err := startProxyServer(ns)
 			if cmd != nil {
@@ -1657,7 +1657,7 @@ metadata:
 			Testname: Kubectl, proxy socket
 			Description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
 		*/
-		framework.ConformanceIt("should support --unix-socket=/path ", func() {
+		framework.ConformanceIt("Base", "should support --unix-socket=/path ", func() {
 			ginkgo.By("Starting the proxy")
 			tmpdir, err := ioutil.TempDir("", "kubectl-proxy-unix")
 			if err != nil {

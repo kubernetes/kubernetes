@@ -61,7 +61,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, run basic image
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
-	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
+	framework.ConformanceIt("Base", "should serve a basic image on each replica with a public image ", func() {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
@@ -77,7 +77,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, check for issues like exceeding allocated quota
 		Description: Attempt to create a Replication Controller with pods exceeding the namespace quota. The creation MUST fail
 	*/
-	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func() {
+	framework.ConformanceIt("Base", "should surface a failure condition on a common issue like exceeded quota", func() {
 		testReplicationControllerConditionCheck(f)
 	})
 
@@ -86,7 +86,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, adopt matching pods
 		Description: An ownerless Pod is created, then a Replication Controller (RC) is created whose label selector will match the Pod. The RC MUST either adopt the Pod or delete and replace it with a new Pod
 	*/
-	framework.ConformanceIt("should adopt matching pods on creation", func() {
+	framework.ConformanceIt("Base", "should adopt matching pods on creation", func() {
 		testRCAdoptMatchingOrphans(f)
 	})
 
@@ -95,7 +95,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, release pods
 		Description: A Replication Controller (RC) is created, and its Pods are created. When the labels on one of the Pods change to no longer match the RC's label selector, the RC MUST release the Pod and update the Pod's owner references.
 	*/
-	framework.ConformanceIt("should release no longer matching pods", func() {
+	framework.ConformanceIt("Base", "should release no longer matching pods", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 

@@ -97,7 +97,7 @@ var _ = SIGDescribe("Job", func() {
 		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
 		execute to completion.
 	*/
-	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
+	framework.ConformanceIt("Base", "should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach, because kubelet will
@@ -152,7 +152,7 @@ var _ = SIGDescribe("Job", func() {
 		Testname: Jobs, active pods, graceful termination
 		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
-	framework.ConformanceIt("should delete a job", func() {
+	framework.ConformanceIt("Base", "should delete a job", func() {
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
@@ -178,7 +178,7 @@ var _ = SIGDescribe("Job", func() {
 		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
 		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
 	*/
-	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
+	framework.ConformanceIt("Base", "should adopt matching orphans and release non-matching pods", func() {
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.

@@ -293,7 +293,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Rolling Update
 		   Description: StatefulSet MUST support the RollingUpdate strategy to automatically replace Pods one at a time when the Pod template changes. The StatefulSet's status MUST indicate the CurrentRevision and UpdateRevision. If the template is changed to match a prior revision, StatefulSet MUST detect this as a rollback instead of creating a new revision. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func() {
+		framework.ConformanceIt("Base", "should perform rolling updates and roll backs of template modifications", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			rollbackTest(c, ns, ss)
@@ -304,7 +304,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Rolling Update with Partition
 		   Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress, StatefulSet MUST restore the Pod without violating the Partition. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
+		framework.ConformanceIt("Base", "should perform canary updates and phased rolling updates of template modifications", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			setHTTPProbe(ss)
@@ -574,7 +574,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Scaling
 		   Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func() {
+		framework.ConformanceIt("Base", "Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func() {
 			psLabels := klabels.Set(labels)
 			w := &cache.ListWatch{
 				WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
@@ -684,7 +684,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Burst Scaling
 		   Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods [Slow]", func() {
+		framework.ConformanceIt("Base", "Burst scaling should run to completion even with unhealthy pods [Slow]", func() {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
@@ -726,7 +726,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Recreate Failed Pod
 		   Description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed state, such as when they are rejected or evicted by a Node. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Should recreate evicted statefulset", func() {
+		framework.ConformanceIt("Privileged", "Should recreate evicted statefulset", func() {
 			podName := "test-pod"
 			statefulPodName := ssName + "-0"
 			ginkgo.By("Looking for a node to schedule stateful set and pod")
@@ -836,7 +836,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Newly created StatefulSet resource MUST have a scale of one.
 			Bring the scale of the StatefulSet resource up to two. StatefulSet scale MUST be at two replicas.
 		*/
-		framework.ConformanceIt("should have a working scale subresource", func() {
+		framework.ConformanceIt("Base", "should have a working scale subresource", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)

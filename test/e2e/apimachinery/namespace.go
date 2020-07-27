@@ -231,14 +231,14 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		Testname: namespace-deletion-removes-pods
 		Description: Ensure that if a namespace is deleted then all pods are removed from that namespace.
 	*/
-	framework.ConformanceIt("should ensure that all pods are removed when a namespace is deleted",
+	framework.ConformanceIt("Base", "should ensure that all pods are removed when a namespace is deleted",
 		func() { ensurePodsAreRemovedWhenNamespaceIsDeleted(f) })
 
 	/*
 		Testname: namespace-deletion-removes-services
 		Description: Ensure that if a namespace is deleted then all services are removed from that namespace.
 	*/
-	framework.ConformanceIt("should ensure that all services are removed when a namespace is deleted",
+	framework.ConformanceIt("Base", "should ensure that all services are removed when a namespace is deleted",
 		func() { ensureServicesAreRemovedWhenNamespaceIsDeleted(f) })
 
 	ginkgo.It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",
@@ -255,7 +255,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	   The Namespace is patched.
 	   The Namespace and MUST now include the new Label.
 	*/
-	framework.ConformanceIt("should patch a Namespace", func() {
+	framework.ConformanceIt("Base", "should patch a Namespace", func() {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
 		ns, err := f.CreateNamespace(namespaceName, nil)

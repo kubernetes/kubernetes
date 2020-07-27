@@ -80,7 +80,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("volume on tmpfs should have the correct mode [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "volume on tmpfs should have the correct mode [LinuxOnly] [NodeConformance]", func() {
 		doTestVolumeMode(f, 0, v1.StorageMediumMemory)
 	})
 
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, 0, v1.StorageMediumMemory)
 	})
 
@@ -100,7 +100,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, 0, v1.StorageMediumMemory)
 	})
 
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, 0, v1.StorageMediumMemory)
 	})
 
@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0644. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (non-root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, nonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -130,7 +130,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0666. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (non-root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, nonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0777. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (non-root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, nonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("volume on default medium should have the correct mode [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "volume on default medium should have the correct mode [LinuxOnly] [NodeConformance]", func() {
 		doTestVolumeMode(f, 0, v1.StorageMediumDefault)
 	})
 
@@ -160,7 +160,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (root,0644,default) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (root,0644,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, 0, v1.StorageMediumDefault)
 	})
 
@@ -170,7 +170,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (root,0666,default) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (root,0666,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, 0, v1.StorageMediumDefault)
 	})
 
@@ -180,7 +180,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (root,0777,default) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (root,0777,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, 0, v1.StorageMediumDefault)
 	})
 
@@ -190,7 +190,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,default) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (non-root,0644,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, nonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -200,7 +200,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,default) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (non-root,0666,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, nonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -210,7 +210,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,default) [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("Base", "should support (non-root,0777,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, nonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -220,7 +220,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume, should share volumes between the containeres in the pod. The two busybox image containers shoud share the volumes mounted to the pod.
 		The main container shoud wait until the sub container drops a file, and main container acess the shared data.
 	*/
-	framework.ConformanceIt("pod should support shared volumes between containers", func() {
+	framework.ConformanceIt("Base", "pod should support shared volumes between containers", func() {
 		var (
 			volumeName                 = "shared-data"
 			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
