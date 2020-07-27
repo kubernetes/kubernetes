@@ -12,7 +12,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/network/apis/externalipranger"
 	v1 "k8s.io/kubernetes/openshift-kube-apiserver/admission/network/apis/externalipranger/v1"
 	kapi "k8s.io/kubernetes/pkg/apis/core"

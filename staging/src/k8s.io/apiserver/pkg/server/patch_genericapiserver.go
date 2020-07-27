@@ -24,7 +24,7 @@ import (
 
 	"go.uber.org/atomic"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 )
