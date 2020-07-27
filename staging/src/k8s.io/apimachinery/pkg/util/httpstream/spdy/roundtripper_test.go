@@ -409,7 +409,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 									break
 								}
 								t.Errorf("error accepting connection: %s", err)
-								continue
 							}
 							if err := proxyHandler.ServeConn(conn); err != nil && !testCase.shouldError {
 								if closed {
