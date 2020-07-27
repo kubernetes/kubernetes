@@ -2,7 +2,7 @@
 
 module k8s.io/apimachinery
 
-go 1.13
+go 1.15
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -26,7 +26,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
 	golang.org/x/text v0.3.3 // indirect
 	google.golang.org/protobuf v1.24.0 // indirect

@@ -59,6 +59,9 @@ go_library(
         "//vendor/github.com/prometheus/procfs/internal/fs:go_default_library",
         "//vendor/github.com/prometheus/procfs/internal/util:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

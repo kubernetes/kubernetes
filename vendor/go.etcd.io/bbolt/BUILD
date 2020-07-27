@@ -13,8 +13,10 @@ go_library(
         "bolt_openbsd.go",
         "bolt_ppc64.go",
         "bolt_ppc64le.go",
+        "bolt_riscv64.go",
         "bolt_s390x.go",
         "bolt_unix.go",
+        "bolt_unix_aix.go",
         "bolt_unix_solaris.go",
         "bolt_windows.go",
         "boltsync_unix.go",
@@ -34,6 +36,9 @@ go_library(
     importpath = "go.etcd.io/bbolt",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

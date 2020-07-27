@@ -13,6 +13,7 @@ go_library(
         "logger.go",
         "logrus.go",
         "terminal_check_bsd.go",
+        "terminal_check_js.go",
         "terminal_check_no_terminal.go",
         "terminal_check_notappengine.go",
         "terminal_check_solaris.go",
@@ -25,6 +26,9 @@ go_library(
     importpath = "github.com/sirupsen/logrus",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

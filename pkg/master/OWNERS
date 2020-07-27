@@ -40,4 +40,3 @@ reviewers:
 - enj
 labels:
 - sig/api-machinery
-- triage/needs-information

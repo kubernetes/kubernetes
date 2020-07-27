@@ -572,7 +572,7 @@ func (gex *dhGEXSHA) diffieHellman(theirPublic, myPrivate *big.Int) (*big.Int, e
 	return new(big.Int).Exp(theirPublic, myPrivate, gex.p), nil
 }
 
-func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshakeMagics) (*kexResult, error) {
+func (gex dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshakeMagics) (*kexResult, error) {
 	// Send GexRequest
 	kexDHGexRequest := kexDHGexRequestMsg{
 		MinBits:      dhGroupExchangeMinimumBits,
@@ -677,7 +677,7 @@ func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshak
 // Server half implementation of the Diffie Hellman Key Exchange with SHA1 and SHA256.
 //
 // This is a minimal implementation to satisfy the automated tests.
-func (gex *dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshakeMagics, priv Signer) (result *kexResult, err error) {
+func (gex dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshakeMagics, priv Signer) (result *kexResult, err error) {
 	// Receive GexRequest
 	packet, err := c.readPacket()
 	if err != nil {

@@ -34,7 +34,7 @@ multi_arch_container(
     docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/conformance-{ARCH}:{{STABLE_DOCKER_TAG}}"],
     docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/conformance-{ARCH}:{{STABLE_DOCKER_TAG}}"],
     env = {
-        "E2E_FOCUS": "\[Conformance\]",
+        "E2E_FOCUS": "\\[Conformance\\]",
         "E2E_SKIP": "",
         "E2E_PARALLEL": "1",
         "E2E_PROVIDER": "local",

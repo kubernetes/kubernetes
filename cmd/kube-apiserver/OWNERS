@@ -28,5 +28,4 @@ reviewers:
 - yue9944882
 labels:
 - sig/api-machinery
-- triage/needs-information
 - area/apiserver

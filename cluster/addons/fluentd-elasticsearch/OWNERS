@@ -8,4 +8,3 @@ reviewers:
 - sig-instrumentation-reviewers
 labels:
 - sig/instrumentation
-- triage/needs-information

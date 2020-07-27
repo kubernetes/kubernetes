@@ -23,5 +23,4 @@ reviewers:
 - jpbetz
 labels:
 - sig/api-machinery
-- triage/needs-information
 - area/apiserver
