@@ -202,7 +202,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 									Name:      string(nodeName),
 									UID:       types.UID(nodeName),
 									Namespace: "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+								}, v1.EventTypeWarning, "FailedToCreateRoute: %v", msg)
 							klog.V(4).Infof(msg)
 							return err
 						}
