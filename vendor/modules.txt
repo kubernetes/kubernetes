@@ -2175,6 +2175,10 @@ k8s.io/component-base/metrics/testutil
 k8s.io/component-base/term
 k8s.io/component-base/version
 k8s.io/component-base/version/verflag
+# k8s.io/component-helpers v0.0.0 => ./staging/src/k8s.io/component-helpers
+## explicit
+# k8s.io/component-helpers => ./staging/src/k8s.io/component-helpers
+k8s.io/component-helpers/scheduling/corev1
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit
 # k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
