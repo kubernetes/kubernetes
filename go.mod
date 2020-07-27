@@ -74,7 +74,7 @@ require (
 	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 	github.com/opencontainers/selinux v1.5.2
 	github.com/openshift/api v0.0.0-20200722204502-c33fd0aa6ffa
-	github.com/openshift/apiserver-library-go v0.0.0-20200722231130-01c5eee5e10b
+	github.com/openshift/apiserver-library-go v0.0.0-20200723181026-dd21ec96ba0a
 	github.com/openshift/client-go v0.0.0-20200722173614-5a1b0aaeff15
 	github.com/openshift/library-go v0.0.0-20200722204747-e3f2c82ff290
 	github.com/pkg/errors v0.9.1
@@ -123,7 +123,6 @@ require (
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/heapster v1.2.0-beta.1
-	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.2.0
 	k8s.io/kube-aggregator v0.19.0-rc.2
 	k8s.io/kube-controller-manager v0.0.0
@@ -378,7 +377,7 @@ replace (
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.5.2
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20200722204502-c33fd0aa6ffa
-	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20200722231130-01c5eee5e10b
+	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20200723181026-dd21ec96ba0a
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20200722173614-5a1b0aaeff15
 	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200722204747-e3f2c82ff290
