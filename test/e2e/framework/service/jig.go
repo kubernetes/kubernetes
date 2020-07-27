@@ -260,21 +260,42 @@ func (j *TestJig) CreateLoadBalancerService(timeout time.Duration, tweak func(sv
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the Service are running.
 func (j *TestJig) GetEndpointNodes() (map[string][]string, error) {
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, MaxNodesForEndpointsTests)
-	if err != nil {
-		return nil, err
-	}
-	epNodes, err := j.GetEndpointNodeNames()
+	return j.GetEndpointNodesWithIP(v1.NodeExternalIP)
+}
+
+// GetEndpointNodesWithIP returns a map of nodenames:<ip of given type> on which the
+// endpoints of the Service are running.
+func (j *TestJig) GetEndpointNodesWithIP(addressType v1.NodeAddressType) (map[string][]string, error) {
+	nodes, err := j.ListNodesWithEndpoint()
 	if err != nil {
 		return nil, err
 	}
 	nodeMap := map[string][]string{}
-	for _, n := range nodes.Items {
-		if epNodes.Has(n.Name) {
-			nodeMap[n.Name] = e2enode.GetAddresses(&n, v1.NodeExternalIP)
-		}
+	for _, node := range nodes {
+		nodeMap[node.Name] = e2enode.GetAddresses(&node, addressType)
 	}
 	return nodeMap, nil
+}
+
+// ListNodesWithEndpoint returns a list of nodes on which the
+// endpoints of the given Service are running.
+func (j *TestJig) ListNodesWithEndpoint() ([]v1.Node, error) {
+	nodeNames, err := j.GetEndpointNodeNames()
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.TODO()
+	allNodes, err := j.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	epNodes := make([]v1.Node, 0, nodeNames.Len())
+	for _, node := range allNodes.Items {
+		if nodeNames.Has(node.Name) {
+			epNodes = append(epNodes, node)
+		}
+	}
+	return epNodes, nil
 }
 
 // GetEndpointNodeNames returns a string set of node names on which the
