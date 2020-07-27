@@ -412,7 +412,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 								continue
 							}
 							if err := proxyHandler.ServeConn(conn); err != nil && !testCase.shouldError {
-								t.Fatalf("ServeConn error: %s", err)
+								t.Errorf("ServeConn error: %s", err)
 							}
 						}
 					}()
