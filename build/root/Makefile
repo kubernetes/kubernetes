@@ -574,8 +574,8 @@ bazel-build:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 # Some things in vendor don't build due to empty target lists for cross-platform rules.
-bazel-build:
-	bazel build -- //... -//vendor/...
+bazel-build: build
+	@echo "Delegated to build"
 endif
 
 
@@ -591,11 +591,8 @@ bazel-test:
 else
 # //hack:verify-all is a manual target.
 # Some things in vendor don't build due to empty target lists for cross-platform rules.
-bazel-test:
-	bazel test --config=unit -- \
-	  //... \
-	  //hack:verify-all \
-	  -//vendor/...
+bazel-test: test
+	@echo "Delegated to test"
 endif
 
 ifeq ($(PRINT_HELP),y)
@@ -608,8 +605,8 @@ endef
 bazel-test-integration:
 	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
 else
-bazel-test-integration:
-	bazel test --config integration //test/integration/...
+bazel-test-integration: test-integration
+	@echo "Delegated to test integration"
 endif
 
 ifeq ($(PRINT_HELP),y)
@@ -622,8 +619,6 @@ endef
 bazel-release:
 	@echo "$$BAZEL_RELEASE_HELP_INFO"
 else
-bazel-release:
-	bazel build //build/release-tars
-	bazel shutdown || true
-	pkill ^bazel || true
+bazel-release: release
+	@echo "Delegated to release"
 endif
