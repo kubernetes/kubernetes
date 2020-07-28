@@ -34,6 +34,9 @@ func main() {
 
 	command := app.NewAPIServerCommand()
 
+	exitCode := 0
+	defer func() { os.Exit(exitCode) }()
+
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
@@ -42,6 +45,7 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
