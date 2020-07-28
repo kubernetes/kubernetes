@@ -189,7 +189,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				}
 			}
 
-			err = wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + resourceName
 				esList, err := client.DiscoveryV1beta1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
