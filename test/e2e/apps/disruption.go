@@ -491,7 +491,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 		ready := 0
 		for i := range pods.Items {
 			pod := pods.Items[i]
-			if podutil.IsPodReady(&pod) && pod.ObjectMeta.DeletionTimestamp.IsZero() {
+			if podutil.IsPodReady(&pod) && pod.ObjectMeta.DeletionTimestamp == nil {
 				ready++
 			}
 		}
@@ -550,7 +550,7 @@ func locateRunningPod(cs kubernetes.Interface, ns string) (pod *v1.Pod, err erro
 
 		for i := range podList.Items {
 			p := podList.Items[i]
-			if podutil.IsPodReady(&p) && p.ObjectMeta.DeletionTimestamp.IsZero() {
+			if podutil.IsPodReady(&p) && p.ObjectMeta.DeletionTimestamp == nil {
 				pod = &p
 				return true, nil
 			}
