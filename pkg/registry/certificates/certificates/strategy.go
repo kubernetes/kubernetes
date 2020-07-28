@@ -19,10 +19,6 @@ package certificates
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
-
-	"k8s.io/kubernetes/pkg/apis/core"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,23 +81,6 @@ func (csrStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	// Be explicit that users cannot create pre-approved certificate requests.
 	csr.Status = certificates.CertificateSigningRequestStatus{}
 	csr.Status.Conditions = []certificates.CertificateSigningRequestCondition{}
-
-	// REBASE HACK: auto-approve during bootstrapping
-	// TODO: remove when https://github.com/openshift/installer/pull/3943 or equivalent merges
-	for _, a := range os.Args {
-		if a == "--log-file=/var/log/bootstrap-control-plane/kube-apiserver.log" {
-			csr.Status.Conditions = []certificates.CertificateSigningRequestCondition{
-				{
-					Type:               certificates.CertificateApproved,
-					Status:             core.ConditionTrue,
-					Reason:             "AutoApproveDuringBootstrapping",
-					Message:            "CSR was auto-approved during bootstrapping through the API server",
-					LastUpdateTime:     metav1.Time{Time: time.Now()},
-					LastTransitionTime: metav1.Time{Time: time.Now()},
-				},
-			}
-		}
-	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users
