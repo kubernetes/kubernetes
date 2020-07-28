@@ -176,16 +176,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.Extender)(nil), (*v1.LegacyExtender)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Extender_To_v1_LegacyExtender(a.(*config.Extender), b.(*v1.LegacyExtender), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.LegacyExtender)(nil), (*config.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_LegacyExtender_To_config_Extender(a.(*v1.LegacyExtender), b.(*config.Extender), scope)
-	}); err != nil {
-		return err
-	}
 	return nil
 }
 
