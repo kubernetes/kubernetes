@@ -360,7 +360,6 @@ var _ = SIGDescribe("Deployment", func() {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.Labels["test-deployment-static"] == "true" &&
-					deployment.Status.AvailableReplicas == testDeploymentDefaultReplicas &&
 					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
