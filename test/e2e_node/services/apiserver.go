@@ -27,7 +27,7 @@ import (
 
 const (
 	clusterIPRange          = "10.0.0.1/24"
-	apiserverClientURL      = "http://localhost:8080"
+	apiserverClientURL      = "https://localhost:6443"
 	apiserverHealthCheckURL = apiserverClientURL + "/healthz"
 )
 
@@ -53,6 +53,7 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return err
 	}
+	o.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
 	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}

@@ -17,18 +17,28 @@ limitations under the License.
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 // terminationSignals are signals that cause the program to exit in the
 // supported platforms (linux, darwin, windows).
 var terminationSignals = []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
+
+var insecureHTTPClient = &http.Client{}
+
+func init() {
+	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	insecureHTTPClient.Transport = insecureTransport
+}
 
 // waitForTerminationSignal waits for termination signal.
 func waitForTerminationSignal() {
@@ -67,8 +77,7 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 		case <-time.After(time.Second):
 			ready := true
 			for _, url := range urls {
-				resp, err := http.Head(url)
-				if err != nil || resp.StatusCode != http.StatusOK {
+				if !healthCheck(url) {
 					ready = false
 					break
 				}
@@ -79,4 +88,11 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 		}
 	}
 	return fmt.Errorf("e2e service %q readiness check timeout %v", name, *serverStartTimeout)
+}
+
+// Perform a health check. Anything other than a 200-response is treated as a failure.
+// Skip verification of server certs.
+func healthCheck(url string) bool {
+	resp, err := insecureHTTPClient.Head(url)
+	return err == nil && resp.StatusCode == http.StatusOK
 }

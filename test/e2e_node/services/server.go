@@ -19,7 +19,6 @@ package services
 import (
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -191,8 +190,7 @@ func (s *server) start() error {
 						return
 					case <-time.After(time.Second):
 						for _, url := range s.healthCheckUrls {
-							resp, err := http.Head(url)
-							if err != nil || resp.StatusCode != http.StatusOK {
+							if !healthCheck(url) {
 								break stillAlive
 							}
 						}

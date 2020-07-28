@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	defaultHost = "http://127.0.0.1:8080"
+	defaultHost = "https://127.0.0.1:6443"
 
 	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
 	DefaultNumNodes = -1
