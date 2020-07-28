@@ -181,7 +181,6 @@ pkg/security/podsecuritypolicy/util
 pkg/serviceaccount
 pkg/ssh
 pkg/util/config
-pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/labels # See previous effort in PR #80685
 pkg/util/oom

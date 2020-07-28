@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package ebtables allows to control the ebtables Linux-based bridging firewall.
+// Both chains and rules can be added, deleted and modified.
+// For ebtables specific documentation see: http://ebtables.netfilter.org/
 package ebtables
 
 import (
@@ -31,23 +34,29 @@ const (
 	fullMac = "--Lmac2"
 )
 
+// RulePosition is the rule position within a table
 type RulePosition string
 
+// Relative position for a new rule
 const (
 	Prepend RulePosition = "-I"
 	Append  RulePosition = "-A"
 )
 
+// Table is an Ebtables table type
 type Table string
 
+// Tables available in ebtables by default
 const (
 	TableNAT    Table = "nat"
 	TableFilter Table = "filter"
 	TableBroute Table = "broute"
 )
 
+// Chain is an Ebtables chain type
 type Chain string
 
+// Chains that are built-in in ebtables
 const (
 	ChainPostrouting Chain = "POSTROUTING"
 	ChainPrerouting  Chain = "PREROUTING"
@@ -68,7 +77,7 @@ const (
 	opDeleteRule  operation = "-D"
 )
 
-// An injectable interface for running ebtables commands.  Implementations must be goroutine-safe.
+// Interface for running ebtables commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// GetVersion returns the "X.Y.Z" semver string for ebtables.
 	GetVersion() (string, error)
@@ -125,7 +134,7 @@ func (runner *runner) GetVersion() (string, error) {
 }
 
 func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error) {
-	exist := true
+	var exist bool
 	fullArgs := makeFullArgs(table, opListChain, chain, fullMac)
 	out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()
 	if err != nil {
@@ -144,7 +153,7 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 }
 
 func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error {
-	exist := true
+	var exist bool
 	fullArgs := makeFullArgs(table, opListChain, chain, fullMac)
 	out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()
 	if err != nil {
