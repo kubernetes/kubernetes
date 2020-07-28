@@ -240,3 +240,35 @@ func TestEmptyColonSeparatedMultimapStringString(t *testing.T) {
 		})
 	}
 }
+
+func TestDeepCopyColonSeparatedMultimapStringString(t *testing.T) {
+	var nilMap map[string][]string
+	cases := []struct {
+		desc string
+		in   *ColonSeparatedMultimapStringString
+	}{
+		{"nil pointer", NewColonSeparatedMultimapStringString(
+			nil)},
+		{"nil map", NewColonSeparatedMultimapStringString(
+			&nilMap)},
+		{"empty map", NewColonSeparatedMultimapStringString(
+			&map[string][]string{})},
+		{"non-empty map, empty slice", NewColonSeparatedMultimapStringString(
+			&map[string][]string{"foo": {}})},
+		{"non-empty map, non-empty slice", NewColonSeparatedMultimapStringString(
+			&map[string][]string{"foo": {"bar"}})},
+		{"non-empty map, empty and non-empty slice", NewColonSeparatedMultimapStringString(
+			&map[string][]string{"foo": {}, "bar": {"baz"}})},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			out := c.in.DeepCopy()
+			if c.in.Multimap != nil && c.in.Multimap == out.Multimap {
+				t.Fatalf("got shallow copy, want deep copy")
+			}
+			if !reflect.DeepEqual(c.in.Multimap, out.Multimap) {
+				t.Fatalf("expect deep copy to exactly equal source")
+			}
+		})
+	}
+}

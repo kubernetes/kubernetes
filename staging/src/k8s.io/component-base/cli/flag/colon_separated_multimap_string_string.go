@@ -100,3 +100,27 @@ func (m *ColonSeparatedMultimapStringString) Type() string {
 func (m *ColonSeparatedMultimapStringString) Empty() bool {
 	return len(*m.Multimap) == 0
 }
+
+// DeepCopy returns a deep copy of the ColonSeparatedMultimapStringString.
+func (m *ColonSeparatedMultimapStringString) DeepCopy() *ColonSeparatedMultimapStringString {
+	var pmm *map[string][]string
+	if m.Multimap != nil {
+		var mm map[string][]string
+		if *m.Multimap != nil {
+			mm = map[string][]string{}
+			for k, ls := range *m.Multimap {
+				var newls []string
+				if ls != nil {
+					newls = make([]string, len(ls))
+					copy(newls, ls)
+				}
+				mm[k] = newls
+			}
+		}
+		pmm = &mm
+	}
+	return &ColonSeparatedMultimapStringString{
+		Multimap:    pmm,
+		initialized: m.initialized,
+	}
+}
