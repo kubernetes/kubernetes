@@ -26,6 +26,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -33,10 +39,37 @@ import (
 
 // This file tests the scheduler priority functions.
 
+func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Score: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: scorePluginName, Weight: 1},
+				},
+				Disabled: []schedulerconfig.Plugin{
+					{Name: "*"},
+				},
+			},
+		},
+	}
+	testCtx := testutils.InitTestSchedulerWithOptions(
+		t,
+		testutils.InitTestMaster(t, strings.ToLower(scorePluginName), nil),
+		false,
+		nil,
+		0,
+		scheduler.WithProfiles(prof),
+	)
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	return testCtx
+}
+
 // TestNodeAffinity verifies that scheduler's node affinity priority function
-// works correctly.
+// works correctly.s
 func TestNodeAffinity(t *testing.T) {
-	testCtx := initTest(t, "node-affinity")
+	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
 	_, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 4)
@@ -88,7 +121,7 @@ func TestNodeAffinity(t *testing.T) {
 // TestPodAffinity verifies that scheduler's pod affinity priority function
 // works correctly.
 func TestPodAffinity(t *testing.T) {
-	testCtx := initTest(t, "pod-affinity")
+	testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
 	topologyKey := "node-topologykey"
@@ -166,7 +199,7 @@ func TestPodAffinity(t *testing.T) {
 // TestImageLocality verifies that the scheduler's image locality priority function
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
 func TestImageLocality(t *testing.T) {
-	testCtx := initTest(t, "image-locality")
+	testCtx := initTestSchedulerForPriorityTest(t, imagelocality.Name)
 	defer testutils.CleanupTest(t, testCtx)
 
 	// Create a node with the large image.
@@ -224,10 +257,10 @@ func makeContainersWithImages(images []string) []v1.Container {
 
 // TestEvenPodsSpreadPriority verifies that EvenPodsSpread priority functions well.
 func TestEvenPodsSpreadPriority(t *testing.T) {
-	testCtx := initTest(t, "eps-priority")
+	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
+	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
-	defer testutils.CleanupTest(t, testCtx)
 
 	var nodes []*v1.Node
 	for i := 0; i < 4; i++ {
