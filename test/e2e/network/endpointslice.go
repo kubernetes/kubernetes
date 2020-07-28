@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -311,13 +312,12 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
-			framework.Logf("Matching EndpointSlices not found")
 			return false, nil
 		}
 		endpointSlices = endpointSlicesFound
 		return true, nil
 	}); err != nil {
-		framework.Failf("Timed out waiting for matching EndpointSlices to exist: %v", err)
+		framework.Failf("Timed out waiting for EndpointSlices to match expectations: %v", err)
 	}
 
 	endpoints := &v1.Endpoints{}
@@ -330,7 +330,7 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 		endpoints = endpointsFound
 		return true, nil
 	}); err != nil {
-		framework.Failf("Timed out waiting for matching Endpoints to exist: %v", err)
+		framework.Failf("Timed out waiting for Endpoints to match expectations: %v", err)
 	}
 
 	podsByIP := map[string]*v1.Pod{}
@@ -494,7 +494,15 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 	}
 	if len(esList.Items) != numSlices {
 		framework.Logf("Expected %d EndpointSlices for Service %s/%s, got %d", numSlices, ns, svcName, len(esList.Items))
-		return []discoveryv1beta1.EndpointSlice{}, false
+		for i, epSlice := range esList.Items {
+			epsData, err := json.Marshal(epSlice)
+			if err != nil {
+				framework.Logf("Error marshaling JSON for EndpointSlice: %v", err)
+			} else {
+				framework.Logf("%d - %v", i, string(epsData))
+			}
+		}
+		return esList.Items, false
 	}
 
 	actualNumEndpoints := 0
@@ -503,7 +511,7 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 	}
 	if actualNumEndpoints != numEndpoints {
 		framework.Logf("EndpointSlices for %s/%s Service have %d/%d endpoints", ns, svcName, actualNumEndpoints, numEndpoints)
-		return []discoveryv1beta1.EndpointSlice{}, false
+		return esList.Items, false
 	}
 
 	return esList.Items, true
