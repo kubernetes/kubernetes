@@ -1852,6 +1852,15 @@
     Pod and the service must now have empty set of endpoints.
   release: v1.9
   file: test/e2e/network/service.go
+- testname: Endpoint resource lifecycle
+  codename: '[sig-network] Services should test the lifecycle of an Endpoint [Conformance]'
+  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
+    with a new label, a check after the update MUST find the changes. The endpoint
+    is then patched with a new IPv4 address and port, a check after the patch MUST
+    the changes. The endpoint is deleted by it's label, a watch listens for the deleted
+    watch event.
+  release: v1.19
+  file: test/e2e/network/service.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
     [Conformance]'
