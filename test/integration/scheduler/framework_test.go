@@ -19,6 +19,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ type PreFilterPlugin struct {
 
 type ScorePlugin struct {
 	failScore      bool
-	numScoreCalled int
+	numScoreCalled int32
 	highScoreNode  string
 }
 
@@ -170,13 +171,13 @@ func (sp *ScorePlugin) reset() {
 
 // Score returns the score of scheduling a pod on a specific node.
 func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
-	sp.numScoreCalled++
+	curCalled := atomic.AddInt32(&sp.numScoreCalled, 1)
 	if sp.failScore {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
 	}
 
 	score := int64(1)
-	if sp.numScoreCalled == 1 {
+	if curCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
 		sp.highScoreNode = nodeName
 		score = framework.MaxNodeScore
