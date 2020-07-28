@@ -1,6 +1,6 @@
 // +build modhack
 
-package date
+package tracing
 
 // Copyright 2017 Microsoft Corporation
 //
