@@ -44,6 +44,7 @@ spec:
       containers:
       - name: metadata-proxy
         image: k8s.gcr.io/metadata-proxy:v0.1.12
+        args: ["--addr=0.0.0.0:988"]
         securityContext:
           privileged: true
         # Request and limit resources to get guaranteed QoS.
