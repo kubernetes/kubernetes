@@ -339,7 +339,7 @@ func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string,
 	}
 
 	ginkgo.By("checking the Snapshot has been deleted")
-	err = utils.WaitForNamespacedGVRDeletion(dc, SnapshotGVR, snapshotName, ns, poll, timeout)
+	err = utils.WaitForNamespacedGVRDeletion(dc, SnapshotGVR, ns, snapshotName, poll, timeout)
 
 	return err
 }
@@ -438,7 +438,11 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		framework.Logf("Recording snapshot handle: %s", snapshotHandle)
 		csiDriverName := r.Vsclass.Object["driver"].(string)
 
-		ginkgo.By("deleting the snapshot and snapshot content") // TODO: test what happens when I have two snapshot content that refer to the same content
+		// If the deletion policy is retain on vscontent:
+		// when vs is deleted vscontent will not be deleted
+		// when the vscontent is manually deleted then the underlying snapshot resource will not be deleted.
+		// We exploit this to create a snapshot resource from which we can create a preprovisioned snapshot
+		ginkgo.By("deleting the snapshot and snapshot content")
 		err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Delete(context.TODO(), r.Vs.GetName(), metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 

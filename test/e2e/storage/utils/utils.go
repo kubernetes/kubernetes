@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -784,4 +785,12 @@ func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 
 	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
 	return false
+}
+
+// GenShortHash returns the first 7 hex characters of the sha1 hash of string s
+func GenShortHash(s string) string {
+	h := sha1.New()
+	h.Write([]byte(s))
+	bs := h.Sum(nil)
+	return fmt.Sprintf("%x", bs)[:7]
 }
