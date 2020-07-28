@@ -114,11 +114,7 @@ func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
-	kubeletConfig, err := options.NewKubeletConfiguration()
-	// programmer error
-	if err != nil {
-		klog.Fatal(err)
-	}
+	var applyKubeletConfigFlags func(c *kubeletconfiginternal.KubeletConfiguration)
 
 	cmd := &cobra.Command{
 		Use: componentKubelet,
@@ -177,6 +173,13 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cleanFlagSet)
 
+			// apply config flags to a defaulted Kubelet config
+			kubeletConfig, err := options.NewKubeletConfiguration()
+			if err != nil {
+				klog.Fatal(err)
+			}
+			applyKubeletConfigFlags(kubeletConfig)
+
 			// set feature gates from initial flags-based config
 			if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
 				klog.Fatal(err)
@@ -197,12 +200,10 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				if err != nil {
 					klog.Fatal(err)
 				}
-				// We must enforce flag precedence by re-parsing the command line into the new object.
-				// This is necessary to preserve backwards-compatibility across binary upgrades.
-				// See issue #56171 for more details.
-				if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
-					klog.Fatal(err)
-				}
+				// Enforce flag precedence to preserve backwards-compatibility
+				// across binary upgrades. See issue #56171 for more details.
+				applyKubeletConfigFlags(kubeletConfig)
+
 				// update feature gates based on new config
 				if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
 					klog.Fatal(err)
@@ -221,11 +222,14 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				var dynamicKubeletConfig *kubeletconfiginternal.KubeletConfiguration
 				dynamicKubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(dynamicConfigDir,
 					func(kc *kubeletconfiginternal.KubeletConfiguration) error {
-						// Here, we enforce flag precedence inside the controller, prior to the controller's validation sequence,
-						// so that we get a complete validation at the same point where we can decide to reject dynamic config.
-						// This fixes the flag-precedence component of issue #63305.
-						// See issue #56171 for general details on flag precedence.
-						return kubeletConfigFlagPrecedence(kc, args)
+						// Enforce flag precedence to preserve backwards-compatibility
+						// across binary upgrades. See issue #56171 for more details.
+						// The controller, which will apply this transformation prior
+						// to validating the config. This is required, because the
+						// controller decides whether to reject a dynamic config based
+						// on this validation.
+						applyKubeletConfigFlags(kubeletConfig)
+						return nil
 					})
 				if err != nil {
 					klog.Fatal(err)
@@ -267,9 +271,17 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		},
 	}
 
-	// keep cleanFlagSet separate, so Cobra doesn't pollute it with the global flags
+	// keep cleanFlagSet separate, so Cobra doesn't pollute it with global flags
+	// that are outside of our allow-list (options.AddGlobalFlags).
 	kubeletFlags.AddFlags(cleanFlagSet)
-	options.AddKubeletConfigFlags(cleanFlagSet, kubeletConfig)
+
+	helpTextDefaults, err := options.NewKubeletConfiguration()
+	if err != nil {
+		klog.Fatal(err)
+	}
+	applyKubeletConfigFlags = options.AddKubeletConfigFlags(
+		cleanFlagSet, helpTextDefaults)
+
 	options.AddGlobalFlags(cleanFlagSet)
 	cleanFlagSet.BoolP("help", "h", false, fmt.Sprintf("help for %s", cmd.Name()))
 
@@ -284,55 +296,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	})
 
 	return cmd
-}
-
-// newFlagSetWithGlobals constructs a new pflag.FlagSet with global flags registered
-// on it.
-func newFlagSetWithGlobals() *pflag.FlagSet {
-	fs := pflag.NewFlagSet("", pflag.ExitOnError)
-	// set the normalize func, similar to k8s.io/component-base/cli//flags.go:InitFlags
-	fs.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-	// explicitly add flags from libs that register global flags
-	options.AddGlobalFlags(fs)
-	return fs
-}
-
-// newFakeFlagSet constructs a pflag.FlagSet with the same flags as fs, but where
-// all values have noop Set implementations
-func newFakeFlagSet(fs *pflag.FlagSet) *pflag.FlagSet {
-	ret := pflag.NewFlagSet("", pflag.ExitOnError)
-	ret.SetNormalizeFunc(fs.GetNormalizeFunc())
-	fs.VisitAll(func(f *pflag.Flag) {
-		ret.VarP(cliflag.NoOp{}, f.Name, f.Shorthand, f.Usage)
-	})
-	return ret
-}
-
-// kubeletConfigFlagPrecedence re-parses flags over the KubeletConfiguration object.
-// We must enforce flag precedence by re-parsing the command line into the new object.
-// This is necessary to preserve backwards-compatibility across binary upgrades.
-// See issue #56171 for more details.
-func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration, args []string) error {
-	// We use a throwaway kubeletFlags and a fake global flagset to avoid double-parses,
-	// as some Set implementations accumulate values from multiple flag invocations.
-	fs := newFakeFlagSet(newFlagSetWithGlobals())
-	// register throwaway KubeletFlags
-	options.NewKubeletFlags().AddFlags(fs)
-	// register new KubeletConfiguration
-	options.AddKubeletConfigFlags(fs, kc)
-	// Remember original feature gates, so we can merge with flag gates later
-	original := kc.FeatureGates
-	// re-parse flags
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	// Add back feature gates that were set in the original kc, but not in flags
-	for k, v := range original {
-		if _, ok := kc.FeatureGates[k]; !ok {
-			kc.FeatureGates[k] = v
-		}
-	}
-	return nil
 }
 
 func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, error) {
