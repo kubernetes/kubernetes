@@ -263,6 +263,7 @@ filename | sha512 hash
 [kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.16.13/kubernetes-client-darwin-386.tar.gz) | 6e720c2259ec62f0d898804ca55c20ea50034c15a5871b7037edd11c043f95243c792a9fb1890084351ddf3bb7d8ad9e549d80b817f904224033183ddd5ee47b
 [kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.16.13/kubernetes-client-darwin-amd64.tar.gz) | 0fe4ac6853922b7d20b5381991dda48eb9ad11c79b368516e3c1c83227dc617f540f64040550f60bdc2892fc6fda6abc13464a9e51376ccb4ac860fb0154bffb
 [kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.16.13/kubernetes-client-linux-386.tar.gz) | 2d3f59f907311e0ccbc261ac9f0ad24876f6954f2e22d4954456f6c7a1ea99616d97beecf352fc90b225d1ec20df45e599ed0dc9e90f46ac56c843346766fb4f
+
 [kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.16.13/kubernetes-client-linux-amd64.tar.gz) | 587c9f192fbc46e04201906fd8e24c71b18838c13722b743b1d7b60d65cd0c1bd48ffa4bd7e82a9b3f05ff482747f2afde17975e01d2400b14ce3ed864f4308d
 [kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.16.13/kubernetes-client-linux-arm.tar.gz) | 757f8b512f28d4c62b217dec13963f21bb0dc6ec083deef74974c79f2d989c033a88a8a5d7c206304d2f7499da7343dbc2015f4000e8d38c83fa524283e09721
 [kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.16.13/kubernetes-client-linux-arm64.tar.gz) | 6ec7749f380185f8db968964af9822debc509dd4168242a142bbbcd1f2bfb3310534b985c6280f18684e1670d7fbb82806c471a1d87e44c08a13836915f6e9ae
