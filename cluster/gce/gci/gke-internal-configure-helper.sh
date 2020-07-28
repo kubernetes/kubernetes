@@ -107,7 +107,11 @@ function setup_pod_autoscaler_component {
 
   if [[ ${component} == "recommender" ]]; then
     local uas_params="${UAS_PARAMS:-}"
-    sed -i -e "s@{{uas_params}}@${uas_params}@g" "${src_file}"
+    # split the params into separate arguments passed to binary
+    local uas_params_split
+    uas_params_split=$(eval "for param in $uas_params; do echo -n \\\"\$param\\\",; done")
+    uas_params_split=${uas_params_split%?}
+    sed -i -e "s@{{uas_params}}@${uas_params_split:-}@g" "${src_file}"
   fi
 
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
