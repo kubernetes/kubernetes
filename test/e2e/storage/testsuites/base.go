@@ -18,7 +18,6 @@ package testsuites
 
 import (
 	"context"
-	"crypto/sha1"
 	"flag"
 	"fmt"
 	"math"
@@ -47,6 +46,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 var (
@@ -617,18 +617,12 @@ func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotH
 	return snapshotContent
 }
 
-func genShortHash(s string) string {
-	h := sha1.New()
-	h.Write([]byte(s))
-	bs := h.Sum(nil)
-	return fmt.Sprintf("%x", bs)[:7]
-}
 func getPreProvisionedSnapshotContentName(snapshotHandle string) string {
-	return fmt.Sprintf("pre-provisioned-snapcontent-%s", genShortHash(snapshotHandle))
+	return fmt.Sprintf("pre-provisioned-snapcontent-%s", utils.GenShortHash(snapshotHandle))
 }
 
 func getPreProvisionedSnapshotName(snapshotHandle string) string {
-	return fmt.Sprintf("pre-provisioned-snapshot-%s", genShortHash(snapshotHandle))
+	return fmt.Sprintf("pre-provisioned-snapshot-%s", utils.GenShortHash(snapshotHandle))
 }
 
 // StartPodLogs begins capturing log output and events from current
