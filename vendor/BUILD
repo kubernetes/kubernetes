@@ -521,6 +521,7 @@ filegroup(
         "//vendor/sigs.k8s.io/kustomize/pkg/target:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/transformers:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/types:all-srcs",
+        "//vendor/sigs.k8s.io/legacyflag/pkg/legacyflag:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/v3/fieldpath:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/v3/merge:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/v3/schema:all-srcs",
