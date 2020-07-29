@@ -17,9 +17,10 @@ limitations under the License.
 package apimachinery
 
 import (
+	"regexp"
+
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"regexp"
 
 	"github.com/onsi/ginkgo"
 )
@@ -28,7 +29,7 @@ var _ = SIGDescribe("server version", func() {
 	f := framework.NewDefaultFramework("server-version")
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: Confirm a server version
 	   Description: Ensure that an API server version can be retrieved.
 	   Both the major and minor versions MUST only be an integer.

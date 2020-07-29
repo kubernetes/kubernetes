@@ -21,13 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"encoding/base64"
+
 	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -36,7 +37,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Secrets, pod environment field
 		Description: Create a secret. Create a Pod with Container that declares a environment variable which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
@@ -85,7 +86,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Secrets, pod environment from source
 		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
@@ -130,7 +131,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	})
 
 	/*
-	   Release : v1.15
+	   Release: v1.15
 	   Testname: Secrets, with empty-key
 	   Description: Attempt to create a Secret with an empty key. The creation MUST fail.
 	*/
@@ -140,7 +141,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	})
 
 	/*
-			   Release : v1.18
+			   Release: v1.18
 			   Testname: Secret patching
 			   Description: A Secret is created.
 		           Listing all Secrets MUST return an empty list.

@@ -92,7 +92,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Jobs, completion after task failure
 		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
 		execute to completion.
@@ -148,7 +148,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Release : v1.15
+		Release: v1.15
 		Testname: Jobs, active pods, graceful termination
 		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Jobs, orphan pods, re-adoption
 		Description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
 		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.

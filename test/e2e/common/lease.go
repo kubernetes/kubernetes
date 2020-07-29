@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
 
 	/*
-		Release : v1.17
+		Release: v1.17
 		Testname: lease API should be available
 		Description: Create Lease object, and get it; create and get MUST be successful and Spec of the
 		read Lease MUST match Spec of original Lease. Update the Lease and get it; update and get MUST

@@ -78,7 +78,7 @@ var _ = SIGDescribe("Proxy", func() {
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Proxy, logs service endpoint
 			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
