@@ -145,23 +145,23 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
 func DefaultOffAdmissionPlugins() sets.String {
 	defaultOnPlugins := sets.NewString(
-		lifecycle.PluginName,                    //NamespaceLifecycle
-		limitranger.PluginName,                  //LimitRanger
-		serviceaccount.PluginName,               //ServiceAccount
-		setdefault.PluginName,                   //DefaultStorageClass
-		resize.PluginName,                       //PersistentVolumeClaimResize
-		defaulttolerationseconds.PluginName,     //DefaultTolerationSeconds
-		mutatingwebhook.PluginName,              //MutatingAdmissionWebhook
-		validatingwebhook.PluginName,            //ValidatingAdmissionWebhook
-		resourcequota.PluginName,                //ResourceQuota
-		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
-		podpriority.PluginName,                  //PodPriority
-		nodetaint.PluginName,                    //TaintNodesByCondition
-		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
+		lifecycle.PluginName,                    // NamespaceLifecycle
+		limitranger.PluginName,                  // LimitRanger
+		serviceaccount.PluginName,               // ServiceAccount
+		setdefault.PluginName,                   // DefaultStorageClass
+		resize.PluginName,                       // PersistentVolumeClaimResize
+		defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
+		mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
+		validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
+		resourcequota.PluginName,                // ResourceQuota
+		storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+		podpriority.PluginName,                  // PodPriority
+		nodetaint.PluginName,                    // TaintNodesByCondition
+		runtimeclass.PluginName,                 // RuntimeClass, gates internally on the feature
 		certapproval.PluginName,                 // CertificateApproval
 		certsigning.PluginName,                  // CertificateSigning
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
-		defaultingressclass.PluginName,          //DefaultIngressClass
+		defaultingressclass.PluginName,          // DefaultIngressClass
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
