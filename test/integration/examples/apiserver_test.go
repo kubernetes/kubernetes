@@ -77,8 +77,6 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// use a channel to hand off the error
-	errs := make(chan error, 1)
 	go func() {
 		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
 		o.RecommendedOptions.SecureServing.Listener = listener
@@ -92,19 +90,14 @@ func TestAggregatedAPIServer(t *testing.T) {
 			"--kubeconfig", wardleToKASKubeConfigFile,
 		})
 		if err := wardleCmd.Execute(); err != nil {
-			errs <- err
+			t.Errorf("Error executing command: %v", err)
 		}
 	}()
-	// wait for it
-	err = <-errs
-	if err != nil {
-		t.Fatal(err)
-	}
 	directWardleClientConfig, err := waitForWardleRunning(t, kubeClientConfig, wardleCertDir, wardlePort)
+
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// now we're finally ready to test. These are what's run by default now
 	wardleClient, err := client.NewForConfig(directWardleClientConfig)
 	if err != nil {
