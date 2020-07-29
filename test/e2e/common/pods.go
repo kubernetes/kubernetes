@@ -832,7 +832,13 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	})
 
-	ginkgo.It("should delete a collection of pods", func() {
+	/*
+		Release : v1.19
+		Testname: Pods, delete a collection
+		Description: A set of pods is created with a label selector which MUST be found when listed.
+		The set of pods is deleted and MUST NOT show up when listed by its label selector.
+	*/
+	framework.ConformanceIt("should delete a collection of pods", func() {
 		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
 
 		zero := int64(0)
