@@ -324,14 +324,26 @@ func (v *glusterVolume) DeleteVolume() {
 
 	name := v.prefix + "-server"
 
-	framework.Logf("Deleting Gluster endpoints %q...", name)
+	nameSpaceName := fmt.Sprintf("%s/%s", ns.Name, name)
+
+	framework.Logf("Deleting Gluster endpoints %s...", nameSpaceName)
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("Gluster delete endpoints failed: %v", err)
+			framework.Failf("Gluster deleting endpoint %s failed: %v", nameSpaceName, err)
 		}
-		framework.Logf("Gluster endpoints %q not found, assuming deleted", name)
+		framework.Logf("Gluster endpoints %q not found, assuming deleted", nameSpaceName)
 	}
+
+	framework.Logf("Deleting Gluster service %s...", nameSpaceName)
+	err = cs.CoreV1().Services(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("Gluster deleting service %s failed: %v", nameSpaceName, err)
+		}
+		framework.Logf("Gluster service %q not found, assuming deleted", nameSpaceName)
+	}
+
 	framework.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = e2epod.DeletePodWithWait(cs, v.serverPod)
 	if err != nil {
