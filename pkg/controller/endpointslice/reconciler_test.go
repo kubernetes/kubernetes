@@ -65,7 +65,7 @@ func TestReconcileEmpty(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
-	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "100")
+	expectTrackedGeneration(t, r.endpointSliceTracker, &slices[0], 1)
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 }
 
@@ -473,7 +473,7 @@ func TestReconcile1Pod(t *testing.T) {
 					t.Fatalf("Expected endpoint: %+v, got: %+v", expectedEndPointList[0], endpoint)
 				}
 
-				expectTrackedResourceVersion(t, r.endpointSliceTracker, &slice, "100")
+				expectTrackedGeneration(t, r.endpointSliceTracker, &slice, 1)
 
 				expectMetrics(t,
 					expectedMetrics{
@@ -516,7 +516,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
-	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "200")
+	expectTrackedGeneration(t, r.endpointSliceTracker, &slices[0], 1)
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0})
 }
 
@@ -1436,14 +1436,17 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 	}
 }
 
-func expectTrackedResourceVersion(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedRV string) {
-	rrv, _ := tracker.relatedResourceVersions(slice)
-	rv, tracked := rrv[slice.Name]
-	if !tracked {
+func expectTrackedGeneration(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedGeneration int64) {
+	gfs, ok := tracker.generationsForSliceUnsafe(slice)
+	if !ok {
+		t.Fatalf("Expected Service to be tracked for EndpointSlices %s", slice.Name)
+	}
+	generation, ok := gfs[slice.UID]
+	if !ok {
 		t.Fatalf("Expected EndpointSlice %s to be tracked", slice.Name)
 	}
-	if rv != expectedRV {
-		t.Errorf("Expected ResourceVersion of %s to be %s, got %s", slice.Name, expectedRV, rv)
+	if generation != expectedGeneration {
+		t.Errorf("Expected Generation of %s to be %d, got %d", slice.Name, expectedGeneration, generation)
 	}
 }
 

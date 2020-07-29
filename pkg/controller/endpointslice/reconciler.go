@@ -101,7 +101,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", sliceToDelete.Name, service.Namespace, service.Name, err))
 		} else {
-			r.endpointSliceTracker.Delete(sliceToDelete)
+			r.endpointSliceTracker.ExpectDeletion(sliceToDelete)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 		}
 	}
@@ -293,7 +293,7 @@ func (r *reconciler) finalize(
 		if err != nil {
 			return fmt.Errorf("failed to delete %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err)
 		}
-		r.endpointSliceTracker.Delete(endpointSlice)
+		r.endpointSliceTracker.ExpectDeletion(endpointSlice)
 		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
