@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -72,6 +73,24 @@ func (rsStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.Garba
 // NamespaceScoped returns true because all ReplicaSets need to be within a namespace.
 func (rsStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (rsStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	// TODO: make sure this works and is the best way to do this
+	specStr, templateStr := "spec", "template"
+	pod.AddDisabledTemplateFieldsTo(fields["apps/v1"].
+		WithPrefix(fieldpath.PathElement{FieldName: &specStr}).
+		WithPrefix(fieldpath.PathElement{FieldName: &templateStr}))
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
@@ -189,6 +208,16 @@ type rsStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = rsStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (rsStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
 
 func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRS := obj.(*apps.ReplicaSet)
