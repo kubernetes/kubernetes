@@ -35,7 +35,7 @@ make --no-print-directory -C "${KUBE_ROOT}" generated_files
 # force this tooling to run in a fake GOPATH.
 ret=0
 hack/run-in-gopath.sh \
-    go run test/typecheck/main.go "$@" || ret=$?
+    go run test/typecheck/main.go --serial "$@" || ret=$?
 if [[ $ret -ne 0 ]]; then
   echo "!!! Type Check has failed. This may cause cross platform build failures." >&2
   echo "!!! Please see https://git.k8s.io/kubernetes/test/typecheck for more information." >&2
