@@ -77,6 +77,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/testing:all-srcs",
     ],

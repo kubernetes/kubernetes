@@ -18,9 +18,9 @@ package install
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	core "k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
-	generic "k8s.io/kubernetes/pkg/quota/v1/generic"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.

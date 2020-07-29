@@ -19,7 +19,8 @@ package admission
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/admission/initializer"
+	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
@@ -32,12 +33,6 @@ type WantsCloudConfig interface {
 // WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
 type WantsRESTMapper interface {
 	SetRESTMapper(meta.RESTMapper)
-}
-
-// WantsQuotaConfiguration defines a function which sets quota configuration for admission plugins that need it.
-type WantsQuotaConfiguration interface {
-	SetQuotaConfiguration(quota.Configuration)
-	admission.InitializationValidator
 }
 
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
@@ -75,7 +70,7 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetRESTMapper(i.restMapper)
 	}
 
-	if wants, ok := plugin.(WantsQuotaConfiguration); ok {
+	if wants, ok := plugin.(initializer.WantsQuotaConfiguration); ok {
 		wants.SetQuotaConfiguration(i.quotaConfiguration)
 	}
 }
