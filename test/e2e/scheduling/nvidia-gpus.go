@@ -22,18 +22,20 @@ import (
 	"regexp"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -48,7 +50,6 @@ const (
 
 var (
 	gpuResourceName v1.ResourceName
-	dsYamlURL       string
 )
 
 func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
@@ -126,18 +127,23 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
 	logOSImages(f)
 
+	var err error
+	var ds *appsv1.DaemonSet
 	dsYamlURLFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
 	if dsYamlURLFromEnv != "" {
-		dsYamlURL = dsYamlURLFromEnv
+		// Using DaemonSet from remote URL
+		framework.Logf("Using remote nvidia-driver-installer daemonset manifest from %v", dsYamlURLFromEnv)
+		ds, err = framework.DsFromManifest(dsYamlURLFromEnv)
+		framework.ExpectNoError(err, "failed get remote")
 	} else {
-		dsYamlURL = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		// Using default local DaemonSet
+		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
+		data, err := e2etestfiles.Read("test/e2e/testing-manifests/scheduling/nvidia-driver-installer.yaml")
+		framework.ExpectNoError(err, "failed to read local manifest for nvidia-driver-installer daemonset")
+		ds, err = framework.DsFromData(data)
+		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
 	}
-	gpuResourceName = gpu.NVIDIAGPUResourceName
-
-	framework.Logf("Using %v", dsYamlURL)
-	// Creates the DaemonSet that installs Nvidia Drivers.
-	ds, err := framework.DsFromManifest(dsYamlURL)
-	framework.ExpectNoError(err)
+	gpuResourceName = e2egpu.NVIDIAGPUResourceName
 	ds.Namespace = f.Namespace.Name
 	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(context.TODO(), ds, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
