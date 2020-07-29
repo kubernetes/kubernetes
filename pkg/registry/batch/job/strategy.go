@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -70,6 +71,28 @@ func (jobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.Garb
 // NamespaceScoped returns true because all jobs need to be within a namespace.
 func (jobStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (jobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"batch/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+		fields["batch/v1"].Insert(fieldpath.MakePathOrDie("spec", "ttlSecondsAfterFinished"))
+	}
+
+	// TODO: make sure this works and is the best way to do this
+	specStr, templateStr := "spec", "template"
+	pod.AddDisabledTemplateFieldsTo(fields["batch/v1"].
+		WithPrefix(fieldpath.PathElement{FieldName: &specStr}).
+		WithPrefix(fieldpath.PathElement{FieldName: &templateStr}))
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a job before creation.
@@ -187,6 +210,16 @@ type jobStatusStrategy struct {
 }
 
 var StatusStrategy = jobStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (jobStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"batch/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
 
 func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
