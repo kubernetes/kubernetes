@@ -228,6 +228,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	f := framework.NewDefaultFramework("namespaces")
 
 	/*
+		Release : v1.11
 		Testname: namespace-deletion-removes-pods
 		Description: Ensure that if a namespace is deleted then all pods are removed from that namespace.
 	*/
@@ -235,6 +236,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		func() { ensurePodsAreRemovedWhenNamespaceIsDeleted(f) })
 
 	/*
+		Release : v1.11
 		Testname: namespace-deletion-removes-services
 		Description: Ensure that if a namespace is deleted then all services are removed from that namespace.
 	*/

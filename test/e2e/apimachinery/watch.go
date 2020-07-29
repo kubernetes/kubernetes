@@ -46,6 +46,7 @@ var _ = SIGDescribe("Watchers", func() {
 	f := framework.NewDefaultFramework("watch")
 
 	/*
+		    Release : v1.11
 		    Testname: watch-configmaps-with-multiple-watchers
 		    Description: Ensure that multiple watchers are able to receive all add,
 			update, and delete notifications on configmaps that match a label selector and do
@@ -132,6 +133,7 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+		    Release : v1.11
 		    Testname: watch-configmaps-from-resource-version
 		    Description: Ensure that a watch can be opened from a particular resource version
 			in the past and only notifications happening after that resource version are observed.
@@ -179,6 +181,7 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+		    Release : v1.11
 		    Testname: watch-configmaps-closed-and-restarted
 		    Description: Ensure that a watch can be reopened from the last resource version
 			observed by the previous watch, and it will continue delivering notifications from
@@ -244,6 +247,7 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+		    Release : v1.11
 		    Testname: watch-configmaps-label-changed
 		    Description: Ensure that a watched object stops meeting the requirements of
 			a watch's selector, the watch will observe a delete, and will not observe
