@@ -20,14 +20,18 @@ import (
 	"context"
 	"fmt"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
+	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1listers "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -50,17 +54,24 @@ func Register(plugins *admission.Plugins) {
 type classDefaulterPlugin struct {
 	*admission.Handler
 	lister networkingv1listers.IngressClassLister
+	client networkingv1client.IngressClassInterface
 }
 
 var _ admission.Interface = &classDefaulterPlugin{}
 var _ admission.MutationInterface = &classDefaulterPlugin{}
 var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&classDefaulterPlugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&classDefaulterPlugin{})
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *classDefaulterPlugin {
 	return &classDefaulterPlugin{
 		Handler: admission.NewHandler(admission.Create),
 	}
+}
+
+// SetExternalKubeClientSet sets the client for the plugin
+func (a *classDefaulterPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
+	a.client = client.NetworkingV1().IngressClasses()
 }
 
 // SetExternalKubeInformerFactory sets a lister and readyFunc for this
@@ -109,7 +120,7 @@ func (a *classDefaulterPlugin) Admit(ctx context.Context, attr admission.Attribu
 
 	klog.V(4).Infof("No class specified on Ingress %s", ingress.Name)
 
-	defaultClass, err := getDefaultClass(a.lister)
+	defaultClass, err := a.getDefaultClass(ctx, a.lister, ingress)
 	if err != nil {
 		return admission.NewForbidden(attr, err)
 	}
@@ -125,8 +136,17 @@ func (a *classDefaulterPlugin) Admit(ctx context.Context, attr admission.Attribu
 }
 
 // getDefaultClass returns the default IngressClass from the store, or nil.
-func getDefaultClass(lister networkingv1listers.IngressClassLister) (*networkingv1.IngressClass, error) {
+func (a *classDefaulterPlugin) getDefaultClass(ctx context.Context, lister networkingv1listers.IngressClassLister, ingress *networking.Ingress) (*networkingv1.IngressClass, error) {
 	list, err := lister.List(labels.Everything())
+	if apierrors.IsNotFound(err) {
+		// if not found, informer cache could be stale, try a live lookup
+		ing, err := a.client.Get(ctx, *ingress.Spec.IngressClassName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		list = append(list, ing)
+
+	}
 	if err != nil {
 		return nil, err
 	}
