@@ -489,7 +489,7 @@ func TestUpdateServiceMapHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
 	}
@@ -516,7 +516,7 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
 	}
@@ -576,7 +576,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.addService(services[i])
 	}
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 8 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -609,7 +609,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.deleteService(services[2])
 	fp.deleteService(services[3])
 
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
 	}
@@ -658,7 +658,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	fp.addService(servicev1)
 
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -672,7 +672,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// Change service to load-balancer
 	fp.updateService(servicev1, servicev2)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -686,7 +686,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.updateService(servicev2, servicev2)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -699,7 +699,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// And back to ClusterIP
 	fp.updateService(servicev2, servicev1)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
