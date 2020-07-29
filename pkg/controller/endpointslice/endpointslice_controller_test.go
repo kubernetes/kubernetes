@@ -97,7 +97,7 @@ func TestSyncServiceNoSelector(t *testing.T) {
 		},
 	})
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	err := esController.syncService(ns, serviceName)
 	assert.Nil(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
@@ -116,7 +116,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 		},
 	})
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	err := esController.syncService(ns, serviceName)
 	assert.Nil(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
@@ -164,7 +164,7 @@ func TestSyncServiceMissing(t *testing.T) {
 	missingServiceKey := endpointutil.ServiceKey{Name: missingServiceName, Namespace: namespace}
 	esController.triggerTimeTracker.ServiceStates[missingServiceKey] = endpointutil.ServiceState{}
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, missingServiceName))
+	err := esController.syncService(namespace, missingServiceName)
 
 	// nil should be returned when the service doesn't exist
 	assert.Nil(t, err, "Expected no error syncing service")
@@ -365,7 +365,7 @@ func TestSyncServiceFull(t *testing.T) {
 	assert.Nil(t, err, "Expected no error creating service")
 
 	// run through full sync service loop
-	err = esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+	err = esController.syncService(namespace, serviceName)
 	assert.Nil(t, err)
 
 	// last action should be to create endpoint slice
@@ -475,6 +475,9 @@ func TestPodAddsBatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := metav1.NamespaceDefault
 			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
+			// Overriding default value here because it interferes with timing
+			// requirements in theses tests.
+			esController.maxCacheWaitDelay = 0 * time.Second
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
@@ -606,6 +609,9 @@ func TestPodUpdatesBatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := metav1.NamespaceDefault
 			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
+			// Overriding default value here because it interferes with timing
+			// requirements in theses tests.
+			esController.maxCacheWaitDelay = 0 * time.Second
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
@@ -740,6 +746,9 @@ func TestPodDeleteBatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := metav1.NamespaceDefault
 			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
+			// Overriding default value here because it interferes with timing
+			// requirements in theses tests.
+			esController.maxCacheWaitDelay = 0 * time.Second
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
@@ -788,7 +797,7 @@ func standardSyncService(t *testing.T, esController *endpointSliceController, na
 	t.Helper()
 	createService(t, esController, namespace, serviceName, managedBySetup)
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+	err := esController.syncService(namespace, serviceName)
 	assert.Nil(t, err, "Expected no error syncing service")
 }
 

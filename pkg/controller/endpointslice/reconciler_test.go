@@ -983,13 +983,16 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 }
 
 func expectTrackedResourceVersion(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedRV string) {
-	rrv, _ := tracker.relatedResourceVersions(slice)
-	rv, tracked := rrv[slice.Name]
-	if !tracked {
+	serviceStatus, ok := tracker.serviceStatusForSlice(slice)
+	if !ok {
+		t.Fatalf("Expected Service to be tracked for EndpointSlices %s", slice.Name)
+	}
+	sliceStatus, ok := serviceStatus.statusBySlice[slice.Name]
+	if !ok {
 		t.Fatalf("Expected EndpointSlice %s to be tracked", slice.Name)
 	}
-	if rv != expectedRV {
-		t.Errorf("Expected ResourceVersion of %s to be %s, got %s", slice.Name, expectedRV, rv)
+	if sliceStatus.resourceVersion != expectedRV {
+		t.Errorf("Expected ResourceVersion of %s to be %s, got %s", slice.Name, expectedRV, sliceStatus.resourceVersion)
 	}
 }
 

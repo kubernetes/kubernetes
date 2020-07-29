@@ -55,6 +55,11 @@ const (
 	// 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s, 1000s (max)
 	maxRetries = 15
 
+	// maxCacheWaitDelay indicates the maximum amount of time the controller
+	// will wait for the EndpointSlice informer cache to be up to date for a
+	// Service before syncing it again.
+	maxCacheWaitDelay = 3 * time.Second
+
 	// endpointSliceChangeMinSyncDelay indicates the mininum delay before
 	// queuing a syncService call after an EndpointSlice changes. If
 	// endpointUpdatesBatchPeriod is greater than this value, it will be used
@@ -141,6 +146,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	c.endpointSliceTracker = newEndpointSliceTracker()
 
 	c.maxEndpointsPerSlice = maxEndpointsPerSlice
+	c.maxCacheWaitDelay = maxCacheWaitDelay
 
 	c.reconciler = &reconciler{
 		client:               c.client,
@@ -216,6 +222,11 @@ type Controller struct {
 	// should be added to an EndpointSlice
 	maxEndpointsPerSlice int32
 
+	// maxCacheWaitDelay indicates the maximum amount of time the controller
+	// will wait for the EndpointSlice informer cache to be up to date for a
+	// Service before syncing it again.
+	maxCacheWaitDelay time.Duration
+
 	// workerLoopPeriod is the time between worker runs. The workers
 	// process the queue of service and pod changes
 	workerLoopPeriod time.Duration
@@ -268,7 +279,25 @@ func (c *Controller) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncService(cKey.(string))
+	namespace, name, err := cache.SplitMetaNamespaceKey(cKey.(string))
+	if err != nil {
+		c.handleErr(err, cKey)
+		return true
+	}
+
+	if c.endpointSliceTracker.ServiceCacheOutdated(namespace, name) {
+		if c.endpointSliceTracker.ServiceCacheUpdatedSince(namespace, name, time.Now().Add(-c.maxCacheWaitDelay)) {
+			klog.V(2).Infof("Informer cache for %s/%s EndpointSlices outdated, retrying", namespace, name)
+			c.queue.AddRateLimited(cKey)
+			return true
+		}
+		// Mark all EndpointSlices for a Service as updated if the wait delay is
+		// exceeded so this is not stuck in a delayed sync forever.
+		c.endpointSliceTracker.MarkServiceCacheUpdated(namespace, name)
+		klog.Warningf("Informer cache for %s/%s EndpointSlices outdated and maxCacheWaitDelay exceeded, attempting sync", namespace, name)
+	}
+
+	err = c.syncService(namespace, name)
 	c.handleErr(err, cKey)
 
 	return true
@@ -291,16 +320,11 @@ func (c *Controller) handleErr(err error, key interface{}) {
 	utilruntime.HandleError(err)
 }
 
-func (c *Controller) syncService(key string) error {
+func (c *Controller) syncService(namespace, name string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing service %q endpoint slices. (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing service %s/%s endpoint slices. (%v)", namespace, name, time.Since(startTime))
 	}()
-
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return err
-	}
 
 	service, err := c.serviceLister.Services(namespace).Get(name)
 	if err != nil {
@@ -320,7 +344,7 @@ func (c *Controller) syncService(key string) error {
 		return nil
 	}
 
-	klog.V(5).Infof("About to update endpoint slices for service %q", key)
+	klog.V(5).Infof("About to update endpoint slices for service %s/%s", namespace, name)
 
 	podLabelSelector := labels.Set(service.Spec.Selector).AsSelectorPreValidated()
 	pods, err := c.podLister.Pods(service.Namespace).List(podLabelSelector)
@@ -395,8 +419,11 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceAdd()"))
 		return
 	}
-	if managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice) {
-		c.queueServiceForEndpointSlice(endpointSlice)
+	if managedByController(endpointSlice) {
+		c.endpointSliceTracker.MarkCacheUpdated(endpointSlice)
+		if c.endpointSliceTracker.Stale(endpointSlice) {
+			c.queueServiceForEndpointSlice(endpointSlice)
+		}
 	}
 }
 
@@ -411,8 +438,12 @@ func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
 		return
 	}
-	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice)) {
-		c.queueServiceForEndpointSlice(endpointSlice)
+	controllerChanged := managedByChanged(prevEndpointSlice, endpointSlice)
+	if controllerChanged || managedByController(endpointSlice) {
+		c.endpointSliceTracker.MarkCacheUpdated(endpointSlice)
+		if controllerChanged || c.endpointSliceTracker.Stale(endpointSlice) {
+			c.queueServiceForEndpointSlice(endpointSlice)
+		}
 	}
 }
 

@@ -19,8 +19,6 @@ package endpointslice
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,55 +44,39 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 	epSlice1DifferentRV.ResourceVersion = "rv2"
 
 	testCases := map[string]struct {
-		updateParam                     *discovery.EndpointSlice
-		checksParam                     *discovery.EndpointSlice
-		expectHas                       bool
-		expectStale                     bool
-		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+		updateParam           *discovery.EndpointSlice
+		checksParam           *discovery.EndpointSlice
+		expectHas             bool
+		expectStale           bool
+		expectResourceVersion string
 	}{
 		"same slice": {
-			updateParam: epSlice1,
-			checksParam: epSlice1,
-			expectHas:   true,
-			expectStale: false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:           epSlice1,
+			checksParam:           epSlice1,
+			expectHas:             true,
+			expectStale:           false,
+			expectResourceVersion: epSlice1.ResourceVersion,
 		},
 		"different namespace": {
-			updateParam: epSlice1,
-			checksParam: epSlice1DifferentNS,
-			expectHas:   false,
-			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:           epSlice1,
+			checksParam:           epSlice1DifferentNS,
+			expectHas:             false,
+			expectStale:           true,
+			expectResourceVersion: epSlice1.ResourceVersion,
 		},
 		"different service": {
-			updateParam: epSlice1,
-			checksParam: epSlice1DifferentService,
-			expectHas:   false,
-			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:           epSlice1,
+			checksParam:           epSlice1DifferentService,
+			expectHas:             false,
+			expectStale:           true,
+			expectResourceVersion: epSlice1.ResourceVersion,
 		},
 		"different resource version": {
-			updateParam: epSlice1,
-			checksParam: epSlice1DifferentRV,
-			expectHas:   true,
-			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:           epSlice1,
+			checksParam:           epSlice1DifferentRV,
+			expectHas:             true,
+			expectStale:           true,
+			expectResourceVersion: epSlice1.ResourceVersion,
 		},
 	}
 
@@ -108,7 +90,18 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 			if esTracker.Stale(tc.checksParam) != tc.expectStale {
 				t.Errorf("tc.tracker.Stale(%+v) == %t, expected %t", tc.checksParam, esTracker.Stale(tc.checksParam), tc.expectStale)
 			}
-			assert.Equal(t, tc.expectResourceVersionsByService, esTracker.resourceVersionsByService)
+			serviceNN := types.NamespacedName{Namespace: epSlice1.Namespace, Name: "svc1"}
+			ss, ok := esTracker.statusByService[serviceNN]
+			if !ok {
+				t.Fatalf("expected tracker to have status for %s Service", serviceNN.Name)
+			}
+			sliceStatus, ok := ss.statusBySlice[epSlice1.Name]
+			if !ok {
+				t.Fatalf("expected tracker to have status for %s EndpointSlice", epSlice1.Name)
+			}
+			if tc.expectResourceVersion != sliceStatus.resourceVersion {
+				t.Fatalf("expected resource version to be %s, got %s", tc.expectResourceVersion, sliceStatus.resourceVersion)
+			}
 		})
 	}
 }
@@ -211,40 +204,31 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		updateParam                     *discovery.EndpointSlice
-		deleteServiceParam              *types.NamespacedName
-		expectHas                       bool
-		expectStale                     bool
-		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+		updateParam           *discovery.EndpointSlice
+		deleteServiceParam    *types.NamespacedName
+		expectHas             bool
+		expectStale           bool
+		expectResourceVersion string
 	}{
 		"same service": {
-			updateParam:                     epSlice1,
-			deleteServiceParam:              &types.NamespacedName{Namespace: svcNS1, Name: svcName1},
-			expectHas:                       false,
-			expectStale:                     true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{},
+			updateParam:        epSlice1,
+			deleteServiceParam: &types.NamespacedName{Namespace: svcNS1, Name: svcName1},
+			expectHas:          false,
+			expectStale:        true,
 		},
 		"different namespace": {
-			updateParam:        epSlice1,
-			deleteServiceParam: &types.NamespacedName{Namespace: svcNS2, Name: svcName1},
-			expectHas:          true,
-			expectStale:        false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:           epSlice1,
+			deleteServiceParam:    &types.NamespacedName{Namespace: svcNS2, Name: svcName1},
+			expectHas:             true,
+			expectStale:           false,
+			expectResourceVersion: epSlice1.ResourceVersion,
 		},
 		"different service": {
-			updateParam:        epSlice1,
-			deleteServiceParam: &types.NamespacedName{Namespace: svcNS1, Name: svcName2},
-			expectHas:          true,
-			expectStale:        false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:           epSlice1,
+			deleteServiceParam:    &types.NamespacedName{Namespace: svcNS1, Name: svcName2},
+			expectHas:             true,
+			expectStale:           false,
+			expectResourceVersion: epSlice1.ResourceVersion,
 		},
 	}
 
@@ -259,7 +243,225 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 			if esTracker.Stale(tc.updateParam) != tc.expectStale {
 				t.Errorf("tc.tracker.Stale(%+v) == %t, expected %t", tc.updateParam, esTracker.Stale(tc.updateParam), tc.expectStale)
 			}
-			assert.Equal(t, tc.expectResourceVersionsByService, esTracker.resourceVersionsByService)
+			if tc.expectResourceVersion != "" {
+				serviceNN := types.NamespacedName{Namespace: epSlice1.Namespace, Name: "svc1"}
+				ss, ok := esTracker.statusByService[serviceNN]
+				if !ok {
+					t.Fatalf("expected tracker to have status for %s Service", serviceNN.Name)
+				}
+				sliceStatus, ok := ss.statusBySlice[epSlice1.Name]
+				if !ok {
+					t.Fatalf("expected tracker to have status for %s EndpointSlice", epSlice1.Name)
+				}
+				if tc.expectResourceVersion != sliceStatus.resourceVersion {
+					t.Fatalf("expected resource version to be %s, got %s", tc.expectResourceVersion, sliceStatus.resourceVersion)
+				}
+			}
 		})
 	}
+}
+
+func TestServiceCacheOutdated(t *testing.T) {
+	testCases := []struct {
+		testName        string
+		svcNamespace    string
+		svcName         string
+		statusByService map[types.NamespacedName]*serviceStatus
+		expectOutdated  bool
+	}{{
+		testName:       "empty statusByService",
+		svcNamespace:   "foo",
+		svcName:        "bar",
+		expectOutdated: false,
+	}, {
+		testName:     "statusByService with no slices",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{},
+			},
+		},
+		expectOutdated: false,
+	}, {
+		testName:     "statusByService with one slice out of date",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: false},
+				},
+			},
+		},
+		expectOutdated: true,
+	}, {
+		testName:     "statusByService with one slice out of date, different namespace",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo2", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: false},
+				},
+			},
+		},
+		expectOutdated: false,
+	}, {
+		testName:     "statusByService with one slice up to date",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: true},
+				},
+			},
+		},
+		expectOutdated: false,
+	}, {
+		testName:     "statusByService with one slice up to date and one out of date",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: true},
+					"slice-2": {cacheUpdated: false},
+				},
+			},
+		},
+		expectOutdated: true,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			est := newEndpointSliceTracker()
+			est.statusByService = tc.statusByService
+			actualOutdated := est.ServiceCacheOutdated(tc.svcNamespace, tc.svcName)
+
+			if tc.expectOutdated != actualOutdated {
+				t.Errorf("Expected ServiceCacheOutdated() to return %t, got %t", tc.expectOutdated, actualOutdated)
+			}
+		})
+	}
+}
+
+func TestMarkCacheUpdated(t *testing.T) {
+	testCases := []struct {
+		testName             string
+		svcNamespace         string
+		svcName              string
+		statusByService      map[types.NamespacedName]*serviceStatus
+		expectOutdatedBefore bool
+		endpointSlice        *discovery.EndpointSlice
+		expectOutdatedAfter  bool
+	}{{
+		testName:             "empty statusByService",
+		svcNamespace:         "foo",
+		svcName:              "bar",
+		expectOutdatedBefore: false,
+		endpointSlice:        endpointSliceForService("slice-1", "foo", "bar"),
+		expectOutdatedAfter:  false,
+	}, {
+		testName:     "statusByService with no slices",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{},
+			},
+		},
+		expectOutdatedBefore: false,
+		endpointSlice:        endpointSliceForService("slice-1", "foo", "bar"),
+		expectOutdatedAfter:  false,
+	}, {
+		testName:     "statusByService with one slice out of date",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: false},
+				},
+			},
+		},
+		expectOutdatedBefore: true,
+		endpointSlice:        endpointSliceForService("slice-1", "foo", "bar"),
+		expectOutdatedAfter:  false,
+	}, {
+		testName:     "statusByService with one slice out of date, different namespace",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo2", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: false},
+				},
+			},
+		},
+		expectOutdatedBefore: false,
+		endpointSlice:        endpointSliceForService("slice-1", "foo", "bar"),
+		expectOutdatedAfter:  false,
+	}, {
+		testName:     "statusByService with one slice up to date",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: true},
+				},
+			},
+		},
+		expectOutdatedBefore: false,
+		endpointSlice:        endpointSliceForService("slice-1", "foo", "bar"),
+		expectOutdatedAfter:  false,
+	}, {
+		testName:     "statusByService with one slice up to date and one out of date",
+		svcNamespace: "foo",
+		svcName:      "bar",
+		statusByService: map[types.NamespacedName]*serviceStatus{
+			{Namespace: "foo", Name: "bar"}: {
+				statusBySlice: map[string]*sliceStatus{
+					"slice-1": {cacheUpdated: true},
+					"slice-2": {cacheUpdated: false},
+				},
+			},
+		},
+		expectOutdatedBefore: true,
+		endpointSlice:        endpointSliceForService("slice-2", "foo", "bar"),
+		expectOutdatedAfter:  false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			est := newEndpointSliceTracker()
+			est.statusByService = tc.statusByService
+			actualOutdatedBefore := est.ServiceCacheOutdated(tc.svcNamespace, tc.svcName)
+
+			if tc.expectOutdatedBefore != actualOutdatedBefore {
+				t.Errorf("Expected ServiceCacheOutdated() to return %t before update, got %t", tc.expectOutdatedBefore, actualOutdatedBefore)
+			}
+
+			est.MarkCacheUpdated(tc.endpointSlice)
+
+			actualOutdatedAfter := est.ServiceCacheOutdated(tc.svcNamespace, tc.svcName)
+
+			if tc.expectOutdatedAfter != actualOutdatedAfter {
+				t.Errorf("Expected ServiceCacheOutdated() to return %t after update, got %t", tc.expectOutdatedAfter, actualOutdatedAfter)
+			}
+
+		})
+	}
+}
+
+func endpointSliceForService(name, namespace, svcName string) *discovery.EndpointSlice {
+	return &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      name,
+		Labels: map[string]string{
+			discovery.LabelServiceName: svcName,
+		},
+	}}
 }

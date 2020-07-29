@@ -18,14 +18,29 @@ package endpointslice
 
 import (
 	"sync"
+	"time"
 
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// endpointSliceResourceVersions tracks expected EndpointSlice resource versions
-// by EndpointSlice name.
-type endpointSliceResourceVersions map[string]string
+// serviceStatus tracks the last time an EndpointSlice for the Service has been
+// updated along with status for each EndpointSlice.
+type serviceStatus struct {
+	// lastUpdated tracks the last time an EndpointSlice for this Service was
+	// updated.
+	lastUpdated time.Time
+	// statusBySlice tracks expected EndpointSlice resource versions by
+	// EndpointSlice name.
+	statusBySlice map[string]*sliceStatus
+}
+
+// sliceStatus tracks the last known resource version for an EndpointSlice
+// and if that has been updated in the informer cache.
+type sliceStatus struct {
+	resourceVersion string
+	cacheUpdated    bool
+}
 
 // endpointSliceTracker tracks EndpointSlices and their associated resource
 // versions to help determine if a change to an EndpointSlice has been processed
@@ -33,15 +48,22 @@ type endpointSliceResourceVersions map[string]string
 type endpointSliceTracker struct {
 	// lock protects resourceVersionsByService.
 	lock sync.Mutex
-	// resourceVersionsByService tracks the list of EndpointSlices and
-	// associated resource versions expected for a given Service.
-	resourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+	// statusByService tracks the status of each Service and the associated
+	// EndpointSlices.
+	statusByService map[types.NamespacedName]*serviceStatus
 }
 
 // newEndpointSliceTracker creates and initializes a new endpointSliceTracker.
 func newEndpointSliceTracker() *endpointSliceTracker {
 	return &endpointSliceTracker{
-		resourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{},
+		statusByService: map[types.NamespacedName]*serviceStatus{},
+	}
+}
+
+// newServiceStatus returns a new serviceStatus.
+func newServiceStatus() *serviceStatus {
+	return &serviceStatus{
+		statusBySlice: map[string]*sliceStatus{},
 	}
 }
 
@@ -51,11 +73,11 @@ func (est *endpointSliceTracker) Has(endpointSlice *discovery.EndpointSlice) boo
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	ss, ok := est.serviceStatusForSlice(endpointSlice)
 	if !ok {
 		return false
 	}
-	_, ok = rrv[endpointSlice.Name]
+	_, ok = ss.statusBySlice[endpointSlice.Name]
 	return ok
 }
 
@@ -66,11 +88,15 @@ func (est *endpointSliceTracker) Stale(endpointSlice *discovery.EndpointSlice) b
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	ss, ok := est.serviceStatusForSlice(endpointSlice)
 	if !ok {
 		return true
 	}
-	return rrv[endpointSlice.Name] != endpointSlice.ResourceVersion
+	rvs, ok := ss.statusBySlice[endpointSlice.Name]
+	if !ok {
+		return true
+	}
+	return rvs.resourceVersion != endpointSlice.ResourceVersion
 }
 
 // Update adds or updates the resource version in this endpointSliceTracker for
@@ -79,12 +105,16 @@ func (est *endpointSliceTracker) Update(endpointSlice *discovery.EndpointSlice) 
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	ss, ok := est.serviceStatusForSlice(endpointSlice)
 	if !ok {
-		rrv = endpointSliceResourceVersions{}
-		est.resourceVersionsByService[getServiceNN(endpointSlice)] = rrv
+		ss = newServiceStatus()
+		est.statusByService[getServiceNN(endpointSlice)] = ss
 	}
-	rrv[endpointSlice.Name] = endpointSlice.ResourceVersion
+	ss.lastUpdated = time.Now()
+	ss.statusBySlice[endpointSlice.Name] = &sliceStatus{
+		resourceVersion: endpointSlice.ResourceVersion,
+		cacheUpdated:    false,
+	}
 }
 
 // DeleteService removes the set of resource versions tracked for the Service.
@@ -93,7 +123,7 @@ func (est *endpointSliceTracker) DeleteService(namespace, name string) {
 	defer est.lock.Unlock()
 
 	serviceNN := types.NamespacedName{Name: name, Namespace: namespace}
-	delete(est.resourceVersionsByService, serviceNN)
+	delete(est.statusByService, serviceNN)
 }
 
 // Delete removes the resource version in this endpointSliceTracker for the
@@ -102,19 +132,90 @@ func (est *endpointSliceTracker) Delete(endpointSlice *discovery.EndpointSlice) 
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	ss, ok := est.serviceStatusForSlice(endpointSlice)
 	if ok {
-		delete(rrv, endpointSlice.Name)
+		delete(ss.statusBySlice, endpointSlice.Name)
 	}
 }
 
-// relatedResourceVersions returns the set of resource versions tracked for the
-// Service corresponding to the provided EndpointSlice, and a bool to indicate
-// if it exists.
-func (est *endpointSliceTracker) relatedResourceVersions(endpointSlice *discovery.EndpointSlice) (endpointSliceResourceVersions, bool) {
+// MarkCacheUpdated sets cacheUpdated to true for an EndpointSlice if the
+// EndpointSlice resource version matches what is tracked.
+func (est *endpointSliceTracker) MarkCacheUpdated(endpointSlice *discovery.EndpointSlice) {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	ss, ok := est.serviceStatusForSlice(endpointSlice)
+	if !ok {
+		return
+	}
+	epStatus, ok := ss.statusBySlice[endpointSlice.Name]
+	if !ok {
+		return
+	}
+	if epStatus.resourceVersion == endpointSlice.ResourceVersion {
+		epStatus.cacheUpdated = true
+	}
+}
+
+// MarkServiceCacheUpdated sets cacheUpdated to true for all EndpointSlices
+// owned by a Service.
+func (est *endpointSliceTracker) MarkServiceCacheUpdated(namespace, name string) {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	ss, ok := est.statusByService[types.NamespacedName{Namespace: namespace, Name: name}]
+	if !ok {
+		return
+	}
+	for _, sliceStatus := range ss.statusBySlice {
+		sliceStatus.cacheUpdated = true
+	}
+}
+
+// ServiceCacheOutdated returns true if the cache is out of date for any
+// EndpointSlices tracked for the provided Service namespace and name.
+func (est *endpointSliceTracker) ServiceCacheOutdated(namespace, name string) bool {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	ss, ok := est.statusByService[types.NamespacedName{Namespace: namespace, Name: name}]
+	if !ok {
+		// If we don't have any record of this Service it is technically up to
+		// date. This likely means this is a new Service and we should not be
+		// delaying any syncs in this case.
+		return false
+	}
+	for _, epStatus := range ss.statusBySlice {
+		if !epStatus.cacheUpdated {
+			return true
+		}
+	}
+	return false
+}
+
+// ServiceCacheUpdatedSince returns true if the cache for a Service has been
+// updated since the provided time.
+func (est *endpointSliceTracker) ServiceCacheUpdatedSince(namespace, name string, updatedSince time.Time) bool {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	ss, ok := est.statusByService[types.NamespacedName{Namespace: namespace, Name: name}]
+	if !ok {
+		// If we don't have any record of this Service it is technically up to
+		// date. This likely means this is a new Service and we should not be
+		// delaying any syncs in this case.
+		return false
+	}
+
+	return ss.lastUpdated.After(updatedSince)
+}
+
+// serviceStatusForSlice returns the serviceStatus for the Service corresponding
+// to the provided EndpointSlice, and a bool to indicate if it exists.
+func (est *endpointSliceTracker) serviceStatusForSlice(endpointSlice *discovery.EndpointSlice) (*serviceStatus, bool) {
 	serviceNN := getServiceNN(endpointSlice)
-	vers, ok := est.resourceVersionsByService[serviceNN]
-	return vers, ok
+	serviceStatus, ok := est.statusByService[serviceNN]
+	return serviceStatus, ok
 }
 
 // getServiceNN returns a namespaced name for the Service corresponding to the
