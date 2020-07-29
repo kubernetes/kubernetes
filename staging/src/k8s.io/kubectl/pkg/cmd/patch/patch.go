@@ -18,6 +18,7 @@ package patch
 
 import (
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strings"
 
@@ -57,6 +58,7 @@ type PatchOptions struct {
 	Local     bool
 	PatchType string
 	Patch     string
+	PatchFile string
 
 	namespace                    string
 	enforceNamespace             bool
@@ -107,9 +109,9 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o := NewPatchOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "patch (-f FILENAME | TYPE NAME) -p PATCH",
+		Use:                   "patch (-f FILENAME | TYPE NAME) [-p PATCH|--patch-file FILE]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update field(s) of a resource using strategic merge patch"),
+		Short:                 i18n.T("Update field(s) of a resource"),
 		Long:                  patchLong,
 		Example:               patchExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -123,7 +125,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().StringVarP(&o.Patch, "patch", "p", "", "The patch to be applied to the resource JSON file.")
-	cmd.MarkFlagRequired("patch")
+	cmd.Flags().StringVar(&o.PatchFile, "patch-file", "", "A file containing a patch to be applied to the resource.")
 	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
@@ -175,14 +177,17 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 func (o *PatchOptions) Validate() error {
+	if len(o.Patch) > 0 && len(o.PatchFile) > 0 {
+		return fmt.Errorf("cannot specify --patch and --patch-file together")
+	}
+	if len(o.Patch) == 0 && len(o.PatchFile) == 0 {
+		return fmt.Errorf("must specify --patch or --patch-file containing the contents of the patch")
+	}
 	if o.Local && len(o.args) != 0 {
 		return fmt.Errorf("cannot specify --local and server resources")
 	}
 	if o.Local && o.dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
-	}
-	if len(o.Patch) == 0 {
-		return fmt.Errorf("must specify -p to patch")
 	}
 	if len(o.PatchType) != 0 {
 		if _, ok := patchTypes[strings.ToLower(o.PatchType)]; !ok {
@@ -199,7 +204,18 @@ func (o *PatchOptions) RunPatch() error {
 		patchType = patchTypes[strings.ToLower(o.PatchType)]
 	}
 
-	patchBytes, err := yaml.ToJSON([]byte(o.Patch))
+	var patchBytes []byte
+	if len(o.PatchFile) > 0 {
+		var err error
+		patchBytes, err = ioutil.ReadFile(o.PatchFile)
+		if err != nil {
+			return fmt.Errorf("unable to read patch file: %v", err)
+		}
+	} else {
+		patchBytes = []byte(o.Patch)
+	}
+
+	patchBytes, err := yaml.ToJSON(patchBytes)
 	if err != nil {
 		return fmt.Errorf("unable to parse %q: %v", o.Patch, err)
 	}
