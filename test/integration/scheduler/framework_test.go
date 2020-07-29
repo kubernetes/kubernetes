@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -216,6 +217,14 @@ func (sp *ScoreWithNormalizePlugin) ScoreExtensions() framework.ScoreExtensions 
 	return sp
 }
 
+// schedAttempted returns true if the scheduler already attempted to schedule the pod.
+// Note that the logic used here works only for our integration tests because kubelet is not running,
+// and so the condition will continue to exist even if the pod eventually got scheduled.
+func schedAttempted(pod *v1.Pod) bool {
+	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+	return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable
+}
+
 // Name returns name of the plugin.
 func (fp *FilterPlugin) Name() string {
 	return filterPluginName
@@ -230,7 +239,9 @@ func (fp *FilterPlugin) reset() {
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
 func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	fp.numFilterCalled++
+	if !schedAttempted(pod) {
+		fp.numFilterCalled++
+	}
 
 	if fp.failFilter {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -402,7 +413,10 @@ func (pp *PostFilterPlugin) Name() string {
 }
 
 func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	pp.numPostFilterCalled++
+	if !schedAttempted(pod) {
+		pp.numPostFilterCalled++
+	}
+
 	nodeInfos, err := pp.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return nil, framework.NewStatus(framework.Error, err.Error())
