@@ -239,7 +239,7 @@ func (r *reconciler) finalize(
 		if err != nil {
 			return fmt.Errorf("failed to delete %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err)
 		}
-		r.endpointSliceTracker.Delete(endpointSlice)
+		r.endpointSliceTracker.ExpectDeletion(endpointSlice)
 		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
