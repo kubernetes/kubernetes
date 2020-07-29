@@ -555,6 +555,10 @@ type PodNominator interface {
 // This is used by preemption PostFilter plugins when evaluating the feasibility of
 // scheduling the pod on nodes when certain running pods get evicted.
 type PluginsRunner interface {
+	// RunPreScorePlugins runs the set of configured PreScore plugins for pod on the given nodes
+	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
+	// RunScorePlugins runs the set of configured Score plugins for pod on the given nodes
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) (PluginToNodeScores, *Status)
 	// RunFilterPlugins runs the set of configured filter plugins for pod on the given node.
 	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) PluginToStatus
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured PreFilter plugins.
