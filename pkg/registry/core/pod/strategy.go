@@ -367,7 +367,7 @@ func LogLocation(
 		params.Add("sinceSeconds", strconv.FormatInt(*opts.SinceSeconds, 10))
 	}
 	if opts.SinceTime != nil {
-		params.Add("sinceTime", opts.SinceTime.Format(time.RFC3339))
+		params.Add("sinceTime", opts.SinceTime.Format(time.RFC3339Nano))
 	}
 	if opts.TailLines != nil {
 		params.Add("tailLines", strconv.FormatInt(*opts.TailLines, 10))

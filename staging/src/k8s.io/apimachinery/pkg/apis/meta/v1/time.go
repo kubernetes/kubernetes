@@ -130,7 +130,7 @@ func (t *Time) UnmarshalQueryParameter(str string) error {
 		return nil
 	}
 
-	pt, err := time.Parse(time.RFC3339, str)
+	pt, err := time.Parse(time.RFC3339Nano, str)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (t Time) MarshalQueryParameter() (string, error) {
 		return "", nil
 	}
 
-	return t.UTC().Format(time.RFC3339), nil
+	return t.UTC().Format(time.RFC3339Nano), nil
 }
 
 // Fuzz satisfies fuzz.Interface.
