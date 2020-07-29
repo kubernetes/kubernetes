@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // deploymentStrategy implements behavior for Deployments.
@@ -66,6 +67,24 @@ func (deploymentStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) re
 // NamespaceScoped is true for deployment.
 func (deploymentStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (deploymentStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	// TODO: make sure this works and is the best way to do this
+	specStr, templateStr := "spec", "template"
+	pod.AddDisabledTemplateFieldsTo(fields["apps/v1"].
+		WithPrefix(fieldpath.PathElement{FieldName: &specStr}).
+		WithPrefix(fieldpath.PathElement{FieldName: &templateStr}))
+
+	return fields
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
@@ -147,6 +166,17 @@ type deploymentStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = deploymentStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (deploymentStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata", "labels"),
+		),
+	}
+}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
