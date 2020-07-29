@@ -205,7 +205,7 @@ func keyedAssociativeListItemToPathElement(a value.Allocator, list *schema.List,
 	return pe, nil
 }
 
-func setItemToPathElement(list *schema.List, index int, child value.Value) (fieldpath.PathElement, error) {
+func setItemToPathElement(child value.Value) (fieldpath.PathElement, error) {
 	pe := fieldpath.PathElement{}
 	switch {
 	case child.IsMap():
@@ -232,7 +232,7 @@ func listItemToPathElement(a value.Allocator, list *schema.List, index int, chil
 		}
 
 		// If there's no keys, then we must be a set of primitives.
-		return setItemToPathElement(list, index, child)
+		return setItemToPathElement(child)
 	}
 
 	// Use the index as a key for atomic lists.
