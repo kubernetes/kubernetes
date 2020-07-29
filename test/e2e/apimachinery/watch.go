@@ -324,8 +324,8 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
-	   Testname: watch-consistency
 	   Release: v1.15
+	   Testname: watch-consistency
 	   Description: Ensure that concurrent watches are consistent with each other by initiating an additional watch
 	   for events received from the first watch, initiated at the resource version of the event, and checking that all
 	   resource versions of all events match. Events are produced from writes on a background goroutine.
