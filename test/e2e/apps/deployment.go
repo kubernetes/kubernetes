@@ -83,6 +83,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeleteDeployment(f)
 	})
 	/*
+	  Release : v1.12
 	  Testname: Deployment RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with RollingUpdate strategy.
 	*/
@@ -90,6 +91,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testRollingUpdateDeployment(f)
 	})
 	/*
+	  Release : v1.12
 	  Testname: Deployment Recreate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with Recreate strategy.
 	*/
@@ -97,6 +99,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testRecreateDeployment(f)
 	})
 	/*
+	  Release : v1.12
 	  Testname: Deployment RevisionHistoryLimit
 	  Description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets based on
 	  the Deployment's `.spec.revisionHistoryLimit`.
@@ -105,6 +108,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentCleanUpPolicy(f)
 	})
 	/*
+	  Release : v1.12
 	  Testname: Deployment Rollover
 	  Description: A conformant Kubernetes distribution MUST support Deployment rollover,
 	    i.e. allow arbitrary number of changes to desired state during rolling update
@@ -120,6 +124,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentsControllerRef(f)
 	})
 	/*
+	  Release : v1.12
 	  Testname: Deployment Proportional Scaling
 	  Description: A conformant Kubernetes distribution MUST support Deployment
 	    proportional scaling, i.e. proportionally scale a Deployment's ReplicaSets

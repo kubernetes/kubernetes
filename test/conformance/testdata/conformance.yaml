@@ -259,6 +259,13 @@
     and FOOSERVICE_PORT_8765_TCP_ADDR that are populated with proper values.
   release: v1.9
   file: test/e2e/common/pods.go
+- testname: Pods, delete a collection
+  codename: '[k8s.io] Pods should delete a collection of pods [Conformance]'
+  description: A set of pods is created with a label selector which MUST be found
+    when listed. The set of pods is deleted and MUST NOT show up when listed by its
+    label selector.
+  release: v1.19
+  file: test/e2e/common/pods.go
 - testname: Pods, assigned hostip
   codename: '[k8s.io] Pods should get a host IP [NodeConformance] [Conformance]'
   description: Create a Pod. Pod status MUST return successfully and contains a valid
@@ -649,7 +656,7 @@
     API Server using the current Aggregator [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
     1.17 will work on the current Aggregator/API-Server.
-  release: ""
+  release: v1.17
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
@@ -886,14 +893,14 @@
     removed when a namespace is deleted [Conformance]'
   description: Ensure that if a namespace is deleted then all pods are removed from
     that namespace.
-  release: ""
+  release: v1.11
   file: test/e2e/apimachinery/namespace.go
 - testname: namespace-deletion-removes-services
   codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all services
     are removed when a namespace is deleted [Conformance]'
   description: Ensure that if a namespace is deleted then all services are removed
     from that namespace.
-  release: ""
+  release: v1.11
   file: test/e2e/apimachinery/namespace.go
 - testname: Namespace patching
   codename: '[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]'
@@ -1074,14 +1081,14 @@
   description: Ensure that a watch can be reopened from the last resource version
     observed by the previous watch, and it will continue delivering notifications
     from that point in time.
-  release: ""
+  release: v1.11
   file: test/e2e/apimachinery/watch.go
 - testname: watch-configmaps-from-resource-version
   codename: '[sig-api-machinery] Watchers should be able to start watching from a
     specific resource version [Conformance]'
   description: Ensure that a watch can be opened from a particular resource version
     in the past and only notifications happening after that resource version are observed.
-  release: ""
+  release: v1.11
   file: test/e2e/apimachinery/watch.go
 - testname: watch-configmaps-with-multiple-watchers
   codename: '[sig-api-machinery] Watchers should observe add, update, and delete watch
@@ -1089,7 +1096,7 @@
   description: Ensure that multiple watchers are able to receive all add, update,
     and delete notifications on configmaps that match a label selector and do not
     receive notifications for configmaps which do not match that label selector.
-  release: ""
+  release: v1.11
   file: test/e2e/apimachinery/watch.go
 - testname: watch-configmaps-label-changed
   codename: '[sig-api-machinery] Watchers should observe an object deletion if it
@@ -1097,7 +1104,7 @@
   description: Ensure that a watched object stops meeting the requirements of a watch's
     selector, the watch will observe a delete, and will not observe notifications
     for that object until it meets the selector's requirements again.
-  release: ""
+  release: v1.11
   file: test/e2e/apimachinery/watch.go
 - testname: watch-consistency
   codename: '[sig-api-machinery] Watchers should receive events on concurrent watches
@@ -1119,53 +1126,53 @@
     [Conformance]'
   description: A conformant Kubernetes distribution MUST create new DaemonSet Pods
     when they fail.
-  release: ""
+  release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-Rollback
   codename: '[sig-apps] Daemon set [Serial] should rollback without unnecessary restarts
     [Conformance]'
   description: A conformant Kubernetes distribution MUST support automated, minimally
     disruptive rollback of updates to a DaemonSet.
-  release: ""
+  release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-NodeSelection
   codename: '[sig-apps] Daemon set [Serial] should run and stop complex daemon [Conformance]'
   description: A conformant Kubernetes distribution MUST support DaemonSet Pod node
     selection via label selectors.
-  release: ""
+  release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-Creation
   codename: '[sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]'
   description: A conformant Kubernetes distribution MUST support the creation of DaemonSets.
     When a DaemonSet Pod is deleted, the DaemonSet controller MUST create a replacement
     Pod.
-  release: ""
+  release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-RollingUpdate
   codename: '[sig-apps] Daemon set [Serial] should update pod when spec was updated
     and update strategy is RollingUpdate [Conformance]'
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
-  release: ""
+  release: v1.10
   file: test/e2e/apps/daemon_set.go
 - testname: Deployment Recreate
   codename: '[sig-apps] Deployment RecreateDeployment should delete old pods and create
     new ones [Conformance]'
   description: A conformant Kubernetes distribution MUST support the Deployment with
     Recreate strategy.
-  release: ""
+  release: v1.12
   file: test/e2e/apps/deployment.go
 - testname: Deployment RollingUpdate
   codename: '[sig-apps] Deployment RollingUpdateDeployment should delete old pods
     and create new ones [Conformance]'
   description: A conformant Kubernetes distribution MUST support the Deployment with
     RollingUpdate strategy.
-  release: ""
+  release: v1.12
   file: test/e2e/apps/deployment.go
 - testname: Deployment RevisionHistoryLimit
   codename: '[sig-apps] Deployment deployment should delete old replica sets [Conformance]'
   description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets
     based on the Deployment's `.spec.revisionHistoryLimit`.
-  release: ""
+  release: v1.12
   file: test/e2e/apps/deployment.go
 - testname: Deployment Proportional Scaling
   codename: '[sig-apps] Deployment deployment should support proportional scaling
@@ -1173,14 +1180,14 @@
   description: A conformant Kubernetes distribution MUST support Deployment proportional
     scaling, i.e. proportionally scale a Deployment's ReplicaSets when a Deployment
     is scaled.
-  release: ""
+  release: v1.12
   file: test/e2e/apps/deployment.go
 - testname: Deployment Rollover
   codename: '[sig-apps] Deployment deployment should support rollover [Conformance]'
   description: A conformant Kubernetes distribution MUST support Deployment rollover,
     i.e. allow arbitrary number of changes to desired state during rolling update
     before the rollout finishes.
-  release: ""
+  release: v1.12
   file: test/e2e/apps/deployment.go
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
@@ -1851,6 +1858,15 @@
     and the service MUST list only the endpoint to the second Pod. Delete the second
     Pod and the service must now have empty set of endpoints.
   release: v1.9
+  file: test/e2e/network/service.go
+- testname: Endpoint resource lifecycle
+  codename: '[sig-network] Services should test the lifecycle of an Endpoint [Conformance]'
+  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
+    with a new label, a check after the update MUST find the changes. The endpoint
+    is then patched with a new IPv4 address and port, a check after the patch MUST
+    the changes. The endpoint is deleted by it's label, a watch listens for the deleted
+    watch event.
+  release: v1.19
   file: test/e2e/network/service.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]

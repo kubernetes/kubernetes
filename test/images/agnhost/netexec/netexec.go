@@ -491,9 +491,9 @@ func hostNameHandler(w http.ResponseWriter, r *http.Request) {
 // udp server supports the hostName, echo and clientIP commands.
 func startUDPServer(udpPort int) {
 	serverAddress, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", udpPort))
-	assertNoError(err)
+	assertNoError(err, fmt.Sprintf("failed to resolve UDP address for port %d", sctpPort))
 	serverConn, err := net.ListenUDP("udp", serverAddress)
-	assertNoError(err)
+	assertNoError(err, fmt.Sprintf("failed to create listener for UDP address %v", serverAddress))
 	defer serverConn.Close()
 	buf := make([]byte, 2048)
 
@@ -506,27 +506,27 @@ func startUDPServer(udpPort int) {
 	}()
 	for {
 		n, clientAddress, err := serverConn.ReadFromUDP(buf)
-		assertNoError(err)
+		assertNoError(err, fmt.Sprintf("failed accepting UDP connections"))
 		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
 		if receivedText == "hostname" {
 			log.Println("Sending udp hostName response")
 			_, err = serverConn.WriteToUDP([]byte(getHostName()), clientAddress)
-			assertNoError(err)
+			assertNoError(err, fmt.Sprintf("failed to write hostname to UDP client %s", clientAddress))
 		} else if strings.HasPrefix(receivedText, "echo ") {
 			parts := strings.SplitN(receivedText, " ", 2)
 			resp := ""
 			if len(parts) == 2 {
 				resp = parts[1]
 			}
-			log.Printf("Echoing %v\n", resp)
+			log.Printf("Echoing %v to UDP client %s\n", resp, clientAddress)
 			_, err = serverConn.WriteToUDP([]byte(resp), clientAddress)
-			assertNoError(err)
+			assertNoError(err, fmt.Sprintf("failed to echo to UDP client %s", clientAddress))
 		} else if receivedText == "clientip" {
-			log.Printf("Sending back clientip to %s", clientAddress.String())
+			log.Printf("Sending clientip back to UDP client %s\n", clientAddress)
 			_, err = serverConn.WriteToUDP([]byte(clientAddress.String()), clientAddress)
-			assertNoError(err)
+			assertNoError(err, fmt.Sprintf("failed to write clientip to UDP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
-			log.Printf("Unknown udp command received: %v\n", receivedText)
+			log.Printf("Unknown UDP command received from %s: %v\n", clientAddress, receivedText)
 		}
 	}
 }
@@ -534,9 +534,9 @@ func startUDPServer(udpPort int) {
 // sctp server supports the hostName, echo and clientIP commands.
 func startSCTPServer(sctpPort int) {
 	serverAddress, err := sctp.ResolveSCTPAddr("sctp", fmt.Sprintf(":%d", sctpPort))
-	assertNoError(err)
+	assertNoError(err, fmt.Sprintf("failed to resolve SCTP address for port %d", sctpPort))
 	listener, err := sctp.ListenSCTP("sctp", serverAddress)
-	assertNoError(err)
+	assertNoError(err, fmt.Sprintf("failed to create listener for SCTP address %v", serverAddress))
 	defer listener.Close()
 	buf := make([]byte, 1024)
 
@@ -549,30 +549,30 @@ func startSCTPServer(sctpPort int) {
 	}()
 	for {
 		conn, err := listener.AcceptSCTP()
-		assertNoError(err)
+		assertNoError(err, fmt.Sprintf("failed accepting SCTP connections"))
+		clientAddress := conn.RemoteAddr().String()
 		n, err := conn.Read(buf)
-		assertNoError(err)
+		assertNoError(err, fmt.Sprintf("failed to read from SCTP client %s", clientAddress))
 		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
 		if receivedText == "hostname" {
-			log.Println("Sending sctp hostName response")
+			log.Println("Sending SCTP hostName response")
 			_, err = conn.Write([]byte(getHostName()))
-			assertNoError(err)
+			assertNoError(err, fmt.Sprintf("failed to write hostname to SCTP client %s", clientAddress))
 		} else if strings.HasPrefix(receivedText, "echo ") {
 			parts := strings.SplitN(receivedText, " ", 2)
 			resp := ""
 			if len(parts) == 2 {
 				resp = parts[1]
 			}
-			log.Printf("Echoing %v\n", resp)
+			log.Printf("Echoing %v to SCTP client %s\n", resp, clientAddress)
 			_, err = conn.Write([]byte(resp))
-			assertNoError(err)
+			assertNoError(err, fmt.Sprintf("failed to echo to SCTP client %s", clientAddress))
 		} else if receivedText == "clientip" {
-			clientAddress := conn.RemoteAddr()
-			log.Printf("Sending back clientip to %s", clientAddress.String())
-			_, err = conn.Write([]byte(clientAddress.String()))
-			assertNoError(err)
+			log.Printf("Sending clientip back to SCTP client %s\n", clientAddress)
+			_, err = conn.Write([]byte(clientAddress))
+			assertNoError(err, fmt.Sprintf("failed to write clientip to SCTP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
-			log.Printf("Unknown sctp command received: %v\n", receivedText)
+			log.Printf("Unknown SCTP command received from %s: %v\n", clientAddress, receivedText)
 		}
 		conn.Close()
 	}
@@ -580,12 +580,12 @@ func startSCTPServer(sctpPort int) {
 
 func getHostName() string {
 	hostName, err := os.Hostname()
-	assertNoError(err)
+	assertNoError(err, "failed to get hostname")
 	return hostName
 }
 
-func assertNoError(err error) {
+func assertNoError(err error, detail string) {
 	if err != nil {
-		log.Fatal("Error occurred. error:", err)
+		log.Fatalf("Error occurred: %s:%v", detail, err)
 	}
 }
