@@ -58,29 +58,6 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 	return err
 }
 
-<<<<<<< HEAD
-=======
-// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func MasterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
-	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
-	// TODO: Remove these variables when they're no longer needed for downgrades.
-	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
-		env = append(env,
-			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
-			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE="+etcdImage)
-	} else {
-		// In e2e tests, we skip the confirmation prompt about
-		// implicit etcd upgrades to simulate the user entering "y".
-		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
-	}
-
-	v := "v" + rawV
-	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-M", v)
-	return err
-}
-
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 // LocationParamGKE returns parameter related to location for gcloud command.
 func LocationParamGKE() string {
 	if TestContext.CloudConfig.MultiMaster {

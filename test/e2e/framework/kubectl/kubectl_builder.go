@@ -37,46 +37,46 @@ import (
 	uexec "k8s.io/utils/exec"
 )
 
-// KubectlBuilder is used to build, customize and execute a kubectl Command.
+// Builder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
-type KubectlBuilder struct {
+type Builder struct {
 	cmd     *exec.Cmd
 	timeout <-chan time.Time
 }
 
-// NewKubectlCommand returns a KubectlBuilder for running kubectl.
-func NewKubectlCommand(tk *TestKubeconfig, args ...string) *KubectlBuilder {
-	b := new(KubectlBuilder)
+// NewKubectlCommand returns a Builder for running kubectl.
+func NewKubectlCommand(tk *TestKubeconfig, args ...string) *Builder {
+	b := new(Builder)
 	b.cmd = tk.KubectlCmd(args...)
 	return b
 }
 
 // WithEnv sets the given environment and returns itself.
-func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
+func (b *Builder) WithEnv(env []string) *Builder {
 	b.cmd.Env = env
 	return b
 }
 
 // WithTimeout sets the given timeout and returns itself.
-func (b *KubectlBuilder) WithTimeout(t <-chan time.Time) *KubectlBuilder {
+func (b *Builder) WithTimeout(t <-chan time.Time) *Builder {
 	b.timeout = t
 	return b
 }
 
 // WithStdinData sets the given data to stdin and returns itself.
-func (b KubectlBuilder) WithStdinData(data string) *KubectlBuilder {
+func (b Builder) WithStdinData(data string) *Builder {
 	b.cmd.Stdin = strings.NewReader(data)
 	return &b
 }
 
 // WithStdinReader sets the given reader and returns itself.
-func (b KubectlBuilder) WithStdinReader(reader io.Reader) *KubectlBuilder {
+func (b Builder) WithStdinReader(reader io.Reader) *Builder {
 	b.cmd.Stdin = reader
 	return &b
 }
 
 // ExecOrDie runs the kubectl executable or dies if error occurs.
-func (b KubectlBuilder) ExecOrDie(namespace string) string {
+func (b Builder) ExecOrDie(namespace string) string {
 	str, err := b.Exec()
 	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
 	// Note that we're still dying after retrying so that we can get visibility to triage it further.
@@ -106,13 +106,13 @@ func isTimeout(err error) bool {
 }
 
 // Exec runs the kubectl executable.
-func (b KubectlBuilder) Exec() (string, error) {
+func (b Builder) Exec() (string, error) {
 	stdout, _, err := b.ExecWithFullOutput()
 	return stdout, err
 }
 
 // ExecWithFullOutput runs the kubectl executable, and returns the stdout and stderr.
-func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
+func (b Builder) ExecWithFullOutput() (string, string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -147,52 +147,52 @@ func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	return stdout.String(), stderr.String(), nil
 }
 
-// RunKubectlOrDie is a convenience wrapper over kubectlBuilder
+// RunKubectlOrDie is a convenience wrapper over Builder
 func RunKubectlOrDie(namespace string, args ...string) string {
 	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	return NewKubectlCommand(tk, args...).ExecOrDie(namespace)
 }
 
-// RunKubectl is a convenience wrapper over kubectlBuilder
+// RunKubectl is a convenience wrapper over Builder
 func RunKubectl(namespace string, args ...string) (string, error) {
 	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	return NewKubectlCommand(tk, args...).Exec()
 }
 
-// RunKubectlWithFullOutput is a convenience wrapper over kubectlBuilder
+// RunKubectlWithFullOutput is a convenience wrapper over Builder
 // It will also return the command's stderr.
 func RunKubectlWithFullOutput(namespace string, args ...string) (string, string, error) {
 	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	return NewKubectlCommand(tk, args...).ExecWithFullOutput()
 }
 
-// RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+// RunKubectlOrDieInput is a convenience wrapper over Builder that takes input to stdin
 func RunKubectlOrDieInput(namespace string, data string, args ...string) string {
 	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	return NewKubectlCommand(tk, args...).WithStdinData(data).ExecOrDie(namespace)
 }
 
-// RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
+// RunKubectlInput is a convenience wrapper over Builder that takes input to stdin
 func RunKubectlInput(namespace string, data string, args ...string) (string, error) {
 	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	return NewKubectlCommand(tk, args...).WithStdinData(data).Exec()
 }
 
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
-func RunKubemciWithKubeconfig(kubeconfig string, projectId string, args ...string) (string, error) {
+func RunKubemciWithKubeconfig(kubeconfig string, projectID string, args ...string) (string, error) {
 	if kubeconfig != "" {
 		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+kubeconfig)
 	}
-	return RunKubemciCmd(projectId, args...)
+	return RunKubemciCmd(projectID, args...)
 }
 
-// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
+// RunKubemciCmd is a convenience wrapper over Builder to run kubemci.
 // It assumes that kubemci exists in PATH.
-func RunKubemciCmd(projectId string, args ...string) (string, error) {
+func RunKubemciCmd(projectID string, args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
-	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+projectId)
+	b := new(Builder)
+	args = append(args, "--gcp-project="+projectID)
 
 	b.cmd = exec.Command(kubemci, args...)
 	return b.Exec()
@@ -307,12 +307,12 @@ func WaitForSSHTunnels(namespace string) {
 }
 
 // MasterUpgradeGKE upgrades master node to the specified version on GKE.
-func MasterUpgradeGKE(namespace string, v string, projectId string, locationParamGKE string, cluster string) error {
+func MasterUpgradeGKE(namespace string, v string, projectID string, locationParamGKE string, cluster string) error {
 	framework.Logf("Upgrading master to %q", v)
 	args := []string{
 		"container",
 		"clusters",
-		fmt.Sprintf("--project=%s", projectId),
+		fmt.Sprintf("--project=%s", projectID),
 		locationParamGKE,
 		"upgrade",
 		cluster,

@@ -545,11 +545,11 @@ func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 	// Use kubemci to create a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
 	kubeconfig := framework.TestContext.KubeConfig
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectId, "create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectID, "create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return ing, err
 }
 
@@ -562,11 +562,11 @@ func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
 	kubeconfig := framework.TestContext.KubeConfig
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectId, "create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
+	_, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectID, "create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
 	return ing, err
 }
 
@@ -679,11 +679,11 @@ func (j *TestJig) runDelete(ing *networkingv1beta1.Ingress) error {
 	// Use kubemci to delete a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
 	kubeconfig := framework.TestContext.KubeConfig
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return err
 	}
-	_, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectId, "delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectID, "delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return err
 }
 
@@ -691,8 +691,8 @@ func (j *TestJig) runDelete(ing *networkingv1beta1.Ingress) error {
 // TODO(nikhiljindal): Update this to be able to return hostname as well.
 func getIngressAddressFromKubemci(name string) ([]string, error) {
 	var addresses []string
-	projectId := framework.TestContext.CloudConfig.ProjectID
-	out, err := e2ekubectl.RunKubemciCmd(projectId, "get-status", name)
+	projectID := framework.TestContext.CloudConfig.ProjectID
+	out, err := e2ekubectl.RunKubemciCmd(projectID, "get-status", name)
 	if err != nil {
 		return addresses, err
 	}

@@ -632,8 +632,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Reuse the ingress file created while creating the ingress.
 			filePath := filepath.Join(framework.TestContext.OutputDir, "mci.yaml")
 			kubeconfig := framework.TestContext.KubeConfig
-			projectId := framework.TestContext.CloudConfig.ProjectID
-			output, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectId, "remove-clusters", name, "--ingress="+filePath)
+			projectID := framework.TestContext.CloudConfig.ProjectID
+			output, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectID, "remove-clusters", name, "--ingress="+filePath)
 			if err != nil {
 				framework.Failf("unexpected error in running kubemci remove-clusters command to remove from all clusters: %s", err)
 			}
@@ -643,7 +643,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Verify that the ingress is still spread to 1 cluster as expected.
 			verifyKubemciStatusHas(name, "is spread across 1 cluster")
 			// remove-clusters should succeed with --force=true
-			if _, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectId, "remove-clusters", name, "--ingress="+filePath, "--force=true"); err != nil {
+			if _, err := e2ekubectl.RunKubemciWithKubeconfig(kubeconfig, projectID, "remove-clusters", name, "--ingress="+filePath, "--force=true"); err != nil {
 				framework.Failf("unexpected error in running kubemci remove-clusters to remove from all clusters with --force=true: %s", err)
 			}
 			verifyKubemciStatusHas(name, "is spread across 0 cluster")
@@ -737,8 +737,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 // verifyKubemciStatusHas fails if kubemci get-status output for the given mci does not have the given expectedSubStr.
 func verifyKubemciStatusHas(name, expectedSubStr string) {
-	projectId := framework.TestContext.CloudConfig.ProjectID
-	statusStr, err := e2ekubectl.RunKubemciCmd(projectId, "get-status", name)
+	projectID := framework.TestContext.CloudConfig.ProjectID
+	statusStr, err := e2ekubectl.RunKubemciCmd(projectID, "get-status", name)
 	if err != nil {
 		framework.Failf("unexpected error in running kubemci get-status %s: %s", name, err)
 	}

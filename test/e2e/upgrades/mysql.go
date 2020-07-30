@@ -67,11 +67,7 @@ func mysqlKubectlCreate(ns, file string) {
 		framework.Fail(err.Error())
 	}
 	input := string(data)
-<<<<<<< HEAD
-	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
-=======
-	e2ekubectl.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
+	e2ekubectl.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
