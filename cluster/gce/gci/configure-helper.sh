@@ -1710,6 +1710,7 @@ function prepare-etcd-manifest {
 # More specifically, it prepares dirs and files, sets the variable value
 # in the manifests, and copies them to /etc/kubernetes/manifests.
 function start-etcd-servers {
+  # Test Comment
   echo "Start etcd pods"
   if [[ -d /etc/etcd ]]; then
     rm -rf /etc/etcd
