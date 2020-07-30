@@ -660,6 +660,7 @@ func (g *Cloud) Instances() (cloudprovider.Instances, bool) {
 }
 
 // InstancesV2 returns an implementation of InstancesV2 for Google Compute Engine.
+// TODO: implement ONLY for external cloud provider
 func (g *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
