@@ -18,18 +18,25 @@ package images
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -50,12 +57,20 @@ type imageManager struct {
 	puller imagePuller
 
 	podPullingTimeRecorder ImagePodPullingTimeRecorder
+
+	keyring *credentialprovider.DockerKeyring
+	// ensureSecretPulledImages - map of imageref (image digest) to successful secret pulled image details
+	ensureSecretPulledImages     map[string]*imagePullInfo
+	pullImageSecretRecheckPeriod metav1.Duration
+	lock                         sync.RWMutex
 }
 
 var _ ImageManager = &imageManager{}
 
 // NewImageManager instantiates a new ImageManager object.
-func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
+func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff,
+	serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder,
+	keyring *credentialprovider.DockerKeyring, pullImageSecretRecheckPeriod metav1.Duration) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
@@ -64,27 +79,44 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 	} else {
 		puller = newParallelImagePuller(imageService, maxParallelImagePulls)
 	}
+
 	return &imageManager{
-		recorder:               recorder,
-		imageService:           imageService,
-		backOff:                imageBackOff,
-		puller:                 puller,
-		podPullingTimeRecorder: podPullingTimeRecorder,
+		recorder:                     recorder,
+		imageService:                 imageService,
+		backOff:                      imageBackOff,
+		puller:                       puller,
+		podPullingTimeRecorder:       podPullingTimeRecorder,
+		keyring:                      keyring,
+		ensureSecretPulledImages:     make(map[string]*imagePullInfo),
+		pullImageSecretRecheckPeriod: pullImageSecretRecheckPeriod,
 	}
 }
 
 // shouldPullImage returns whether we should pull an image according to
 // the presence and pull policy of the image.
-func shouldPullImage(pullPolicy v1.PullPolicy, imagePresent bool) bool {
-	if pullPolicy == v1.PullNever {
+func shouldPullImage(pullPolicy v1.PullPolicy, imagePresent, pulledBySecret, ensuredBySecret bool) bool {
+	switch pullPolicy {
+	case v1.PullNever:
+		return false
+	case v1.PullAlways:
+		return true
+	case v1.PullIfNotPresent:
+		// pull if image doesn't exist
+		if !imagePresent {
+			return true
+		}
+		// if the imageRef has been pulled by a secret and Pull Policy is PullIfNotPresent
+		// we need to ensure that the current pod's secrets map to an auth that has Already
+		// pulled the image successfully. Otherwise pod B could use pod A's images
+		// without auth. So in this case if pulledBySecret but not ensured by matching
+		// secret auth for a pull again for the pod B scenario where the auth does not match
+		if utilfeature.DefaultFeatureGate.Enabled((features.KubeletEnsureSecretPulledImages)) {
+			if pulledBySecret && !ensuredBySecret {
+				return true // noting here that old behaviour returns false in this case indicating the image should not be pulled
+			}
+		}
 		return false
 	}
-
-	if pullPolicy == v1.PullAlways ||
-		(pullPolicy == v1.PullIfNotPresent && (!imagePresent)) {
-		return true
-	}
-
 	return false
 }
 
@@ -97,7 +129,25 @@ func (m *imageManager) logIt(objRef *v1.ObjectReference, eventtype, event, prefi
 	}
 }
 
-// EnsureImageExists pulls the image for the specified pod and imgRef, and returns
+type ensuredInfo struct {
+	// true for ensured secret
+	ensured bool
+	// the secret should be verified again if current time is after the due date.
+	// and the due date is `PullImageSecretRecheckPeriod` after last ensured date.
+	// `PullImageSecretRecheckPeriod` is configurable in kubelet config.
+	lastEnsuredDate time.Time
+}
+
+type imagePullInfo struct {
+	// TODO: (mikebrow) time of last pull for this imageRef
+	// TODO: (mikebrow) time of pull for each particular auth hash
+	//       note @mrunalp makes a good point that we can utilize /apimachinery/pkg/util/sets/string.go here
+
+	// map of auths hash (keys) used to successfully pull this imageref
+	Auths map[string]*ensuredInfo
+}
+
+// EnsureImageExists pulls the image for the specified pod and imageRef, and returns
 // (imageRef, error message, error).
 func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, imgRef string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, imgRef)
@@ -132,10 +182,26 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	}
 
 	present := imageRef != ""
-	if !shouldPullImage(pullPolicy, present) {
+	var pulledBySecret, ensuredBySecret bool
+	if present {
+		pulledBySecret, ensuredBySecret, err := m.isEnsuredBySecret(imageRef, spec, pullSecrets)
+		if err != nil {
+			return imageRef, "Error get ensured check by secret", err
+		}
+		klog.V(5).InfoS("Get ensured check by secret", "image", image, "imageRef", imageRef, "pulledBySecret", pulledBySecret, "ensuredBySecret", ensuredBySecret)
+	}
+
+	if !shouldPullImage(pullPolicy, present, pulledBySecret, ensuredBySecret) {
+		// should not pull when pull never, or if present and correctly authenticated
 		if present {
 			msg := fmt.Sprintf("Container image %q already present on machine", imgRef)
 			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && (pulledBySecret && !ensuredBySecret) {
+				// TODO: add integration test for this thrown error message
+				msg := fmt.Sprintf("Container image %q is present with pull policy of %q but does not have the proper auth (image secret) that was used to pull the image", imageRef, pullPolicy)
+				m.logIt(objRef, v1.EventTypeWarning, events.ErrImageNotEnsured, logPrefix, msg, klog.Warning)
+				return imageRef, msg, ErrImageNotEnsured
+			}
 			return imageRef, "", nil
 		}
 		msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", imgRef)
@@ -168,6 +234,25 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		imgRef, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
+
+	m.lock.Lock()
+	if imagePullResult.pullCredentialsHash == "" {
+		// successful pull no auth hash returned, auth was not required so we should reset the hashmap for this
+		// imageref since auth is no longer required for the local image cache, allowing use of the ImageRef
+		// by other pods if it remains cached and pull policy is PullIfNotPresent
+		delete(m.ensureSecretPulledImages, imageRef)
+	} else {
+		// store/create hashMatch map entry for auth config hash key used to pull the image
+		// for this imageref (digest)
+		digest := m.ensureSecretPulledImages[imageRef]
+		if digest == nil {
+			digest = &imagePullInfo{Auths: make(map[string]*ensuredInfo)}
+			m.ensureSecretPulledImages[imageRef] = digest
+		}
+		digest.Auths[imagePullResult.pullCredentialsHash] = &ensuredInfo{true, time.Now()}
+	}
+	m.lock.Unlock()
+
 	return imagePullResult.imageRef, "", nil
 }
 
@@ -219,4 +304,69 @@ func applyDefaultImageTag(image string) (string, error) {
 		image = image + ":" + tag
 	}
 	return image, nil
+}
+
+// isEnsuredBySecret - returns two bools and error
+// 1. pulledBySecret: true if it is in ensured secret pulled image list,
+// the list will clean the image after PullImageSecretRecheckPeriod
+// 2. ensuredBySecret: true if the secret for an auth used to pull an
+// image has already been authenticated through a successful pull request
+// and the same auth exists for this podSandbox/image.
+func (m *imageManager) isEnsuredBySecret(imageRef string, image kubecontainer.ImageSpec, pullSecrets []v1.Secret) (bool, bool, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if imageRef == "" {
+		return false, false, errors.New("imageRef is empty")
+	}
+
+	// if the image is in the ensured secret pulled image list, it is pulled by secret
+	pulledBySecret := m.ensureSecretPulledImages[imageRef] != nil
+
+	img := image.Image
+	repoToPull, _, _, err := parsers.ParseImageName(img)
+	if err != nil {
+		return pulledBySecret, false, err
+	}
+
+	if m.keyring == nil {
+		return pulledBySecret, false, nil
+	}
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, *m.keyring)
+	if err != nil {
+		return pulledBySecret, false, err
+	}
+
+	creds, withCredentials := keyring.Lookup(repoToPull)
+	if !withCredentials {
+		return pulledBySecret, false, nil
+	}
+	// if the pullImageSecretRecheckPeriod is 0, we don't need to check the secret again
+	if m.pullImageSecretRecheckPeriod.Duration == 0 {
+		return pulledBySecret, true, nil
+	}
+
+	for _, currentCreds := range creds {
+		auth := &runtimeapi.AuthConfig{
+			Username:      currentCreds.Username,
+			Password:      currentCreds.Password,
+			Auth:          currentCreds.Auth,
+			ServerAddress: currentCreds.ServerAddress,
+			IdentityToken: currentCreds.IdentityToken,
+			RegistryToken: currentCreds.RegistryToken,
+		}
+
+		hash, err := kubecontainer.HashAuth(auth)
+		if err != nil {
+			klog.ErrorS(err, "Failed to hash auth", "auth", auth)
+			continue
+		}
+		digest := m.ensureSecretPulledImages[imageRef]
+		if digest != nil {
+			ensuredInfo := digest.Auths[hash]
+			if ensuredInfo != nil && ensuredInfo.ensured && ensuredInfo.lastEnsuredDate.Add(m.pullImageSecretRecheckPeriod.Duration).After(time.Now()) {
+				return pulledBySecret, true, nil
+			}
+		}
+	}
+	return pulledBySecret, false, nil
 }

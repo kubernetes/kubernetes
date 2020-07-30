@@ -529,6 +529,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.FailCgroupV1, &out.FailCgroupV1, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_v1_Duration_To_v1_Duration(&in.PullImageSecretRecheckPeriod, &out.PullImageSecretRecheckPeriod, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -723,6 +726,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.ContainerRuntimeEndpoint = in.ContainerRuntimeEndpoint
 	out.ImageServiceEndpoint = in.ImageServiceEndpoint
 	if err := v1.Convert_bool_To_Pointer_bool(&in.FailCgroupV1, &out.FailCgroupV1, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_v1_Duration_To_Pointer_v1_Duration(&in.PullImageSecretRecheckPeriod, &out.PullImageSecretRecheckPeriod, s); err != nil {
 		return err
 	}
 	return nil

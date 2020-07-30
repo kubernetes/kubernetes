@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -987,5 +988,55 @@ func TestHashContainerWithoutResources(t *testing.T) {
 			assert.Equal(t, tc.expectedHash, hash, "[%s]", tc.name)
 			assert.Equal(t, containerCopy, tc.container, "[%s]", tc.name)
 		})
+	}
+}
+
+func TestHashAuth(t *testing.T) {
+	testUser := "username"
+	testPasswd := "password"
+	testAuth := testUser + ":" + testPasswd
+	testServer := "https://registry-1.io"
+	testIdentityToken := "kas9Da81Dfa8"
+	testRegistryToken :=
+		`eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IlBZWU86VEVXVTpWN0pIOjI2SlY6QVFUWjpMSkMzOlNYVko6WEdIQTozNEYyOjJMQVE6WlJNSzpaN1E2In0.eyJpc3MiOiJhdXRoLmRvY2tlci5jb20iLCJzdWIiOiJqbGhhd24iLCJhdWQiOiJyZWdpc3RyeS5kb2NrZXIuY29tIiwiZXhwIjoxNDE1Mzg3MzE1LCJuYmYiOjE0MTUzODcwMTUsImlhdCI6MTQxNTM4NzAxNSwianRpIjoidFlKQ08xYzZjbnl5N2tBbjBjN3JLUGdiVjFIMWJGd3MiLCJhY2Nlc3MiOlt7InR5cGUiOiJyZXBvc2l0b3J5IiwibmFtZSI6InNhbWFsYmEvbXktYXBwIiwiYWN0aW9ucyI6WyJwdXNoIl19XX0.QhflHPfbd6eVF4lM9bwYpFZIV0PfikbyXuLx959ykRTBpe3CYnzs6YBK8FToVb5R47920PVLrh8zuLzdCr9t3w`
+
+	testCases := []struct {
+		auth         *runtimeapi.AuthConfig
+		expectedHash string
+	}{
+		{
+			auth: &runtimeapi.AuthConfig{
+				IdentityToken: testIdentityToken},
+			expectedHash: "4d3e035376aaa6fe",
+		},
+		{
+			auth: &runtimeapi.AuthConfig{
+				Username:      testUser,
+				Password:      testPasswd,
+				ServerAddress: testServer},
+			expectedHash: "deed1b4ea7ff40f9",
+		},
+		{
+			auth: &runtimeapi.AuthConfig{
+				Auth:          testAuth,
+				ServerAddress: testServer},
+			expectedHash: "f5017bcbcc0fbffc",
+		},
+		{
+			auth: &runtimeapi.AuthConfig{
+				ServerAddress: testServer,
+				RegistryToken: testRegistryToken},
+			expectedHash: "28256605b2151d68",
+		},
+		{
+			auth:         &runtimeapi.AuthConfig{},
+			expectedHash: "42a21bc689278e90",
+		},
+	}
+
+	for _, tc := range testCases {
+		hashVal, err := HashAuth(tc.auth)
+		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
+		assert.Nil(t, err)
 	}
 }

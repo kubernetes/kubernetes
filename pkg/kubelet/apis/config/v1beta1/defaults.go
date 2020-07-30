@@ -39,6 +39,9 @@ const (
 	DefaultPodLogsDir            = "/var/log/pods"
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor = 0.9
+
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2535-ensure-secret-pulled-images
+	DefaultImagePullRecheckPeriod = 24 * time.Hour
 )
 
 var (
@@ -285,5 +288,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.PodLogsDir == "" {
 		obj.PodLogsDir = DefaultPodLogsDir
+	}
+	if obj.PullImageSecretRecheckPeriod == nil {
+		obj.PullImageSecretRecheckPeriod = &metav1.Duration{Duration: DefaultImagePullRecheckPeriod}
 	}
 }

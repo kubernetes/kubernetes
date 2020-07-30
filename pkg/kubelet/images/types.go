@@ -37,6 +37,9 @@ var (
 	// ErrImageNeverPull - Required Image is absent on host and PullPolicy is NeverPullImage
 	ErrImageNeverPull = errors.New("ErrImageNeverPull")
 
+	// ErrImageNotEnsured - Required Image existed on host, but the image, pulled by secret is not ensured by secret now
+	ErrImageNotEnsured = errors.New("ErrImageNotEnsured")
+
 	// ErrInvalidImageName - Unable to parse the image name.
 	ErrInvalidImageName = errors.New("InvalidImageName")
 )

@@ -120,6 +120,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = utilpointer.Float64(rand.Float64())
 			obj.LocalStorageCapacityIsolation = true
+			obj.PullImageSecretRecheckPeriod = metav1.Duration{Duration: kubeletconfigv1beta1.DefaultImagePullRecheckPeriod}
 		},
 	}
 }

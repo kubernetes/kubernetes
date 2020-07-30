@@ -490,6 +490,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PullImageSecretRecheckPeriod != nil {
+		in, out := &in.PullImageSecretRecheckPeriod, &out.PullImageSecretRecheckPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 

@@ -691,6 +691,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		*kubeCfg.MemoryThrottlingFactor,
 		kubeDeps.PodStartupLatencyTracker,
 		kubeDeps.TracerProvider,
+		kubeCfg.PullImageSecretRecheckPeriod,
 	)
 	if err != nil {
 		return nil, err

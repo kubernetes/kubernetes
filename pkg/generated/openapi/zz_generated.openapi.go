@@ -62409,8 +62409,14 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"pullImageSecretRecheckPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PullImageSecretRecheckPeriod defines the duration to recheck the pull image secret. By default, the kubelet will recheck the pull image secret every 24 hours(1d).",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
-				Required: []string{"containerRuntimeEndpoint"},
+				Required: []string{"containerRuntimeEndpoint", "pullImageSecretRecheckPeriod"},
 			},
 		},
 		Dependencies: []string{

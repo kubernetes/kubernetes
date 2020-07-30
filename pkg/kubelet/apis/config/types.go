@@ -501,6 +501,10 @@ type KubeletConfiguration struct {
 	// option is explicitly enabled.
 	// +optional
 	FailCgroupV1 bool
+
+	// PullImageSecretRecheckPeriod defines the duration to recheck the pull image secret.
+	// By default, the kubelet will recheck the pull image secret every 24 hours(1d).
+	PullImageSecretRecheckPeriod metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
