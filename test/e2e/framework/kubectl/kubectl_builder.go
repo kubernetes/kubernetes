@@ -45,9 +45,8 @@ type KubectlBuilder struct {
 }
 
 // NewKubectlCommand returns a KubectlBuilder for running kubectl.
-func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
+func NewKubectlCommand(tk *TestKubeconfig, args ...string) *KubectlBuilder {
 	b := new(KubectlBuilder)
-	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	b.cmd = tk.KubectlCmd(args...)
 	return b
 }
@@ -150,45 +149,50 @@ func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 
 // RunKubectlOrDie is a convenience wrapper over kubectlBuilder
 func RunKubectlOrDie(namespace string, args ...string) string {
-	return NewKubectlCommand(namespace, args...).ExecOrDie(namespace)
+	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	return NewKubectlCommand(tk, args...).ExecOrDie(namespace)
 }
 
 // RunKubectl is a convenience wrapper over kubectlBuilder
 func RunKubectl(namespace string, args ...string) (string, error) {
-	return NewKubectlCommand(namespace, args...).Exec()
+	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	return NewKubectlCommand(tk, args...).Exec()
 }
 
 // RunKubectlWithFullOutput is a convenience wrapper over kubectlBuilder
 // It will also return the command's stderr.
 func RunKubectlWithFullOutput(namespace string, args ...string) (string, string, error) {
-	return NewKubectlCommand(namespace, args...).ExecWithFullOutput()
+	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	return NewKubectlCommand(tk, args...).ExecWithFullOutput()
 }
 
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlOrDieInput(namespace string, data string, args ...string) string {
-	return NewKubectlCommand(namespace, args...).WithStdinData(data).ExecOrDie(namespace)
+	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	return NewKubectlCommand(tk, args...).WithStdinData(data).ExecOrDie(namespace)
 }
 
 // RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlInput(namespace string, data string, args ...string) (string, error) {
-	return NewKubectlCommand(namespace, args...).WithStdinData(data).Exec()
+	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	return NewKubectlCommand(tk, args...).WithStdinData(data).Exec()
 }
 
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
-func RunKubemciWithKubeconfig(args ...string) (string, error) {
-	if framework.TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+framework.TestContext.KubeConfig)
+func RunKubemciWithKubeconfig(kubeconfig string, projectId string, args ...string) (string, error) {
+	if kubeconfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+kubeconfig)
 	}
-	return RunKubemciCmd(args...)
+	return RunKubemciCmd(projectId, args...)
 }
 
 // RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
 // It assumes that kubemci exists in PATH.
-func RunKubemciCmd(args ...string) (string, error) {
+func RunKubemciCmd(projectId string, args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
 	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+framework.TestContext.CloudConfig.ProjectID)
+	args = append(args, "--gcp-project="+projectId)
 
 	b.cmd = exec.Command(kubemci, args...)
 	return b.Exec()
@@ -303,15 +307,15 @@ func WaitForSSHTunnels(namespace string) {
 }
 
 // MasterUpgradeGKE upgrades master node to the specified version on GKE.
-func MasterUpgradeGKE(namespace string, v string) error {
+func MasterUpgradeGKE(namespace string, v string, projectId string, locationParamGKE string, cluster string) error {
 	framework.Logf("Upgrading master to %q", v)
 	args := []string{
 		"container",
 		"clusters",
-		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-		framework.LocationParamGKE(),
+		fmt.Sprintf("--project=%s", projectId),
+		locationParamGKE,
 		"upgrade",
-		framework.TestContext.CloudConfig.Cluster,
+		cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
@@ -325,24 +329,3 @@ func MasterUpgradeGKE(namespace string, v string) error {
 
 	return nil
 }
-<<<<<<< HEAD
-=======
-
-// MasterUpgrade upgrades master node on GCE/GKE.
-func MasterUpgrade(f *framework.Framework, v string) error {
-	switch framework.TestContext.Provider {
-	case "gce":
-		return framework.MasterUpgradeGCE(v, false)
-	case "gke":
-		return MasterUpgradeGKE(f.Namespace.Name, v)
-	default:
-		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
-	}
-}
-
-// MasterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
-	return framework.MasterUpgradeGCE(v, enableKubeProxyDaemonSet)
-}
->>>>>>> Update bazel build

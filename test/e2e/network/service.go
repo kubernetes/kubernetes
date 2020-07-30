@@ -327,44 +327,15 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods
 	cmdFunc := func(podName string) string {
 		wgetCmd := "wget -q -T 1 -O -"
 		serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
-<<<<<<< HEAD
 		cmd := fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
 			50*len(expectedPods), wgetCmd, serviceIPPort)
 		framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, podName)
 		// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-		output, err := framework.RunHostCmd(ns, podName, cmd)
+		output, err := e2ekubectl.RunHostCmd(ns, podName, cmd)
 		if err != nil {
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, podName, err, output)
 		}
 		return output
-=======
-		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
-			50*len(expectedPods), wget, serviceIPPort)
-	}
-	commands := []func() string{
-		// verify service from node
-		func() string {
-			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
-			framework.Logf("Executing cmd %q on host %v", cmd, host)
-			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
-			if err != nil || result.Code != 0 {
-				e2essh.LogResult(result)
-				framework.Logf("error while SSH-ing to node: %v", err)
-			}
-			return result.Stdout
-		},
-		// verify service from pod
-		func() string {
-			cmd := buildCommand("wget -q -T 1 -O -")
-			framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPod.Name)
-			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-			output, err := e2ekubectl.RunHostCmd(ns, execPod.Name, cmd)
-			if err != nil {
-				framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPod.Name, err, output)
-			}
-			return output
-		},
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 	}
 
 	expectedEndpoints := sets.NewString(expectedPods...)
@@ -3338,41 +3309,6 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 	})
 })
 
-<<<<<<< HEAD
-=======
-func execSourceipTest(pausePod v1.Pod, serviceAddress string) (string, string) {
-	var err error
-	var stdout string
-	timeout := 2 * time.Minute
-
-	framework.Logf("Waiting up to %v to get response from %s", timeout, serviceAddress)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, serviceAddress)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = e2ekubectl.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
-		if err != nil {
-			framework.Logf("got err: %v, retry until timeout", err)
-			continue
-		}
-		// Need to check output because it might omit in case of error.
-		if strings.TrimSpace(stdout) == "" {
-			framework.Logf("got empty stdout, retry until timeout")
-			continue
-		}
-		break
-	}
-
-	framework.ExpectNoError(err)
-
-	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
-	host, _, err := net.SplitHostPort(stdout)
-	if err != nil {
-		// ginkgo.Fail the test if output format is unexpected.
-		framework.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
-	}
-	return pausePod.Status.PodIP, host
-}
-
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
 // affinity test for non-load-balancer services. Session afinity will be
 // enabled when the service is created and a short timeout will be configured so
@@ -3773,13 +3709,8 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 		if err != nil {
 			return err
 		}
-		return framework.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+		return e2ekubectl.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 	}
-<<<<<<< HEAD
-=======
-	return e2ekubectl.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
-}
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 
 	return restartComponent(cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
 }

@@ -146,9 +146,10 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
 
+		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			e2ekubectl.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
+			e2ekubectl.NewKubectlCommand(tk, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
