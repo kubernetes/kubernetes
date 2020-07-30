@@ -21,7 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
+kube::util::read-array KUBECTL_FILES < <(find pkg/kubectl/cmd -name "*.go")
 
 generate_pot="false"
 generate_mo="false"
@@ -36,7 +36,7 @@ while getopts "hf:xg" opt; do
       exit 0
       ;;
     f)
-      KUBECTL_FILES="${OPTARG}"
+      IFS=" " read -r -a KUBECTL_FILES <<< "${OPTARG}"
       ;;
     x)
       generate_pot="true"
@@ -65,7 +65,7 @@ fi
 
 if [[ "${generate_pot}" == "true" ]]; then
   echo "Extracting strings to POT"
-  go-xgettext -k=i18n.T "${KUBECTL_FILES}" > tmp.pot
+  go-xgettext -k=i18n.T "${KUBECTL_FILES[@]}" > tmp.pot
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
   perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
   perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
