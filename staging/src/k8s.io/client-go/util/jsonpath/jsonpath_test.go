@@ -263,6 +263,8 @@ func TestStructInput(t *testing.T) {
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville", false},
 		{"allfields", `{range .Bicycle[*]}{ "{" }{ @.* }{ "} " }{end}`, storeData, "{red 19.95 true} {green 20.01 false} ", false},
 		{"recurfields", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"recurdotfields", "{...Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"superrecurfields", "{............................................................Price}", storeData, "", true},
 		{"allstructsSlice", "{.Bicycle}", storeData,
 			`[{"Color":"red","Price":19.95,"IsNew":true},{"Color":"green","Price":20.01,"IsNew":false}]`, false},
 		{"allstructs", `{range .Bicycle[*]}{ @ }{ " " }{end}`, storeData,
