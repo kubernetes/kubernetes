@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -217,14 +216,6 @@ func (sp *ScoreWithNormalizePlugin) ScoreExtensions() framework.ScoreExtensions 
 	return sp
 }
 
-// schedAttempted returns true if the scheduler already attempted to schedule the pod.
-// Note that the logic used here works only for our integration tests because kubelet is not running,
-// and so the condition will continue to exist even if the pod eventually got scheduled.
-func schedAttempted(pod *v1.Pod) bool {
-	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-	return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable
-}
-
 // Name returns name of the plugin.
 func (fp *FilterPlugin) Name() string {
 	return filterPluginName
@@ -239,9 +230,7 @@ func (fp *FilterPlugin) reset() {
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
 func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if !schedAttempted(pod) {
-		fp.numFilterCalled++
-	}
+	fp.numFilterCalled++
 
 	if fp.failFilter {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -413,10 +402,7 @@ func (pp *PostFilterPlugin) Name() string {
 }
 
 func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	if !schedAttempted(pod) {
-		pp.numPostFilterCalled++
-	}
-
+	pp.numPostFilterCalled++
 	nodeInfos, err := pp.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return nil, framework.NewStatus(framework.Error, err.Error())
@@ -676,17 +662,22 @@ func TestPostFilterPlugin(t *testing.T) {
 				if err = wait.Poll(10*time.Millisecond, 10*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
+				if filterPlugin.numFilterCalled < tt.expectFilterNumCalled {
+					t.Errorf("Expected the filter plugin to be called at least %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+				}
+				if postFilterPlugin.numPostFilterCalled < tt.expectPostFilterNumCalled {
+					t.Errorf("Expected the postfilter plugin to be called at least %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
-			}
-
-			if filterPlugin.numFilterCalled != tt.expectFilterNumCalled {
-				t.Errorf("Expected the filter plugin to be called %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
-			}
-			if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
-				t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+				if filterPlugin.numFilterCalled != tt.expectFilterNumCalled {
+					t.Errorf("Expected the filter plugin to be called %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+				}
+				if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
+					t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+				}
 			}
 		})
 	}
@@ -1688,14 +1679,16 @@ func TestFilterPlugin(t *testing.T) {
 				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
+				if filterPlugin.numFilterCalled < 1 {
+					t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
+				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
-			}
-
-			if filterPlugin.numFilterCalled != 1 {
-				t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
+				if filterPlugin.numFilterCalled != 1 {
+					t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
+				}
 			}
 
 			filterPlugin.reset()
