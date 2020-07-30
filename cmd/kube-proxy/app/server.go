@@ -143,7 +143,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.addOSFlags(fs)
 
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
-	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
+	fs.StringVar(&o.config.WriteConfigTo, "write-config-to", o.config.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location can be overridden by the master flag).")
 	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
 	fs.StringVar(&o.config.ClientConnection.ContentType, "kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
@@ -222,8 +222,8 @@ func NewOptions() *Options {
 
 // Complete completes all the required options.
 func (o *Options) Complete() error {
-	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
+	if len(o.ConfigFile) == 0 {
+		klog.Warning("WARNING: all flags other than --config and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
@@ -305,7 +305,7 @@ func (o *Options) Validate() error {
 // Run runs the specified ProxyServer.
 func (o *Options) Run() error {
 	defer close(o.errCh)
-	if len(o.WriteConfigTo) > 0 {
+	if len(o.config.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
 
@@ -352,7 +352,7 @@ func (o *Options) writeConfigFile() (err error) {
 
 	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
 
-	configFile, err := os.Create(o.WriteConfigTo)
+	configFile, err := os.Create(o.config.WriteConfigTo)
 	if err != nil {
 		return err
 	}
@@ -368,7 +368,7 @@ func (o *Options) writeConfigFile() (err error) {
 		return err
 	}
 
-	klog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
+	klog.Infof("Wrote configuration to: %s\n", o.config.WriteConfigTo)
 
 	return nil
 }

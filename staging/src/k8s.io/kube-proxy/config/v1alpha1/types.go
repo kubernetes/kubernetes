@@ -164,6 +164,8 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
+	// WriteConfigTo if set, write the default configuration values to this file and exit
+	WriteConfigTo string `json:"writeConfigTo"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
