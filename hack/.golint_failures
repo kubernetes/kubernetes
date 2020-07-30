@@ -105,7 +105,6 @@ pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni/testing
 pkg/kubelet/dockershim/network/hostport
-pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
 pkg/kubelet/pluginmanager/pluginwatcher
