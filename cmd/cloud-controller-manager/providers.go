@@ -1,7 +1,7 @@
 // +build !providerless
 
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,10 +16,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+// The external controller manager is responsible for running controller loops that
+// are cloud provider dependent. It uses the API to listen to new events on resources.
+
+package main
 
 import (
-	// transitive test dependencies are not vendored by go modules
-	// so we have to explicitly import them here
-	_ "k8s.io/legacy-cloud-providers/vsphere/testing"
+	// NOTE: Importing all in-tree cloud-providers is not required when
+	// implementing an out-of-tree cloud-provider.
+	_ "k8s.io/legacy-cloud-providers/aws"
+	_ "k8s.io/legacy-cloud-providers/azure"
+	_ "k8s.io/legacy-cloud-providers/gce"
+	_ "k8s.io/legacy-cloud-providers/openstack"
+	_ "k8s.io/legacy-cloud-providers/vsphere"
 )
