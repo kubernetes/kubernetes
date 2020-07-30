@@ -94,5 +94,14 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 // Skip verification of server certs.
 func healthCheck(url string) bool {
 	resp, err := insecureHTTPClient.Head(url)
-	return err == nil && resp.StatusCode == http.StatusOK
+	// return err == nil && resp.StatusCode == http.StatusOK
+	if err == nil && resp.StatusCode == http.StatusOK { // FIXME
+		return true
+	}
+	if err != nil {
+		klog.Warningf("Health check on '%s' failed. Error: %v", url, err)
+	} else {
+		klog.Warningf("Health check on '%s' failed. Status: %d", url, resp.StatusCode)
+	}
+	return false
 }
