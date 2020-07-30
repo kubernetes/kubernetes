@@ -1019,7 +1019,7 @@ var _ = SIGDescribe("Services", func() {
 		serviceAddress := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 
 		for _, pausePod := range pausePods.Items {
-			sourceIP, execPodIP := execSourceipTest(pausePod, serviceAddress)
+			sourceIP, execPodIP := execSourceIPTest(pausePod, serviceAddress)
 			ginkgo.By("Verifying the preserved source ip")
 			framework.ExpectEqual(sourceIP, execPodIP)
 		}
@@ -3381,38 +3381,6 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		}
 	})
 })
-
-func execSourceipTest(pausePod v1.Pod, serviceAddress string) (string, string) {
-	var err error
-	var stdout string
-	timeout := 2 * time.Minute
-
-	framework.Logf("Waiting up to %v to get response from %s", timeout, serviceAddress)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, serviceAddress)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
-		if err != nil {
-			framework.Logf("got err: %v, retry until timeout", err)
-			continue
-		}
-		// Need to check output because it might omit in case of error.
-		if strings.TrimSpace(stdout) == "" {
-			framework.Logf("got empty stdout, retry until timeout")
-			continue
-		}
-		break
-	}
-
-	framework.ExpectNoError(err)
-
-	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
-	host, _, err := net.SplitHostPort(stdout)
-	if err != nil {
-		// ginkgo.Fail the test if output format is unexpected.
-		framework.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
-	}
-	return pausePod.Status.PodIP, host
-}
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
 // affinity test for non-load-balancer services. Session afinity will be
