@@ -79,7 +79,7 @@ const (
 	gmsaWebhookDeployScriptURL = "https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/deploy-gmsa-webhook.sh"
 )
 
-var _ = SIGDescribe("[Feature:Windows] GMSA Full [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
 
 	ginkgo.Describe("GMSA support", func() {
