@@ -37,7 +37,7 @@ func TestPullImage(t *testing.T) {
 	_, _, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, _, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imageRef)
 
@@ -53,7 +53,7 @@ func TestPullImageWithError(t *testing.T) {
 	assert.NoError(t, err)
 
 	fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
-	imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, _, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.Error(t, err)
 	assert.Equal(t, "", imageRef)
 
@@ -138,7 +138,7 @@ func TestRemoveImage(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	_, _, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fakeImageService.Images))
 
@@ -161,7 +161,7 @@ func TestRemoveImageWithError(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	_, _, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fakeImageService.Images))
 
@@ -266,7 +266,7 @@ func TestPullWithSecrets(t *testing.T) {
 		_, fakeImageService, fakeManager, err := customTestRuntimeManager(builtInKeyRing)
 		require.NoError(t, err)
 
-		_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
+		_, _, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
 		require.NoError(t, err)
 		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
 	}
@@ -284,7 +284,7 @@ func TestPullThenListWithAnnotations(t *testing.T) {
 		},
 	}
 
-	_, err = fakeManager.PullImage(ctx, imageSpec, nil, nil)
+	_, _, err = fakeManager.PullImage(ctx, imageSpec, nil, nil)
 	assert.NoError(t, err)
 
 	images, err := fakeManager.ListImages(ctx)

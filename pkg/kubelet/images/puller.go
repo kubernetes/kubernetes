@@ -27,9 +27,11 @@ import (
 )
 
 type pullResult struct {
-	imageRef     string
-	err          error
-	pullDuration time.Duration
+	imageRef string
+	// pullCredentialsHash of successful pull with auth, nil if no auth used or error
+	pullCredentialsHash string
+	err                 error
+	pullDuration        time.Duration
 }
 
 type imagePuller interface {
@@ -49,11 +51,12 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	go func() {
 		startTime := time.Now()
-		imageRef, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
+		imageRef, hash, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
-			imageRef:     imageRef,
-			err:          err,
-			pullDuration: time.Since(startTime),
+			imageRef:            imageRef,
+			pullCredentialsHash: hash,
+			err:                 err,
+			pullDuration:        time.Since(startTime),
 		}
 	}()
 }
@@ -93,11 +96,12 @@ func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
 		startTime := time.Now()
-		imageRef, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
+		imageRef, hash, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
 		pullRequest.pullChan <- pullResult{
-			imageRef:     imageRef,
-			err:          err,
-			pullDuration: time.Since(startTime),
+			imageRef:            imageRef,
+			pullCredentialsHash: hash,
+			err:                 err,
+			pullDuration:        time.Since(startTime),
 		}
 	}
 }

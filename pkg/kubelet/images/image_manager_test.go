@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	. "k8s.io/kubernetes/pkg/kubelet/container"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -180,11 +182,11 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	fakeRuntime = &ctest.FakeRuntime{}
 	fakeRecorder := &record.FakeRecorder{}
 
-	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
+	fakeRuntime.ImageList = []kubecontainer.Image{{ID: "present_image:latest"}}
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, c.qps, c.burst, &mockPodPullingTimeRecorder{})
+	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, c.qps, c.burst, &mockPodPullingTimeRecorder{}, nil)
 	return
 }
 
@@ -289,7 +291,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 	useSerializedEnv := true
 	puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
 	fakeRuntime.CalledFunctions = nil
-	fakeRuntime.ImageList = []Image{}
+	fakeRuntime.ImageList = []kubecontainer.Image{}
 	fakeClock.Step(time.Second)
 
 	t.Run(c.testName, func(t *testing.T) {
@@ -304,11 +306,140 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		image := images[0]
 		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
 
-		expectedAnnotations := []Annotation{
+		expectedAnnotations := []kubecontainer.Annotation{
 			{
 				Name:  "kubernetes.io/runtimehandler",
 				Value: "handler_name",
 			}}
 		assert.Equal(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
 	})
+}
+
+func TestShouldPullImage(t *testing.T) {
+	pullIfNotPresent := &v1.Container{
+		Name:            "container_name",
+		Image:           "container_image",
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+	pullNever := &v1.Container{
+		Name:            "container_name",
+		Image:           "container_image",
+		ImagePullPolicy: v1.PullNever,
+	}
+	pullAlways := &v1.Container{
+		Name:            "container_name",
+		Image:           "container_image",
+		ImagePullPolicy: v1.PullAlways,
+	}
+	tests := []struct {
+		description       string
+		container         *v1.Container
+		imagePresent      bool
+		pulledBySecret    bool
+		ensuredBySecret   bool
+		expectedWithFGOff bool
+		expectedWithFGOn  bool
+	}{
+		{
+			description:       "PullAlways should always pull esp. if not present",
+			container:         pullAlways,
+			imagePresent:      false,
+			pulledBySecret:    false,
+			ensuredBySecret:   false,
+			expectedWithFGOff: true,
+			expectedWithFGOn:  true,
+		},
+		{
+			description:       "PullAlways should always pull even if present and not pulled by secret",
+			container:         pullAlways,
+			imagePresent:      true,
+			pulledBySecret:    false,
+			ensuredBySecret:   false,
+			expectedWithFGOff: true,
+			expectedWithFGOn:  true,
+		},
+		{
+			description:       "PullAlways should always pull even if present and ensuredBySecret",
+			container:         pullAlways,
+			imagePresent:      true,
+			pulledBySecret:    true,
+			ensuredBySecret:   true,
+			expectedWithFGOff: true,
+			expectedWithFGOn:  true,
+		},
+		{
+			description:       "PullIfNotPresent should pull if not present",
+			container:         pullIfNotPresent,
+			imagePresent:      false,
+			pulledBySecret:    false,
+			ensuredBySecret:   false,
+			expectedWithFGOff: true,
+			expectedWithFGOn:  true,
+		},
+		{
+			description:       "PullIfNotPresent should pull if not present even if pulledBySecret and ensuredBySecret",
+			container:         pullIfNotPresent,
+			imagePresent:      false,
+			pulledBySecret:    true,
+			ensuredBySecret:   true,
+			expectedWithFGOff: true,
+			expectedWithFGOn:  true,
+		},
+		{
+			description:       "PullIfNotPresent should not pull if present (and secrets are not involved)",
+			container:         pullIfNotPresent,
+			imagePresent:      true,
+			pulledBySecret:    false,
+			ensuredBySecret:   false,
+			expectedWithFGOff: false,
+			expectedWithFGOn:  false,
+		},
+		{
+			description:       "PullIfNotPresent should not pull if present (and secrets are involved and match)",
+			container:         pullIfNotPresent,
+			imagePresent:      true,
+			pulledBySecret:    true,
+			ensuredBySecret:   true,
+			expectedWithFGOff: false,
+			expectedWithFGOn:  false,
+		},
+		{
+			description:       "PullIfNotPresent should pull if present and secrets are involved and no match, unless ensure fg is off",
+			container:         pullIfNotPresent,
+			imagePresent:      true,
+			pulledBySecret:    true,
+			ensuredBySecret:   false,
+			expectedWithFGOff: false,
+			expectedWithFGOn:  true,
+		},
+		{
+			description:       "PullNever should never report pull, but we'll throw error in EnsureImageExists()",
+			container:         pullNever,
+			imagePresent:      false,
+			pulledBySecret:    false,
+			ensuredBySecret:   false,
+			expectedWithFGOff: false,
+			expectedWithFGOn:  false,
+		},
+		{
+			description:       "PullNever should never pull even if pulled by secret and not ensured by secret",
+			container:         pullNever,
+			imagePresent:      true,
+			pulledBySecret:    true,
+			ensuredBySecret:   false,
+			expectedWithFGOff: false,
+			expectedWithFGOn:  false,
+		},
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)()
+
+	for i, test := range tests {
+		sp := shouldPullImage(test.container, test.imagePresent, test.pulledBySecret, test.ensuredBySecret)
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+			assert.Equal(t, test.expectedWithFGOn, sp, "TestCase[%d]: %s ensured image fg enabled", i, test.description)
+		} else {
+			assert.Equal(t, test.expectedWithFGOff, sp, "TestCase[%d]: %s ensured image fg disabled", i, test.description)
+		}
+	}
 }

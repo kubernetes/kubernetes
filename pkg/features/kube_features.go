@@ -440,6 +440,14 @@ const (
 	// Enable kubelet exec plugins for image pull credentials.
 	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
 
+	// owner: @mikebrow
+	// kep: http://kep.k8s.io/2535
+	// alpha: v1.27
+	//
+	// Enables kubelet to ensure images pulled with pod imagePullSecrets are authenticated
+	// by other pods that do not have the same credentials.
+	KubeletEnsureSecretPulledImages featuregate.Feature = "KubeletEnsureSecretPulledImages"
+
 	// owner: @AkihiroSuda
 	// alpha: v1.22
 	//
@@ -948,6 +956,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	KubeletCredentialProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
+
+	KubeletEnsureSecretPulledImages: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletInUserNamespace: {Default: false, PreRelease: featuregate.Alpha},
 
