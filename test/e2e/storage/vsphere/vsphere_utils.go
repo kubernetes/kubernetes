@@ -359,12 +359,8 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
-<<<<<<< HEAD
 		_, err := framework.RunKubectl(namespace, "exec", podName, "--", "/bin/ls", filePath)
-=======
-		_, err := e2ekubectl.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
-		framework.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
+		e2ekubectl.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
 
@@ -820,11 +816,7 @@ func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []str
 
 // writeContentToPodFile writes the given content to the specified file.
 func writeContentToPodFile(namespace, podName, filePath, content string) error {
-<<<<<<< HEAD
-	_, err := framework.RunKubectl(namespace, "exec", podName,
-=======
-	_, err := e2ekubectl.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
+	_, err := e2ekubectl.RunKubectl(namespace, "exec", podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo '%s' > %s", content, filePath))
 	return err
 }
@@ -832,11 +824,7 @@ func writeContentToPodFile(namespace, podName, filePath, content string) error {
 // expectFileContentToMatch checks if a given file contains the specified
 // content, else fails.
 func expectFileContentToMatch(namespace, podName, filePath, content string) {
-<<<<<<< HEAD
-	_, err := framework.RunKubectl(namespace, "exec", podName,
-=======
-	_, err := e2ekubectl.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
+	_, err := e2ekubectl.RunKubectl(namespace, "exec", podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
 	framework.ExpectNoError(err, fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
 }

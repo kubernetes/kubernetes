@@ -1031,9 +1031,5 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		shell = "/bin/sh"
 		option = "-c"
 	}
-<<<<<<< HEAD
-	return framework.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
-=======
-	return e2ekubectl.RunKubectl(pod.Namespace, "exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
+	return e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }

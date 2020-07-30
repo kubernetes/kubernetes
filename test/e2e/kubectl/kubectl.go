@@ -294,8 +294,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 		framework.Logf("scanned %s for discovery docs: %v", home, err)
 	}
 
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
-
 	ginkgo.Describe("Update Demo", func() {
 		var nautilus string
 		ginkgo.BeforeEach(func() {
@@ -451,6 +449,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			testSrv, proxyLogs := startLocalProxy()
 			defer testSrv.Close()
 			proxyAddr := testSrv.URL
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 
 			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
 				proxyLogs.Reset()
@@ -488,6 +487,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			//proxyLogs.Reset()
 			host := fmt.Sprintf("--server=http://127.0.0.1:%d", port)
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 			ginkgo.By("Running kubectl via kubectl proxy using " + host)
 			output := e2ekubectl.NewKubectlCommand(
 				tk, host, fmt.Sprintf("--namespace=%s", ns),
@@ -801,7 +801,6 @@ metadata:
 	ginkgo.Describe("Kubectl apply", func() {
 		ginkgo.It("should apply a new configuration to an existing RC", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
-
 			ginkgo.By("creating Agnhost RC")
 			e2ekubectl.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-")
 			ginkgo.By("applying a modified configuration")
