@@ -416,7 +416,7 @@ func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string
 
 func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy)) {
 	for _, strategy := range updateStrategies() {
-		t.Run(fmt.Sprintf("%s (%v)", t.Name(), strategy),
+		t.Run(fmt.Sprintf("%s_%s", t.Name(), strategy.Type),
 			func(tt *testing.T) { tf(tt, strategy) })
 	}
 }
