@@ -297,6 +297,7 @@ func main() {
 			errors, err := c.verify(plat)
 			if err != nil {
 				serialFprintf(os.Stderr, "ERROR(%s): failed to verify: %v\n", plat, err)
+				f = true
 			} else if len(errors) > 0 {
 				for _, e := range errors {
 					// Special case CGo errors which may depend on headers we
