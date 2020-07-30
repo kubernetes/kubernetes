@@ -125,8 +125,8 @@ type kubeGenericRuntimeManager struct {
 	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
 	cpuCFSQuotaPeriod metav1.Duration
 
-	// wrapped image puller.
-	imagePuller images.ImageManager
+	// wrapped image puller for ensuring image pull secret.
+	imagePullSecretEnsurer images.ImageManager
 
 	// gRPC service clients
 	runtimeService internalapi.RuntimeService
@@ -212,6 +212,7 @@ func NewKubeGenericRuntimeManager(
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
+	pullImageSecretRecheckPeriod metav1.Duration,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
@@ -271,7 +272,7 @@ func NewKubeGenericRuntimeManager(
 	}
 	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
 
-	kubeRuntimeManager.imagePuller = images.NewImageManager(
+	kubeRuntimeManager.imagePullSecretEnsurer = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		imageBackOff,
@@ -279,7 +280,10 @@ func NewKubeGenericRuntimeManager(
 		maxParallelImagePulls,
 		imagePullQPS,
 		imagePullBurst,
-		podPullingTimeRecorder)
+		podPullingTimeRecorder,
+		&kubeRuntimeManager.keyring,
+		pullImageSecretRecheckPeriod)
+
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
 	kubeRuntimeManager.podStateProvider = podStateProvider

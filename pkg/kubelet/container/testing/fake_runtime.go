@@ -308,7 +308,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
 	if f.Err == nil {
@@ -321,7 +321,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 
 	if !f.BlockImagePulls {
 		f.Unlock()
-		return image.Image, f.Err
+		return image.Image, "", f.Err
 	}
 
 	retErr := f.Err
@@ -334,7 +334,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 	case <-ctx.Done():
 	case <-f.imagePullTokenBucket:
 	}
-	return image.Image, retErr
+	return image.Image, "", retErr
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.

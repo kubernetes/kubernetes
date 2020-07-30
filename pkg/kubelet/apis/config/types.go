@@ -494,6 +494,10 @@ type KubeletConfiguration struct {
 	// If not specified the default value is ContainerRuntimeEndpoint
 	// +optional
 	ImageServiceEndpoint string
+
+	// PullImageSecretRecheckPeriod defines the duration to recheck the pull image secret.
+	// By default, the kubelet will recheck the pull image secret every 24 hours(1d).
+	PullImageSecretRecheckPeriod metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

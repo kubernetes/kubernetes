@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -129,15 +129,17 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
 	kubeRuntimeManager.podStateProvider = podStateProvider
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
-	kubeRuntimeManager.imagePuller = images.NewImageManager(
+	kubeRuntimeManager.imagePullSecretEnsurer = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second),
 		false,
-		utilpointer.Int32Ptr(0), // No limit on max parallel image pulls,
-		0,                       // Disable image pull throttling by setting QPS to 0,
+		ptr.To[int32](0), // No limit on max parallel image pulls,
+		0,                // Disable image pull throttling by setting QPS to 0,
 		0,
 		&fakePodPullingTimeRecorder{},
+		nil,
+		metav1.Duration{Duration: 1 * time.Minute},
 	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},

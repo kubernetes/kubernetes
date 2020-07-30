@@ -32,16 +32,16 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, m.keyring)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	imgSpec := toRuntimeAPIImageSpec(image)
@@ -50,13 +50,13 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	if !withCredentials {
 		klog.V(3).InfoS("Pulling image without credentials", "image", img)
 
+		// callout to cri impl of pull image
 		imageRef, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
 		if err != nil {
 			klog.ErrorS(err, "Failed to pull image", "image", img)
-			return "", err
+			return "", "", err
 		}
-
-		return imageRef, nil
+		return imageRef, "", nil
 	}
 
 	var pullErrs []error
@@ -70,16 +70,23 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 			RegistryToken: currentCreds.RegistryToken,
 		}
 
+		// callout to cri impl of pull image with auth
 		imageRef, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
 		// If there was no error, return success
 		if err == nil {
-			return imageRef, nil
+			// also return the hash for the auth for this successful pull of this imageRef
+			// hash may be used to ensure another use of the imageRef is also authorized
+			hash, err := kubecontainer.HashAuth(auth)
+			if err != nil {
+				klog.ErrorS(err, "Failed to hash auth", "image", img)
+			}
+			return imageRef, hash, nil
 		}
 
 		pullErrs = append(pullErrs, err)
 	}
 
-	return "", utilerrors.NewAggregate(pullErrs)
+	return "", "", utilerrors.NewAggregate(pullErrs)
 }
 
 // GetImageRef gets the ID of the image which has already been in
