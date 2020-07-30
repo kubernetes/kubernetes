@@ -367,8 +367,8 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 
-	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-	framework.ExpectError(err, "while waiting for pod to be running")
+	err := e2epod.WaitForPodContainerToFail(f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
+	framework.ExpectNoError(err, "while waiting for the pod container to fail")
 }
 
 func newPod(command []string, envVars []v1.EnvVar, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {
