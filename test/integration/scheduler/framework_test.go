@@ -971,57 +971,6 @@ func TestPrebindPlugin(t *testing.T) {
 // tests that the order of invocation of Unreserve operation is executed in the
 // reverse order of invocation of the Reserve operation.
 func TestReservePluginUnreserve(t *testing.T) {
-	numReservePlugins := 3
-	pluginInvokeEventChan := make(chan pluginInvokeEvent, numReservePlugins)
-
-	preBindPlugin := &PreBindPlugin{
-		failPreBind: true,
-	}
-	var reservePlugins []*ReservePlugin
-	for i := 0; i < numReservePlugins; i++ {
-		reservePlugins = append(reservePlugins, &ReservePlugin{
-			name:                  fmt.Sprintf("%s-%d", reservePluginName, i),
-			pluginInvokeEventChan: pluginInvokeEventChan,
-		})
-	}
-
-	registry := frameworkruntime.Registry{
-		// TODO(#92229): test more failure points that would trigger Unreserve in
-		// reserve plugins than just one pre-bind plugin.
-		preBindPluginName: newPlugin(preBindPlugin),
-	}
-	for _, pl := range reservePlugins {
-		registry[pl.Name()] = newPlugin(pl)
-	}
-
-	// Setup initial reserve and prebind plugin for testing.
-	prof := schedulerconfig.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedulerconfig.Plugins{
-			Reserve: &schedulerconfig.PluginSet{
-				// filled by looping over reservePlugins
-			},
-			PreBind: &schedulerconfig.PluginSet{
-				Enabled: []schedulerconfig.Plugin{
-					{
-						Name: preBindPluginName,
-					},
-				},
-			},
-		},
-	}
-	for _, pl := range reservePlugins {
-		prof.Plugins.Reserve.Enabled = append(prof.Plugins.Reserve.Enabled, schedulerconfig.Plugin{
-			Name: pl.Name(),
-		})
-	}
-
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-unreserve", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
-
 	tests := []struct {
 		name             string
 		failReserve      bool
@@ -1044,6 +993,57 @@ func TestReservePluginUnreserve(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			numReservePlugins := 3
+			pluginInvokeEventChan := make(chan pluginInvokeEvent, numReservePlugins)
+
+			preBindPlugin := &PreBindPlugin{
+				failPreBind: true,
+			}
+			var reservePlugins []*ReservePlugin
+			for i := 0; i < numReservePlugins; i++ {
+				reservePlugins = append(reservePlugins, &ReservePlugin{
+					name:                  fmt.Sprintf("%s-%d", reservePluginName, i),
+					pluginInvokeEventChan: pluginInvokeEventChan,
+				})
+			}
+
+			registry := frameworkruntime.Registry{
+				// TODO(#92229): test more failure points that would trigger Unreserve in
+				// reserve plugins than just one pre-bind plugin.
+				preBindPluginName: newPlugin(preBindPlugin),
+			}
+			for _, pl := range reservePlugins {
+				registry[pl.Name()] = newPlugin(pl)
+			}
+
+			// Setup initial reserve and prebind plugin for testing.
+			prof := schedulerconfig.KubeSchedulerProfile{
+				SchedulerName: v1.DefaultSchedulerName,
+				Plugins: &schedulerconfig.Plugins{
+					Reserve: &schedulerconfig.PluginSet{
+						// filled by looping over reservePlugins
+					},
+					PreBind: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{
+								Name: preBindPluginName,
+							},
+						},
+					},
+				},
+			}
+			for _, pl := range reservePlugins {
+				prof.Plugins.Reserve.Enabled = append(prof.Plugins.Reserve.Enabled, schedulerconfig.Plugin{
+					Name: pl.Name(),
+				})
+			}
+
+			// Create the master and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-unreserve", nil), 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
+
 			preBindPlugin.failPreBind = test.failPreBind
 			if test.failReserve {
 				reservePlugins[test.failReserveIndex].failReserve = true
@@ -1079,11 +1079,6 @@ func TestReservePluginUnreserve(t *testing.T) {
 						t.Errorf("reservePlugins[%d].numUnreserveCalled = %d, want 0", i, pl.numUnreserveCalled)
 					}
 				}
-			}
-
-			preBindPlugin.reset()
-			for _, pl := range reservePlugins {
-				pl.reset()
 			}
 			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
