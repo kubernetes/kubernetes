@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "azure_acr_helper.go",
         "azure_credentials.go",
+        "doc.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/credentialprovider/azure",
     deps = [
