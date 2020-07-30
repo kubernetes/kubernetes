@@ -461,6 +461,28 @@ func TestValidateServiceIPFamily(t *testing.T) {
 			},
 			expectErr: nil,
 		},
+		{
+			name:             "provided IP Family not in allowed list (IPv6)",
+			dualStackEnabled: true,
+			ipFamilies:       []api.IPFamily{api.IPv4Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					IPFamily: &ipv6,
+				},
+			},
+			expectErr: []string{"spec.ipFamily: Invalid value: \"IPv6\": only the following families are allowed: IPv4"},
+		},
+		{
+			name:             "provided IP Family not in allowed list (IPv4)",
+			dualStackEnabled: true,
+			ipFamilies:       []api.IPFamily{api.IPv6Protocol},
+			svc: &api.Service{
+				Spec: api.ServiceSpec{
+					IPFamily: &ipv4,
+				},
+			},
+			expectErr: []string{"spec.ipFamily: Invalid value: \"IPv4\": only the following families are allowed: IPv6"},
+		},
 	}
 
 	for _, tc := range testCases {
