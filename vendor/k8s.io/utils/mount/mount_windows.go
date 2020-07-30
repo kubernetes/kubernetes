@@ -54,6 +54,46 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	return mounter.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
 }
 
+//mountNfs uses powershell command "net use" to connect NFS share
+func mountNfs(source, target string, options []string) error {
+	mountCmd := "powershell /c net use " + source
+	output, err := exec.Command(mountCmd, options...).CombinedOutput()
+	if err != nil {
+		klog.Errorf("NFS mount failed: %v, source(%q) output: %q", err, source, target, string(output))
+		return err
+	}
+
+	klog.V(4).Infof("NFS mount source(%q) on target(%q) successfully, output: %q", source, target, string(output))
+	return nil
+}
+
+//mountSmb tries to create SMB mapping to a SMB share
+func mountSmb(source, target string, options []string) error {
+	if len(options) < 2 {
+		klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
+			sanitizedOptionsForLogging, len(options), source, target)
+		return nil
+	}
+	// lock smb mount for the same source
+	getSMBMountMutex.LockKey(source)
+	defer getSMBMountMutex.UnlockKey(source)
+
+	if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+		if isSMBMappingExist(source) {
+			klog.V(2).Infof("SMB Mapping(%s) already exists, now begin to remove and remount", source)
+			if output, err := removeSMBMapping(source); err != nil {
+				return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+			}
+			if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+				return fmt.Errorf("New-SmbGlobalMapping remount failed: %v, output: %q", err, output)
+			}
+		} else {
+			return fmt.Errorf("New-SmbGlobalMapping failed: %v, output: %q", err, output)
+		}
+	}
+	return nil
+}
+
 // MountSensitive is the same as Mount() but this method allows
 // sensitiveOptions to be passed in a separate parameter from the normal
 // mount options and ensures the sensitiveOptions are never logged. This
@@ -83,6 +123,74 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		allOptions := []string{}
 		allOptions = append(allOptions, options...)
 		allOptions = append(allOptions, sensitiveOptions...)
+		fstype = strings.ToLower(fstype)
+		switch fstype {
+		case "nfs":
+			mountNfs(source, target, allOptions)
+		case "cifs":
+			mountSmb(source, target, allOptions)
+		default:
+			return fmt.Errorf("mount failed: only fstypes nfs or cifs are supported")
+		}
+	}
+	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput()
+	if err != nil {
+		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, bindSource, target, string(output))
+		return err
+	}
+	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", bindSource, target, string(output))
+	return nil
+}
+
+// MountSensitive is the same as Mount() but this method allows
+// sensitiveOptions to be passed in a separate parameter from the normal
+// mount options and ensures the sensitiveOptions are never logged. This
+// method should be used by callers that pass sensitive material (like
+// passwords) as mount options.
+/*func (mounter *Mounter) MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	target = NormalizeWindowsPath(target)
+	sanitizedOptionsForLogging := sanitizedOptionsForLogging(options, sensitiveOptions)
+
+	if source == "tmpfs" {
+		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
+		return os.MkdirAll(target, 0755)
+	}
+
+	parentDir := filepath.Dir(target)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return err
+	}
+
+	klog.V(4).Infof("mount options(%q) source:%q, target:%q, fstype:%q, begin to mount",
+		sanitizedOptionsForLogging, source, target, fstype)
+	bindSource := source
+
+	if bind, _, _, _ := MakeBindOptsSensitive(options, sensitiveOptions); bind {
+		bindSource = NormalizeWindowsPath(source)
+	} else {
+		allOptions := []string{}
+		allOptions = append(allOptions, options...)
+		allOptions = append(allOptions, sensitiveOptions...)
+
+		if strings.ToLower(fstype) == "nfs" {
+			mountcmd := "\"mount " + source + " z:\""
+			mountcmd = "net use " + source
+			output, err := exec.Command("powershell", "/c", mountcmd).CombinedOutput()
+			if err != nil {
+				klog.Errorf("mount failed: %v, source(%q) output: %q", err, source, target, string(output))
+				return err
+			}
+
+			klog.V(2).Infof("mount source(%q) on target(%q) successfully, output: %q", source, target, string(output))
+
+			output, err = exec.Command("cmd", "/c", "mklink", "/D", target, source).CombinedOutput()
+			if err != nil {
+				klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, source, target, string(output))
+				return err
+			}
+			klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", source, target, string(output))
+		}
+
 		if len(allOptions) < 2 {
 			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
 				sanitizedOptionsForLogging, len(allOptions), source, target)
@@ -121,7 +229,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", bindSource, target, string(output))
 
 	return nil
-}
+}*/
 
 // do the SMB mount with username, password, remotepath
 // return (output, error)
@@ -165,6 +273,10 @@ func removeSMBMapping(remotepath string) (string, error) {
 func (mounter *Mounter) Unmount(target string) error {
 	klog.V(4).Infof("azureMount: Unmount target (%q)", target)
 	target = NormalizeWindowsPath(target)
+	source, err := os.Readlink(target)
+	klog.Infof("umount target %q source %q", target, source)
+	output, err := exec.Command("powershell", "/c", "net use", source, "/delete").CombinedOutput()
+	klog.Infof("net use /delete %q; error %v", string(output), err)
 	if output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
 		klog.Errorf("rmdir failed: %v, output: %q", err, string(output))
 		return err

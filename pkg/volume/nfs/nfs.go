@@ -19,6 +19,7 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 
 	"k8s.io/klog/v2"
@@ -241,6 +242,51 @@ func (nfsMounter *nfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return nfsMounter.SetUpAt(nfsMounter.GetPath(), mounterArgs)
 }
 
+// Generate commands for configuring the UID and GID for NFS access.
+func setupCommand(name string) string {
+	pathname := ` -Path "HKLM:\SOFTWARE\Microsoft\ClientForNFS\CurrentVersion\Default\" -Name ` + name
+	getcmd := "Get-ItemProperty" + pathname
+	newcmd := "New-ItemProperty" + pathname + "-Value 0 -PropertyType DWORD"
+	bothcmd := getcmd + "; if ( !$? ) { " + newcmd + " }"
+	return bothcmd
+}
+
+// Install NFS client and configure the UID and GID for NFS access.
+func setupNFSonWindows() error {
+	cmd := exec.Command("powershell", "/c", `Install-WindowsFeature -Name NFS-Client`)
+	output, err := cmd.CombinedOutput()
+	klog.Infof("NFS windows setup %v %v", string(output), err)
+	if err != nil {
+		return err
+	}
+	command := setupCommand("AnonymousUid")
+	output, err = exec.Command("powershell", "/c", command).CombinedOutput()
+	klog.Infof("NFS windows setup %v %v", string(output), err)
+	if err != nil {
+		return err
+	}
+	command = setupCommand("AnonymousGid")
+	output, err = exec.Command("powershell", "/c", command).CombinedOutput()
+	klog.Infof("NFS windows setup %v %v", string(output), err)
+	if err != nil {
+		return err
+	}
+
+	cmd = exec.Command("powershell", "/c", `nfsadmin client stop`)
+	output, err = cmd.CombinedOutput()
+	klog.Infof("NFS windows setup %v %v", string(output), err)
+	if err != nil {
+		return err
+	}
+	cmd = exec.Command("powershell", "/c", `nfsadmin client start`)
+	output, err = cmd.CombinedOutput()
+	klog.Infof("NFS windows setup %v %v", string(output), err)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 	klog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
@@ -250,10 +296,19 @@ func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	if !notMnt {
 		return nil
 	}
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return err
+	var source string
+	if runtime.GOOS == "windows" {
+		if err := setupNFSonWindows(); err != nil {
+			return err
+		}
+		source = fmt.Sprintf("\\\\%s\\%s", nfsMounter.server, nfsMounter.exportPath[1:])
+	} else {
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return err
+		}
+		source = fmt.Sprintf("%s:%s", nfsMounter.server, nfsMounter.exportPath)
 	}
-	source := fmt.Sprintf("%s:%s", nfsMounter.server, nfsMounter.exportPath)
+
 	options := []string{}
 	if nfsMounter.readOnly {
 		options = append(options, "ro")
