@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -105,6 +106,14 @@ func HashContainer(container *v1.Container) uint64 {
 	containerJSON, _ := json.Marshal(container)
 	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())
+}
+
+// HashAuth - returns a hash code for a CRI pull image auth
+func HashAuth(auth *runtimeapi.AuthConfig) string {
+	hash := fnv.New64a()
+	authJSON, _ := json.Marshal(auth)
+	hashutil.DeepHashObject(hash, authJSON)
+	return strconv.FormatUint(hash.Sum64(), 16)
 }
 
 // envVarsToMap constructs a map of environment name to value from a slice

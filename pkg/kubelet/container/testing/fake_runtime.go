@@ -293,7 +293,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -305,7 +305,7 @@ func (f *FakeRuntime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.
 		}
 		f.ImageList = append(f.ImageList, i)
 	}
-	return image.Image, f.Err
+	return image.Image, "", f.Err
 }
 
 func (f *FakeRuntime) GetImageRef(image kubecontainer.ImageSpec) (string, error) {

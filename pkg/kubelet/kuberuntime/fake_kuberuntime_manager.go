@@ -123,6 +123,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		false,
 		0, // Disable image pull throttling by setting QPS to 0,
 		0,
+		nil,
 	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},

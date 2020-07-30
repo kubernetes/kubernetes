@@ -826,6 +826,14 @@ const (
 	//
 	// Stop auto-generation of secret-based service account tokens.
 	LegacyServiceAccountTokenNoAutoGeneration featuregate.Feature = "LegacyServiceAccountTokenNoAutoGeneration"
+
+	// owner: @mikebrow
+	// kep: http://kep.k8s.io/2535
+	// alpha: v1.24
+	//
+	// Enables kubelet to ensure images pulled with pod imagePullSecrets are authenticated
+	// by other pods that do not have the same credentials.
+	KubeletEnsureSecretPulledImages featuregate.Feature = "KubeletEnsureSecretPulledImages"
 )
 
 func init() {
@@ -947,6 +955,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RecoverVolumeExpansionFailure:                  {Default: false, PreRelease: featuregate.Alpha},
 	GRPCContainerProbe:                             {Default: false, PreRelease: featuregate.Alpha},
 	LegacyServiceAccountTokenNoAutoGeneration:      {Default: true, PreRelease: featuregate.Beta},
+	KubeletEnsureSecretPulledImages:                {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
