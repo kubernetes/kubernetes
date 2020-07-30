@@ -665,6 +665,7 @@ func (az *Cloud) Instances() (cloudprovider.Instances, bool) {
 }
 
 // InstancesV2 returns an instancesV2 interface. Also returns true if the interface is supported, false otherwise.
+// TODO: implement ONLY for external cloud provider
 func (az *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
