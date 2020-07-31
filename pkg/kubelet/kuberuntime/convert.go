@@ -17,6 +17,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"sort"
+
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -26,11 +28,16 @@ import (
 func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 	var annotations []kubecontainer.Annotation
 
-	if image.Spec != nil && image.Spec.Annotations != nil {
-		for k, v := range image.Spec.Annotations {
+	if image.Spec != nil && len(image.Spec.Annotations) > 0 {
+		annotationKeys := make([]string, 0, len(image.Spec.Annotations))
+		for k := range image.Spec.Annotations {
+			annotationKeys = append(annotationKeys, k)
+		}
+		sort.Strings(annotationKeys)
+		for _, k := range annotationKeys {
 			annotations = append(annotations, kubecontainer.Annotation{
 				Name:  k,
-				Value: v,
+				Value: image.Spec.Annotations[k],
 			})
 		}
 	}
