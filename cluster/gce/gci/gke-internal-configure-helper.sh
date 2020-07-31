@@ -314,6 +314,18 @@ oom_score = -999
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
 
+  if [[ "${ENABLE_GCFS:-}" == "true" ]]; then
+    gke-setup-gcfs
+    cat >> "${config_path}" <<EOF
+[plugins.cri.containerd]
+  snapshotter = "gcfs"
+[proxy_plugins]
+  [proxy_plugins.gcfs]
+    type = "snapshot"
+    address = "/run/containerd-gcfs-grpc/containerd-gcfs-grpc.sock"
+EOF
+  fi
+
   local -r sandbox_root="${CONTAINERD_SANDBOX_RUNTIME_ROOT:-"/run/containerd/runsc"}"
   # shim_config_path is the path of gvisor-containerd-shim config file.
   local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"${sandbox_root}/config.toml"}"
@@ -463,4 +475,48 @@ function gke-configure-npd-custom-plugins {
 
   # Configure sysctl monitor.
   GKE_NPD_CUSTOM_PLUGINS_CONFIG="${config_dir}/sysctl-monitor.json"
+}
+
+# Set up GCFS daemons.
+function gke-setup-gcfs {
+  # Write the systemd service file for GCFS FUSE client.
+  local -r gcfsd_mnt_dir="/run/gcfsd/mnt"
+  cat <<EOF >/etc/systemd/system/gcfsd.service
+# Systemd configuration for Google Container File System service
+[Unit]
+Description=Google Container File System service
+After=network.target
+[Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p ${gcfsd_mnt_dir}
+ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir}
+ExecStop=/bin/umount ${gcfsd_mnt_dir}
+RuntimeDirectory=gcfsd
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Write the configuration file for GCFS snapshotter.
+  # An empty file would work for now.
+  mkdir -p /etc/containerd-gcfs-grpc
+  touch /etc/containerd-gcfs-grpc/config.toml
+  # Write the systemd service file for GCFS snapshotter
+  cat <<EOF >/etc/systemd/system/gcfs-snapshotter.service
+# Systemd configuration for Google Container File System snapshotter
+[Unit]
+Description=GCFS snapshotter
+After=network.target
+Before=containerd.service
+[Service]
+Environment=HOME=/root
+ExecStart=${KUBE_HOME}/bin/containerd-gcfs-grpc --log-level=info --config=/etc/containerd-gcfs-grpc/config.toml
+Restart=always
+RestartSec=1
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl start gcfsd.service
+  systemctl start gcfs-snapshotter.service
 }
