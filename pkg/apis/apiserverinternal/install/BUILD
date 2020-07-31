@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/apiserverinternal/install",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apiserverinternal:go_default_library",
         "//pkg/apis/apiserverinternal/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
