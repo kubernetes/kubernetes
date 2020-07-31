@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -484,14 +483,14 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	t.restoreDNSConfigMap(originalConfigMapData)
 }
 
-var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
+var _ = SIGDescribe("DNS configMap nameserver", func() {
 
 	ginkgo.Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
 
 		ginkgo.It("should be able to change stubDomain configuration [Slow][Serial]", func() {
 			nsTest.c = nsTest.f.ClientSet
-			nsTest.run(false)
+			nsTest.run(framework.TestContext.ClusterIsIPv6())
 		})
 	})
 
@@ -500,7 +499,7 @@ var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 
 		ginkgo.It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
 			fwdTest.c = fwdTest.f.ClientSet
-			fwdTest.run(false)
+			fwdTest.run(framework.TestContext.ClusterIsIPv6())
 		})
 	})
 
@@ -509,42 +508,7 @@ var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 
 		ginkgo.It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
 			externalNameTest.c = externalNameTest.f.ClientSet
-			externalNameTest.run(false)
-		})
-	})
-})
-
-var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6] [LinuxOnly]", func() {
-
-	ginkgo.BeforeEach(func() {
-		// IPv6 is not supported on Windows.
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
-	})
-
-	ginkgo.Context("Change stubDomain", func() {
-		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
-
-		ginkgo.It("should be able to change stubDomain configuration [Slow][Serial]", func() {
-			nsTest.c = nsTest.f.ClientSet
-			nsTest.run(true)
-		})
-	})
-
-	ginkgo.Context("Forward PTR lookup", func() {
-		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDNSTestCommon()}
-
-		ginkgo.It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
-			fwdTest.c = fwdTest.f.ClientSet
-			fwdTest.run(true)
-		})
-	})
-
-	ginkgo.Context("Forward external name lookup", func() {
-		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDNSTestCommon()}
-
-		ginkgo.It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
-			externalNameTest.c = externalNameTest.f.ClientSet
-			externalNameTest.run(true)
+			externalNameTest.run(framework.TestContext.ClusterIsIPv6())
 		})
 	})
 })
