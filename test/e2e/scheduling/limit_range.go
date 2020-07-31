@@ -49,7 +49,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
 
 	/*
-		Release : v1.18
+		Release: v1.18
 		Testname: LimitRange, resources
 		Description: Creating a Limitrange and verifying the creation of Limitrange, updating the Limitrange and validating the Limitrange. Creating Pods with resources and validate the pod resources are applied to the Limitrange
 	*/

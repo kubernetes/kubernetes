@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for name, namespace and ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify Pod Name, namespace and IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for host ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
@@ -157,7 +157,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory request set through environment variables at runtime in the container.
 	*/
@@ -208,7 +208,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for default CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory limits set through environment variables at runtime in the container.
 	*/
@@ -258,7 +258,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for Pod UID
 	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/

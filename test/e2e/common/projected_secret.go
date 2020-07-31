@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"path"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -36,7 +36,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, Secrets, volume mode default
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
 	*/
@@ -45,7 +45,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, Secrets, volume mode 0400
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with permission mode set to 0x400 on the Pod. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Project Volume, Secrets, non-root, custom fsGroup
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key. The volume has permission mode set to 0440, fsgroup set to 1001 and user set to non-root uid of 1000. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--r-----.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, Secrets, mapped
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------on the mapped volume.
 	*/
@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, Secrets, mapped, volume mode 0400
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with permission mode set to 0400. The secret is also mapped to a specific name. Pod MUST be able to read the content of the key successfully and the mode MUST be -r-------- on the mapped volume.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -109,7 +109,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, Secrets, mapped, multiple paths
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key. The secret is mapped to two different volume mounts. Pod MUST be able to read the content of the key successfully from the two volume mounts and the mode MUST be -r-------- on the mapped volumes.
 	*/
@@ -205,7 +205,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, Secrets, create, update delete
 	   Description: Create a Pod with three containers with secrets namely a create, update and delete container. Create Container when started MUST no have a secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/

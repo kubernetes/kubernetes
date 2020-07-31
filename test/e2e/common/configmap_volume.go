@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, without mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, without mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, with mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, with mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, update
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the ConfigMap is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod.
 	*/
@@ -293,7 +293,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, create, update and delete
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
 	*/
@@ -476,7 +476,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, multiple volume maps
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to multiple paths in the Pod. The content MUST be accessible from all the mapped volume mounts.
 	*/

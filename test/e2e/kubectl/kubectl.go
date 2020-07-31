@@ -314,7 +314,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			nautilus = commonutils.SubstituteImageName(string(data))
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, replication controller
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2.
 		*/
@@ -327,7 +327,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, scale replication controller
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Update the replicaset to 1. Number of running instances of the Pod MUST be 1. Update the replicaset to 2. Number of running instances of the Pod MUST be 2.
 		*/
@@ -369,7 +369,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		}
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, guestbook application
 			Description: Create Guestbook application that contains an agnhost primary server, 2 agnhost replicas, frontend application, frontend service and agnhost primary service and agnhost replica service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
@@ -777,7 +777,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl api-versions", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, check version v1
 			Description: Run kubectl to get api versions, output MUST contain returned versions with 'v1' listed.
 		*/
@@ -887,7 +887,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl diff", func() {
 		/*
-			Release : v1.19
+			Release: v1.19
 			Testname: Kubectl, diff Deployment
 			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
 		*/
@@ -918,7 +918,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl server-side dry-run", func() {
 		/*
-			Release : v1.19
+			Release: v1.19
 			Testname: Kubectl, server-side dry-run Pod
 			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl replace --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
@@ -1078,7 +1078,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl cluster-info", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, cluster info
 			Description: Call kubectl to get cluster-info, output MUST contain cluster-info returned and Kubernetes Master SHOULD be running.
 		*/
@@ -1104,7 +1104,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl describe", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, describe pod or rc
 			Description: Deploy an agnhost controller and an agnhost service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
@@ -1245,7 +1245,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl expose", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, create service, replication controller
 			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost primary replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost primary is listening. Using kubectl expose the agnhost primary as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost primary is listening.
 		*/
@@ -1342,7 +1342,7 @@ metadata:
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, label update
 			Description: When a Pod is running, update a Label using 'kubectl label' command. The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the container MUST verify that the label can be read back. Use 'kubectl label label-' to remove the label. 'kubectl get pod' with -l option SHOULD not list the deleted label as the label is removed.
 		*/
@@ -1383,7 +1383,7 @@ metadata:
 		})
 
 		/*
-			Release : v1.12
+			Release: v1.12
 			Testname: Kubectl, copy
 			Description: When a Pod is running, copy a known file from it to a temporary local destination.
 		*/
@@ -1423,7 +1423,7 @@ metadata:
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
 			Starting a Pod should have a expected log line. Also log command options MUST work as expected and described below.
@@ -1489,7 +1489,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl patch", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, patch to annotate
 			Description: Start running agnhost and a replication controller. When the pod is running, using 'kubectl patch' command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
@@ -1523,7 +1523,7 @@ metadata:
 
 	ginkgo.Describe("Kubectl version", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, version
 			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
@@ -1552,7 +1552,7 @@ metadata:
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, run pod
 			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
@@ -1588,7 +1588,7 @@ metadata:
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, replace
 			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
@@ -1628,7 +1628,7 @@ metadata:
 	ginkgo.Describe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, proxy port zero
 			Description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
 		*/
@@ -1653,7 +1653,7 @@ metadata:
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Kubectl, proxy socket
 			Description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
 		*/

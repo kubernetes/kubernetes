@@ -793,7 +793,7 @@ var _ = SIGDescribe("Services", func() {
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Kubernetes Service
 		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
 	*/
@@ -803,7 +803,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Service, endpoints
 		Description: Create a service with a endpoint without any Pods, the service MUST run and show empty endpoints. Add a pod to the service and the service MUST validate to show all the endpoints for the ports exposed by the Pod. Add another Pod then the list of all Ports exposed by both the Pods MUST be valid and have corresponding service endpoint. Once the second Pod is deleted then set of endpoint MUST be validated to show only ports from the first container that are exposed. Once both pods are deleted the endpoints from the service MUST be empty.
 	*/
@@ -856,7 +856,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Service, endpoints with multiple ports
 		Description: Create a service with two ports but no Pods are added to the service yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first port, service MUST list one endpoint for the Pod on that port. Add another Pod to the second port, service MUST list both the endpoints. Delete the first Pod and the service MUST list only the endpoint to the second Pod. Delete the second Pod and the service must now have empty set of endpoints.
 	*/
@@ -1210,7 +1210,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Service, NodePort Service
 		Description: Create a TCP NodePort service, and test reachability from a client Pod.
 		The client Pod MUST be able to access the NodePort service by service name and cluster
@@ -2793,7 +2793,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-	   Release : v1.18
+	   Release: v1.18
 	   Testname: Find Kubernetes Service in default Namespace
 	   Description: List all Services in all Namespaces, response MUST include a Service named Kubernetes with the Namespace of default.
 	*/
@@ -2813,7 +2813,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: Endpoint resource lifecycle
 	   Description: Create an endpoint, the endpoint MUST exist.
 	   The endpoint is updated with a new label, a check after the update MUST find the changes.

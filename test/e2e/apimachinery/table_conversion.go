@@ -146,7 +146,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	})
 
 	/*
-			    Release : v1.16
+			    Release: v1.16
 				Testname: API metadata HTTP return
 				Description: Issue a HTTP request to the API.
 		        HTTP request MUST return a HTTP status code of 406.

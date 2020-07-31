@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, runAsUser=65534
 			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
@@ -85,7 +85,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, runAsUser=0
 			Description: Container is created with runAsUser option by passing uid 0 to run as root priviledged user. Pod MUST be in Succeeded phase.
 			This e2e can not be promoted to Conformance because a Conformant platform may not allow to run containers with 'uid 0' or running privileged operations.
@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, readOnlyRootFilesystem=true.
 			Description: Container is configured to run with readOnlyRootFilesystem to true which will force containers to run with a read only root file system.
 			Write operation MUST NOT be allowed and Pod MUST be in Failed state.
@@ -214,7 +214,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, readOnlyRootFilesystem=false.
 			Description: Container is configured to run with readOnlyRootFilesystem to false.
 			Write operation MUST be allowed and Pod MUST be in Succeeded state.
@@ -256,7 +256,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return podName
 		}
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, privileged=false.
 			Description: Create a container to run in unprivileged mode by setting pod's SecurityContext Privileged option as false. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since it runs a Linux-specific command.
@@ -319,7 +319,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, allowPrivilegeEscalation unset, uid != 0.
 			Description: Configuring the allowPrivilegeEscalation unset, allows the privilege escalation operation.
 			A container is configured with allowPrivilegeEscalation not specified (nil) and a given uid which is not 0.
@@ -335,7 +335,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, allowPrivilegeEscalation=false.
 			Description: Configuring the allowPrivilegeEscalation to false, does not allow the privilege escalation operation.
 			A container is configured with allowPrivilegeEscalation=false and a given uid (1000) which is not 0.
@@ -351,7 +351,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Security Context, allowPrivilegeEscalation=true.
 			Description: Configuring the allowPrivilegeEscalation to true, allows the privilege escalation operation.
 			A container is configured with allowPrivilegeEscalation=true and a given uid (1000) which is not 0.
