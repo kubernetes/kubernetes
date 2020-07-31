@@ -33,10 +33,11 @@ endif
 all: all-container
 
 all-container:
-	./image-util.sh build $(WHAT)
+	./image-util.sh build $(WHAT) "docker"
 
-all-push: all-container
-	./image-util.sh push $(WHAT)
+all-push:
+	bash -x ./image-util.sh build $(WHAT) "registry"
+	bash -x ./image-util.sh push $(WHAT)
 
 all-build-and-push:
 	./image-util.sh build_and_push ${WHAT}
