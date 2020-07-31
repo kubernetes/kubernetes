@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpoints
+package endpointslice
 
 import (
-	v1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -25,16 +25,20 @@ import (
 type PortsByPodUID map[types.UID][]int
 
 // GetContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
-func GetContainerPortsByPodUID(ep *v1.Endpoints) PortsByPodUID {
+func GetContainerPortsByPodUID(eps []discoveryv1beta1.EndpointSlice) PortsByPodUID {
 	m := PortsByPodUID{}
-	for _, ss := range ep.Subsets {
-		for _, port := range ss.Ports {
-			for _, addr := range ss.Addresses {
-				containerPort := port.Port
-				if _, ok := m[addr.TargetRef.UID]; !ok {
-					m[addr.TargetRef.UID] = make([]int, 0)
+
+	for _, es := range eps {
+		for _, port := range es.Ports {
+			if port.Port == nil {
+				continue
+			}
+			for _, ep := range es.Endpoints {
+				containerPort := *port.Port
+				if _, ok := m[ep.TargetRef.UID]; !ok {
+					m[ep.TargetRef.UID] = make([]int, 0)
 				}
-				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], int(containerPort))
+				m[ep.TargetRef.UID] = append(m[ep.TargetRef.UID], int(containerPort))
 			}
 		}
 	}
