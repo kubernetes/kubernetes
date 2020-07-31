@@ -42,7 +42,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, log output, default
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
@@ -100,7 +100,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, failed pod, terminated reason
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, failed pod, delete
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
@@ -138,7 +138,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-host-aliases" + string(uuid.NewUUID())
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, hostAliases
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
 			Kubernetes mounts the /etc/hosts file into its containers, however, mounting individual files is not supported on Windows Containers. For this reason, this test is marked LinuxOnly.
@@ -189,7 +189,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, pod with read only root file system
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 			This test is marked LinuxOnly since Windows does not support creating containers with read-only access.

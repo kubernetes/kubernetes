@@ -289,7 +289,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-		   Release : v1.9
+		   Release: v1.9
 		   Testname: StatefulSet, Rolling Update
 		   Description: StatefulSet MUST support the RollingUpdate strategy to automatically replace Pods one at a time when the Pod template changes. The StatefulSet's status MUST indicate the CurrentRevision and UpdateRevision. If the template is changed to match a prior revision, StatefulSet MUST detect this as a rollback instead of creating a new revision. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
@@ -300,7 +300,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-		   Release : v1.9
+		   Release: v1.9
 		   Testname: StatefulSet, Rolling Update with Partition
 		   Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress, StatefulSet MUST restore the Pod without violating the Partition. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
@@ -570,7 +570,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-		   Release : v1.9
+		   Release: v1.9
 		   Testname: StatefulSet, Scaling
 		   Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
@@ -680,7 +680,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-		   Release : v1.9
+		   Release: v1.9
 		   Testname: StatefulSet, Burst Scaling
 		   Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
@@ -722,7 +722,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-		   Release : v1.9
+		   Release: v1.9
 		   Testname: StatefulSet, Recreate Failed Pod
 		   Description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed state, such as when they are rejected or evicted by a Node. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
@@ -830,7 +830,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: StatefulSet resource Replica scaling
 			Description: Create a StatefulSet resource.
 			Newly created StatefulSet resource MUST have a scale of one.

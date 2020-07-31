@@ -111,7 +111,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: Scheduler, Basic Preemption
 		Description: When a higher priority pod is created and no node with enough
 		resources is found, the scheduler MUST preempt a lower priority pod and
@@ -199,7 +199,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: Scheduler, Preemption for critical pod
 		Description: When a critical pod is created and no node with enough
 		resources is found, the scheduler MUST preempt a lower priority pod to

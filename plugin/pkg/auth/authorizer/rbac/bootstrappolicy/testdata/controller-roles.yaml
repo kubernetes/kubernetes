@@ -545,6 +545,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - ""
+    resources:
+    - endpoints/finalizers
+    verbs:
+    - update
+  - apiGroups:
     - discovery.k8s.io
     resources:
     - endpointslices

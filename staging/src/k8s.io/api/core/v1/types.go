@@ -5828,6 +5828,7 @@ type ComponentCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// Deprecated: This API is deprecated in v1.19+
 type ComponentStatus struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -5845,6 +5846,7 @@ type ComponentStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Status of all the conditions for the component as a list of ComponentStatus objects.
+// Deprecated: This API is deprecated in v1.19+
 type ComponentStatusList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.

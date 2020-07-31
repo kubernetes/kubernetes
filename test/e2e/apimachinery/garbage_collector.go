@@ -320,7 +320,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, delete replication controller, propagation policy background
 		Description: Create a replication controller with 2 Pods. Once RC is created and the first Pod is created, delete RC with deleteOptions.PropagationPolicy set to Background. Deleting the Replication Controller MUST cause pods created by that RC to be deleted.
 	*/
@@ -378,7 +378,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, delete replication controller, propagation policy orphan
 		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller MUST cause pods created by that RC to be orphaned.
 	*/
@@ -499,7 +499,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, delete deployment,  propagation policy background
 		Description: Create a deployment with a replicaset. Once replicaset is created , delete the deployment  with deleteOptions.PropagationPolicy set to Background. Deleting the deployment MUST delete the replicaset created by the deployment and also the Pods that belong to the deployments MUST be deleted.
 	*/
@@ -558,7 +558,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, delete deployment, propagation policy orphan
 		Description: Create a deployment with a replicaset. Once replicaset is created , delete the deployment  with deleteOptions.PropagationPolicy set to Orphan. Deleting the deployment MUST cause the replicaset created by the deployment to be orphaned, also the Pods created by the deployments MUST be orphaned.
 	*/
@@ -642,7 +642,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, delete replication controller, after owned pods
 		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication Controller MUST cause pods created by that RC to be deleted before the RC is deleted.
 	*/
@@ -727,7 +727,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	// TODO: this should be an integration test
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, multiple owners
 		Description: Create a replication controller RC1, with maximum allocatable Pods between 10 and 100 replicas. Create second replication controller RC2 and set RC2 as owner for half of those replicas. Once RC1 is created and the all Pods are created, delete RC1 with deleteOptions.PropagationPolicy set to Foreground. Half of the Pods that has RC2 as owner MUST not be deleted but have a deletion timestamp. Deleting the Replication Controller MUST not delete Pods that are owned by multiple replication controllers.
 	*/
@@ -841,7 +841,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	// TODO: should be an integration test
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Garbage Collector, dependency cycle
 		Description: Create three pods, patch them with Owner references such that pod1 has pod3, pod2 has pod1 and pod3 has pod2 as owner references respectively. Delete pod1 MUST delete all pods. The dependency cycle MUST not block the garbage collection.
 	*/

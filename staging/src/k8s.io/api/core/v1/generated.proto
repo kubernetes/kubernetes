@@ -424,6 +424,7 @@ message ComponentCondition {
 }
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// Deprecated: This API is deprecated in v1.19+
 message ComponentStatus {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -438,6 +439,7 @@ message ComponentStatus {
 }
 
 // Status of all the conditions for the component as a list of ComponentStatus objects.
+// Deprecated: This API is deprecated in v1.19+
 message ComponentStatusList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
