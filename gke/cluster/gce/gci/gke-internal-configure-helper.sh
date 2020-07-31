@@ -332,6 +332,19 @@ oom_score = -999
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
 
+  if [[ "${ENABLE_GCFS:-}" == "true" ]]; then
+    gke-setup-gcfs
+    cat >> "${config_path}" <<EOF
+[plugins.cri.containerd]
+  snapshotter = "gcfs"
+  disable_snapshot_annotations = false
+[proxy_plugins]
+  [proxy_plugins.gcfs]
+    type = "snapshot"
+    address = "/run/containerd-gcfs-grpc/containerd-gcfs-grpc.sock"
+EOF
+  fi
+
   local -r sandbox_root="${CONTAINERD_SANDBOX_RUNTIME_ROOT:-"/run/containerd/runsc"}"
   # shim_config_path is the path of gvisor-containerd-shim config file.
   local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"${sandbox_root}/config.toml"}"
@@ -491,4 +504,75 @@ function gke-configure-npd-custom-plugins {
   if [[ "${ENABLE_GCFS:-}" == "true" ]]; then
     GKE_NPD_CUSTOM_PLUGINS_CONFIG+=",${config_dir}/systemd-monitor-health.json,${config_dir}/systemd-monitor-restart.json"
   fi
+}
+
+# Set up GCFS daemons.
+function gke-setup-gcfs {
+  # Write the systemd service file for GCFS FUSE client.
+  local -r gcfsd_mnt_dir="/run/gcfsd/mnt"
+  local -r layer_cache_dir="/var/lib/containerd/io.containerd.snapshotter.v1.gcfs/snapshotter/layers"
+  local -r images_in_use_db_path="/var/lib/containerd/io.containerd.snapshotter.v1.gcfs/gcfsd/images_in_use.db"
+
+  local each_cache_size
+  local gcfs_cache_size_flag
+  if [[ -z "${GCFSD_CACHE_SIZE_MIB}" ]]; then
+    gcfs_cache_size_flag=""
+  else
+    # GCFSD maintains two caches, each being allocated half of GCFSD_CACHE_SIZE_MIB
+    each_cache_size=$((${GCFSD_CACHE_SIZE_MIB} / 2))
+    gcfs_cache_size_flag="--max_content_cache_size_mb=${each_cache_size} --max_large_files_cache_size_mb=${each_cache_size}"
+  fi
+
+  local gcfs_layer_caching_flag=""
+  if [[ "${ENABLE_GCFS_LAYER_CACHING:-false}" == "true" ]]; then
+    gcfs_layer_caching_flag="--layer_cache_dir=${layer_cache_dir}"
+  fi
+
+
+  cat <<EOF >/etc/systemd/system/gcfsd.service
+# Systemd configuration for Google Container File System service
+[Unit]
+Description=Google Container File System service
+After=network.target
+[Service]
+Type=simple
+LimitNOFILE=infinity
+# More aggressive Go garbage collection setting (go/fast/19).
+Environment=GOGC=10
+ExecStartPre=-/bin/umount ${gcfsd_mnt_dir}
+ExecStartPre=/bin/mkdir -p ${gcfsd_mnt_dir}
+ExecStartPre=/bin/mkdir -p ${layer_cache_dir}
+ExecStartPre=/bin/mkdir -p $(dirname ${images_in_use_db_path})
+ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir} ${gcfs_cache_size_flag} ${gcfs_layer_caching_flag} --images_in_use_db_path=${images_in_use_db_path}
+ExecStop=/bin/umount ${gcfsd_mnt_dir}
+RuntimeDirectory=gcfsd
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Write the configuration file for GCFS snapshotter.
+  # An empty file would work for now.
+  mkdir -p /etc/containerd-gcfs-grpc
+  touch /etc/containerd-gcfs-grpc/config.toml
+  # Write the systemd service file for GCFS snapshotter
+  cat <<EOF >/etc/systemd/system/gcfs-snapshotter.service
+# Systemd configuration for Google Container File System snapshotter
+[Unit]
+Description=GCFS snapshotter
+After=network.target
+Before=containerd.service
+[Service]
+Environment=HOME=/root
+ExecStart=${KUBE_HOME}/bin/containerd-gcfs-grpc --log-level=info --config=/etc/containerd-gcfs-grpc/config.toml
+Restart=always
+RestartSec=1
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl start gcfsd.service
+  systemctl start gcfs-snapshotter.service
 }
