@@ -40,7 +40,7 @@ const (
 var (
 	kubeReleaseBucketURL  = "https://dl.k8s.io"
 	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
-	kubeReleaseLabelRegex = regexp.MustCompile(`(k8s-master|((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?))\z`)
+	kubeReleaseLabelRegex = regexp.MustCompile(`^((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?)\z`)
 	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci|ci-cross)/)?([-\w_\.+]+)$`)
 )
 
@@ -61,7 +61,6 @@ var (
 //  latest      (latest release, including alpha/beta)
 //  latest-1    (latest release in 1.x, including alpha/beta)
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
-//  k8s-master  (latest cross build)
 func KubernetesReleaseVersion(version string) (string, error) {
 	return kubernetesReleaseVersion(version, fetchFromURL)
 }
