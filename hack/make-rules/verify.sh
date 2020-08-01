@@ -220,7 +220,7 @@ fi
 
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
-run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+run-checks "${KUBE_ROOT}/hack/verify-*.py" python3
 missing-target-checks
 
 if [[ ${ret} -eq 1 ]]; then
