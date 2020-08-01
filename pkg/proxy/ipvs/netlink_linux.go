@@ -177,6 +177,16 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	if err != nil {
 		return nil, fmt.Errorf("error list route table, err: %v", err)
 	}
+
+	if h.isIPv6 {
+		unsRouteFilter := &netlink.Route{
+			Table:    unix.RT_TABLE_LOCAL,
+			Type:     unix.RTN_LOCAL,
+			Protocol: unix.RTPROT_UNSPEC,
+		}
+		unsroutes, _ := h.RouteListFiltered(netlink.FAMILY_V6, unsRouteFilter, filterMask)
+		routes = append(routes, unsroutes...)
+	}
 	res := sets.NewString()
 	for _, route := range routes {
 		if route.LinkIndex == filterLinkIndex {
