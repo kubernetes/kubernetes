@@ -23,15 +23,16 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
 
@@ -1293,7 +1294,8 @@ func Test_AddCloudNode(t *testing.T) {
 				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 				nodeStatusUpdateFrequency: 1 * time.Second,
 			}
-			eventBroadcaster.StartLogging(t.Logf)
+			w := eventBroadcaster.StartLogging(klog.Infof)
+			defer w.Stop()
 
 			cloudNodeController.AddCloudNode(context.TODO(), test.existingNode)
 
@@ -1371,7 +1373,8 @@ func TestGCEConditionV2(t *testing.T) {
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
-	eventBroadcaster.StartLogging(t.Logf)
+	w := eventBroadcaster.StartLogging(klog.Infof)
+	defer w.Stop()
 
 	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
 
@@ -1453,7 +1456,8 @@ func TestGCECondition(t *testing.T) {
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
-	eventBroadcaster.StartLogging(t.Logf)
+	w := eventBroadcaster.StartLogging(klog.Infof)
+	defer w.Stop()
 
 	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
 
