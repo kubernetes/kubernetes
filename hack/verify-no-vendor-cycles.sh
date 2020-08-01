@@ -21,7 +21,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x;
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
@@ -34,21 +33,24 @@ staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 
 cd "${KUBE_ROOT}"
 
-failed=false
-while IFS= read -r dir; do
-  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' "${dir}" 2> /dev/null || echo "")
-  deps_on_main=$(echo "${deps}" | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
-  if [ -n "${deps_on_main}" ]; then
-    echo "Package ${dir} has a cyclic dependency on the main repository."
-    failed=true
-  fi
-  deps_on_staging=$(echo "${deps}" | grep "k8s.io/kubernetes/vendor/k8s.io" | grep -E "k8s.io\/${staging_repos_pattern}\>" || echo "")
-  if [ -n "${deps_on_staging}" ]; then
-    echo "Package ${dir} has a cyclic dependency on staging repository packages: ${deps_on_staging}"
-    failed=true
-  fi
-done < <(find ./vendor -type d)
-
-if [[ "${failed}" == "true" ]]; then
+# Check for any module that is not main or staging and depends on main or staging
+bad_deps=$(go mod graph | grep -vE "^k8s.io\/(kubernetes|${staging_repos_pattern})" | grep -E "\sk8s.io\/(kubernetes|${staging_repos_pattern})" || true)
+if [[ -n "${bad_deps}" ]]; then
+  echo "Found disallowed dependencies that transitively depend on k8s.io/kubernetes or staging modules:"
+  echo "${bad_deps}"
   exit 1
 fi
+
+kube::util::ensure-temp-dir
+
+# Get vendored packages dependencies
+# Use -deps flag to include transitive dependencies
+go list -mod=vendor -test -deps -json ./vendor/... > "${KUBE_TEMP}/deps.json"
+
+# Check for any vendored package that imports main repo
+# Staging repos are explicitly excluded even though go list does not currently consider symlinks
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
+
+# Check for any vendored package that imports a staging repo
+# Staging repos are explicitly excluded even though go list does not currently consider symlinks
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${staging_repos_pattern})(/|$)" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
