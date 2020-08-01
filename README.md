@@ -79,8 +79,8 @@ That said, if you have questions, reach out to us
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://golang.org/doc/install
-[GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
+[GoDoc]: https://pkg.go.dev/k8s.io/kubernetes
+[GoDoc Widget]: https://pkg.go.dev/badge/k8s.io/kubernetes
 [interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
