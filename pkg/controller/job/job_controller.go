@@ -26,7 +26,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -832,15 +832,15 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 func (jm *Controller) updateJobStatus(job *batch.Job) error {
 	jobClient := jm.kubeClient.BatchV1().Jobs(job.Namespace)
 	var err error
-	for i := 0; i <= statusUpdateRetries; i = i + 1 {
+	for i := 0; i <= statusUpdateRetries; i++ {
 		var newJob *batch.Job
 		newJob, err = jobClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
 		if err != nil {
-			break
+			continue
 		}
 		newJob.Status = job.Status
 		if _, err = jobClient.UpdateStatus(context.TODO(), newJob, metav1.UpdateOptions{}); err == nil {
-			break
+			continue
 		}
 	}
 
