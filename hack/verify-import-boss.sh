@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-make -C "${KUBE_ROOT}" WHAT=vendor/k8s.io/code-generator/cmd/import-boss
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/import-boss
 
 packages=(
   "k8s.io/kubernetes/pkg/..."

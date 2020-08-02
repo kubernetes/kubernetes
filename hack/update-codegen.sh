@@ -26,12 +26,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-BUILD_TARGETS=(
-  vendor/k8s.io/code-generator/cmd/client-gen
-  vendor/k8s.io/code-generator/cmd/lister-gen
-  vendor/k8s.io/code-generator/cmd/informer-gen
-)
-make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/informer-gen
 
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
