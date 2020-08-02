@@ -13,6 +13,7 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/util/mount:go_default_library",
+            "//pkg/volume/util/hostutil:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
         ],
@@ -34,6 +35,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/mount:go_default_library",
+            "//pkg/volume/util/hostutil:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
         ],
