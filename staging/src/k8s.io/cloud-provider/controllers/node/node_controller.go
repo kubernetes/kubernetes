@@ -108,7 +108,9 @@ func NewCloudNodeController(
 	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
-	if _, ok := cloud.Instances(); !ok {
+	_, instancesSupported := cloud.Instances()
+	_, instancesV2Supported := cloud.InstancesV2()
+	if !instancesSupported && !instancesV2Supported {
 		return nil, errors.New("cloud provider does not support instances")
 	}
 
