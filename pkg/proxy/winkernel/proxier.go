@@ -319,19 +319,21 @@ func (ep *endpointsInfo) Cleanup() {
 	Log(ep, "Endpoint Cleanup", 3)
 	if ep.refCount != nil {
 		*ep.refCount--
-	}
 
-	// Remove the remote hns endpoint, if no service is referring it
-	// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
-	// Remove only remote endpoints created by this service
-	if (ep.refCount == nil || *ep.refCount <= 0) && !ep.GetIsLocal() {
-		klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
-		err := ep.hns.deleteEndpoint(ep.hnsID)
-		if err == nil {
-			ep.hnsID = ""
-		} else {
-			klog.Errorf("Endpoint deletion failed for %v: %v", ep.IP(), err)
+		// Remove the remote hns endpoint, if no service is referring it
+		// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
+		// Remove only remote endpoints created by this service
+		if *ep.refCount <= 0 && !ep.GetIsLocal() {
+			klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
+			err := ep.hns.deleteEndpoint(ep.hnsID)
+			if err == nil {
+				ep.hnsID = ""
+			} else {
+				klog.Errorf("Endpoint deletion failed for %v: %v", ep.IP(), err)
+			}
 		}
+
+		ep.refCount = nil
 	}
 }
 
