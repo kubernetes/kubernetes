@@ -428,14 +428,14 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 		},
 		{
 			name:           "add more nodes to an exhausted zone",
-			nodesToAdd:     append(allNodes[4:9], allNodes[3]),
+			nodesToAdd:     append(allNodes[4:9:9], allNodes[3]),
 			nodesToRemove:  nil,
 			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
-			expectedOutput: []string{"node-4", "node-6", "node-7", "node-8", "node-3", "node-4", "node-6"},
+			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
 		},
 		{
 			name:           "remove zone and add new to ensure exhausted is reset correctly",
-			nodesToAdd:     append(allNodes[3:5], allNodes[6:8]...),
+			nodesToAdd:     append(allNodes[3:5:5], allNodes[6:8]...),
 			nodesToRemove:  allNodes[3:5],
 			operations:     []string{"add", "add", "next", "next", "remove", "add", "add", "next", "next", "remove", "next", "next"},
 			expectedOutput: []string{"node-3", "node-4", "node-6", "node-7", "node-6", "node-7"},
