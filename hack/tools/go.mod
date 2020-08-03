@@ -7,6 +7,7 @@ require (
 	github.com/bazelbuild/buildtools v0.0.0-20200228172928-c9d9e342afdb
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/client9/misspell v0.3.4
+	github.com/golangci/golangci-lint v1.30.0
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
