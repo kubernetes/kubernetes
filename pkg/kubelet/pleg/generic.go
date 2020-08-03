@@ -423,8 +423,7 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 }
 
 func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
-	// Set the number of running pods in the parameter
-	metrics.RunningPodCount.Set(float64(len(pods)))
+	runningSandboxNum := 0
 	// intermediate map to store the count of each "container_state"
 	containerStateCount := make(map[string]int)
 
@@ -434,10 +433,23 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 			// update the corresponding "container_state" in map to set value for the gaugeVec metrics
 			containerStateCount[string(container.State)]++
 		}
+
+		sandboxes := pod.Sandboxes
+
+		for _, sandbox := range sandboxes {
+			if sandbox.State == kubecontainer.ContainerStateRunning {
+				runningSandboxNum++
+				// every pod should only have one running sandbox
+				break
+			}
+		}
 	}
 	for key, value := range containerStateCount {
 		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
 	}
+
+	// Set the number of running pods in the parameter
+	metrics.RunningPodCount.Set(float64(runningSandboxNum))
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {
