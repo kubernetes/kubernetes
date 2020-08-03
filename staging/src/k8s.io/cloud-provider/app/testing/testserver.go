@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
@@ -84,13 +85,11 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	if err != nil {
 		return TestServer{}, err
 	}
-	all, disabled := app.KnownControllers(), app.ControllersDisabledByDefault.List()
-	namedFlagSets := s.Flags(all, disabled)
+	namedFlagSets := s.Flags([]string{}, []string{})
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 	fs.Parse(customFlags)
-
 	if s.SecureServing.BindPort != 0 {
 		s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
 		if err != nil {
@@ -110,14 +109,22 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("cloud-controller-manager will listen insecurely on port %d...", s.InsecureServing.BindPort)
 	}
 
-	config, err := s.Config(all, disabled)
+	config, err := s.Config([]string{}, []string{})
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
+	}
+	cloudconfig := config.Complete().ComponentConfig.KubeCloudShared.CloudProvider
+	cloud, err := cloudprovider.InitCloudProvider(cloudconfig.Name, cloudconfig.CloudConfigFile)
+	if err != nil {
+		return result, fmt.Errorf("Cloud provider could not be initialized: %v", err)
+	}
+	if cloud == nil {
+		return result, fmt.Errorf("cloud provider is nil")
 	}
 
 	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
-		if err := app.Run(config.Complete(), stopCh); err != nil {
+		if err := app.Run(config.Complete(), app.DefaultControllerInitializers(config.Complete(), cloud), stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)

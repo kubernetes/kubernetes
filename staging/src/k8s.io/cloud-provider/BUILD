@@ -46,6 +46,7 @@ filegroup(
         "//staging/src/k8s.io/cloud-provider/fake:all-srcs",
         "//staging/src/k8s.io/cloud-provider/node:all-srcs",
         "//staging/src/k8s.io/cloud-provider/options:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/sample:all-srcs",
         "//staging/src/k8s.io/cloud-provider/service/config:all-srcs",
         "//staging/src/k8s.io/cloud-provider/service/helpers:all-srcs",
         "//staging/src/k8s.io/cloud-provider/volume:all-srcs",
