@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -272,4 +273,44 @@ func createGetRequestWithUrl(rawUrlString string) *http.Request {
 		Proto:  "HTTP/1.1",
 		URL:    url,
 	}
+}
+
+func TestInformerSyncHealthChecker(t *testing.T) {
+	t.Run("test that check returns nil when all informers are started", func(t *testing.T) {
+		healthChecker := NewInformerSyncHealthz(cacheSyncWaiterStub{
+			startedByInformerType: map[reflect.Type]bool{
+				reflect.TypeOf(corev1.Pod{}): true,
+			},
+		})
+
+		err := healthChecker.Check(nil)
+		if err != nil {
+			t.Errorf("Got %v, expected no error", err)
+		}
+	})
+
+	t.Run("test that check returns err when there is not started informer", func(t *testing.T) {
+		healthChecker := NewInformerSyncHealthz(cacheSyncWaiterStub{
+			startedByInformerType: map[reflect.Type]bool{
+				reflect.TypeOf(corev1.Pod{}):     true,
+				reflect.TypeOf(corev1.Service{}): false,
+				reflect.TypeOf(corev1.Node{}):    true,
+			},
+		})
+
+		err := healthChecker.Check(nil)
+		if err == nil {
+			t.Errorf("expected error, got: %v", err)
+		}
+	})
+}
+
+type cacheSyncWaiterStub struct {
+	startedByInformerType map[reflect.Type]bool
+}
+
+// WaitForCacheSync is a stub implementation of the corresponding func
+// that simply returns the value passed during stub initialization.
+func (s cacheSyncWaiterStub) WaitForCacheSync(_ <-chan struct{}) map[reflect.Type]bool {
+	return s.startedByInformerType
 }
