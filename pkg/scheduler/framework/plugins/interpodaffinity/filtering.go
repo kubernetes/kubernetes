@@ -251,6 +251,9 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	}
 
 	podInfo := framework.NewPodInfo(pod)
+	if podInfo.ParseError != nil {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", podInfo.ParseError))
+	}
 
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
 	existingPodAntiAffinityMap := getTPMapMatchingExistingAntiAffinity(pod, havePodsWithAffinityNodes)
