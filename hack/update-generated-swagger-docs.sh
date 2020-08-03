@@ -35,6 +35,8 @@ IFS=" " read -r -a GROUP_VERSIONS <<< "meta/v1 meta/v1beta1 ${KUBE_AVAILABLE_GRO
 for group_version in "${GROUP_VERSIONS[@]}"; do
   rm -f "$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 done
+# ensure we have the latest genswaggertypedocs built
+go install k8s.io/kubernetes/cmd/genswaggertypedocs
 for group_version in "${GROUP_VERSIONS[@]}"; do
   kube::swagger::gen_types_swagger_doc "${group_version}" "$(kube::util::group-version-to-pkg-path "${group_version}")"
 done

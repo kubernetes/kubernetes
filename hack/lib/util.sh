@@ -200,6 +200,13 @@ kube::util::find-binary-for-platform() {
     "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
+  # if we're looking for the host platform, add local non-platform-qualified search paths
+  if [[ "${platform}" = "$(kube::util::host_platform)" ]]; then
+    locations+=(
+      "${KUBE_ROOT}/_output/local/go/bin/${lookfor}"
+      "${KUBE_ROOT}/_output/dockerized/go/bin/${lookfor}"
+    );
+  fi
   # Also search for binary in bazel build tree.
   # The bazel go rules place some binaries in subtrees like
   # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
