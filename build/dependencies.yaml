@@ -103,12 +103,6 @@ dependencies:
       match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images
-  - name: "k8s.gcr.io/debian-base"
-    version: 2.1.1
-    refPaths:
-    - path: build/debian-base/Makefile
-      match: TAG \?=
-
   - name: "k8s.gcr.io/debian-base: dependents"
     version: 2.1.0
     refPaths:
@@ -116,8 +110,6 @@ dependencies:
       match: debian_base_version=
     - path: build/workspace.bzl
       match: tag =
-    - path: build/debian-iptables/Makefile
-      match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-base-\$\(ARCH\)
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
@@ -128,12 +120,6 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
-
-  - name: "k8s.gcr.io/debian-iptables"
-    version: 12.1.0
-    refPaths:
-    - path: build/debian-iptables/Makefile
-      match: TAG\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
     version: 12.1.0
