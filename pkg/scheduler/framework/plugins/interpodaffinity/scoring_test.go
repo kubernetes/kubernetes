@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -252,12 +253,56 @@ func TestPreferredAffinity(t *testing.T) {
 		},
 	}
 
+	invalidAffinityLabels := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 8,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+			},
+		},
+	}
+	invalidAntiAffinityLabels := &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 5,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "az",
+					},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
 		expectedList framework.NodeScoreList
 		name         string
+		wantStatus   *framework.Status
 	}{
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -513,6 +558,24 @@ func TestPreferredAffinity(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "Avoid panic when partial nodes in a topology don't have pods with affinity",
 		},
+		{
+			name:       "invalid Affinity fails PreScore",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAffinityLabels}},
+			wantStatus: framework.NewStatus(framework.Error, "invalid label value"),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+			},
+		},
+		{
+			name:       "invalid AntiAffinity fails PreScore",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAntiAffinityLabels}},
+			wantStatus: framework.NewStatus(framework.Error, "invalid label value"),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -527,25 +590,28 @@ func TestPreferredAffinity(t *testing.T) {
 
 			status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
-				t.Errorf("unexpected error: %v", status)
-			}
-			var gotList framework.NodeScoreList
-			for _, n := range test.nodes {
-				nodeName := n.ObjectMeta.Name
-				score, status := p.Score(context.Background(), state, test.pod, nodeName)
+				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
+					t.Errorf("unexpected error: %v", status)
+				}
+			} else {
+				var gotList framework.NodeScoreList
+				for _, n := range test.nodes {
+					nodeName := n.ObjectMeta.Name
+					score, status := p.Score(context.Background(), state, test.pod, nodeName)
+					if !status.IsSuccess() {
+						t.Errorf("unexpected error: %v", status)
+					}
+					gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				}
+
+				status = p.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
-			}
 
-			status = p.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
-			if !status.IsSuccess() {
-				t.Errorf("unexpected error: %v", status)
-			}
-
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+				if !reflect.DeepEqual(test.expectedList, gotList) {
+					t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+				}
 			}
 
 		})
