@@ -109,8 +109,7 @@ function setup_pod_autoscaler_component {
     local uas_params="${UAS_PARAMS:-}"
     # split the params into separate arguments passed to binary
     local uas_params_split
-    uas_params_split=$(eval "for param in $uas_params; do echo -n \\\"\$param\\\",; done")
-    uas_params_split=${uas_params_split%?}
+    uas_params_split=$(eval "for param in $uas_params; do echo -n ,\\\"\$param\\\"; done")
     sed -i -e "s@{{uas_params}}@${uas_params_split:-}@g" "${src_file}"
   fi
 
