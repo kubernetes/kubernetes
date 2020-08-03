@@ -21,6 +21,7 @@ import (
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Funcs returns the fuzzer functions for the certificates api group.
@@ -30,6 +31,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
 			obj.Usages = []certificates.KeyUsage{certificates.UsageKeyEncipherment}
 			obj.SignerName = "example.com/custom-sample-signer"
+		},
+		func(obj *certificates.CertificateSigningRequestCondition, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if len(obj.Status) == 0 {
+				obj.Status = api.ConditionTrue
+			}
 		},
 	}
 }
