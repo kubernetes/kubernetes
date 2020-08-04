@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -128,8 +129,11 @@ func TestControllerSync(t *testing.T) {
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
 				reactor.DeleteClaimEvent(claim)
-				for len(ctrl.claims.ListKeys()) > 0 {
-					time.Sleep(10 * time.Millisecond)
+				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					return len(ctrl.claims.ListKeys()) == 0, nil
+				})
+				if err != nil {
+					return err
 				}
 				// claim has been removed from controller's cache, generate a volume deleted event
 				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
@@ -157,8 +161,11 @@ func TestControllerSync(t *testing.T) {
 				claim := obj.(*v1.PersistentVolumeClaim)
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
-				for len(ctrl.claims.ListKeys()) > 0 {
-					time.Sleep(10 * time.Millisecond)
+				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					return len(ctrl.claims.ListKeys()) == 0, nil
+				})
+				if err != nil {
+					return err
 				}
 				// make sure the operation timestamp cache is NOT empty
 				if !ctrl.operationTimestamps.Has("volume5-6") {
@@ -183,16 +190,22 @@ func TestControllerSync(t *testing.T) {
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
 				reactor.DeleteVolumeEvent(volume)
-				for len(ctrl.volumes.store.ListKeys()) > 0 {
-					time.Sleep(10 * time.Millisecond)
+				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					return len(ctrl.volumes.store.ListKeys()) == 0, nil
+				})
+				if err != nil {
+					return err
 				}
 				// trying to remove the claim as well
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
-				for len(ctrl.claims.ListKeys()) > 0 {
-					time.Sleep(10 * time.Millisecond)
+				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					return len(ctrl.claims.ListKeys()) == 0, nil
+				})
+				if err != nil {
+					return err
 				}
 				// make sure operation timestamp cache is empty
 				if ctrl.operationTimestamps.Has("volume5-7") {
@@ -215,16 +228,22 @@ func TestControllerSync(t *testing.T) {
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// wait until the provision timestamp has been inserted
-				for !ctrl.operationTimestamps.Has("default/claim5-8") {
-					time.Sleep(10 * time.Millisecond)
+				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					return ctrl.operationTimestamps.Has("default/claim5-8"), nil
+				})
+				if err != nil {
+					return err
 				}
 				// delete the claim
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
 				reactor.DeleteClaimEvent(claim)
 				// wait until claim is cleared from cache, i.e., deleteClaim is called
-				for len(ctrl.claims.ListKeys()) > 0 {
-					time.Sleep(10 * time.Millisecond)
+				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					return len(ctrl.claims.ListKeys()) == 0, nil
+				})
+				if err != nil {
+					return err
 				}
 				// make sure operation timestamp cache is empty
 				if ctrl.operationTimestamps.Has("default/claim5-8") {
@@ -302,12 +321,14 @@ func TestControllerSync(t *testing.T) {
 		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
-		for !ctrl.volumeListerSynced() ||
-			!ctrl.claimListerSynced() ||
-			len(ctrl.claims.ListKeys()) < len(test.initialClaims) ||
-			len(ctrl.volumes.store.ListKeys()) < len(test.initialVolumes) {
-
-			time.Sleep(10 * time.Millisecond)
+		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			return ctrl.volumeListerSynced() &&
+				ctrl.claimListerSynced() &&
+				len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
+				len(ctrl.volumes.store.ListKeys()) >= len(test.initialVolumes), nil
+		})
+		if err != nil {
+			t.Errorf("Test %q controller sync failed: %v", test.name, err)
 		}
 		klog.V(4).Infof("controller synced, starting test")
 
