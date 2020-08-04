@@ -3641,11 +3641,15 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 		} else {
 			interval = translateTimestampSince(e.FirstTimestamp)
 		}
+		source := e.Source.Component
+		if source == "" {
+			source = e.ReportingController
+		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
 			e.Reason,
 			interval,
-			formatEventSource(e.Source),
+			source,
 			strings.TrimSpace(e.Message),
 		)
 	}
@@ -4747,15 +4751,6 @@ func translateTimestampSince(timestamp metav1.Time) string {
 	}
 
 	return duration.HumanDuration(time.Since(timestamp.Time))
-}
-
-// formatEventSource formats EventSource as a comma separated string excluding Host when empty
-func formatEventSource(es corev1.EventSource) string {
-	EventSourceString := []string{es.Component}
-	if len(es.Host) > 0 {
-		EventSourceString = append(EventSourceString, es.Host)
-	}
-	return strings.Join(EventSourceString, ", ")
 }
 
 // Pass ports=nil for all ports.
