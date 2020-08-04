@@ -14,6 +14,12 @@ rules:
       - namespaces
     verbs:
       - get
+  # calico/node checks configmaps for cluster CIDR.
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs:
+      - get
   - apiGroups: [""]
     resources:
       - endpoints
@@ -55,7 +61,7 @@ rules:
     verbs:
       - patch
   # Calico monitors various CRDs for config.
-  # Note: Though we are not using ipam from calico, calico node still needs those permission
+  # Note: Though we are not using ipam from calico, calico node still needs those permissions
   #       to boot.
   - apiGroups: ["crd.projectcalico.org"]
     resources:
