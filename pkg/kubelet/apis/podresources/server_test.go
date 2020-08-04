@@ -145,7 +145,7 @@ func TestListPodResources(t *testing.T) {
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
 			m.On("UpdateAllocatedDevices").Return()
-			server := NewPodResourcesServer(m, m)
+			server, _ := NewPodResourcesServer(m, m)
 			resp, err := server.List(context.TODO(), &v1alpha1.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)

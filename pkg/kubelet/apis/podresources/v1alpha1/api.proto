@@ -18,9 +18,10 @@ option (gogoproto.goproto_unrecognized_all) = false;
 // node resources consumed by pods and containers on the node
 service PodResourcesLister {
     rpc List(ListPodResourcesRequest) returns (ListPodResourcesResponse) {}
+    rpc Watch(WatchPodResourcesRequest) returns (stream WatchPodResourcesResponse) {}
 }
 
-// ListPodResourcesRequest is the request made to the PodResourcesLister service
+// ListPodResourcesRequest is the request made to the PodResources service
 message ListPodResourcesRequest {}
 
 // ListPodResourcesResponse is the response returned by List function
@@ -28,11 +29,27 @@ message ListPodResourcesResponse {
     repeated PodResources pod_resources = 1;
 }
 
+// WatchPodResourcesRequest is the request made to the Watch PodResourcesLister service
+message WatchPodResourcesRequest {}
+
+enum WatchPodAction {
+    ADDED = 0;
+    MODIFIED = 1;
+    DELETED = 2;
+}
+
+// WatchPodResourcesResponse is the response returned by Watch function
+message WatchPodResourcesResponse {
+    WatchPodAction action = 1;
+    repeated PodResources pod_resources = 2;
+}
+
 // PodResources contains information about the node resources assigned to a pod
 message PodResources {
     string name = 1;
     string namespace = 2;
     repeated ContainerResources containers = 3;
+    int64 resource_version = 4;
 }
 
 // ContainerResources contains information about the resources assigned to a container
