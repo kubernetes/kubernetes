@@ -319,7 +319,7 @@ type UIDSet struct {
 type UIDTrackingControllerExpectations struct {
 	ControllerExpectationsInterface
 	// TODO: There is a much nicer way to do this that involves a single store,
-	// a lock per entry, and a ControlleeExpectationsInterface type.
+	// a lock per entry, and a ControllerExpectationsInterface type.
 	uidStoreLock sync.Mutex
 	// Store used for the UIDs associated with any expectation tracked via the
 	// ControllerExpectationsInterface.
