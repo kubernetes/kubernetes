@@ -71,43 +71,43 @@ def cri_tarballs():
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.0
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.0
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.3
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.3
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:b118abac0bcf633b9db4086584ee718526fe394cf1bd18aee036e6cc497860f6",
-    "amd64": "sha256:a67798e4746faaab3fde5b7407fa8bba75d8b1214d168dc7ad2b5364f6fc4319",
-    "arm": "sha256:3ab4332e481610acbcba7a801711e29506b4bd4ecb38f72590253674d914c449",
-    "arm64": "sha256:8d53ac4da977eb20d6219ee49b9cdff8c066831ecab0e4294d0a02179d26b1d7",
-    "ppc64le": "sha256:a631023e795fe18df7faa8fe1264e757a6c74a232b9a2659657bf65756f3f4aa",
-    "s390x": "sha256:dac908eaa61d2034aec252576a470a7e4ab184c361f89170526f707a0c3c6082",
+    "manifest": "sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8",
+    "amd64": "sha256:dc06e242160076b72bd75135fb3dd0a9e91f386b2d812ec10cbf9e65864c755d",
+    "arm": "sha256:9c52e9b31d679102586381fb4a03bba73fc05992adacce31df3db6d2f75f010e",
+    "arm64": "sha256:9a3ae250d59f317c9cf1f7bf0b61c0d90e70012ee82996867655401968076ee4",
+    "ppc64le": "sha256:d7c50e06d954bedb1f362ce42380f7a059423f8cbd9e7b426a7f2d73dfb4431a",
+    "s390x": "sha256:7e6d43baf4972f7faa33f1179fb92ff858a3e0e23f78b96a5821d13199b9da91",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.0
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.0
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.2
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.2
 _DEBIAN_IPTABLES_DIGEST = {
-    "manifest": "sha256:1ae6d76dea462973759ff1c4e02263867da1f85db9aa10462a030ca421cbf0e9",
-    "amd64": "sha256:2fb9fa09123a41e6369cac04eb29e26237fe9e43da8e18f676d18d8fffb906fc",
-    "arm": "sha256:a0e97386c073a2990265938fa15dc0db575efdb4d13c0ea63a79e0590813a998",
-    "arm64": "sha256:2a7df97e2c702d9852cc6234aff89b4671cd5b09086ac2b5383411315e5f115d",
-    "ppc64le": "sha256:f5289a6494328b7ccb695e3add65b33ca380b77fcfc9715e474f0efe26e1c506",
-    "s390x": "sha256:1b91a2788750552913377bf1bc99a095544dfb523d80a55674003c974c8e0905",
+    "manifest": "sha256:fff1fd5ab38fefde8c9eee5470ed6ea737f30e5ab86e1c0c0d429fa6add28a84",
+    "amd64": "sha256:448c0e019689da3f4e238922824551d02578473f7b5d11604fffd528056caafa",
+    "arm": "sha256:08e267a6297640eb0b218a783cabaef0a039cc4734b4a2d9cb54ee41cd82656a",
+    "arm64": "sha256:a83cf1d501ad33f5aa93e2719baa59b054939b8a819c3997f915a6acfaa8e31a",
+    "ppc64le": "sha256:c86649ac541c35431a4df8ba44e7c61923d9e34679fd17da7723db7b6ecc5245",
+    "s390x": "sha256:53437fe32e13bb0bd2af08ddaaf2e908add8ab576574d881ba79544f34a774b2",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.1.1
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.1.1
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.1.3
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.1.3
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
-    "manifest": "sha256:f7f47c37bf6b0fc4b168912edbd45550240cecaf96fd53dccbe06c2a6bd268f2",
-    "amd64": "sha256:d0830921ae6c9636788ac89980bc8f77cb4a47fe53985f0b31b10d978a905a1a",
-    "arm": "sha256:f06e07c95a11ead1d8a6929f8df5f6afe061943f970be9d3121b1bc58d25ba1b",
-    "arm64": "sha256:c471afeec232448c2bafd52762a977470c85e4246ebca67bba544844f93b4b03",
-    "ppc64le": "sha256:d62012612769d4d803ca8d78782a0b3643df362ddf338c9926738ea9dca9d624",
-    "s390x": "sha256:504417278bd2935f8ed72ebcc1bba6ae4deae9959b07769280fda2948fe76dd4",
+    "manifest": "sha256:9190cda1ba1c1bf07eace001240d648a1d480bc55cc383b49f4d29d4f9ce6a51",
+    "amd64": "sha256:9f1f43babd36bfd2cce05a63b0331ed580c1fea876c833aae7036ffa5c6346c0",
+    "arm": "sha256:d4d0f188ee723c3f276922512ce2d335af4a54caf65b5df5e9105955d34a1d72",
+    "arm64": "sha256:9b98a76c8bca6d4b19adae1a20d475d959428a28530febba8c044ca0aabb471d",
+    "ppc64le": "sha256:0ba61ab0ec8b2ed9501e4e1245119fd8af1c211eab0cf3bfddb1dbd95ed7ef08",
+    "s390x": "sha256:f031fe21b338443166ae00142d05601507f9959d1bce94b5d4f0dbe5cd75f64b",
 }
 
 def _digest(d, arch):
@@ -125,7 +125,7 @@ def debian_image_dependencies():
             registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-base",
             # Ensure the digests above are updated to match a new tag
-            tag = "v2.1.0",  # ignored, but kept here for documentation
+            tag = "v2.1.3",  # ignored, but kept here for documentation
         )
 
         container_pull(
@@ -135,7 +135,7 @@ def debian_image_dependencies():
             registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-iptables",
             # Ensure the digests above are updated to match a new tag
-            tag = "v12.1.0",  # ignored, but kept here for documentation
+            tag = "v12.1.2",  # ignored, but kept here for documentation
         )
 
         container_pull(
@@ -145,7 +145,7 @@ def debian_image_dependencies():
             registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-hyperkube-base",
             # Ensure the digests above are updated to match a new tag
-            tag = "v1.1.1",  # ignored, but kept here for documentation
+            tag = "v1.1.3",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():
