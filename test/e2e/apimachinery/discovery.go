@@ -82,7 +82,13 @@ var _ = SIGDescribe("Discovery", func() {
 		}
 	})
 
-	ginkgo.It("should validate PreferredVersion for each APIGroup", func() {
+	/*
+	   Release : v1.19
+	   Testname: Discovery, confirm the PreferredVersion for each api group
+	   Description: Ensure that a list of apis is retrieved.
+	   Each api group found MUST return a valid PreferredVersion unless the group suffix is example.com.
+	*/
+	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func() {
 
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}
