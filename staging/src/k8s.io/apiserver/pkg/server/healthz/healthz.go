@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/client-go/informers"
 	"k8s.io/klog"
 )
 
@@ -81,16 +81,20 @@ func (l *log) Check(_ *http.Request) error {
 	return fmt.Errorf("logging blocked")
 }
 
+type cacheSyncWaiter interface {
+	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+}
+
 type informerSync struct {
-	sharedInformerFactory informers.SharedInformerFactory
+	cacheSyncWaiter cacheSyncWaiter
 }
 
 var _ HealthChecker = &informerSync{}
 
-// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given sharedInformerFactory sync.
-func NewInformerSyncHealthz(sharedInformerFactory informers.SharedInformerFactory) HealthChecker {
+// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given cacheSyncWaiter sync.
+func NewInformerSyncHealthz(cacheSyncWaiter cacheSyncWaiter) HealthChecker {
 	return &informerSync{
-		sharedInformerFactory: sharedInformerFactory,
+		cacheSyncWaiter: cacheSyncWaiter,
 	}
 }
 
@@ -103,8 +107,8 @@ func (i *informerSync) Check(_ *http.Request) error {
 	// Close stopCh to force checking if informers are synced now.
 	close(stopCh)
 
-	var informersByStarted map[bool][]string
-	for informerType, started := range i.sharedInformerFactory.WaitForCacheSync(stopCh) {
+	informersByStarted := make(map[bool][]string)
+	for informerType, started := range i.cacheSyncWaiter.WaitForCacheSync(stopCh) {
 		informersByStarted[started] = append(informersByStarted[started], informerType.String())
 	}
 
