@@ -22,6 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	lru "github.com/hashicorp/golang-lru"
 	corev1 "k8s.io/api/core/v1"
@@ -30,18 +31,6 @@ import (
 )
 
 func TestLRUCacheLookup(t *testing.T) {
-	liveLookupCache, err := lru.New(100)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kubeClient := fake.NewSimpleClientset()
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-
-	accessor, _ := newQuotaAccessor()
-	accessor.client = kubeClient
-	accessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	accessor.liveLookupCache = liveLookupCache
-
 	namespace := "foo"
 	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
@@ -50,20 +39,90 @@ func TestLRUCacheLookup(t *testing.T) {
 		},
 	}
 
-	liveLookupCache.Add(resourceQuota.Namespace, liveLookupEntry{expiry: time.Now().Add(30 * time.Second), items: []*corev1.ResourceQuota{
-		resourceQuota,
-	}})
-
-	quotas, err := accessor.GetQuotas(resourceQuota.Namespace)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	testcases := []struct {
+		description   string
+		cacheInput    []*corev1.ResourceQuota
+		clientInput   []runtime.Object
+		ttl           time.Duration
+		namespace     string
+		expectedQuota *corev1.ResourceQuota
+	}{
+		{
+			description:   "object is found via cache",
+			cacheInput:    []*corev1.ResourceQuota{resourceQuota},
+			ttl:           30 * time.Second,
+			namespace:     namespace,
+			expectedQuota: resourceQuota,
+		},
+		{
+			description:   "object is outdated and not found with client",
+			cacheInput:    []*corev1.ResourceQuota{resourceQuota},
+			ttl:           -30 * time.Second,
+			namespace:     namespace,
+			expectedQuota: nil,
+		},
+		{
+			description:   "object is outdated but is found with client",
+			cacheInput:    []*corev1.ResourceQuota{resourceQuota},
+			clientInput:   []runtime.Object{resourceQuota},
+			ttl:           -30 * time.Second,
+			namespace:     namespace,
+			expectedQuota: resourceQuota,
+		},
+		{
+			description:   "object does not exist in cache and is not found with client",
+			cacheInput:    []*corev1.ResourceQuota{resourceQuota},
+			ttl:           30 * time.Second,
+			expectedQuota: nil,
+		},
+		{
+			description:   "object does not exist in cache and is found with client",
+			cacheInput:    []*corev1.ResourceQuota{},
+			clientInput:   []runtime.Object{resourceQuota},
+			namespace:     namespace,
+			expectedQuota: resourceQuota,
+		},
 	}
 
-	if count := len(quotas); count != 1 {
-		t.Errorf("Expected 1 object but got %d", count)
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			liveLookupCache, err := lru.New(1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kubeClient := fake.NewSimpleClientset(tc.clientInput...)
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+			accessor, _ := newQuotaAccessor()
+			accessor.client = kubeClient
+			accessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+			accessor.liveLookupCache = liveLookupCache
+
+			for _, q := range tc.cacheInput {
+				quota := q
+				liveLookupCache.Add(quota.Namespace, liveLookupEntry{expiry: time.Now().Add(tc.ttl), items: []*corev1.ResourceQuota{quota}})
+			}
+
+			quotas, err := accessor.GetQuotas(tc.namespace)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if tc.expectedQuota != nil {
+				if count := len(quotas); count != 1 {
+					t.Fatalf("Expected 1 object but got %d", count)
+				}
+
+				if !reflect.DeepEqual(quotas[0], *tc.expectedQuota) {
+					t.Errorf("Retrieved object does not match")
+				}
+				return
+			}
+
+			if count := len(quotas); count > 0 {
+				t.Errorf("Expected 0 objects but got %d", count)
+			}
+		})
 	}
 
-	if !reflect.DeepEqual(quotas[0], *resourceQuota) {
-		t.Errorf("Retrieved object does not match")
-	}
 }
