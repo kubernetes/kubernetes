@@ -112,6 +112,9 @@ type Options struct {
 	// required claims key value pairs are present in the ID Token.
 	RequiredClaims map[string]string
 
+	// Proxy, if specified all OIDC requests will go through the proxy.
+	Proxy string
+
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
 }
@@ -288,6 +291,17 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		// TLS uses the host's root CA set.
 		TLSClientConfig: &tls.Config{RootCAs: roots},
 	})
+
+	if opts.Proxy != "" {
+		proxyURL, err := url.Parse(opts.Proxy)
+		if err != nil {
+			return nil, fmt.Errorf("oidc: failed to parse proxy url: %v", err)
+		}
+		if proxyURL.Scheme == "" {
+			return nil, errors.New("oidc: proxy url scheme is empty")
+		}
+		tr.Proxy = http.ProxyURL(proxyURL)
+	}
 
 	client := &http.Client{Transport: tr, Timeout: 30 * time.Second}
 

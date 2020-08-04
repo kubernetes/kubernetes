@@ -83,6 +83,7 @@ type OIDCAuthenticationOptions struct {
 	GroupsPrefix   string
 	SigningAlgs    []string
 	RequiredClaims map[string]string
+	Proxy          string
 }
 
 // ServiceAccountAuthenticationOptions contains service account authentication options for API Server
@@ -303,6 +304,9 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"A key=value pair that describes a required claim in the ID Token. "+
 			"If set, the claim is verified to be present in the ID Token with a matching value. "+
 			"Repeat this flag to specify multiple claims.")
+
+		fs.StringVar(&o.OIDC.Proxy, "oidc-proxy", "", ""+
+			"If provided, all OIDC requests will go through the proxy.")
 	}
 
 	if o.RequestHeader != nil {
@@ -406,6 +410,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.OIDCUsernamePrefix = o.OIDC.UsernamePrefix
 		ret.OIDCSigningAlgs = o.OIDC.SigningAlgs
 		ret.OIDCRequiredClaims = o.OIDC.RequiredClaims
+		ret.OIDCProxy = o.OIDC.Proxy
 	}
 
 	if o.RequestHeader != nil {
