@@ -397,7 +397,6 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	// Separate stop channel because Processor should be stopped strictly after controller
 	processorStopCh := make(chan struct{})
 	var wg wait.Group
-	defer wg.Wait()              // Wait for Processor to stop
 	defer close(processorStopCh) // Tell Processor to stop
 	wg.StartWithChannel(processorStopCh, s.cacheMutationDetector.Run)
 	wg.StartWithChannel(processorStopCh, s.processor.run)
@@ -408,6 +407,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.stopped = true // Don't want any new listeners
 	}()
 	s.controller.Run(stopCh)
+	wg.Wait() // Wait for Processor to stop
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
