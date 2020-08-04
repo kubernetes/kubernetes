@@ -808,6 +808,13 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
+- testname: Discovery, confirm the PreferredVersion for each api group
+  codename: '[sig-api-machinery] Discovery should validate PreferredVersion for each
+    APIGroup [Conformance]'
+  description: Ensure that a list of apis is retrieved. Each api group found MUST
+    return a valid PreferredVersion unless the group suffix is example.com.
+  release: v1.19
+  file: test/e2e/apimachinery/discovery.go
 - testname: Event, delete a collection
   codename: '[sig-api-machinery] Events should delete a collection of events [Conformance]'
   description: A set of events is created with a label selector which MUST be found
