@@ -87,7 +87,8 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 		Type:                eventtype,
 		// TODO: remove this when we change conversion to convert eventSource
 		// to reportingController
-		DeprecatedSource:        v1.EventSource{Component: reportingController},
-		DeprecatedLastTimestamp: t,
+		DeprecatedSource:         v1.EventSource{Component: reportingController},
+		DeprecatedLastTimestamp:  t,
+		DeprecatedFirstTimestamp: t,
 	}
 }
