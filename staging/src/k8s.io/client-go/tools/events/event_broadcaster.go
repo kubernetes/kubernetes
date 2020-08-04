@@ -113,6 +113,7 @@ func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
+			event.DeprecatedLastTimestamp = metav1.Time{Time: event.Series.LastObservedTime.Time}
 			if recordedEvent, retry := recordEvent(e.sink, event); !retry {
 				if recordedEvent != nil {
 					e.eventCache[isomorphicKey] = recordedEvent
@@ -175,6 +176,9 @@ func (e *eventBroadcasterImpl) recordToSink(event *v1beta1.Event, clock clock.Cl
 			return eventCopy
 		}()
 		if evToRecord != nil {
+			if evToRecord.Series != nil {
+				evToRecord.DeprecatedLastTimestamp = metav1.Time{Time: evToRecord.Series.LastObservedTime.Time}
+			}
 			recordedEvent := e.attemptRecording(evToRecord)
 			if recordedEvent != nil {
 				recordedEventKey := getKey(recordedEvent)
@@ -251,6 +255,7 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 func createPatchBytesForSeries(event *v1beta1.Event) ([]byte, error) {
 	oldEvent := event.DeepCopy()
 	oldEvent.Series = nil
+	oldEvent.DeprecatedLastTimestamp = metav1.Time{}
 	oldData, err := json.Marshal(oldEvent)
 	if err != nil {
 		return nil, err
