@@ -797,7 +797,7 @@ func TestScorePlugin(t *testing.T) {
 				}
 			}
 
-			if scorePlugin.numScoreCalled == 0 {
+			if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled == 0 {
 				t.Errorf("Expected the score plugin to be called.")
 			}
 
