@@ -695,7 +695,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	for _, envVar := range container.Env {
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
-			// Step 1a: expand variable references , if extended variables is `runtimeVal` , the extension is ordered
+			// Step 1a: expand variable references, if extended variables is `runtimeVal`, the extension is ordered
 			runtimeVal = expansion.Expand(runtimeVal, mappingFunc)
 		} else if envVar.ValueFrom != nil {
 			// Step 1b: resolve alternate env var sources
