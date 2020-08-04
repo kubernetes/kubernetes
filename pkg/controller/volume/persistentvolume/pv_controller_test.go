@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -160,11 +161,15 @@ func TestControllerSync(t *testing.T) {
 				for len(ctrl.claims.ListKeys()) > 0 {
 					time.Sleep(10 * time.Millisecond)
 				}
-				// make sure the operation timestamp cache is NOT empty
-				if !ctrl.operationTimestamps.Has("volume5-6") {
-					return errors.New("failed checking timestamp cache: should not be empty")
-				}
-				return nil
+				// wait for volume delete operation to appear once volumeWorker() runs
+				return wait.PollImmediate(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					// make sure the operation timestamp cache is NOT empty
+					if ctrl.operationTimestamps.Has("volume5-6") {
+						return true, nil
+					}
+					t.Logf("missing volume5-6 from timestamp cache, will retry")
+					return false, nil
+				})
 			},
 		},
 		{
