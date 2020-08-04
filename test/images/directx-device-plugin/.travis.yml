@@ -1,0 +1,27 @@
+dist: xenial
+
+language: go
+go:
+- 1.12.x
+env:
+  global:
+    - GO111MODULE=on
+# Only clone the most recent commit.
+git:
+  depth: 1
+
+# Skip the install step. Don't `go get` dependencies. Only build with the code
+# in vendor/
+install: true
+
+script:
+- "GOOS=windows GOARCH=amd64 go build -mod vendor -o k8s-directx-device-plugin.exe cmd/k8s-device-plugin/main.go"
+
+deploy:
+  provider: releases
+  api_key:
+    secure: YDmapuQE8nsulaBnsCuR5OTN8TZvwi+oSUzbe5ya+tuy3hNUmXQCX4Q9EdWppmq0X6CNh5b8W97J8bC/f0V4zfjqzNS0UNd7zWZImyGQWfIcHo+C08/nVrji2LpzkqIGjq9h9gUDnJpbWiIuUwqckzAIjvJs/0wm+ZPOak7ew/1m48hrPJFQeL9M0y6NOnoTdJMd4eVuG5SFXzZBkcWPIxsBBlSJLolq3zCokQx0gCZ7q+MUjV7rm4mdrGtS7RWZZ8+oHb3kXXwMh8YV6m1dB1PVMRVBY5XCNRzUgnub/ARTt1NowHH7ZuVA2l6AbcDBp3q1VHI9FJM5+2y0muuLyc+zfEf/uam37SlbK/BEGPmEFyxU4Eug5Z4n0OR0glmkY4SxnmtTaqYT6pqXlHoa3pd1+0sgBPbXEwwWbd0t8YFoTA/Xw56vRSoZJ65u8NBykmycw3ZqZI02UndNZSgYFF0PkZs1puXC0gLGwuPF7kl7Ns4Xwxt+TCxXyTr67HF1sNhxsgIcu9fKXzGaiPQI1/aIajF+L7sisqRgNi+iZVaugwcvglS/5/7bML8iS8kTdmIEqA9O2QtpuOxJfiOrHBhmw8MJNlMTU7GHioUHGRAw+Xz9juLSCpzg/rBGdxKE1SDT5irYrGRag7em69mL4gyqOUT7URR5qQENfQIHgEU=
+  file: k8s-directx-device-plugin.exe
+  skip_cleanup: true
+  on:
+    tags: true
