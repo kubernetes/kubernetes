@@ -338,15 +338,16 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 		}
 		klog.Infof("[cpumanager] Regenerating TopologyHints for CPUs already allocated to (pod %v, container %v)", string(pod.UID), container.Name)
 		return map[string][]topologymanager.TopologyHint{
-			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, requested),
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.CPUSet{}, requested),
 		}
 	}
 
 	// Get a list of available CPUs.
 	available := p.assignableCPUs(s)
+	reusable := p.cpusToReuse[string(pod.UID)]
 
 	// Generate hints.
-	cpuHints := p.generateCPUTopologyHints(available, requested)
+	cpuHints := p.generateCPUTopologyHints(available, reusable, requested)
 	klog.Infof("[cpumanager] TopologyHints generated for pod '%v', container '%v': %v", pod.Name, container.Name, cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
@@ -360,7 +361,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 // It follows the convention of marking all hints that have the same number of
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
-func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
+func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
 	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
 	// Initialize minSocketsOnMinAffinity to include all Sockets.
@@ -380,16 +381,25 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, req
 			}
 		}
 
-		// Then check to see if we have enough CPUs available on the current
-		// socket bitmask to satisfy the CPU request.
+		// Then check to see if all of the reusable CPUs are part of the bitmask.
 		numMatching := 0
+		for _, c := range reusableCPUs.ToSlice() {
+			// Disregard this mask if its NUMANode isn't part of it.
+			if !mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
+				return
+			}
+			numMatching++
+		}
+
+		// Finally, check to see if enough available CPUs remain on the current
+		// NUMA node combination to satisfy the CPU request.
 		for _, c := range availableCPUs.ToSlice() {
 			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
 		}
 
-		// If we don't, then move onto the next combination.
+		// If they don't, then move onto the next combination.
 		if numMatching < request {
 			return
 		}
