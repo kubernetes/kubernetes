@@ -10,7 +10,6 @@ filters:
       - thockin
       - liggitt
     approvers:
-      - bgrant0607
       - brendandburns
       - dchen1107
       - lavalamp
@@ -19,6 +18,7 @@ filters:
       - wojtek-t
       - liggitt
     emeritus_approvers:
+      - bgrant0607
       - jbeda
 
   # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
