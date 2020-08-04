@@ -78,42 +78,38 @@ dependencies:
       match: GOLANG_VERSION
 
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: 2.1.0
+    version: 2.1.3
     refPaths:
     - path: build/common.sh
       match: debian_base_version=
     - path: build/workspace.bzl
       match: tag =
-    - path: build/debian-iptables/Makefile
-      match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-base-\$\(ARCH\)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
     - path: cluster/images/etcd-empty-dir-cleanup/Dockerfile
-      match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
+      match: k8s\.gcr\.io\/build-image\/debian-base:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-hyperkube-base: dependents"
-    version: 1.1.1
+    version: 1.1.3
     refPaths:
     - path: build/workspace.bzl
       match: tag =
     - path: cluster/images/hyperkube/Makefile
-      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-hyperkube-base-\$\(ARCH\):v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-hyperkube-base-\$\(ARCH\):v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: 12.1.0
+    version: 12.1.2
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
-    - path: build/debian-hyperkube-base/Makefile
-      match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-iptables-\$\(ARCH\):v\d+\.\d+\.\d+
     - path: build/workspace.bzl
       match: tag =
 
