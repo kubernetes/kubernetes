@@ -104,7 +104,7 @@ dependencies:
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: 2.1.0
+    version: 2.1.2
     refPaths:
     - path: build/common.sh
       match: debian_base_version=
@@ -122,7 +122,7 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: 12.1.0
+    version: 12.1.1
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
