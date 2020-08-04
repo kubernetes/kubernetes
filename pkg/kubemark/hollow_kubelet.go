@@ -28,6 +28,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -144,6 +145,7 @@ type HollowKubletOptions struct {
 	MaxPods             int
 	PodsPerCore         int
 	NodeLabels          map[string]string
+	RegisterWithTaints  []core.Taint
 }
 
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
@@ -164,6 +166,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
+	f.RegisterWithTaints = opt.RegisterWithTaints
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
