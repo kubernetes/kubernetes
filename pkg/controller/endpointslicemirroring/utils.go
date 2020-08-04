@@ -88,10 +88,7 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 	ownerRef := metav1.NewControllerRef(endpoints, gvk)
 	epSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				discovery.LabelServiceName: endpoints.Name,
-				discovery.LabelManagedBy:   controllerName,
-			},
+			Labels:          map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       endpoints.Namespace,
 		},
@@ -99,6 +96,13 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 		AddressType: addrType,
 		Endpoints:   []discovery.Endpoint{},
 	}
+
+	for label, val := range endpoints.Labels {
+		epSlice.Labels[label] = val
+	}
+
+	epSlice.Labels[discovery.LabelServiceName] = endpoints.Name
+	epSlice.Labels[discovery.LabelManagedBy] = controllerName
 
 	if sliceName == "" {
 		epSlice.GenerateName = getEndpointSlicePrefix(endpoints.Name)
