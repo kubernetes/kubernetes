@@ -1,0 +1,26 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+- thockin
+- smarterclayton
+- caesarxuchao
+- wojtek-t
+- deads2k
+- brendandburns
+- liggitt
+- nikhiljindal
+- gmarek
+- erictune
+- sttts
+- luxas
+- dims
+- errordeveloper
+- hongchaodeng
+- krousey
+- resouer
+- cjcullen
+- rmmh
+- lixiaobing10051267
+- asalkeld
+- juanvallejo
+- lojies
