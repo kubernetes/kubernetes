@@ -362,6 +362,38 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim2-10", "uid2-10", "1Gi", "volume2-10", v1.ClaimPending, nil),
 			[]string{"Warning VolumeMismatch"}, noerrors, testSyncClaim,
 		},
+		{
+			// syncClaim with claim pre-bound to a released PV that is pre-bound to the
+			// claim by UID. Check it gets bound and no pvutil.AnnBoundByController is
+			// set.
+			"2-11 - claim prebound to released and prebound volume by UID",
+			newVolumeArray("volume2-5", "1Gi", "uid2-5", "claim2-5", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume2-5", "1Gi", "uid2-5", "claim2-5", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newClaimArray("claim2-5", "uid2-5", "1Gi", "volume2-5", v1.ClaimPending, nil),
+			newClaimArray("claim2-5", "uid2-5", "1Gi", "volume2-5", v1.ClaimBound, nil, pvutil.AnnBindCompleted),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim with claim pre-bound to a released PV that is pre-bound to the
+			// claim by name. Check it gets bound and no pvutil.AnnBoundByController is
+			// set.
+			"2-12 - claim prebound to released and prebound volume by name",
+			newVolumeArray("volume2-5", "1Gi", "", "claim2-5", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume2-5", "1Gi", "uid2-5", "claim2-5", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newClaimArray("claim2-5", "uid2-5", "1Gi", "volume2-5", v1.ClaimPending, nil),
+			newClaimArray("claim2-5", "uid2-5", "1Gi", "volume2-5", v1.ClaimBound, nil, pvutil.AnnBindCompleted),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim with claim pre-bound to a released PV that exists and is
+			// unbound. Check it gets bound and no pvutil.AnnBoundByController is set.
+			"2-13 - claim prebound to released and unbound volume",
+			newVolumeArray("volume2-3", "1Gi", "", "", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume2-3", "1Gi", "uid2-3", "claim2-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", v1.ClaimPending, nil),
+			newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", v1.ClaimBound, nil, pvutil.AnnBindCompleted),
+			noevents, noerrors, testSyncClaim,
+		},
 
 		// [Unit test set 3] Syncing bound claim
 		{

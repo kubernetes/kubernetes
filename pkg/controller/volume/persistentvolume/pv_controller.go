@@ -409,7 +409,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
 			if volume.Spec.ClaimRef == nil {
 				// User asked for a PV that is not claimed
-				// OBSERVATION: pvc is "Pending", pv is "Available"
+				// OBSERVATION: pvc is "Pending"
 				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume is unbound, binding", claimToClaimKey(claim))
 				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
 					klog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
