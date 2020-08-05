@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func TestKubeletDirs(t *testing.T) {
@@ -39,6 +41,10 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "plugins")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getPluginsRegistrationDir()
+	exp = filepath.Join(root, "plugins_registry")
+	assert.Equal(t, exp, got)
+
 	got = kubelet.getPluginDir("foobar")
 	exp = filepath.Join(root, "plugins/foobar")
 	assert.Equal(t, exp, got)
@@ -55,6 +61,14 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods/abc123/volumes/plugin/foobar")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getPodVolumeDevicesDir("abc123")
+	exp = filepath.Join(root, "pods/abc123/volumeDevices")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getPodVolumeDeviceDir("abc123", "plugin")
+	exp = filepath.Join(root, "pods/abc123/volumeDevices/plugin")
+	assert.Equal(t, exp, got)
+
 	got = kubelet.getPodPluginsDir("abc123")
 	exp = filepath.Join(root, "pods/abc123/plugins")
 	assert.Equal(t, exp, got)
@@ -63,7 +77,29 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods/abc123/plugins/foobar")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getVolumeDevicePluginsDir()
+	exp = filepath.Join(root, "plugins")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getVolumeDevicePluginDir("foobar")
+	exp = filepath.Join(root, "plugins", "foobar", "volumeDevices")
+	assert.Equal(t, exp, got)
+
 	got = kubelet.getPodContainerDir("abc123", "def456")
 	exp = filepath.Join(root, "pods/abc123/containers/def456")
+	assert.Equal(t, exp, got)
+
+	got = kubelet.getPodResourcesDir()
+	exp = filepath.Join(root, "pod-resources")
+	assert.Equal(t, exp, got)
+
+	// GetNodeConfig for containerManagerStub returns an empty node config
+	gotCfg := kubelet.GetNodeConfig()
+	expCfg := cm.NodeConfig{}
+	assert.Equal(t, expCfg, gotCfg)
+
+	// GetPodCgroupRoot for containerManagerStub returns an empty string
+	got = kubelet.GetPodCgroupRoot()
+	exp = ""
 	assert.Equal(t, exp, got)
 }
