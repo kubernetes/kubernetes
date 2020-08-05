@@ -37,8 +37,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -821,9 +822,53 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
 				defer cancel()
-				pvcWatch, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Watch(ctx, metav1.ListOptions{})
-				framework.ExpectNoError(err, "create PVC watch")
-				defer pvcWatch.Stop()
+
+				// The capacity error is dealt with in two different ways.
+				//
+				// For delayed binding, the external-provisioner should unset the node annotation
+				// to give the scheduler the opportunity to reschedule the pod onto a different
+				// node.
+				//
+				// For immediate binding, the external-scheduler must keep retrying.
+				//
+				// Unfortunately, the call log is the same in both cases. We have to collect
+				// additional evidence that rescheduling really happened. What we have observed
+				// above is how the PVC changed over time. Now we can analyze that.
+				ginkgo.By("Checking PVC events")
+				nodeAnnotationSet := false
+				nodeAnnotationReset := false
+
+				watchDone := make(chan struct{})
+				informerFactory := informers.NewSharedInformerFactory(f.ClientSet, 10*time.Minute)
+				informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
+					cache.ResourceEventHandlerFuncs{
+						AddFunc: func(obj interface{}) {
+							framework.Logf("PVC add event: %#v", obj)
+							pvc := obj.(*v1.PersistentVolumeClaim)
+							framework.Logf("PVC add event: %#v", pvc)
+							if _, set := pvc.Annotations["volume.kubernetes.io/selected-node"]; set {
+								nodeAnnotationSet = true
+							}
+						},
+						UpdateFunc: func(oldObj, newObj interface{}) {
+							pvc := newObj.(*v1.PersistentVolumeClaim)
+							framework.Logf("PVC update event: %#v", pvc)
+							_, set := pvc.Annotations["volume.kubernetes.io/selected-node"]
+							if set {
+								nodeAnnotationSet = true
+							} else if nodeAnnotationSet {
+								nodeAnnotationReset = true
+							}
+						},
+						DeleteFunc: func(obj interface{}) {
+							pvc := obj.(*v1.PersistentVolumeClaim)
+							framework.Logf("PVC delete event: %#v", pvc)
+							close(watchDone)
+						},
+					},
+				)
+				framework.Logf("Starting PVC informer")
+				informerFactory.Start(ctx.Done())
 
 				sc, claim, pod := createPod(false)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod")
@@ -875,49 +920,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}, ctx.Done())
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 
-				// The capacity error is dealt with in two different ways.
-				//
-				// For delayed binding, the external-provisioner should unset the node annotation
-				// to give the scheduler the opportunity to reschedule the pod onto a different
-				// node.
-				//
-				// For immediate binding, the external-scheduler must keep retrying.
-				//
-				// Unfortunately, the call log is the same in both cases. We have to collect
-				// additional evidence that rescheduling really happened. What we have observed
-				// above is how the PVC changed over time. Now we can analyze that.
-				ginkgo.By("Checking PVC events")
-				nodeAnnotationSet := false
-				nodeAnnotationReset := false
+				// Wait for the right PVC operations to complete
+				framework.Logf("Waiting for PVC events or timeout")
 			loop:
 				for {
 					select {
-					case event, ok := <-pvcWatch.ResultChan():
-						if !ok {
-							framework.Failf("PVC watch ended prematurely")
-						}
-
-						framework.Logf("PVC event %s: %#v", event.Type, event.Object)
-						switch event.Type {
-						case watch.Modified:
-							pvc, ok := event.Object.(*v1.PersistentVolumeClaim)
-							if !ok {
-								framework.Failf("PVC watch sent %#v instead of a PVC", event.Object)
-							}
-							_, set := pvc.Annotations["volume.kubernetes.io/selected-node"]
-							if set {
-								nodeAnnotationSet = true
-							} else if nodeAnnotationSet {
-								nodeAnnotationReset = true
-							}
-						case watch.Deleted:
-							break loop
-						case watch.Error:
-							// Can this occur when the apiserver is under heavy load?
-							// If yes, then we should bail out of the test here early and
-							// skip further checks instead of treating it as a test failure.
-							framework.Failf("PVC watch failed prematurely: %v", event.Object)
-						}
+					case <-watchDone:
+						framework.Logf("PVC event handler finished")
+						break loop
 					case <-ctx.Done():
 						framework.Failf("Timeout while waiting to observe PVC list")
 					}
