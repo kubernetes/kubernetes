@@ -19,7 +19,7 @@ require (
 	golang.org/x/tools v0.0.0-20200616133436-c1934b75d054 // indirect
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/klog/v2 v2.2.0
-	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
+	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 

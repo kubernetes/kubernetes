@@ -20,8 +20,8 @@ go_library(
         "valuereflect.go",
         "valueunstructured.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v3/value",
-    importpath = "sigs.k8s.io/structured-merge-diff/v3/value",
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v4/value",
+    importpath = "sigs.k8s.io/structured-merge-diff/v4/value",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/json-iterator/go:go_default_library",
