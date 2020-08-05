@@ -28,6 +28,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,12 +54,13 @@ import (
 )
 
 var (
-	simpleDaemonSetLabel  = map[string]string{"name": "simple-daemon", "type": "production"}
-	simpleDaemonSetLabel2 = map[string]string{"name": "simple-daemon", "type": "test"}
-	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
-	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
-	alwaysReady           = func() bool { return true }
-	informerSyncTimeout   = 30 * time.Second
+	simpleDaemonSetLabel    = map[string]string{"name": "simple-daemon", "type": "production"}
+	simpleDaemonSetLabel2   = map[string]string{"name": "simple-daemon", "type": "test"}
+	simpleNodeLabel         = map[string]string{"color": "blue", "speed": "fast"}
+	simpleNodeLabel2        = map[string]string{"color": "red", "speed": "fast"}
+	alwaysReady             = func() bool { return true }
+	informerSyncTimeout     = 30 * time.Second
+	maxHandlerExecutionTime = 100 * time.Millisecond
 )
 
 var (
@@ -482,11 +484,6 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		fakeRecorder:         fakeRecorder,
 	}
 
-	_, err = client.CoreV1().Nodes().Create(context.Background(), newNode("master-0", nil), metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	f.Start(stopCh)
 
 	cacheCtx, cancelCacheCtx := context.WithTimeout(context.Background(), 30*time.Second)
@@ -499,8 +496,32 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal("caches failed to sync")
 	}
 
+	node, err := client.CoreV1().Nodes().Create(context.Background(), newNode("master-0", nil), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure that any informer handlers as a follow up to node creation are already executed.
+	// If they were executed after creating the DaemonSet it would raise the queue length.
+	err = wait.PollImmediate(10*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+		klog.V(8).Infof("Waiting for node %q to be seen by the lister", node.Name)
+		_, err := f.Core().V1().Nodes().Lister().Get(node.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return true, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Node %q is not seen by the lister: %v", node.Name, err)
+	}
+	// When listers see the item the informer handlers are executed right after.
+	time.Sleep(maxHandlerExecutionTime)
+
 	if dsc.queue.Len() != 0 {
-		t.Fatal("Unexpected item in the queue")
+		t.Fatalf("Expected queue length %d, got %d", 0, dsc.queue.Len())
 	}
 
 	oldDS := newDaemonSet("test")
@@ -514,13 +535,22 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		return dsc.queue.Len() == 1, nil
 	})
 	if err != nil {
-		t.Fatalf("initial DS didn't result in new item in the queue: %v", err)
+		t.Fatalf("Expected queue length %d, got %d", 1, dsc.queue.Len())
 	}
 
 	ok = dsc.processNextWorkItem()
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
+
+	// Skip sync for the initial status update.
+	klog.V(2).Infof("Skipping sync for the initial status update.")
+	key, quit := dsc.queue.Get()
+	if quit {
+		t.Fatal("Queue is shutting down!")
+	}
+	dsc.queue.Done(key)
+	klog.V(2).Infof("Sync successfully skipped.")
 
 	err = validateSyncDaemonSets(manager, fakePodControl, 1, 0, 0)
 	if err != nil {
@@ -538,14 +568,14 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !exists {
-		t.Errorf("No expectations found for DaemonSet %q", oldDSKey)
+		t.Fatalf("No expectations found for DaemonSet %q", oldDSKey)
 	}
 	if dsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for DaemonSet %q", oldDSKey)
+		t.Fatalf("There should be unfulfiled expectation for creating new pods for DaemonSet %q", oldDSKey)
 	}
 
 	if dsc.queue.Len() != 0 {
-		t.Fatal("Unexpected item in the queue")
+		t.Fatalf("Expected queue length %d, got %d", 0, dsc.queue.Len())
 	}
 
 	err = client.AppsV1().DaemonSets(oldDS.Namespace).Delete(context.Background(), oldDS.Name, metav1.DeleteOptions{})
@@ -558,7 +588,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		return dsc.queue.Len() == 1, nil
 	})
 	if err != nil {
-		t.Fatalf("Deleting DS didn't result in new item in the queue: %v", err)
+		t.Fatalf("Expected queue length %d, got %d", 1, dsc.queue.Len())
 	}
 
 	_, exists, err = dsc.expectations.GetExpectations(oldDSKey)
@@ -566,11 +596,11 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if exists {
-		t.Errorf("There should be no expectations for DaemonSet %q after it was deleted", oldDSKey)
+		t.Fatalf("There should be no expectations for DaemonSet %q after it was deleted", oldDSKey)
 	}
 
 	// skip sync for the delete event so we only see the new RS in sync
-	key, quit := dsc.queue.Get()
+	key, quit = dsc.queue.Get()
 	if quit {
 		t.Fatal("Queue is shutting down!")
 	}
@@ -600,7 +630,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		return dsc.queue.Len() == 1, nil
 	})
 	if err != nil {
-		t.Fatalf("Re-creating DS didn't result in new item in the queue: %v", err)
+		t.Fatalf("Expected queue length %d, got %d", 1, dsc.queue.Len())
 	}
 
 	ok = dsc.processNextWorkItem()
@@ -617,15 +647,15 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !exists {
-		t.Errorf("No expectations found for DaemonSet %q", oldDSKey)
+		t.Fatalf("No expectations found for DaemonSet %q", oldDSKey)
 	}
 	if dsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for DaemonSet %q", oldDSKey)
+		t.Fatalf("There should be unfulfiled expectation for creating new pods for DaemonSet %q", oldDSKey)
 	}
 
 	err = validateSyncDaemonSets(manager, fakePodControl, 1, 0, 0)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	fakePodControl.Clear()
 }
