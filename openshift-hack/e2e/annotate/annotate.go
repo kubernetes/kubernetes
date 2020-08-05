@@ -1,4 +1,4 @@
-package main
+package annotate
 
 import (
 	"fmt"
@@ -15,7 +15,8 @@ import (
 
 var reHasSig = regexp.MustCompile(`\[sig-[\w-]+\]`)
 
-func main() {
+// Run generates tests annotations for the targeted package.
+func Run() {
 	if len(os.Args) != 2 && len(os.Args) != 3 {
 		fmt.Fprintf(os.Stderr, "error: requires exactly one argument\n")
 		os.Exit(1)
@@ -87,7 +88,7 @@ func init() {
 			node.SetText(updated)
 		} else {
 			panic(fmt.Sprintf("unable to find test %%s", combined))
-		}	
+		}
 	})
 }
 `, strings.Join(pairs, "\n\n"))
@@ -107,7 +108,7 @@ func newGenerator() *ginkgoTestRenamer {
 	stringMatches := make(map[string][]string)
 	excludes := make(map[string]*regexp.Regexp)
 
-	for label, items := range testMaps {
+	for label, items := range TestMaps {
 		sort.Strings(items)
 		allLabels = append(allLabels, label)
 		var remain []string
@@ -123,13 +124,13 @@ func newGenerator() *ginkgoTestRenamer {
 			matches[label] = regexp.MustCompile(strings.Join(remain, `|`))
 		}
 	}
-	for label, items := range labelExcludes {
+	for label, items := range LabelExcludes {
 		sort.Strings(items)
 		excludes[label] = regexp.MustCompile(strings.Join(items, `|`))
 	}
 	sort.Strings(allLabels)
 
-	excludedTestsFilter := regexp.MustCompile(strings.Join(excludedTests, `|`))
+	excludedTestsFilter := regexp.MustCompile(strings.Join(ExcludedTests, `|`))
 
 	return &ginkgoTestRenamer{
 		allLabels:           allLabels,

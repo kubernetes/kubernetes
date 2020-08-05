@@ -26,6 +26,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ViperizeFlags is exported for use by the k8s-e2e.test binary used for testing openshift.
+func ViperizeFlagsForKubeE2E(requiredConfig, optionalConfig string, flags *flag.FlagSet) error {
+	return viperizeFlags(requiredConfig, optionalConfig, flags)
+}
+
 // viperizeFlags checks whether a configuration file was specified,
 // reads it, and updates the configuration variables in the specified
 // flag set accordingly. Must be called after framework.HandleFlags()

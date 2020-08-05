@@ -1,4 +1,4 @@
-package main
+package annotate
 
 import (
 	"testing"

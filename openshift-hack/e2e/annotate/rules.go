@@ -1,17 +1,12 @@
-package main
+package annotate
 
 import (
 	// ensure all the ginkgo tests are loaded
-	_ "github.com/openshift/origin/test/extended"
+	_ "k8s.io/kubernetes/openshift-hack/e2e"
 )
 
 var (
-	testMaps = map[string][]string{
-		// tests that require a local host
-		"[Local]": {
-			// Doesn't work on scaled up clusters
-			`\[Feature:ImagePrune\]`,
-		},
+	TestMaps = map[string][]string{
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
 			// ALPHA features in 1.19, disabled by default.
@@ -69,20 +64,18 @@ var (
 		// tests that are known broken and need to be fixed upstream or in openshift
 		// always add an issue here
 		"[Disabled:Broken]": {
-			`mount an API token into pods`,                                // We add 6 secrets, not 1
-			`ServiceAccounts should ensure a single API token exists`,     // We create lots of secrets
-			`unchanging, static URL paths for kubernetes api services`,    // the test needs to exclude URLs that are not part of conformance (/logs)
-			`Services should be able to up and down services`,             // we don't have wget installed on nodes
-			`Network should set TCP CLOSE_WAIT timeout`,                   // possibly some difference between ubuntu and fedora
-			`\[NodeFeature:Sysctls\]`,                                     // needs SCC support
-			`should check kube-proxy urls`,                                // previously this test was skipped b/c we reported -1 as the number of nodes, now we report proper number and test fails
-			`SSH`,                                                         // TRIAGE
-			`should implement service.kubernetes.io/service-proxy-name`,   // this is an optional test that requires SSH. sig-network
-			`should idle the service and DeploymentConfig properly`,       // idling with a single service and DeploymentConfig
-			`should answer endpoint and wildcard queries for the cluster`, // currently not supported by dns operator https://github.com/openshift/cluster-dns-operator/issues/43
-			`should allow ingress access on one named port`,               // https://bugzilla.redhat.com/show_bug.cgi?id=1711602
-			`recreate nodes and ensure they function upon restart`,        // https://bugzilla.redhat.com/show_bug.cgi?id=1756428
-			`\[Driver: iscsi\]`,                                           // https://bugzilla.redhat.com/show_bug.cgi?id=1711627
+			`mount an API token into pods`,                              // We add 6 secrets, not 1
+			`ServiceAccounts should ensure a single API token exists`,   // We create lots of secrets
+			`unchanging, static URL paths for kubernetes api services`,  // the test needs to exclude URLs that are not part of conformance (/logs)
+			`Services should be able to up and down services`,           // we don't have wget installed on nodes
+			`Network should set TCP CLOSE_WAIT timeout`,                 // possibly some difference between ubuntu and fedora
+			`\[NodeFeature:Sysctls\]`,                                   // needs SCC support
+			`should check kube-proxy urls`,                              // previously this test was skipped b/c we reported -1 as the number of nodes, now we report proper number and test fails
+			`SSH`,                                                       // TRIAGE
+			`should implement service.kubernetes.io/service-proxy-name`, // this is an optional test that requires SSH. sig-network
+			`should allow ingress access on one named port`,             // https://bugzilla.redhat.com/show_bug.cgi?id=1711602
+			`recreate nodes and ensure they function upon restart`,      // https://bugzilla.redhat.com/show_bug.cgi?id=1756428
+			`\[Driver: iscsi\]`,                                         // https://bugzilla.redhat.com/show_bug.cgi?id=1711627
 
 			"RuntimeClass should reject",
 
@@ -98,8 +91,6 @@ var (
 			// A fix is in progress: https://github.com/openshift/origin/pull/24709
 			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
 
-			`Cluster should restore itself after quorum loss`, // https://bugzilla.redhat.com/show_bug.cgi?id=1837157
-
 			// Fix is in progress upstream and tracked via https://bugzilla.redhat.com/show_bug.cgi?id=1861215
 			`Secret should create a pod that reads a secret`,
 
@@ -112,10 +103,6 @@ var (
 			// Test passes but container it uses exits with non-zero.
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1861526
 			`ServiceAccounts should set ownership and permission when RunAsUser or FsGroup is present`,
-
-			// Perma-fail
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1862322
-			`an end user can use OLM can subscribe to the operator`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
@@ -134,8 +121,6 @@ var (
 		// tests that are known flaky
 		"[Flaky]": {
 			`Job should run a job to completion when tasks sometimes fail and are not locally restarted`, // seems flaky, also may require too many resources
-			`openshift mongodb replication creating from a template`,                                     // flaking on deployment
-
 			// TODO(node): test works when run alone, but not in the suite in CI
 			`\[Feature:HPA\] Horizontal pod autoscaling \(scale resource: CPU\) \[sig-autoscaling\] ReplicationController light Should scale from 1 pod to 2 pods`,
 		},
@@ -165,12 +150,6 @@ var (
 			`\[sig-storage\] In-tree Volumes \[Driver: azure\] \[Testpattern: Inline-volume`,
 			`\[sig-storage\] In-tree Volumes \[Driver: azure\] \[Testpattern: Pre-provisioned PV`,
 		},
-		"[Skipped:ovirt]": {
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1838751
-			`\[sig-network\] Networking Granular Checks: Services should function for endpoint-Service`,
-			`\[sig-network\] Networking Granular Checks: Services should function for node-Service`,
-			`\[sig-network\] Networking Granular Checks: Services should function for pod-Service`,
-		},
 		"[Skipped:gce]": {
 			// Requires creation of a different compute instance in a different zone and is not compatible with volumeBindingMode of WaitForFirstConsumer which we use in 4.x
 			`\[sig-scheduling\] Multi-AZ Cluster Volumes \[sig-storage\] should only be allowed to provision PDs in zones where nodes exist`,
@@ -199,76 +178,6 @@ var (
 			// should be serial if/when it's re-enabled
 			`\[HPA\] Horizontal pod autoscaling \(scale resource: Custom Metrics from Stackdriver\)`,
 		},
-		// tests that don't pass under openshift-sdn but that are expected to pass
-		// with other network plugins (particularly ovn-kubernetes)
-		"[Skipped:Network/OpenShiftSDN]": {
-			`NetworkPolicy between server and client should allow egress access on one named port`, // not yet implemented
-		},
-		// tests that don't pass under openshift-sdn multitenant mode
-		"[Skipped:Network/OpenShiftSDN/Multitenant]": {
-			`\[Feature:NetworkPolicy\]`, // not compatible with multitenant mode
-			`\[sig-network\] Services should preserve source pod IP for traffic thru service cluster IP`, // known bug, not planned to be fixed
-		},
-		// tests that don't pass under OVN Kubernetes
-		"[Skipped:Network/OVNKubernetes]": {
-			// https://jira.coreos.com/browse/SDN-510: OVN-K doesn't support session affinity
-			`\[sig-network\] Networking Granular Checks: Services should function for client IP based session affinity: http`,
-			`\[sig-network\] Networking Granular Checks: Services should function for client IP based session affinity: udp`,
-			`\[sig-network\] Services should be able to switch session affinity for NodePort service`,
-			`\[sig-network\] Services should be able to switch session affinity for service with type clusterIP`,
-			`\[sig-network\] Services should have session affinity work for NodePort service`,
-			`\[sig-network\] Services should have session affinity work for service with type clusterIP`,
-			`\[sig-network\] Services should have session affinity timeout work for NodePort service`,
-			`\[sig-network\] Services should have session affinity timeout work for service with type clusterIP`,
-			// https://github.com/kubernetes/kubernetes/pull/93597: upstream is flaky
-			`\[sig-network\] Conntrack should be able to preserve UDP traffic when server pod cycles for a NodePort service`,
-		},
-		"[Skipped:ibmcloud]": {
-			// skip Gluster tests (not supported on ROKS worker nodes)
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825009 - e2e: skip Glusterfs-related tests upstream for rhel7 worker nodes
-			`\[Driver: gluster\]`,
-			`GlusterFS`,
-			`GlusterDynamicProvisioner`,
-
-			// Nodes in ROKS have access to secrets in the cluster to handle encryption
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825013 - ROKS: worker nodes have access to secrets in the cluster
-			`\[sig-auth\] \[Feature:NodeAuthorizer\] Getting a non-existent configmap should exit with the Forbidden error, not a NotFound error`,
-			`\[sig-auth\] \[Feature:NodeAuthorizer\] Getting a non-existent secret should exit with the Forbidden error, not a NotFound error`,
-			`\[sig-auth\] \[Feature:NodeAuthorizer\] Getting a secret for a workload the node has access to should succeed`,
-			`\[sig-auth\] \[Feature:NodeAuthorizer\] Getting an existing configmap should exit with the Forbidden error`,
-			`\[sig-auth\] \[Feature:NodeAuthorizer\] Getting an existing secret should exit with the Forbidden error`,
-
-			// Access to node external address is blocked from pods within a ROKS cluster by Calico
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825016 - e2e: NodeAuthenticator tests use both external and internal addresses for node
-			`\[sig-auth\] \[Feature:NodeAuthenticator\] The kubelet's main port 10250 should reject requests with no credentials`,
-			`\[sig-auth\] \[Feature:NodeAuthenticator\] The kubelet can delegate ServiceAccount tokens to the API server`,
-
-			// The cluster-network-operator creates the kube-proxy daemonset pods without mem/cpu requests,
-			// resulting in a qosClass of BestEffort
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825019 - kube-proxy deployment does not include any memory/cpu requests
-			`\[Feature:Platform\] Managed cluster should ensure control plane pods do not run in best-effort QoS`,
-
-			// Calico is allowing the request to timeout instead of returning 'REFUSED'
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825021 - ROKS: calico SDN results in a request timeout when accessing services with no endpoints
-			`\[sig-network\] Services should be rejected when no endpoints exist`,
-
-			// Mode returned by RHEL7 worker contains an extra character not expected by the test: dgtrwx vs dtrwx
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825024 - e2e: Failing test - HostPath should give a volume the correct mode
-			`\[sig-storage\] HostPath should give a volume the correct mode`,
-
-			// Currently ibm-master-proxy-static and imbcloud-block-storage-plugin tolerate all taints
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825027
-			`\[Feature:Platform\] Managed cluster should ensure control plane operators do not make themselves unevictable`,
-
-			// Prometheus is not reporting router metrics
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825029
-			`\[Feature:Prometheus\]\[Conformance\] Prometheus when installed on the cluster should provide ingress metrics`,
-			`\[Conformance\]\[Area:Networking\]\[Feature:Router\] The HAProxy router should enable openshift-monitoring to pull metrics`,
-
-			// Test does not allow enough time for the pods to be created before deleting them
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1825372
-			`Pod Container Status should never report success for a pending container`,
-		},
 		"[sig-node]": {
 			`\[NodeConformance\]`,
 			`NodeLease`,
@@ -294,9 +203,9 @@ var (
 	}
 
 	// labelExcludes temporarily block tests out of a specific suite
-	labelExcludes = map[string][]string{}
+	LabelExcludes = map[string][]string{}
 
-	excludedTests = []string{
+	ExcludedTests = []string{
 		`\[Disabled:`,
 		`\[Disruptive\]`,
 		`\[Skipped\]`,
