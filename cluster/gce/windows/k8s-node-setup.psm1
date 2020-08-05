@@ -1623,6 +1623,10 @@ function Install-LoggingAgent {
     # installer binary and searched for flags to do this but found nothing. Oh
     # well.
     Log-Output ("Skip: Stackdriver logging agent is already installed")
+
+    # Restarting logging agent forces it to reconnect with the metadata 
+    # server. This makes the startup more reliable.
+    Restart-LoggingAgent
     return
   }
   
