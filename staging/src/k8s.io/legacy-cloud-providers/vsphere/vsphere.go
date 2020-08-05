@@ -561,6 +561,7 @@ func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
 }
 
 // InstancesV2 returns an implementation of InstancesV2 for vSphere.
+// TODO: implement ONLY for external cloud provider
 func (vs *VSphere) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
@@ -795,41 +796,6 @@ func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID 
 		return false, err
 	}
 	return !isActive, nil
-}
-
-// InstanceMetadataByProviderID returns metadata of the specified instance.
-func (vs *VSphere) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	if providerID == "" {
-		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
-	}
-
-	// TODO dropped get nodeName by GetNodeNameFromProviderID here. If it not behave as expected,
-	// get nodeName by vm.GetNodeNameFromProviderID.
-	return vs.instanceMetadataByNodeName(ctx, convertToK8sType(providerID))
-}
-
-func (vs *VSphere) instanceMetadataByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (*cloudprovider.InstanceMetadata, error) {
-	if vs.hostName == convertToString(nodeName) {
-		addresses, err := vs.getNodeAddressesFromLocalIP()
-		if err != nil {
-			return nil, err
-		}
-		return &cloudprovider.InstanceMetadata{
-			ProviderID:    vs.vmUUID,
-			Type:          "",
-			NodeAddresses: addresses,
-		}, nil
-	}
-
-	addresses, err := vs.getNodeAddressesFromVM(ctx, nodeName)
-	if err != nil {
-		return nil, err
-	}
-	return &cloudprovider.InstanceMetadata{
-		ProviderID:    vs.vmUUID,
-		Type:          "",
-		NodeAddresses: addresses,
-	}, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
