@@ -215,8 +215,8 @@ func collectServiceNodePorts(service *corev1.Service) []int {
 			continue
 		}
 		proto := string(port.Protocol)
-		s := seen[nodePort]
-		if s == nil { // have not seen this nodePort before
+		s, ok := seen[nodePort]
+		if !ok { // have not seen this nodePort before
 			s = sets.NewString(proto)
 			servicePorts = append(servicePorts, nodePort)
 		} else if s.Has(proto) { // same nodePort with same protocol
@@ -229,9 +229,9 @@ func collectServiceNodePorts(service *corev1.Service) []int {
 
 	healthPort := int(service.Spec.HealthCheckNodePort)
 	if healthPort != 0 {
-		s := seen[healthPort]
+		s, ok := seen[healthPort]
 		// TODO: is it safe to assume the protocol is always TCP?
-		if s == nil || s.Has(string(corev1.ProtocolTCP)) {
+		if !ok || s.Has(string(corev1.ProtocolTCP)) {
 			servicePorts = append(servicePorts, healthPort)
 		}
 	}
