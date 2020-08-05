@@ -381,6 +381,9 @@ type FakeVolumePlugin struct {
 	ProvisionDelaySeconds  int
 	SupportsRemount        bool
 
+	// default to false which means it is attachable by default
+	NonAttachable bool
+
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
 	UnmountDeviceHook func(globalMountPath string) error
@@ -444,6 +447,8 @@ func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
 		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	} else if spec.Volume != nil && spec.Volume.CSI != nil {
+		volumeName = spec.Volume.CSI.Driver
 	}
 	if volumeName == "" {
 		volumeName = spec.Name()
@@ -604,7 +609,7 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 }
 
 func (plugin *FakeVolumePlugin) CanAttach(spec *Spec) (bool, error) {
-	return true, nil
+	return !plugin.NonAttachable, nil
 }
 
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *Spec) (bool, error) {
