@@ -892,7 +892,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			loop:
 				for {
 					select {
-					case event := <-pvcWatch.ResultChan():
+					case event, ok := <-pvcWatch.ResultChan():
+						if !ok {
+							framework.Failf("PVC watch ended prematurely")
+						}
+
 						framework.Logf("PVC event %s: %#v", event.Type, event.Object)
 						switch event.Type {
 						case watch.Modified:
