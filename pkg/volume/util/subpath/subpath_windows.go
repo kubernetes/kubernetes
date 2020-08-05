@@ -31,6 +31,10 @@ import (
 	"k8s.io/utils/nsenter"
 )
 
+// MaxPathLength is the maximum length of Windows path. Normally, it is 260, but if long path is enable,
+// the max number is 32,767
+const MaxPathLength = 32767
+
 type subpath struct{}
 
 // New returns a subpath.Interface for the current system
@@ -44,30 +48,91 @@ func NewNSEnter(mounter mount.Interface, ne *nsenter.Nsenter, rootDir string) In
 	return nil
 }
 
-// evalPath returns the path name after the evaluation of any symbolic links.
-// If the path after evaluation starts with Volume or \??\Volume, it means that it was a symlink from
-// volume (represented by volumeID) to the given path. In this case, the given path is returned.
-func evalPath(path string) (linkedPath string, err error) {
-	cmd := fmt.Sprintf("Get-Item -Path %s | Select-Object -ExpandProperty Target", path)
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	klog.V(4).Infof("evaluate symlink from %s: %s %v", path, string(output), err)
-	if err != nil {
-		return "", err
-	}
-	linkedPath = strings.TrimSpace(string(output))
-	if isVolumePrefix(linkedPath) {
-		return path, err
-	}
-	return linkedPath, err
-}
-
-// isVolumePrefix returns true if the given path name starts with "Volume" or volume prefix including
-// "\\.\" or "\\?\". Otherwise, it returns false.
-func isVolumePrefix(path string) bool {
-	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") {
+// isDriveLetterPath returns true if the given path is empty or it ends with ":" or ":\" or ":\\"
+func isDriveLetterorEmptyPath(path string) bool {
+	if path == "" || strings.HasSuffix(path, ":\\\\") || strings.HasSuffix(path, ":") || strings.HasSuffix(path, ":\\") {
 		return true
 	}
 	return false
+}
+
+// isVolumePrefix returns true if the given path name starts with "Volume" or volume prefix including
+// "\\.\", "\\?\" for device path or "UNC" or "\\" for UNC path. Otherwise, it returns false.
+func isDeviceOrUncPath(path string) bool {
+	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") || strings.HasPrefix(path, "UNC") {
+		return true
+	}
+	return false
+}
+
+// getUpperPath removes the last level of directory.
+func getUpperPath(path string) string {
+	sep := fmt.Sprintf("%c", filepath.Separator)
+	upperpath := strings.TrimSuffix(path, sep)
+	return filepath.Dir(upperpath)
+}
+
+// Check whether a directory/file is a link type or not
+// LinkType could be SymbolicLink, Junction, or HardLink
+func isLinkPath(path string) (bool, error) {
+	cmd := fmt.Sprintf("(Get-Item -Path %s).LinkType", path)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return false, err
+	}
+	if strings.TrimSpace(string(output)) != "" {
+		return true, nil
+	}
+	return false, nil
+}
+
+// evalSymlink returns the path name after the evaluation of any symbolic links.
+// If the path after evaluation is a device path or network connection, the original path is returned
+func evalSymlink(path string) (string, error) {
+	path = mount.NormalizeWindowsPath(path)
+	if isDeviceOrUncPath(path) || isDriveLetterorEmptyPath(path) {
+		klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
+		return path, nil
+	}
+	upperpath := path
+	base := ""
+	for i := 0; i < MaxPathLength; i++ {
+		isLink, err := isLinkPath(upperpath)
+		if err != nil {
+			return "", err
+		}
+		if isLink {
+			break
+		}
+		// continue to check next layer
+		base = filepath.Join(filepath.Base(upperpath), base)
+		upperpath = getUpperPath(upperpath)
+		if isDriveLetterorEmptyPath(upperpath) {
+			klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
+			return path, nil
+		}
+	}
+	// This command will give the target path of a given symlink
+	cmd := fmt.Sprintf("(Get-Item -Path %s).Target", upperpath)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	klog.V(4).Infof("evaluate path %s: symlink from %s to %s", path, upperpath, string(output))
+	linkedPath := strings.TrimSpace(string(output))
+	if linkedPath == "" || isDeviceOrUncPath(linkedPath) {
+		klog.V(4).Infof("Path '%s' has a target %s. Return its original form.", path, linkedPath)
+		return path, nil
+	}
+	// If the target is not an absoluate path, join iit with the current upperpath
+	if !filepath.IsAbs(linkedPath) {
+		linkedPath = filepath.Join(getUpperPath(upperpath), linkedPath)
+	}
+	nextLink, err := evalSymlink(linkedPath)
+	if err != nil {
+		return path, err
+	}
+	return filepath.Join(nextLink, base), nil
 }
 
 // check whether hostPath is within volume path
@@ -77,12 +142,12 @@ func lockAndCheckSubPath(volumePath, hostPath string) ([]uintptr, error) {
 		return []uintptr{}, nil
 	}
 
-	finalSubPath, err := evalPath(hostPath)
+	finalSubPath, err := evalSymlink(hostPath)
 	if err != nil {
 		return []uintptr{}, fmt.Errorf("cannot evaluate link %s: %s", hostPath, err)
 	}
 
-	finalVolumePath, err := evalPath(volumePath)
+	finalVolumePath, err := evalSymlink(volumePath)
 	if err != nil {
 		return []uintptr{}, fmt.Errorf("cannot read link %s: %s", volumePath, err)
 	}
@@ -190,7 +255,7 @@ func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
 
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
-	realBase, err := evalPath(base)
+	realBase, err := evalSymlink(base)
 	if err != nil {
 		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
 	}
@@ -229,11 +294,11 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	}
 
 	// Ensure the existing directory is inside allowed base
-	fullExistingPath, err := evalPath(existingPath)
+	fullExistingPath, err := evalSymlink(existingPath)
 	if err != nil {
 		return fmt.Errorf("error opening existing directory %s: %s", existingPath, err)
 	}
-	fullBasePath, err := evalPath(base)
+	fullBasePath, err := evalSymlink(base)
 	if err != nil {
 		return fmt.Errorf("cannot read link %s: %s", base, err)
 	}
