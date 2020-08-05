@@ -45,6 +45,7 @@ fi
 
 # Skip bazel since it's not used downstream
 BASH_TARGETS="
+	update-test-annotations
 	update-generated-protobuf
 	update-codegen
 	update-generated-runtime
