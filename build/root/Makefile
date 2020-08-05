@@ -543,7 +543,7 @@ generated_files:
 	@echo "$$GENERATED_FILES_HELP_INFO"
 else
 generated_files gen_openapi:
-	# $(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
 endif
 
 define HELP_INFO
