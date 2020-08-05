@@ -250,12 +250,25 @@ func (expc *expandController) syncHandler(key string) error {
 
 	volumeResizerName := class.Provisioner
 	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
+
+	volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
+	if err != nil || volumePlugin == nil {
+		msg := fmt.Errorf("didn't find a plugin capable of expanding the volume")
+		eventType := v1.EventTypeNormal
+		if err != nil {
+			eventType = v1.EventTypeWarning
+		}
+		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
+		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
+		return nil
+	}
+
 	migratable, err := expc.csiMigratedPluginManager.IsMigratable(volumeSpec)
 	if err != nil {
 		klog.V(4).Infof("failed to check CSI migration status for PVC: %s with error: %v", util.ClaimToClaimKey(pvc), err)
 		return nil
 	}
-	// handle CSI migration scenarios before invoking FindExpandablePluginBySpec for in-tree
+	// handle CSI migration scenario
 	if migratable {
 		msg := fmt.Sprintf("CSI migration enabled for %s; waiting for external resizer to expand the pvc", volumeResizerName)
 		expc.recorder.Event(pvc, v1.EventTypeNormal, events.ExternalExpanding, msg)
@@ -274,22 +287,6 @@ func (expc *expandController) syncHandler(key string) error {
 		}
 		return nil
 	}
-
-	volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
-	if err != nil || volumePlugin == nil {
-		msg := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
-			"waiting for an external controller to process this PVC")
-		eventType := v1.EventTypeNormal
-		if err != nil {
-			eventType = v1.EventTypeWarning
-		}
-		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
-		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
-		// If we are expecting that an external plugin will handle resizing this volume then
-		// is no point in requeuing this PVC.
-		return nil
-	}
-
 	return expc.expand(pvc, pv, volumeResizerName)
 }
 
