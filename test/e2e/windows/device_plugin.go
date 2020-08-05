@@ -17,20 +17,58 @@ limitations under the License.
 package windows
 
 import (
-	"fmt"
+	"context"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
 
+/*
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: directx-device-plugin
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: directx-device-plugin
+  template:
+    metadata:
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
+      labels:
+        name: directx-device-plugin
+    spec:
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      containers:
+      - name: hostdev
+        image: localhost:5000/directxplugin
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      nodeSelector:
+        kubernetes.io/os: windows
+*/
+
 var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
+	ns := f.Namespace.Name
 
 	var cs clientset.Interface
 
@@ -40,33 +78,82 @@ var _ = SIGDescribe("Services", func() {
 		cs = f.ClientSet
 	})
 	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
-		serviceName := "device-plugin-test"
-		ns := f.Namespace.Name
-
-		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		//nodeIP, err := e2enode.PickIP(jig.Client)
-		//framework.ExpectNoError(err)
-
-		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeNodePort
-		})
+                ginkgo.By("creating Windows device plugin daemonset")
+		dsName := "directx-device-plugin"
+		daemonsetNameLabel := "daemonset-name"
+		image := "directxplugin"
+		mountName := "device-plugin"
+		mountPath := "/var/lib/kubelet/device-plugins"
+		privileged := true
+		labels := map[string]string{
+			daemonsetNameLabel: dsName,
+		}
+        	ds := &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: dsName,
+				Namespace: "kube-system",
+			},
+			Spec: appsv1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: labels,
+				},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"scheduler.alpha.kubernetes.io/critical-pod": "",
+						},
+						Labels: labels,
+					},
+					Spec: v1.PodSpec{
+						Tolerations: []v1.Toleration{
+							{
+								Key: "CriticalAddonsOnly",
+								Operator: "Exists",
+							},
+						},
+						Containers: []v1.Container{
+							{
+								Name:  "hostdev",
+								Image: image,
+								SecurityContext: &v1.SecurityContext{
+									Privileged: &privileged,
+								},
+								VolumeMounts: []v1.VolumeMount{
+									{
+										Name: mountName,
+										MountPath: mountPath,
+									},
+								},
+							},
+						},
+						Volumes: []v1.Volume{
+							{
+								Name: mountName,
+								VolumeSource: v1.VolumeSource{
+									HostPath: &v1.HostPathVolumeSource{
+										Path: mountPath,
+									},
+								},
+							},
+						},
+						NodeSelector: map[string]string{
+							"kubernetes.io/os": "windows",
+						},
+					},
+				},
+			},
+		}
+		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		//nodePort := int(svc.Spec.Ports[0].NodePort)
-
-		ginkgo.By("creating Pod to be part of service " + serviceName)
-		_, err = jig.Run(nil)
-		framework.ExpectNoError(err)
-
-		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 		windowsPod = f.PodClient().CreateSync(windowsPod)
 
-		//ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
-		//assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s:%d", nodeIP, nodePort)))
-
+		ginkgo.By("verifying device access in Windows testing Pod")
+                command := []string{"cmd.exe", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
+                expectedString  := "Todo: DirectX Version: DirectX 12"
+                _, err = framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
+                framework.ExpectNoError(err, "failed: didn't find expected string in dxdiag output.")
 	})
-
 })
