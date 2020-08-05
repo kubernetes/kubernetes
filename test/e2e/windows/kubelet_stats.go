@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -126,7 +127,7 @@ func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName stri
 		podName := "statscollectiontest-" + string(uuid.NewUUID())
 		pod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: podName,
+				Name: fmt.Sprintf("%s-%d", podName, i),
 				Labels: map[string]string{
 					"name":    podName,
 					"testapp": "stats-collection",
@@ -136,7 +137,7 @@ func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName stri
 				Containers: []v1.Container{
 					{
 						Image: image.GetE2EImage(),
-						Name:  podName,
+						Name:  "stat-container",
 						Command: []string{
 							"powershell.exe",
 							"-Command",
@@ -147,7 +148,7 @@ func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName stri
 				InitContainers: []v1.Container{
 					{
 						Image: image.GetE2EImage(),
-						Name:  podName,
+						Name:  "init-container",
 						Command: []string{
 							"powershell.exe",
 							"-Command",
