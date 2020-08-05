@@ -193,7 +193,8 @@ func NewVolumeManager(
 		kubeContainerRuntime,
 		keepTerminatedPodVolumes,
 		csiMigratedPluginManager,
-		intreeToCSITranslator)
+		intreeToCSITranslator,
+		volumePluginMgr)
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
