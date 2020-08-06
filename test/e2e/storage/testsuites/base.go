@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -46,7 +47,6 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 var (
@@ -572,13 +572,13 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 
 	return snapshot
 }
-func getPreProvisionedSnapshot(snapshotContentName, ns, snapshotHandle string) *unstructured.Unstructured {
+func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstructured.Unstructured {
 	snapshot := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "VolumeSnapshot",
 			"apiVersion": snapshotAPIVersion,
 			"metadata": map[string]interface{}{
-				"name":      getPreProvisionedSnapshotName(snapshotHandle),
+				"name":      snapName,
 				"namespace": ns,
 			},
 			"spec": map[string]interface{}{
@@ -591,13 +591,13 @@ func getPreProvisionedSnapshot(snapshotContentName, ns, snapshotHandle string) *
 
 	return snapshot
 }
-func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+func getPreProvisionedSnapshotContent(snapcontentName, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
 	snapshotContent := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "VolumeSnapshotContent",
 			"apiVersion": snapshotAPIVersion,
 			"metadata": map[string]interface{}{
-				"name": getPreProvisionedSnapshotContentName(snapshotHandle),
+				"name": snapcontentName,
 			},
 			"spec": map[string]interface{}{
 				"source": map[string]interface{}{
@@ -616,12 +616,12 @@ func getPreProvisionedSnapshotContent(snapshotName, snapshotNamespace, snapshotH
 	return snapshotContent
 }
 
-func getPreProvisionedSnapshotContentName(snapshotHandle string) string {
-	return fmt.Sprintf("pre-provisioned-snapcontent-%s", utils.GenShortHash(snapshotHandle))
+func getPreProvisionedSnapshotContentName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-snapcontent-%s", string(uuid))
 }
 
-func getPreProvisionedSnapshotName(snapshotHandle string) string {
-	return fmt.Sprintf("pre-provisioned-snapshot-%s", utils.GenShortHash(snapshotHandle))
+func getPreProvisionedSnapshotName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-snapshot-%s", string(uuid))
 }
 
 // StartPodLogs begins capturing log output and events from current
