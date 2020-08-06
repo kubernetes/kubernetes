@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -458,12 +459,17 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a snapshot content with the snapshot handle")
-		r.Vscontent = getPreProvisionedSnapshotContent(getPreProvisionedSnapshotName(snapshotHandle), pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
+		uuid := uuid.NewUUID()
+
+		snapName := getPreProvisionedSnapshotName(uuid)
+		snapcontentName := getPreProvisionedSnapshotContentName(uuid)
+
+		r.Vscontent = getPreProvisionedSnapshotContent(snapcontentName, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 		r.Vscontent, err = dc.Resource(SnapshotContentGVR).Create(context.TODO(), r.Vscontent, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a snapshot with that snapshot content")
-		r.Vs = getPreProvisionedSnapshot(getPreProvisionedSnapshotContentName(snapshotHandle), pvcNamespace, snapshotHandle)
+		r.Vs = getPreProvisionedSnapshot(snapName, pvcNamespace, snapcontentName)
 		r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Create(context.TODO(), r.Vs, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
