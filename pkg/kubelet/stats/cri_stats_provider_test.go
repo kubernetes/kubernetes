@@ -230,7 +230,7 @@ func TestCRIListPodStats(t *testing.T) {
 		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
-		NewFakeHostStatsProviderWithData(fakeStats),
+		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 	)
 
 	stats, err := provider.ListPodStats()

@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// PodEtcHostsFunc is a function to fetch a etc hosts path by pod uid.
+// PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid.
 type PodEtcHostsPathFunc func(podUID types.UID) string
 
 // metricsProviderByPath maps a path to its metrics provider
@@ -52,7 +52,7 @@ type hostStatsProvider struct {
 	podEtcHostsPathFunc PodEtcHostsPathFunc
 }
 
-// NewLogMetricsService returns a new LogMetricsService type struct.
+// NewHostStatsProvider returns a new HostStatsProvider type struct.
 func NewHostStatsProvider(osInterface kubecontainer.OSInterface, podEtcHostsPathFunc PodEtcHostsPathFunc) HostStatsProvider {
 	return hostStatsProvider{
 		osInterface:         osInterface,
