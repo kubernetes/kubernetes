@@ -12,6 +12,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/apply:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/apps:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/completion:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/describe:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/drain:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/explain:all-srcs",

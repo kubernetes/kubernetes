@@ -2312,6 +2312,7 @@ k8s.io/kubectl/pkg/cmd/util/editor/crlf
 k8s.io/kubectl/pkg/cmd/util/sanity
 k8s.io/kubectl/pkg/cmd/version
 k8s.io/kubectl/pkg/cmd/wait
+k8s.io/kubectl/pkg/completion
 k8s.io/kubectl/pkg/describe
 k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/explain

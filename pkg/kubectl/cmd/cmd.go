@@ -27,7 +27,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
+	"k8s.io/kubectl/pkg/cmd/kustomize"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
@@ -72,11 +73,9 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
+
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
 
 const (
@@ -287,15 +286,6 @@ __kubectl_custom_func() {
     esac
 }
 `
-)
-
-var (
-	bashCompletionFlags = map[string]string{
-		"namespace": "__kubectl_get_resource_namespace",
-		"context":   "__kubectl_config_get_contexts",
-		"cluster":   "__kubectl_config_get_clusters",
-		"user":      "__kubectl_config_get_users",
-	}
 )
 
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
@@ -586,17 +576,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	for name, completion := range bashCompletionFlags {
-		if cmds.Flag(name) != nil {
-			if cmds.Flag(name).Annotations == nil {
-				cmds.Flag(name).Annotations = map[string][]string{}
-			}
-			cmds.Flag(name).Annotations[cobra.BashCompCustom] = append(
-				cmds.Flag(name).Annotations[cobra.BashCompCustom],
-				completion,
-			)
-		}
-	}
+	registerCompletionFuncForGlobalFlags(cmds, f)
 
 	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
