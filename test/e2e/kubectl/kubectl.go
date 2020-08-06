@@ -1481,6 +1481,7 @@ metadata:
 			time.Sleep(2500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
 			recentOut := framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--since=1s")
 			recent := len(strings.Split(recentOut, "\n"))
+			time.Sleep(2500 * time.Millisecond) // ensure that enough logs on the node are created past previous call
 			olderOut := framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--since=24h")
 			older := len(strings.Split(olderOut, "\n"))
 			gomega.Expect(recent).To(gomega.BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recentOut, olderOut)
