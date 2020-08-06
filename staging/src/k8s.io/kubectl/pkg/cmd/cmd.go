@@ -325,15 +325,6 @@ __kubectl_custom_func() {
 
 const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
-var (
-	bashCompletionFlags = map[string]string{
-		"namespace": "__kubectl_get_resource_namespace",
-		"context":   "__kubectl_config_get_contexts",
-		"cluster":   "__kubectl_config_get_clusters",
-		"user":      "__kubectl_config_get_users",
-	}
-)
-
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
 	return NewDefaultKubectlCommandWithArgs(NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes), os.Args, os.Stdin, os.Stdout, os.Stderr)
@@ -633,17 +624,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	for name, completion := range bashCompletionFlags {
-		if cmds.Flag(name) != nil {
-			if cmds.Flag(name).Annotations == nil {
-				cmds.Flag(name).Annotations = map[string][]string{}
-			}
-			cmds.Flag(name).Annotations[cobra.BashCompCustom] = append(
-				cmds.Flag(name).Annotations[cobra.BashCompCustom],
-				completion,
-			)
-		}
-	}
+	registerCompletionFuncForGlobalFlags(cmds, f)
 
 	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
