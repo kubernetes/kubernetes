@@ -614,11 +614,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 			if err != nil {
 				return nil, err
 			}
-			// TODO: Once we get rid of /healthz consider changing this to post-start-hook.
-			err = s.addReadyzChecks(healthz.NewInformerSyncHealthz(c.SharedInformerFactory))
-			if err != nil {
-				return nil, err
-			}
+		}
+		// TODO: Once we get rid of /healthz consider changing this to post-start-hook.
+		err := s.addReadyzChecks(healthz.NewInformerSyncHealthz(c.SharedInformerFactory))
+		if err != nil {
+			return nil, err
 		}
 	}
 
