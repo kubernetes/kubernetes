@@ -382,53 +382,35 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 	r.Vsclass, err = dc.Resource(SnapshotClassGVR).Get(context.TODO(), r.Vsclass.GetName(), metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	switch pattern.SnapshotType {
-	case testpatterns.DynamicCreatedSnapshot:
-		ginkgo.By("creating a VolumeSnapshot")
-		// prepare a dynamically provisioned volume snapshot with certain data
-		r.Vs = getSnapshot(pvcName, pvcNamespace, r.Vsclass.GetName())
+	ginkgo.By("creating a dynamic VolumeSnapshot")
+	// prepare a dynamically provisioned volume snapshot with certain data
+	r.Vs = getSnapshot(pvcName, pvcNamespace, r.Vsclass.GetName())
 
-		r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Create(context.TODO(), r.Vs, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+	r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Create(context.TODO(), r.Vs, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
 
-		err = WaitForSnapshotReady(dc, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-		framework.ExpectNoError(err)
+	err = WaitForSnapshotReady(dc, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	framework.ExpectNoError(err)
 
-		r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Get(context.TODO(), r.Vs.GetName(), metav1.GetOptions{})
+	r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Get(context.TODO(), r.Vs.GetName(), metav1.GetOptions{})
 
-		snapshotStatus := r.Vs.Object["status"].(map[string]interface{})
-		snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
-		framework.Logf("received snapshotStatus %v", snapshotStatus)
-		framework.Logf("snapshotContentName %s", snapshotContentName)
-		framework.ExpectNoError(err)
+	snapshotStatus := r.Vs.Object["status"].(map[string]interface{})
+	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
+	framework.Logf("received snapshotStatus %v", snapshotStatus)
+	framework.Logf("snapshotContentName %s", snapshotContentName)
+	framework.ExpectNoError(err)
 
-		r.Vscontent, err = dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-	case testpatterns.PreprovisionedCreatedSnapshot:
+	r.Vscontent, err = dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	if pattern.SnapshotType == testpatterns.PreprovisionedCreatedSnapshot {
 		// prepare a pre-provisioned VolumeSnapshotContent with certain data
 		// Because this could be run with an external CSI driver, we have no way
 		// to pre-provision the snapshot as we normally would using their API.
-		// We instead dynamically take a snapshot and create another snapshot using
-		// the first snapshot's snapshot handle.
-		ginkgo.By("taking a dynamic snapshot")
-		r.Vs = getSnapshot(pvcName, pvcNamespace, r.Vsclass.GetName())
-		r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Create(context.TODO(), r.Vs, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		err = WaitForSnapshotReady(dc, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-		framework.ExpectNoError(err)
-
-		r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Get(context.TODO(), r.Vs.GetName(), metav1.GetOptions{})
-
-		snapshotStatus := r.Vs.Object["status"].(map[string]interface{})
-		snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
-		framework.Logf("received snapshotStatus %v", snapshotStatus)
-		framework.Logf("snapshotContentName %s", snapshotContentName)
-		framework.ExpectNoError(err)
+		// We instead dynamically take a snapshot (above step), delete the old snapshot,
+		// and create another snapshot using the first snapshot's snapshot handle.
 
 		ginkgo.By("updating the snapshot content deletion policy to retain")
-		r.Vscontent, err = dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
 		r.Vscontent.Object["spec"].(map[string]interface{})["deletionPolicy"] = "Retain"
 
 		r.Vscontent, err = dc.Resource(SnapshotContentGVR).Update(context.TODO(), r.Vscontent, metav1.UpdateOptions{})
