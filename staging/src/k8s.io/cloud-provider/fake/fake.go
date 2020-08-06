@@ -325,6 +325,8 @@ func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 		ProviderID:    node.Spec.ProviderID,
 		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
 		NodeAddresses: f.Addresses,
+		Zone:          f.Zone.FailureDomain,
+		Region:        f.Zone.Region,
 	}, f.Err
 }
 
