@@ -40,7 +40,7 @@ func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users u
 const sha256Prefix = "sha256~"
 
 func (a *tokenAuthenticator) AuthenticateToken(ctx context.Context, name string) (*kauthenticator.Response, bool, error) {
-	// hash token for new-style sha256: prefixed token
+	// hash token for new-style sha256~ prefixed token
 	// TODO: reject non-sha256 prefix tokens in 4.7+
 	if strings.HasPrefix(name, sha256Prefix) {
 		withoutPrefix := strings.TrimPrefix(name, sha256Prefix)
