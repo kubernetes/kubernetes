@@ -347,7 +347,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	// incomingPodAntiAffinityMap will be used later for efficient check on incoming pod's anti-affinity
 	incomingPodAffinityMap, incomingPodAntiAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, allNodes)
 	if err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("calculating preFilterState: %v", err))
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("calculating preFilterState: %v", err))
 	}
 
 	s := &preFilterState{

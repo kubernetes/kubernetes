@@ -203,14 +203,12 @@ func (pl *InterPodAffinity) PreScore(
 	var antiAffinityTerms []*weightedAffinityTerm
 	if hasAffinityConstraints {
 		if affinityTerms, err = getWeightedAffinityTerms(pod, affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution); err != nil {
-			klog.Error(err)
-			return nil
+			return framework.NewStatus(framework.Error, fmt.Sprintf("processing affinity terms: %+v", err))
 		}
 	}
 	if hasAntiAffinityConstraints {
 		if antiAffinityTerms, err = getWeightedAffinityTerms(pod, affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution); err != nil {
-			klog.Error(err)
-			return nil
+			return framework.NewStatus(framework.Error, fmt.Sprintf("processing affinity terms: %+v", err))
 		}
 	}
 
