@@ -1530,3 +1530,81 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 		})
 	}
 }
+
+func TestFitErrorNoSpammy(t *testing.T) {
+	tests := []struct {
+		name     string
+		nodeNum1 int
+		nodeNum2 int
+		wErr     string
+	}{
+		{
+			name:     "small number of nodes cannot pass the filters",
+			nodeNum1: 2,
+			wErr:     "0/2 nodes are available: 2 injecting failure for pod fake.",
+		},
+		{
+			name:     "large number of nodes cannot pass the filters",
+			nodeNum1: 500,
+			wErr:     "0/500 nodes are available: 500 injecting failure for pod fake.",
+		},
+		{
+			name:     "cannot pass the filters with two different reasons",
+			nodeNum1: 490,
+			nodeNum2: 10,
+			wErr:     "0/500 nodes are available: 10 Nodes failed the fake plugin, 490 injecting failure for pod fake.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fake", UID: types.UID("fake")}}
+			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			var nodes []*v1.Node
+			failedNodeReturnCodeMap := make(map[string]framework.Code)
+			for i := 0; i < test.nodeNum1; i++ {
+				uid := fmt.Sprintf("node%v", i)
+				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: uid, UID: types.UID(uid)}}
+				nodes = append(nodes, node)
+				cache.AddNode(node)
+				failedNodeReturnCodeMap[uid] = framework.Unschedulable
+			}
+
+			registerPlugins := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterFilterPlugin(
+					"FakeFilter",
+					st.NewFakeFilterPlugin(failedNodeReturnCodeMap),
+				),
+				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			for i := test.nodeNum1; i < test.nodeNum1+test.nodeNum2; i++ {
+				uid := fmt.Sprintf("node%v", i)
+				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: uid, UID: types.UID(uid)}}
+				nodes = append(nodes, node)
+				cache.AddNode(node)
+			}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			fwk, err := st.NewFramework(
+				registerPlugins,
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			scheduler := NewGenericScheduler(
+				cache,
+				snapshot,
+				[]framework.Extender{},
+				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+
+			_, err = scheduler.Schedule(context.Background(), fwk, framework.NewCycleState(), pod)
+			if err.Error() != test.wErr {
+				t.Errorf("got: %v, want: %v", err.Error(), test.wErr)
+			}
+		})
+	}
+}
