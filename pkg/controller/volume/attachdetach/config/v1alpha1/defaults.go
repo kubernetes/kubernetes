@@ -37,4 +37,7 @@ func RecommendedDefaultAttachDetachControllerConfiguration(obj *kubectrlmgrconfi
 	if obj.ReconcilerSyncLoopPeriod == zero {
 		obj.ReconcilerSyncLoopPeriod = metav1.Duration{Duration: 60 * time.Second}
 	}
+	if obj.ReconcilerMaxWaitForUnmountDuration == zero {
+		obj.ReconcilerMaxWaitForUnmountDuration = metav1.Duration{Duration: 6 * time.Minute}
+	}
 }

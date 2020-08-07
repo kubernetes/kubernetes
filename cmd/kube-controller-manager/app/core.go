@@ -339,7 +339,11 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
-			attachdetach.DefaultTimerConfig,
+			func() attachdetach.TimerConfig {
+				attachDetachTimerConfig := attachdetach.DefaultTimerConfig
+				attachDetachTimerConfig.ReconcilerMaxWaitForUnmountDuration = ctx.ComponentConfig.AttachDetachController.ReconcilerMaxWaitForUnmountDuration.Duration
+				return attachDetachTimerConfig
+			}(),
 		)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
