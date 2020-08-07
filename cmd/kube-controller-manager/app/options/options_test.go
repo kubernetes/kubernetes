@@ -218,8 +218,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
 			&attachdetachconfig.AttachDetachControllerConfiguration{
-				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
-				DisableAttachDetachReconcilerSync: true,
+				ReconcilerSyncLoopPeriod:            metav1.Duration{Duration: 30 * time.Second},
+				ReconcilerMaxWaitForUnmountDuration: metav1.Duration{Duration: 1 * time.Minute},
+				DisableAttachDetachReconcilerSync:   true,
 			},
 		},
 		CSRSigningController: &CSRSigningControllerOptions{
@@ -487,8 +488,9 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentServiceSyncs: 2,
 			},
 			AttachDetachController: attachdetachconfig.AttachDetachControllerConfiguration{
-				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
-				DisableAttachDetachReconcilerSync: true,
+				ReconcilerSyncLoopPeriod:            metav1.Duration{Duration: 30 * time.Second},
+				ReconcilerMaxWaitForUnmountDuration: metav1.Duration{Duration: 1 * time.Minute},
+				DisableAttachDetachReconcilerSync:   true,
 			},
 			CSRSigningController: csrsigningconfig.CSRSigningControllerConfiguration{
 				ClusterSigningCertFile: "/cluster-signing-cert",
