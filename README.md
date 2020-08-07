@@ -6,7 +6,7 @@
 
 ----
 
-Kubernetes is an open source system for managing [containerized applications]
+Kubernetes is an open-source system for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for deployment, maintenance,
 and scaling of applications.
 
@@ -32,7 +32,7 @@ Try our [interactive tutorial].
 Take a free course on [Scalable Microservices with Kubernetes].
 
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
-Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
+Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries are not supported.
 
 ## To start developing Kubernetes
 
