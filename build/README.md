@@ -39,7 +39,7 @@ The scripts directly under [`build/`](.) are used to build and test.  They will 
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
-There are 3 different containers instances that are run from this image.  The first is a "data" container to store all data that needs to persist across to support incremental builds. Next there is an "rsync" container that is used to transfer data in and out to the data container.  Lastly there is a "build" container that is used for actually doing build actions.  The data container persists across runs while the rsync and build containers are deleted after each use.
+3 different containers instances are run from this image.  The first is a "data" container to store all data that needs to persist across to support incremental builds. Next, there is an "rsync" container that is used to transfer data in and out to the data container.  Lastly, there is a "build" container that is used for actually doing build actions.  The data container persists across runs while the rsync and build containers are deleted after each use.
 
 `rsync` is used transparently behind the scenes to efficiently move data in and out of the container.  This will use an ephemeral port picked by Docker.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.
 
@@ -90,7 +90,7 @@ export KUBE_RSYNC_PORT=8730
 docker-machine ssh ${KUBE_BUILD_VM} -L ${KUBE_RSYNC_PORT}:localhost:${KUBE_RSYNC_PORT} -N &
 ```
 
-Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to manage this VM.
+Look at `docker-machine stop`, `docker-machine start`, and `docker-machine rm` to manage this VM.
 
 ## Releasing
 
@@ -98,12 +98,12 @@ The [`build/release.sh`](release.sh) script will build a release.  It will build
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
-* Script (`kubectl`) for picking and running the right client binary based on platform.
+* Script (`kubectl`) for picking and running the right client binary based on the platform.
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries
 
-In addition, there are some other tar files that are created:
+Also, some other tar files are created:
 * `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
 * `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
 
