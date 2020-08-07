@@ -130,7 +130,7 @@ func (p *pvcEvaluator) MatchingResources(items []corev1.ResourceName) []corev1.R
 			result = append(result, item)
 			continue
 		}
-		// match pvc resources scoped by storage class (<storage-class-name>.storage-class.kubernetes.io/<resource>)
+		// match pvc resources scoped by storage class (<storage-class-name>.storageclass.storage.k8s.io/<resource>)
 		for _, resource := range pvcResources {
 			byStorageClass := storageClassSuffix + string(resource)
 			if strings.HasSuffix(string(item), byStorageClass) {
