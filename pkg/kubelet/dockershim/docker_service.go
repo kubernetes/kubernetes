@@ -31,7 +31,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -316,6 +316,7 @@ type dockerService struct {
 	// (see `applyPlatformSpecificDockerConfig` and `performPlatformSpecificContainerCleanup`
 	// methods for more info).
 	containerCleanupInfos map[string]*containerCleanupInfo
+	cleanupInfosLock      sync.RWMutex
 }
 
 // TODO: handle context.
