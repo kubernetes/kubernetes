@@ -60,6 +60,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 		for i := 0; i < numNs; i++ {
 			ns, _ := f.CreateNamespace(f.BaseName, nil)
 			namespaces = append(namespaces, ns.Name)
+			f.AddNamespacesToDelete(ns)
 		}
 
 		services := generateServicesInNamespaces(namespaces, maxServicesPerCluster)
