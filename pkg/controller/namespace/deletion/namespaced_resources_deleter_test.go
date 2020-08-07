@@ -34,7 +34,9 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/fake"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/metadata"
+	metadatafake "k8s.io/client-go/metadata/fake"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -398,4 +400,68 @@ func testResources() []*metav1.APIResourceList {
 		},
 	}
 	return results
+}
+
+func TestDeleteEncounters404(t *testing.T) {
+	now := metav1.Now()
+	ns1 := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "ns1", ResourceVersion: "1", DeletionTimestamp: &now},
+		Spec:       v1.NamespaceSpec{Finalizers: []v1.FinalizerName{"kubernetes"}},
+		Status:     v1.NamespaceStatus{Phase: v1.NamespaceActive},
+	}
+	ns2 := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "ns2", ResourceVersion: "1", DeletionTimestamp: &now},
+		Spec:       v1.NamespaceSpec{Finalizers: []v1.FinalizerName{"kubernetes"}},
+		Status:     v1.NamespaceStatus{Phase: v1.NamespaceActive},
+	}
+	mockClient := fake.NewSimpleClientset(ns1, ns2)
+
+	ns1FlakesNotFound := func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetNamespace() == "ns1" {
+			// simulate the flakes resource not existing when ns1 is processed
+			return true, nil, errors.NewNotFound(schema.GroupResource{}, "")
+		}
+		return false, nil, nil
+	}
+	mockMetadataClient := metadatafake.NewSimpleMetadataClient(scheme.Scheme)
+	mockMetadataClient.PrependReactor("delete-collection", "flakes", ns1FlakesNotFound)
+	mockMetadataClient.PrependReactor("list", "flakes", ns1FlakesNotFound)
+
+	resourcesFn := func() ([]*metav1.APIResourceList, error) {
+		return []*metav1.APIResourceList{{
+			GroupVersion: "example.com/v1",
+			APIResources: []metav1.APIResource{{Name: "flakes", Namespaced: true, Kind: "Flake", Verbs: []string{"get", "list", "delete", "deletecollection", "create", "update"}}},
+		}}, nil
+	}
+
+	d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), mockMetadataClient, mockClient.CoreV1(), resourcesFn, v1.FinalizerKubernetes, true)
+
+	// Delete ns1 and get NotFound errors for the flakes resource
+	mockMetadataClient.ClearActions()
+	if err := d.Delete(ns1.Name); err != nil {
+		t.Fatal(err)
+	}
+	if len(mockMetadataClient.Actions()) != 3 ||
+		!mockMetadataClient.Actions()[0].Matches("delete-collection", "flakes") ||
+		!mockMetadataClient.Actions()[1].Matches("list", "flakes") ||
+		!mockMetadataClient.Actions()[2].Matches("list", "flakes") {
+		for _, action := range mockMetadataClient.Actions() {
+			t.Log("ns1", action)
+		}
+		t.Error("ns1: expected delete-collection -> fallback to list -> list to verify 0 items")
+	}
+
+	// Delete ns2
+	mockMetadataClient.ClearActions()
+	if err := d.Delete(ns2.Name); err != nil {
+		t.Fatal(err)
+	}
+	if len(mockMetadataClient.Actions()) != 2 ||
+		!mockMetadataClient.Actions()[0].Matches("delete-collection", "flakes") ||
+		!mockMetadataClient.Actions()[1].Matches("list", "flakes") {
+		for _, action := range mockMetadataClient.Actions() {
+			t.Log("ns2", action)
+		}
+		t.Error("ns2: expected delete-collection -> list to verify 0 items")
+	}
 }
