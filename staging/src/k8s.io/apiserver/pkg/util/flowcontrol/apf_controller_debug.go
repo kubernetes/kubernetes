@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,12 +38,37 @@ const (
 func (cfgCtlr *configController) Install(c *mux.PathRecorderMux) {
 	// TODO(yue9944882): handle "Accept" header properly
 	// debugging dumps a CSV content for three levels of granularity
+	c.UnlistedHandleFunc("/debug/api_priority_and_fairness", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/debug/api_priority_and_fairness/", http.StatusFound)
+	})
+
+	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/", Index)
+
 	// 1. row per priority-level
 	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_priority_levels", cfgCtlr.dumpPriorityLevels)
 	// 2. row per queue
 	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_queues", cfgCtlr.dumpQueues)
 	// 3. row per request
 	c.UnlistedHandleFunc("/debug/api_priority_and_fairness/dump_requests", cfgCtlr.dumpRequests)
+}
+
+// Index returns indices for the debugging endpoints.
+func Index(w http.ResponseWriter, r *http.Request) {
+	idx := struct {
+		Paths []string `json:"paths"`
+	}{
+		Paths: []string{
+			"/debug/api_priority_and_fairness/dump_priority_levels",
+			"/debug/api_priority_and_fairness/dump_queues",
+			"/debug/api_priority_and_fairness/dump_requests",
+		},
+	}
+	output, err := json.MarshalIndent(idx, "", "  ")
+	if err != nil {
+		http.Error(w, "failed marshalling indices", http.StatusInternalServerError)
+		return
+	}
+	w.Write(output)
 }
 
 func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *http.Request) {
