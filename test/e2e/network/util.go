@@ -117,7 +117,7 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2ekubectl.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
 			continue
