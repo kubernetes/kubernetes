@@ -90,6 +90,9 @@ const (
 	// ResumedDeployReason is added in a deployment when it is resumed. Useful for not failing accidentally
 	// deployments that paused amidst a rollout and are bounded by a deadline.
 	ResumedDeployReason = "DeploymentResumed"
+	// UnknownDisruption is added in a deployments that are progressing through recovery after an unknown
+	// disruption.
+	UnknownDisruption = "UnknownDisruption"
 	//
 	// Available:
 
@@ -136,6 +139,28 @@ func SetDeploymentCondition(status *apps.DeploymentStatus, condition apps.Deploy
 	}
 	newConditions := filterOutCondition(status.Conditions, condition.Type)
 	status.Conditions = append(newConditions, condition)
+}
+
+// SetDeploymentProgressingCondition updates the status to set Progressing to status=true or add a new
+// one if it doesn't exist. If a Progressing condition with status=true already exists, we should update
+// everything but lastTransitionTime. SetDeploymentCondition already does that but it also is not
+// updating conditions when the reason of the new condition is the same as the old. The Progressing
+// condition is a special case because we want to update with the same reason and change just
+// lastUpdateTime if and only if we notice any progress.
+func SetDeploymentProgressingCondition(status *apps.DeploymentStatus, deployment *apps.Deployment, replicaSet *apps.ReplicaSet, reason string) {
+	msg := fmt.Sprintf("Deployment %q is progressing.", deployment.Name)
+	if replicaSet != nil {
+		msg = fmt.Sprintf("ReplicaSet %q is progressing.", replicaSet.Name)
+	}
+	currentCond := GetDeploymentCondition(deployment.Status, apps.DeploymentProgressing)
+	condition := NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, reason, msg)
+	if currentCond != nil {
+		if currentCond.Status == v1.ConditionTrue {
+			condition.LastTransitionTime = currentCond.LastTransitionTime
+		}
+		RemoveDeploymentCondition(status, apps.DeploymentProgressing)
+	}
+	SetDeploymentCondition(status, *condition)
 }
 
 // RemoveDeploymentCondition removes the deployment condition with the provided type.

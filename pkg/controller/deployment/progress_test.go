@@ -205,6 +205,13 @@ func TestSyncRolloutStatus(t *testing.T) {
 		LastUpdateTime:     testTime,
 		LastTransitionTime: testTime,
 	}
+	unknownDisruption := apps.DeploymentCondition{
+		Type:               apps.DeploymentProgressing,
+		Status:             v1.ConditionTrue,
+		Reason:             util.UnknownDisruption,
+		LastUpdateTime:     testTime,
+		LastTransitionTime: testTime,
+	}
 
 	tests := []struct {
 		name            string
@@ -224,12 +231,12 @@ func TestSyncRolloutStatus(t *testing.T) {
 			newRS:  newRSWithAvailable("foo", 3, 2, 2),
 		},
 		{
-			name:            "General: do not estimate progress of deployment with only one active ReplicaSet",
+			name:            "DeploymentProgressing: set Progressing when deployment has no new ReplicaSet",
 			d:               currentDeployment(&pds, 3, 3, 3, 3, []apps.DeploymentCondition{newRSAvailable}),
 			allRSs:          []*apps.ReplicaSet{newRSWithAvailable("bar", 3, 3, 3)},
 			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
-			conditionReason: util.NewRSAvailableReason,
+			conditionReason: util.ReplicaSetUpdatedReason,
 			lastUpdate:      testTime,
 			lastTransition:  testTime,
 		},
@@ -316,6 +323,24 @@ func TestSyncRolloutStatus(t *testing.T) {
 			conditionReason: util.TimedOutReason,
 			lastUpdate:      testTime,
 			lastTransition:  testTime,
+		},
+		{
+			name:            "UnknownDisruption: update status if replica set regresses after NewReplicaSetAvailable",
+			d:               currentDeployment(&pds, 3, 0, 0, 0, []apps.DeploymentCondition{newRSAvailable}),
+			allRSs:          []*apps.ReplicaSet{},
+			newRS:           newRSWithAvailable("foo", 3, 0, 0),
+			conditionType:   apps.DeploymentProgressing,
+			conditionStatus: v1.ConditionTrue,
+			conditionReason: util.UnknownDisruption,
+		},
+		{
+			name:            "DeploymentTimedOut: update status if rollout exceeds Progress Deadline after UnknownDisruption",
+			d:               currentDeployment(&pds, 3, 0, 0, 0, []apps.DeploymentCondition{unknownDisruption}),
+			allRSs:          []*apps.ReplicaSet{},
+			newRS:           newRSWithAvailable("foo", 3, 0, 0),
+			conditionType:   apps.DeploymentProgressing,
+			conditionStatus: v1.ConditionFalse,
+			conditionReason: util.TimedOutReason,
 		},
 	}
 

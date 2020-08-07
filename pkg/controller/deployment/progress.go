@@ -42,14 +42,8 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 		util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
 	}
 
-	// If there is only one replica set that is active then that means we are not running
-	// a new rollout and this is a resync where we don't need to estimate any progress.
-	// In such a case, we should simply not estimate any progress for this deployment.
 	currentCond := util.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
-	isCompleteDeployment := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
-	// Check for progress only if there is a progress deadline set and the latest rollout
-	// hasn't completed yet.
-	if util.HasProgressDeadline(d) && !isCompleteDeployment {
+	if util.HasProgressDeadline(d) {
 		switch {
 		case util.DeploymentComplete(d, &newStatus):
 			// Update the deployment conditions with a message for the new replica set that
@@ -64,25 +58,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 		case util.DeploymentProgressing(d, &newStatus):
 			// If there is any progress made, continue by not checking if the deployment failed. This
 			// behavior emulates the rolling updater progressDeadline check.
-			msg := fmt.Sprintf("Deployment %q is progressing.", d.Name)
-			if newRS != nil {
-				msg = fmt.Sprintf("ReplicaSet %q is progressing.", newRS.Name)
-			}
-			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
-			// Update the current Progressing condition or add a new one if it doesn't exist.
-			// If a Progressing condition with status=true already exists, we should update
-			// everything but lastTransitionTime. SetDeploymentCondition already does that but
-			// it also is not updating conditions when the reason of the new condition is the
-			// same as the old. The Progressing condition is a special case because we want to
-			// update with the same reason and change just lastUpdateTime iff we notice any
-			// progress. That's why we handle it here.
-			if currentCond != nil {
-				if currentCond.Status == v1.ConditionTrue {
-					condition.LastTransitionTime = currentCond.LastTransitionTime
-				}
-				util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
-			}
-			util.SetDeploymentCondition(&newStatus, *condition)
+			util.SetDeploymentProgressingCondition(&newStatus, d, newRS, util.ReplicaSetUpdatedReason)
 
 		case util.DeploymentTimedOut(d, &newStatus):
 			// Update the deployment with a timeout condition. If the condition already exists,
@@ -93,6 +69,25 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 			}
 			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionFalse, util.TimedOutReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
+
+		case newRS == nil:
+			// Deployment will be trying to create a new replica set. Do not use
+			// SetDeploymentProgressingCondition, because we do not want to update lastTransitionTime.
+			// If we have trouble creating the new replica set, we want to eventually fall into
+			// TimedOutReason.
+			msg := fmt.Sprintf("Deployment %q waiting on an updated replica set", d.Name)
+			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
+			util.SetDeploymentCondition(&newStatus, *condition)
+
+		case currentCond != nil && currentCond.Status == v1.ConditionTrue && currentCond.Reason != util.NewRSAvailableReason:
+			// Deployment is already progressing; no need to set UnknownDisruption.
+
+		default:
+			// Deployment is not complete, but is also not currently
+			// progressing or timed out.  We may have regressed, and are
+			// hopefully beginning to progress back towards our reconciled
+			// state.
+			util.SetDeploymentProgressingCondition(&newStatus, d, newRS, util.UnknownDisruption)
 		}
 	}
 
