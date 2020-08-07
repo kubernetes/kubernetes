@@ -428,17 +428,19 @@ function ensure-local-ssds() {
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
-  # Configure log rotation for all logs in /var/log, which is where k8s services
-  # are configured to write their log files. Whenever logrotate is ran, this
-  # config will:
-  # * rotate the log file if its size is > 100Mb OR if one day has elapsed
-  # * save rotated logs into a gzipped timestamped backup
-  # * log file timestamp (controlled by 'dateformat') includes seconds too. This
-  #   ensures that logrotate can generate unique logfiles during each rotation
-  #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
-  #   day).
-  # * keep only 5 old (rotated) logs, and will discard older logs.
-  cat > /etc/logrotate.d/allvarlogs <<EOF
+
+  if [[ "${ENABLE_LOGROTATE_FILES:-false}" = "true" ]]; then
+    # Configure log rotation for all logs in /var/log, which is where k8s services
+    # are configured to write their log files. Whenever logrotate is ran, this
+    # config will:
+    # * rotate the log file if its size is > 100Mb OR if one day has elapsed
+    # * save rotated logs into a gzipped timestamped backup
+    # * log file timestamp (controlled by 'dateformat') includes seconds too. This
+    #   ensures that logrotate can generate unique logfiles during each rotation
+    #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
+    #   day).
+    # * keep only 5 old (rotated) logs, and will discard older logs.
+    cat > /etc/logrotate.d/allvarlogs <<EOF
 /var/log/*.log {
     rotate ${LOGROTATE_FILES_MAX_COUNT:-5}
     copytruncate
@@ -452,9 +454,11 @@ function setup-logrotate() {
     create 0644 root root
 }
 EOF
+  fi
 
-  # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
-  cat > /etc/logrotate.d/allpodlogs <<EOF
+  if [[ "${ENABLE_POD_LOG:-false}" = "true" ]]; then
+    # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
+    cat > /etc/logrotate.d/allpodlogs <<EOF
 /var/log/pods/*/*.log {
     rotate ${POD_LOG_MAX_FILE:-5}
     copytruncate
@@ -468,6 +472,7 @@ EOF
     create 0644 root root
 }
 EOF
+  fi
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
@@ -924,7 +929,7 @@ EOF
     limitedResources:
     - resource: pods
       matchScopes:
-      - scopeName: PriorityClass 
+      - scopeName: PriorityClass
         operator: In
         values: ["system-node-critical", "system-cluster-critical"]
 EOF
