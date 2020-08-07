@@ -561,7 +561,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
-	klet.machineInfo = machineInfo
+	klet.setCachedMachineInfo(machineInfo)
 
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
@@ -911,7 +911,8 @@ type Kubelet struct {
 	configMapManager configmap.Manager
 
 	// Cached MachineInfo returned by cadvisor.
-	machineInfo *cadvisorapi.MachineInfo
+	machineInfoLock sync.RWMutex
+	machineInfo     *cadvisorapi.MachineInfo
 
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager

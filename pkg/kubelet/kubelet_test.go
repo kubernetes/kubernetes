@@ -215,7 +215,7 @@ func newTestKubeletWithImageList(
 
 	kubelet.cadvisor = &cadvisortest.Fake{}
 	machineInfo, _ := kubelet.cadvisor.MachineInfo()
-	kubelet.machineInfo = machineInfo
+	kubelet.setCachedMachineInfo(machineInfo)
 
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
