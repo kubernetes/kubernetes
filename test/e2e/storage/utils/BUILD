@@ -7,6 +7,7 @@ go_library(
     srcs = [
         "create.go",
         "deployment.go",
+        "ebs.go",
         "framework.go",
         "host_exec.go",
         "local.go",
@@ -36,9 +37,12 @@ go_library(
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/service/ec2:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
