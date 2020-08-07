@@ -265,11 +265,9 @@ func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Nam
 	if namespace.DeletionTimestamp.IsZero() || namespace.Status.Phase == v1.NamespaceTerminating {
 		return namespace, nil
 	}
-	newNamespace := v1.Namespace{}
-	newNamespace.ObjectMeta = namespace.ObjectMeta
-	newNamespace.Status = *namespace.Status.DeepCopy()
+	newNamespace := namespace.DeepCopy()
 	newNamespace.Status.Phase = v1.NamespaceTerminating
-	return d.nsClient.UpdateStatus(context.TODO(), &newNamespace, metav1.UpdateOptions{})
+	return d.nsClient.UpdateStatus(context.TODO(), newNamespace, metav1.UpdateOptions{})
 }
 
 // finalized returns true if the namespace.Spec.Finalizers is an empty list
@@ -330,10 +328,8 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	// we have a resource returned in the discovery API that supports no top-level verbs:
 	//  /apis/extensions/v1beta1/namespaces/default/replicationcontrollers
 	// when working with this resource type, we will get a literal not found error rather than expected method not supported
-	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		klog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		d.opCache.setNotSupported(key)
 		return false, nil
 	}
 
@@ -365,10 +361,8 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 	// we have a resource returned in the discovery API that supports no top-level verbs:
 	//  /apis/extensions/v1beta1/namespaces/default/replicationcontrollers
 	// when working with this resource type, we will get a literal not found error rather than expected method not supported
-	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		klog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		d.opCache.setNotSupported(key)
 		return nil, false, nil
 	}
 
