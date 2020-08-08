@@ -1095,7 +1095,7 @@ metadata:
 		})
 	})
 
-	ginkgo.Describe("Kubectl cluster-info dump", func() {
+	ginkgo.Describe("Kubectl cluster-info dump [DisabledForLargeClusters]", func() {
 		ginkgo.It("should check if cluster-info dump succeeds", func() {
 			ginkgo.By("running cluster-info dump")
 			framework.RunKubectlOrDie(ns, "cluster-info", "dump")
