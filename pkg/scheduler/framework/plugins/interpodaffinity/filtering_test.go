@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -772,6 +773,80 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			),
 			name: "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
+		{
+			name: "PodAffinity fails PreFilter with an invalid affinity label syntax",
+			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"antivirusscan", "value2"},
+								},
+							},
+						},
+						TopologyKey: "node",
+					},
+				}),
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				"invalid label value",
+			),
+		},
+		{
+			name: "PodAntiAffinity fails PreFilter with an invalid antiaffinity label syntax",
+			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"foo"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "node",
+					},
+				}),
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				"invalid label value",
+			),
+		},
 	}
 
 	for _, test := range tests {
@@ -783,12 +858,15 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, test.pod)
 			if !preFilterStatus.IsSuccess() {
-				t.Errorf("prefilter failed with status: %v", preFilterStatus)
-			}
-			nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
-			gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if !strings.Contains(preFilterStatus.Message(), test.wantStatus.Message()) {
+					t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				}
+			} else {
+				nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
+				gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfo)
+				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+					t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				}
 			}
 		})
 	}
