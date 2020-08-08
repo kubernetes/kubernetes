@@ -501,7 +501,7 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 
 }
 
-// NewDiscoveryClient returns  a new DiscoveryClient for the given RESTClient.
+// NewDiscoveryClient returns a new DiscoveryClient for the given RESTClient.
 func NewDiscoveryClient(c restclient.Interface) *DiscoveryClient {
 	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api"}
 }
