@@ -222,7 +222,7 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.Node
 		name := node.Node().Name
 		// We reply on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
 		// to determine whether preemption may help or not on the node.
-		if m[name].Code() == framework.UnschedulableAndUnresolvable {
+		if s, ok := m[name]; !ok || s.Code() == framework.UnschedulableAndUnresolvable {
 			continue
 		}
 		potentialNodes = append(potentialNodes, node)

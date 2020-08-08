@@ -1000,7 +1000,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
-			expected: map[string]bool{"node1": true, "node4": true},
+			expected: map[string]bool{"node1": true},
 		},
 		{
 			name: "pod with both pod affinity and anti-affinity should be tried",
@@ -1008,7 +1008,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 			},
-			expected: map[string]bool{"node1": true, "node3": true, "node4": true},
+			expected: map[string]bool{"node1": true},
 		},
 		{
 			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
@@ -1016,7 +1016,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: map[string]bool{"node2": true},
 		},
 		{
 			name: "Mix of failed predicates works fine",
@@ -1024,14 +1024,14 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: map[string]bool{"node2": true},
 		},
 		{
 			name: "Node condition errors should be considered unresolvable",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: map[string]bool{},
 		},
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
@@ -1040,7 +1040,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonNodeConflict)),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
 			},
-			expected: map[string]bool{"node4": true},
+			expected: map[string]bool{},
 		},
 		{
 			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
@@ -1049,7 +1049,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
-			expected: map[string]bool{"node1": true, "node3": true, "node4": true},
+			expected: map[string]bool{"node1": true, "node3": true},
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
@@ -1058,7 +1058,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: map[string]bool{"node1": true, "node3": true},
+			expected: map[string]bool{"node3": true},
 		},
 		{
 			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
@@ -1067,7 +1067,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: map[string]bool{"node1": true, "node3": true},
+			expected: map[string]bool{"node3": true},
 		},
 	}
 
@@ -1254,6 +1254,7 @@ func TestPreempt(t *testing.T) {
 			}
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
+			filteredNodesStatuses := make(framework.NodeToStatusMap)
 			for i, name := range test.nodeNames {
 				node := st.MakeNode().Name(name).Capacity(veryLargeRes).Obj()
 				// Split node name by '/' to form labels in a format of
@@ -1265,6 +1266,7 @@ func TestPreempt(t *testing.T) {
 				node.Name = node.ObjectMeta.Labels["hostname"]
 				cache.AddNode(node)
 				nodes[i] = node
+				filteredNodesStatuses[node.Name] = framework.NewStatus(framework.Unschedulable, "Preemption might help")
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
 				cachedNodeInfo := framework.NewNodeInfo()
@@ -1307,7 +1309,7 @@ func TestPreempt(t *testing.T) {
 				fh:        fwk,
 				pdbLister: getPDBLister(informerFactory),
 			}
-			node, err := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
+			node, err := pl.preempt(context.Background(), state, test.pod, filteredNodesStatuses)
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
