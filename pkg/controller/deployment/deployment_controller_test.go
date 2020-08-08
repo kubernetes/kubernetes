@@ -22,8 +22,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,7 +44,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/settings/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -161,11 +159,6 @@ func (f *fixture) expectGetDeploymentAction(d *apps.Deployment) {
 func (f *fixture) expectUpdateDeploymentStatusAction(d *apps.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
-	f.actions = append(f.actions, action)
-}
-
-func (f *fixture) expectUpdateDeploymentAction(d *apps.Deployment) {
-	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	f.actions = append(f.actions, action)
 }
 
@@ -331,33 +324,6 @@ func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 
 	// Normally there should be a status update to sync observedGeneration but the fake
 	// deployment has no generation set so there is no action happening here.
-	f.run(testutil.GetKey(d, t))
-}
-
-func TestReentrantRollback(t *testing.T) {
-	f := newFixture(t)
-
-	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	d.Annotations = map[string]string{util.RevisionAnnotation: "2"}
-	setRollbackTo(d, &extensions.RollbackConfig{Revision: 0})
-	f.dLister = append(f.dLister, d)
-
-	rs1 := newReplicaSet(d, "deploymentrs-old", 0)
-	rs1.Annotations = map[string]string{util.RevisionAnnotation: "1"}
-	one := int64(1)
-	rs1.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
-	rs1.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
-
-	rs2 := newReplicaSet(d, "deploymentrs-new", 1)
-	rs2.Annotations = map[string]string{util.RevisionAnnotation: "2"}
-	rs2.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
-
-	f.rsLister = append(f.rsLister, rs1, rs2)
-	f.objects = append(f.objects, d, rs1, rs2)
-
-	// Rollback is done here
-	f.expectUpdateDeploymentAction(d)
-	// Expect no update on replica sets though
 	f.run(testutil.GetKey(d, t))
 }
 
