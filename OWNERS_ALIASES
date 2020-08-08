@@ -222,6 +222,7 @@ aliases:
     - krzyzacy
     - ixdy
     - spiffxp
+    - dims
   sig-testing-approvers:
     - bentheelder
     - cblecker
@@ -424,6 +425,7 @@ aliases:
     - soltysh
     - piosz
     - jsafrane
+    - dims
 
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
@@ -449,6 +451,7 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - andrewsykim
     - cheftako
+    - dims
 
   # sig-cluster-lifecycle-api-reviewers:
   #   -
