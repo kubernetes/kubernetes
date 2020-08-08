@@ -202,10 +202,18 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 			return false
 		}
 
+		if len(n.doc) != len(o.doc) {
+			return false
+		}
+
 		for k, v := range n.doc {
 			ov, ok := o.doc[k]
 
 			if !ok {
+				return false
+			}
+
+			if (v == nil) != (ov == nil) {
 				return false
 			}
 
@@ -429,14 +437,14 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 		return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 	}
 
-	if SupportNegativeIndices {
+	if idx < 0 {
+		if !SupportNegativeIndices {
+			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
 		if idx < -len(ary) {
 			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 		}
-
-		if idx < 0 {
-			idx += len(ary)
-		}
+		idx += len(ary)
 	}
 
 	copy(ary[0:idx], cur[0:idx])
@@ -473,14 +481,14 @@ func (d *partialArray) remove(key string) error {
 		return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 	}
 
-	if SupportNegativeIndices {
+	if idx < 0 {
+		if !SupportNegativeIndices {
+			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
 		if idx < -len(cur) {
 			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 		}
-
-		if idx < 0 {
-			idx += len(cur)
-		}
+		idx += len(cur)
 	}
 
 	ary := make([]*lazyNode, len(cur)-1)

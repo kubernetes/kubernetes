@@ -10,7 +10,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/evanphx/json-patch v0.0.0-20190815234213-e83c0a1c26c8
+	github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
 	github.com/go-openapi/spec v0.19.3
