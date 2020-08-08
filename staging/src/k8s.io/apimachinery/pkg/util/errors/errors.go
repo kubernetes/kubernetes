@@ -163,7 +163,7 @@ func matchesError(err error, fns ...Matcher) bool {
 
 // filterErrors returns any errors (or nested errors, if the list contains
 // nested Errors) for which all fns return false. If no errors
-// remain a nil list is returned. The resulting silec will have all
+// remain a nil list is returned. The resulting slice will have all
 // nested slices flattened as a side effect.
 func filterErrors(list []error, fns ...Matcher) []error {
 	result := []error{}
