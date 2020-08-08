@@ -7,7 +7,6 @@ pkg/volume/azure_dd
 pkg/volume/gcepd
 pkg/volume/testing
 test/e2e/autoscaling
-test/e2e_node
 test/integration/examples
 test/integration/framework
 test/integration/garbagecollector
