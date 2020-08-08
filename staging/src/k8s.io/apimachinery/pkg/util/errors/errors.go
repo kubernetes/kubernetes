@@ -43,13 +43,13 @@ type Aggregate interface {
 // this returns nil.
 // It will check if any of the element of input error list is nil, to avoid
 // nil pointer panic when call Error().
-func NewAggregate(errlist []error) Aggregate {
-	if len(errlist) == 0 {
+func NewAggregate(errList []error) Aggregate {
+	if len(errList) == 0 {
 		return nil
 	}
 	// In case of input error list contains nil
 	var errs []error
-	for _, e := range errlist {
+	for _, e := range errList {
 		if e != nil {
 			errs = append(errs, e)
 		}
@@ -163,7 +163,7 @@ func matchesError(err error, fns ...Matcher) bool {
 
 // filterErrors returns any errors (or nested errors, if the list contains
 // nested Errors) for which all fns return false. If no errors
-// remain a nil list is returned. The resulting silec will have all
+// remain a nil list is returned. The resulting slice will have all
 // nested slices flattened as a side effect.
 func filterErrors(list []error, fns ...Matcher) []error {
 	result := []error{}

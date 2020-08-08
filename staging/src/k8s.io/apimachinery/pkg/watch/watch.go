@@ -89,7 +89,7 @@ func (w emptyWatch) ResultChan() <-chan Event {
 	return chan Event(w)
 }
 
-// FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
+// FakeWatcher lets you test anything that consumes a watch.Interface; ThreadSafe.
 type FakeWatcher struct {
 	result  chan Event
 	stopped bool
@@ -162,7 +162,7 @@ func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
 	f.result <- Event{action, obj}
 }
 
-// RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
+// RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; ThreadSafe.
 type RaceFreeFakeWatcher struct {
 	result  chan Event
 	Stopped bool
@@ -276,7 +276,7 @@ func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
 	}
 }
 
-// ProxyWatcher lets you wrap your channel in watch Interface. Threadsafe.
+// ProxyWatcher lets you wrap your channel in watch Interface. ThreadSafe.
 type ProxyWatcher struct {
 	result chan Event
 	stopCh chan struct{}

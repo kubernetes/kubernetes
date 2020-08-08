@@ -62,9 +62,9 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 
 // IsTimeout returns true if the given error is a network timeout error
 func IsTimeout(err error) bool {
-	var neterr net.Error
-	if errors.As(err, &neterr) {
-		return neterr != nil && neterr.Timeout()
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr != nil && netErr.Timeout()
 	}
 	return false
 }
@@ -79,9 +79,9 @@ func IsProbableEOF(err error) bool {
 	if err == nil {
 		return false
 	}
-	var uerr *url.Error
-	if errors.As(err, &uerr) {
-		err = uerr.Err
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		err = urlErr.Err
 	}
 	msg := err.Error()
 	switch {
@@ -496,7 +496,7 @@ func CloneHeader(in http.Header) http.Header {
 
 // WarningHeader contains a single RFC2616 14.46 warnings header
 type WarningHeader struct {
-	// Codeindicates the type of warning. 299 is a miscellaneous persistent warning
+	// Code indicates the type of warning. 299 is a miscellaneous persistent warning
 	Code int
 	// Agent contains the name or pseudonym of the server adding the Warning header.
 	// A single "-" is recommended when agent is unknown.

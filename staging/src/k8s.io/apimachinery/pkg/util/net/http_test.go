@@ -400,12 +400,12 @@ func TestConnectWithRedirects(t *testing.T) {
 				method = http.MethodGet
 			}
 
-			netdialer := &net.Dialer{
+			netDialer := &net.Dialer{
 				Timeout:   wait.ForeverTestTimeout,
 				KeepAlive: wait.ForeverTestTimeout,
 			}
 			dialer := DialerFunc(func(req *http.Request) (net.Conn, error) {
-				conn, err := netdialer.Dial("tcp", req.URL.Host)
+				conn, err := netDialer.Dial("tcp", req.URL.Host)
 				if err != nil {
 					return conn, err
 				}
@@ -443,7 +443,7 @@ func TestConnectWithRedirects(t *testing.T) {
 }
 
 func TestAllowsHTTP2(t *testing.T) {
-	testcases := []struct {
+	testCases := []struct {
 		Name         string
 		Transport    *http.Transport
 		ExpectAllows bool
@@ -454,7 +454,7 @@ func TestAllowsHTTP2(t *testing.T) {
 			ExpectAllows: true,
 		},
 		{
-			Name:         "empty tlsconfig",
+			Name:         "empty tlsConfig",
 			Transport:    &http.Transport{TLSClientConfig: &tls.Config{}},
 			ExpectAllows: true,
 		},
@@ -485,7 +485,7 @@ func TestAllowsHTTP2(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			allows := allowsHTTP2(tc.Transport)
 			if allows != tc.ExpectAllows {

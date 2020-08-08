@@ -25,17 +25,17 @@ import (
 )
 
 func getIPNet(cidr string) *net.IPNet {
-	_, ipnet, _ := net.ParseCIDR(cidr)
-	return ipnet
+	_, ipNet, _ := net.ParseCIDR(cidr)
+	return ipNet
 }
 
 func TestIPNetEqual(t *testing.T) {
 	testCases := []struct {
-		ipnet1 *net.IPNet
-		ipnet2 *net.IPNet
+		ipNet1 *net.IPNet
+		ipNet2 *net.IPNet
 		expect bool
 	}{
-		//null case
+		// null case
 		{
 			getIPNet("10.0.0.1/24"),
 			getIPNet(""),
@@ -64,8 +64,8 @@ func TestIPNetEqual(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.expect != IPNetEqual(tc.ipnet1, tc.ipnet2) {
-			t.Errorf("Expect equality of %s and %s be to %v", tc.ipnet1.String(), tc.ipnet2.String(), tc.expect)
+		if tc.expect != IPNetEqual(tc.ipNet1, tc.ipNet2) {
+			t.Errorf("Expect equality of %s and %s be to %v", tc.ipNet1.String(), tc.ipNet2.String(), tc.expect)
 		}
 	}
 }

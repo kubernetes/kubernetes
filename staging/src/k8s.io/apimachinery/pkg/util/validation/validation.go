@@ -289,7 +289,7 @@ func IsInRange(value int, min int, max int) []string {
 	return []string{InclusiveRangeError(min, max)}
 }
 
-// Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
+// Now in lib container UID/GID limits is 0 ~ 1<<31 - 1
 // TODO: once we have a type for UID/GID we should make these that type.
 const (
 	minUserID  = 0

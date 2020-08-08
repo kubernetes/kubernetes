@@ -27,11 +27,11 @@ import (
 // For example,
 //	10.0.0.1/24 and 10.0.0.0/24 are the same subnet.
 //	10.0.0.1/24 and 10.0.0.0/25 are not the same subnet.
-func IPNetEqual(ipnet1, ipnet2 *net.IPNet) bool {
-	if ipnet1 == nil || ipnet2 == nil {
+func IPNetEqual(ipNet1, ipNet2 *net.IPNet) bool {
+	if ipNet1 == nil || ipNet2 == nil {
 		return false
 	}
-	if reflect.DeepEqual(ipnet1.Mask, ipnet2.Mask) && ipnet1.Contains(ipnet2.IP) && ipnet2.Contains(ipnet1.IP) {
+	if reflect.DeepEqual(ipNet1.Mask, ipNet2.Mask) && ipNet1.Contains(ipNet2.IP) && ipNet2.Contains(ipNet1.IP) {
 		return true
 	}
 	return false

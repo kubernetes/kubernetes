@@ -279,8 +279,8 @@ func TestProxyTransport(t *testing.T) {
 }
 
 func TestRewriteResponse(t *testing.T) {
-	gzipbuf := bytes.NewBuffer(nil)
-	flatebuf := bytes.NewBuffer(nil)
+	gzipBuf := bytes.NewBuffer(nil)
+	flateBuf := bytes.NewBuffer(nil)
 
 	testTransport := &Transport{
 		Scheme:      "http",
@@ -299,13 +299,13 @@ func TestRewriteResponse(t *testing.T) {
 		{
 			encodeType: "gzip",
 			writer: func(ept string) *http.Response {
-				gzw := gzip.NewWriter(gzipbuf)
+				gzw := gzip.NewWriter(gzipBuf)
 				defer gzw.Close()
 
 				gzw.Write([]byte(ept))
 				gzw.Flush()
 				return &http.Response{
-					Body: ioutil.NopCloser(gzipbuf),
+					Body: ioutil.NopCloser(gzipBuf),
 				}
 			},
 			reader: func(rep *http.Response) string {
@@ -317,13 +317,13 @@ func TestRewriteResponse(t *testing.T) {
 		{
 			encodeType: "deflate",
 			writer: func(ept string) *http.Response {
-				flw, _ := flate.NewWriter(flatebuf, flate.BestCompression)
+				flw, _ := flate.NewWriter(flateBuf, flate.BestCompression)
 				defer flw.Close()
 
 				flw.Write([]byte(ept))
 				flw.Flush()
 				return &http.Response{
-					Body: ioutil.NopCloser(flatebuf),
+					Body: ioutil.NopCloser(flateBuf),
 				}
 			},
 			reader: func(rep *http.Response) string {

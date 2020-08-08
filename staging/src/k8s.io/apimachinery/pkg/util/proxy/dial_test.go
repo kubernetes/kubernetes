@@ -45,7 +45,7 @@ func TestDialURL(t *testing.T) {
 	}
 	var d net.Dialer
 
-	testcases := map[string]struct {
+	testCases := map[string]struct {
 		TLSConfig   *tls.Config
 		Dial        utilnet.DialFunc
 		ExpectError string
@@ -108,7 +108,7 @@ func TestDialURL(t *testing.T) {
 		},
 	}
 
-	for k, tc := range testcases {
+	for k, tc := range testCases {
 		func() {
 			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}))
 			defer ts.Close()
