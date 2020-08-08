@@ -346,7 +346,7 @@ github.com/emicklei/go-restful
 github.com/emicklei/go-restful/log
 # github.com/euank/go-kmsg-parser v2.0.0+incompatible => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 github.com/euank/go-kmsg-parser/kmsgparser
-# github.com/evanphx/json-patch v4.2.0+incompatible => github.com/evanphx/json-patch v4.2.0+incompatible
+# github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b => github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b
 github.com/evanphx/json-patch
 # github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 github.com/exponent-io/jsonpath
