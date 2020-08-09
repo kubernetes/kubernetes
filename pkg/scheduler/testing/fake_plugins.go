@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -149,6 +150,84 @@ func NewFakePreFilterPlugin(status *framework.Status) frameworkruntime.PluginFac
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &FakePreFilterPlugin{
 			Status: status,
+		}, nil
+	}
+}
+
+// FakeReservePlugin is a test reserve plugin.
+type FakeReservePlugin struct {
+	Status *framework.Status
+}
+
+// Name returns name of the plugin.
+func (pl *FakeReservePlugin) Name() string {
+	return "FakeReserve"
+}
+
+// Reserve invoked at the Reserve extension point.
+func (pl *FakeReservePlugin) Reserve(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) *framework.Status {
+	return pl.Status
+}
+
+// Unreserve invoked at the Unreserve extension point.
+func (pl *FakeReservePlugin) Unreserve(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) {
+}
+
+// NewFakeReservePlugin initializes a fakeReservePlugin and returns it.
+func NewFakeReservePlugin(status *framework.Status) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		return &FakeReservePlugin{
+			Status: status,
+		}, nil
+	}
+}
+
+// FakePreBindPlugin is a test prebind plugin.
+type FakePreBindPlugin struct {
+	Status *framework.Status
+}
+
+// Name returns name of the plugin.
+func (pl *FakePreBindPlugin) Name() string {
+	return "FakePreBind"
+}
+
+// PreBind invoked at the PreBind extension point.
+func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) *framework.Status {
+	return pl.Status
+}
+
+// NewFakePreBindPlugin initializes a fakePreBindPlugin and returns it.
+func NewFakePreBindPlugin(status *framework.Status) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		return &FakePreBindPlugin{
+			Status: status,
+		}, nil
+	}
+}
+
+// FakePermitPlugin is a test permit plugin.
+type FakePermitPlugin struct {
+	Status  *framework.Status
+	Timeout time.Duration
+}
+
+// Name returns name of the plugin.
+func (pl *FakePermitPlugin) Name() string {
+	return "FakePermit"
+}
+
+// Permit invoked at the Permit extension point.
+func (pl *FakePermitPlugin) Permit(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
+	return pl.Status, pl.Timeout
+}
+
+// NewFakePermitPlugin initializes a fakePermitPlugin and returns it.
+func NewFakePermitPlugin(status *framework.Status, timeout time.Duration) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		return &FakePermitPlugin{
+			Status:  status,
+			Timeout: timeout,
 		}, nil
 	}
 }

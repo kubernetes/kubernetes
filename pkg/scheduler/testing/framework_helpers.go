@@ -52,6 +52,21 @@ func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
 }
 
+// RegisterReservePlugin returns a function to register a Reserve Plugin to a given registry.
+func RegisterReservePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Reserve")
+}
+
+// RegisterPermitPlugin returns a function to register a Permit Plugin to a given registry.
+func RegisterPermitPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Permit")
+}
+
+// RegisterPreBindPlugin returns a function to register a PreBind Plugin to a given registry.
+func RegisterPreBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreBind")
+}
+
 // RegisterScorePlugin returns a function to register a Score Plugin to a given registry.
 func RegisterScorePlugin(pluginName string, pluginNewFunc runtime.PluginFactory, weight int32) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, weight, pluginNewFunc, "Score")
