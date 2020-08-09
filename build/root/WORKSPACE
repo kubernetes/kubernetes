@@ -27,7 +27,7 @@ repo_infra_configure(
     # TODO(go1.15): Uncomment once we've published a repo-infra release that supports go1.15
     #go_version = "1.15.0",
     # TODO(go1.15): Comment out once we've published a repo-infra release that supports go1.15
-    override_go_version = "1.15.0-rc.1",
+    override_go_version = "1.15.0-rc.2",
     minimum_bazel_version = "2.2.0",
 )
 
