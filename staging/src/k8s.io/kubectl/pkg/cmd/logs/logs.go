@@ -276,7 +276,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		}
 		o.Object = infos[0].Object
 		if o.Selector != "" && len(o.Object.(*corev1.PodList).Items) == 0 {
-			return errors.New(fmt.Sprintf("no resources found in %s namespace", o.Namespace))
+			return fmt.Errorf("no resources found in %s namespace", o.Namespace)
 		}
 	}
 
