@@ -60,10 +60,12 @@ func (pl *NodePorts) Name() string {
 // will be in the result; but it does not resolve port conflict.
 func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 	ports := []*v1.ContainerPort{}
-	for _, pod := range pods {
-		for _, container := range pod.Spec.Containers {
-			for i := range container.Ports {
-				port := &container.Ports[i]
+	for i := range pods {
+		pod := pods[i]
+		for j := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[j]
+			for k := range container.Ports {
+				port := &container.Ports[k]
 				ports = append(ports, port)
 			}
 		}
