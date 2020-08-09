@@ -92,7 +92,7 @@ func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, c
 	return o.applyTo(c, componentConfig)
 }
 
-// ApplyToFromLoadedConfig updates the insecure serving options from the component config and then appies it to the given scheduler app configuration.
+// ApplyToFromLoadedConfig updates the insecure serving options from the component config and then applies it to the given scheduler app configuration.
 func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		return nil
