@@ -98,18 +98,31 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		getSMBMountMutex.LockKey(source)
 		defer getSMBMountMutex.UnlockKey(source)
 
-		if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
+		var output string
+		var err error
+		username := allOptions[0]
+		password := allOptions[1]
+		if output, err = newSMBMapping(username, password, source); err != nil {
+			klog.Warningf("SMB Mapping(%s) returned with error(%v), output(%s)", source, err, string(output))
 			if isSMBMappingExist(source) {
-				klog.V(2).Infof("SMB Mapping(%s) already exists, now begin to remove and remount", source)
-				if output, err := removeSMBMapping(source); err != nil {
-					return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+				valid, errPath := isValidPath(source)
+				if errPath != nil {
+					return errPath
 				}
-				if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
-					return fmt.Errorf("New-SmbGlobalMapping remount failed: %v, output: %q", err, output)
+				if valid {
+					err = nil
+					klog.V(2).Infof("SMB Mapping(%s) already exists and is still valid, skip error", source)
+				} else {
+					klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, now begin to remove and remount", source)
+					if output, err = removeSMBMapping(source); err != nil {
+						return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+					}
+					output, err = newSMBMapping(username, password, source)
 				}
-			} else {
-				return fmt.Errorf("New-SmbGlobalMapping failed: %v, output: %q", err, output)
 			}
+		}
+		if err != nil {
+			return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
 		}
 	}
 
@@ -151,6 +164,19 @@ func isSMBMappingExist(remotepath string) bool {
 	cmd.Env = append(os.Environ(), fmt.Sprintf("smbremotepath=%s", remotepath))
 	_, err := cmd.CombinedOutput()
 	return err == nil
+}
+
+// check whether remotepath is valid
+// return (true, nil) if remotepath is valid
+func isValidPath(remotepath string) (bool, error) {
+	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remoteapth`)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("remoteapth=%s", remotepath))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("returned output: %s, error: %v", string(output), err)
+	}
+
+	return strings.HasPrefix(strings.ToLower(string(output)), "true"), nil
 }
 
 // remove SMB mapping
