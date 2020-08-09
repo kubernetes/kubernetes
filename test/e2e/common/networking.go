@@ -50,12 +50,12 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 					framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors)+1, err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
 				}
 			}
-			if len(errors) == 0 {
+			if len(errors) > 0 {
 				framework.Logf("Pod polling failure summary:")
 				for _, e := range errors {
 					framework.Logf("%v", e)
 				}
-				framework.Failf("Failed due to %v errors polling %v pods", errors, len(config.EndpointPods))
+				framework.Failf("Failed due to %v errors polling %v pods", len(errors), len(config.EndpointPods))
 			}
 		})
 
