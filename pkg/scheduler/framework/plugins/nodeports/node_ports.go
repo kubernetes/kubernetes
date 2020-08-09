@@ -61,10 +61,10 @@ func (pl *NodePorts) Name() string {
 func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 	ports := []*v1.ContainerPort{}
 	for _, pod := range pods {
-		for j := range pod.Spec.Containers {
-			container := &pod.Spec.Containers[j]
-			for k := range container.Ports {
-				ports = append(ports, &container.Ports[k])
+		for _, container := range pod.Spec.Containers {
+			for i := range container.Ports {
+				port := &container.Ports[i]
+				ports = append(ports, port)
 			}
 		}
 	}
