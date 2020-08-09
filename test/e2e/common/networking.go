@@ -39,8 +39,23 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
+
+			// Extra debugging info since this is the most common diagnostic for failing clusters, and is a Conformance test.
+			errors := []error{}
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromTestContainer("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				if err := config.DialFromTestContainer("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
+					errors = append(errors, err)
+					framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+				} else {
+					framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors)+1, err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
+				}
+			}
+			if len(errors) == 0 {
+				framework.Logf("Pod polling failure summary:")
+				for _, e := range errors {
+					framework.Logf("%v", e)
+				}
+				framework.Failf("Failed due to %v errors polling %v pods", errors, len(config.EndpointPods))
 			}
 		})
 
