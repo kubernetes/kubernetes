@@ -34,7 +34,7 @@ type FakeNodeMetricses struct {
 	Fake *FakeMetricsV1alpha1
 }
 
-var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io", Version: "v1alpha1", Resource: "nodes"}
+var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io", Version: "v1alpha1", Resource: "nodemetricses"}
 
 var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics.k8s.io", Version: "v1alpha1", Kind: "NodeMetrics"}
 

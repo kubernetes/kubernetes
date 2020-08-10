@@ -22,7 +22,7 @@ import (
 )
 
 // +genclient
-// +resourceName=nodes
+// +resourceName=nodemetricses
 // +genclient:readonly
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -55,7 +55,7 @@ type NodeMetricsList struct {
 }
 
 // +genclient
-// +resourceName=pods
+// +resourceName=podmetricses
 // +genclient:readonly
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
