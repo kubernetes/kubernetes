@@ -6,10 +6,10 @@ load("//build:workspace_mirror.bzl", "mirror")
 # TODO(go1.15): Update once we've published a repo-infra release that supports go1.15
 http_archive(
     name = "io_k8s_repo_infra",
-    strip_prefix = "repo-infra-0.0.10",
-    sha256 = "b2d39b7d32eab3bf85bf693685b315ece4f942fca4110cf24aac3f260f2f3c6c",
+    strip_prefix = "repo-infra-0.0.11",
+    sha256 = "93da34ad63b1f95db22980becfef7d1cae6f99a84bdd16467edf68956d4288bb",
     urls = [
-        "https://github.com/kubernetes/repo-infra/archive/v0.0.10.tar.gz",
+        "https://github.com/kubernetes/repo-infra/archive/v0.0.11.tar.gz",
     ],
 )
 
@@ -27,7 +27,7 @@ repo_infra_configure(
     # TODO(go1.15): Uncomment once we've published a repo-infra release that supports go1.15
     #go_version = "1.15.0",
     # TODO(go1.15): Comment out once we've published a repo-infra release that supports go1.15
-    override_go_version = "1.15.0-rc.1",
+    override_go_version = "1.15.0-rc.2",
     minimum_bazel_version = "2.2.0",
 )
 
