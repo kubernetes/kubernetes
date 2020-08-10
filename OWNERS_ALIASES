@@ -4,7 +4,6 @@ aliases:
     - sttts
     - tallclair
   sig-auth-audit-reviewers:
-    - CaoShuFeng
     - hzxuzhonghu
     - lavalamp
     - sttts
