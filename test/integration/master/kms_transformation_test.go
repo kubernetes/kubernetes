@@ -206,9 +206,7 @@ resources:
 		t.Fatalf("failed to create mock of KMS Plugin #1: %v", err)
 	}
 
-	if err := pluginMock1.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
+	go pluginMock1.Start()
 	defer pluginMock1.CleanUp()
 	if err := mock.WaitForBase64PluginToBeUp(pluginMock1); err != nil {
 		t.Fatalf("Failed to start plugin #1, err: %v", err)
@@ -218,9 +216,7 @@ resources:
 	if err != nil {
 		t.Fatalf("Failed to create mock of KMS Plugin #2: err: %v", err)
 	}
-	if err := pluginMock2.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
+	go pluginMock2.Start()
 	defer pluginMock2.CleanUp()
 	if err := mock.WaitForBase64PluginToBeUp(pluginMock2); err != nil {
 		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
