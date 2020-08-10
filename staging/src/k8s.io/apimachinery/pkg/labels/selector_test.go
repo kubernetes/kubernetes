@@ -141,6 +141,7 @@ func expectMatchDirect(t *testing.T, selector, ls Set) {
 	}
 }
 
+//lint:ignore U1000 currently commented out in TODO of TestSetMatches
 func expectNoMatchDirect(t *testing.T, selector, ls Set) {
 	if SelectorFromSet(selector).Matches(ls) {
 		t.Errorf("Wanted '%s' to not match '%s', but it did.", selector, ls)
@@ -241,16 +242,14 @@ func TestLexerSequence(t *testing.T) {
 		{"key<1", []Token{IdentifierToken, LessThanToken, IdentifierToken}},
 	}
 	for _, v := range testcases {
-		var literals []string
 		var tokens []Token
 		l := &Lexer{s: v.s, pos: 0}
 		for {
-			token, lit := l.Lex()
+			token, _ := l.Lex()
 			if token == EndOfStringToken {
 				break
 			}
 			tokens = append(tokens, token)
-			literals = append(literals, lit)
 		}
 		if len(tokens) != len(v.t) {
 			t.Errorf("Bad number of tokens for '%s %d, %d", v.s, len(tokens), len(v.t))
