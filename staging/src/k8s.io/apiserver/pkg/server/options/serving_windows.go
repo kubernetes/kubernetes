@@ -23,8 +23,12 @@ import (
 	"syscall"
 )
 
-// Windows only supports SO_REUSEADDR, which may cause undefined behavior, as
-// there is no protection against port hijacking.
 func permitPortReuse(network, address string, c syscall.RawConn) error {
 	return fmt.Errorf("port reuse is not supported on Windows")
+}
+
+// Windows supports SO_REUSEADDR, but it may cause undefined behavior, as
+// there is no protection against port hijacking.
+func permitAddressReuse(network, addr string, conn syscall.RawConn) error {
+	return fmt.Errorf("address reuse is not supported on Windows")
 }
