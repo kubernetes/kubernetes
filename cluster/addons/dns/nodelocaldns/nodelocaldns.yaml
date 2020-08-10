@@ -96,8 +96,8 @@ data:
         cache 30
         reload
         loop
-        bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
-        forward . __PILLAR__UPSTREAM__SERVERS__
+        bind __LOCAL__DNS__ __DNS__SERVER__
+        forward . __UPSTREAM__SERVERS__
         prometheus :9253
         }
 ---

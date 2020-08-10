@@ -2323,10 +2323,10 @@ function setup-coredns-manifest {
   local -r coredns_file="${dst_dir}/0-dns/coredns/coredns.yaml"
   mv "${dst_dir}/0-dns/coredns/coredns.yaml.in" "${coredns_file}"
   # Replace the salt configurations with variable values.
-  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
-  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
+  sed -i -e "s@dns_domain@${DNS_DOMAIN}@g" "${coredns_file}"
+  sed -i -e "s@dns_server@${DNS_SERVER_IP}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${SERVICE_CLUSTER_IP_RANGE}@g" "${coredns_file}"
-  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${coredns_file}"
+  sed -i -e "s@dns_memory_limit@${DNS_MEMORY_LIMIT:-170Mi}@g" "${coredns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2376,9 +2376,9 @@ EOF
     update-prometheus-to-sd-parameters "${kubedns_file}"
   fi
   # Replace the salt configurations with variable values.
-  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
-  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
-  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${kubedns_file}"
+  sed -i -e "s@dns_domain@${DNS_DOMAIN}@g" "${kubedns_file}"
+  sed -i -e "s@dns_server@${DNS_SERVER_IP}@g" "${kubedns_file}"
+  sed -i -e "s@dns_memory_limit@${DNS_MEMORY_LIMIT:-170Mi}@g" "${kubedns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2393,9 +2393,9 @@ function setup-nodelocaldns-manifest {
   local -r localdns_file="${dst_dir}/0-dns/nodelocaldns/nodelocaldns.yaml"
   setup-addon-custom-yaml "addons" "0-dns/nodelocaldns" "nodelocaldns.yaml" "${CUSTOM_NODELOCAL_DNS_YAML:-}"
   # Replace the sed configurations with variable values.
-  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
-  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
-  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
+  sed -i -e "s/_.*_DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
+  sed -i -e "s/_.*_DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
+  sed -i -e "s/_.*_LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
 }
 
 # Sets up the manifests of netd for k8s addons.
