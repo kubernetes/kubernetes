@@ -151,11 +151,16 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		if tp.registerDriver {
 			err = waitForCSIDriver(cs, m.config.GetUniqueDriverName())
-			framework.ExpectNoError(err, "Failed to get CSIDriver : %v", err)
+			framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
 			m.testCleanups = append(m.testCleanups, func() {
 				destroyCSIDriver(cs, m.config.GetUniqueDriverName())
 			})
 		}
+
+		// Wait for the CSIDriver actually get deployed and CSINode object to be generated.
+		// This indicates the mock CSI driver pod is up and running healthy.
+		err = drivers.WaitForCSIDriverRegistrationOnNode(m.config.ClientNodeSelection.Name, m.config.GetUniqueDriverName(), cs)
+		framework.ExpectNoError(err, "Failed to register CSIDriver %v", m.config.GetUniqueDriverName())
 	}
 
 	createPod := func(ephemeral bool) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
