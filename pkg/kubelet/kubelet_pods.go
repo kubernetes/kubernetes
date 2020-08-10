@@ -1514,7 +1514,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			klog.V(4).InfoS("Cannot get host IPs", "err", err)
 		} else {
 			s.HostIP = hostIPs[0].String()
-			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
+			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP != s.HostIP {
 				s.PodIP = hostIPs[0].String()
 				s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
 				if len(hostIPs) == 2 {
