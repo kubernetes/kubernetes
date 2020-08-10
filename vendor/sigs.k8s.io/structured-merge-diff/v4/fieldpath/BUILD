@@ -13,12 +13,12 @@ go_library(
         "serialize-pe.go",
         "set.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v3/fieldpath",
-    importpath = "sigs.k8s.io/structured-merge-diff/v3/fieldpath",
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v4/fieldpath",
+    importpath = "sigs.k8s.io/structured-merge-diff/v4/fieldpath",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/json-iterator/go:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/v3/value:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/value:go_default_library",
     ],
 )
 

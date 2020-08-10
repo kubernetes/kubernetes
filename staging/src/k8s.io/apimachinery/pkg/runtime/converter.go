@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"sigs.k8s.io/structured-merge-diff/v3/value"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 
 	"k8s.io/klog/v2"
 )
