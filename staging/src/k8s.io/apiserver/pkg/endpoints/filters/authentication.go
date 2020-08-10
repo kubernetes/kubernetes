@@ -50,15 +50,14 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		defer recordAuthMetrics(resp, ok, err, apiAuds, authenticationStart)
 		if err != nil || !ok {
 			if err != nil {
-				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
+				klog.Infof("request (%s): unable to authenticate due to an error: %v", shortRequestInfo(req), err)
 			}
 			failed.ServeHTTP(w, req)
 			return
 		}
 
 		if !audiencesAreAcceptable(apiAuds, resp.Audiences) {
-			err = fmt.Errorf("unable to match the audience: %v , accepted: %v", resp.Audiences, apiAuds)
-			klog.Error(err)
+			klog.Infof("request (%s): unable to match the audience: %v , accepted: %v", shortRequestInfo(req), resp.Audiences, apiAuds)
 			failed.ServeHTTP(w, req)
 			return
 		}
@@ -91,4 +90,16 @@ func audiencesAreAcceptable(apiAuds, responseAudiences authenticator.Audiences) 
 	}
 
 	return len(apiAuds.Intersect(responseAudiences)) > 0
+}
+
+func shortRequestInfo(req *http.Request) string {
+	src := req.RemoteAddr
+	if userAgent := req.UserAgent(); len(userAgent) > 0 {
+		src += " " + userAgent
+	}
+	dst := req.Method
+	if req.URL != nil && len(req.URL.Path) > 0 {
+		dst = req.URL.Path + " " + dst
+	}
+	return fmt.Sprintf("src %s: %s", src, dst)
 }
