@@ -1,4 +1,4 @@
-= vendor/sigs.k8s.io/structured-merge-diff/v3 licensed under: =
+= vendor/sigs.k8s.io/structured-merge-diff/v4 licensed under: =
 
                                  Apache License
                            Version 2.0, January 2004
@@ -202,4 +202,4 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/sigs.k8s.io/structured-merge-diff/v3/LICENSE e3fc50a88d0a364313df4b21ef20c29e
+= vendor/sigs.k8s.io/structured-merge-diff/v4/LICENSE e3fc50a88d0a364313df4b21ef20c29e
