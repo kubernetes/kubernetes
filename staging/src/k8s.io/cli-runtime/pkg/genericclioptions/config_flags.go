@@ -274,7 +274,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation")
 	}
 	if f.ImpersonateGroup != nil {
-		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups.")
+		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups. Only specified groups are included (e.g. add group system:authenticated to impersonate authenticated user).")
 	}
 	if f.Username != nil {
 		flags.StringVar(f.Username, flagUsername, *f.Username, "Username for basic authentication to the API server")

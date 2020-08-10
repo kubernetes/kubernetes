@@ -179,7 +179,7 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS"},
 		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server"},
 		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
-		ImpersonateGroups: FlagInfo{prefix + FlagImpersonateGroup, "", "", "Group to impersonate for the operation, this flag can be repeated to specify multiple groups."},
+		ImpersonateGroups: FlagInfo{prefix + FlagImpersonateGroup, "", "", "Group to impersonate for the operation, this flag can be repeated to specify multiple groups. Only specified groups are included (e.g. add group system:authenticated to impersonate authenticated user)."},
 		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
 		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server"},
 	}
