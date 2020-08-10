@@ -592,10 +592,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
-		if d.Status.ObservedGeneration < d.Generation {
-			d.Status.ObservedGeneration = d.Generation
-			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
-		}
 		return nil
 	}
 
