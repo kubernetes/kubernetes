@@ -280,11 +280,10 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
-
 	if dialCommand == echoHostname {
 		config.diagnoseMissingEndpoints(responses)
 	}
-	return fmt.Errorf("Did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, responses, expectedResponses)
+	return fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.

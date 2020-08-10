@@ -28,6 +28,25 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
 
+		checkNodeConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
+			errors := []error{}
+			for _, endpointPod := range config.EndpointPods {
+				if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
+					errors = append(errors, err)
+					framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors)+1, err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
+				} else {
+					framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+				}
+			}
+			if len(errors) > 0 {
+				framework.Logf("Pod polling failure summary:")
+				for _, e := range errors {
+					framework.Logf("%v", e)
+				}
+				framework.Failf("Failed due to %v errors polling %v pods", len(errors), len(config.EndpointPods))
+			}
+		}
+
 		// Try to hit all endpoints through a test container, retry 5 times,
 		// expect exactly one unique hostname. Each of these endpoints reports
 		// its own hostname.
@@ -39,24 +58,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-
-			// Extra debugging info since this is the most common diagnostic for failing clusters, and is a Conformance test.
-			errors := []error{}
-			for _, endpointPod := range config.EndpointPods {
-				if err := config.DialFromTestContainer("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
-					errors = append(errors, err)
-					framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
-				} else {
-					framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors)+1, err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
-				}
-			}
-			if len(errors) > 0 {
-				framework.Logf("Pod polling failure summary:")
-				for _, e := range errors {
-					framework.Logf("%v", e)
-				}
-				framework.Failf("Failed due to %v errors polling %v pods", len(errors), len(config.EndpointPods))
-			}
+			checkNodeConnectivity(config, "http", e2enetwork.EndpointHTTPPort)
 		})
 
 		/*
@@ -67,9 +69,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			for _, endpointPod := range config.EndpointPods {
-				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
-			}
+			checkNodeConnectivity(config, "udp", e2enetwork.EndpointUDPPort)
 		})
 
 		/*
@@ -81,9 +81,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly] [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
-			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
-			}
+			checkNodeConnectivity(config, "http", e2enetwork.EndpointHTTPPort)
 		})
 
 		/*
@@ -95,9 +93,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly] [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
-			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
-			}
+			checkNodeConnectivity(config, "udp", e2enetwork.EndpointUDPPort)
 		})
 	})
 })
