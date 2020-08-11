@@ -480,6 +480,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 
 	// Run scheduler.
 	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 	go sched.Run(ctx)
 
 	// Send pods to be scheduled.
