@@ -110,6 +110,9 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
+	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: e.onEndpointsDelete,
+	})
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
@@ -284,6 +287,15 @@ func (e *EndpointController) onServiceDelete(obj interface{}) {
 	}
 
 	e.serviceSelectorCache.Delete(key)
+	e.queue.Add(key)
+}
+
+func (e *EndpointController) onEndpointsDelete(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
 	e.queue.Add(key)
 }
 

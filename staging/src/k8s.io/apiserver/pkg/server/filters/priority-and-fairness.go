@@ -144,6 +144,7 @@ func WithPriorityAndFairness(
 			}
 		}, execute)
 		if !served {
+			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)
 		}
 

@@ -83,13 +83,16 @@ type scaleSet struct {
 
 // newScaleSet creates a new scaleSet.
 func newScaleSet(az *Cloud) (VMSet, error) {
-	var err error
+	if az.Config.VmssVirtualMachinesCacheTTLInSeconds == 0 {
+		az.Config.VmssVirtualMachinesCacheTTLInSeconds = vmssVirtualMachinesCacheTTLDefaultInSeconds
+	}
 	ss := &scaleSet{
 		Cloud:           az,
 		availabilitySet: newAvailabilitySet(az),
 		vmssVMCache:     &sync.Map{},
 	}
 
+	var err error
 	if !ss.DisableAvailabilitySetNodes {
 		ss.availabilitySetNodesCache, err = ss.newAvailabilitySetNodesCache()
 		if err != nil {
