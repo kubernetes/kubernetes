@@ -503,7 +503,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	// is different than parallelism, otherwise the previous controller loop
 	// failed updating status so even if we pick up failure it is not a new one
 	exceedsBackoffLimit := jobHaveNewFailure && (active != *job.Spec.Parallelism) &&
-		(failed >= *job.Spec.BackoffLimit)
+		(failed > *job.Spec.BackoffLimit)
 
 	if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
 		// check if the number of pod restart exceeds backoff (for restart OnFailure only)

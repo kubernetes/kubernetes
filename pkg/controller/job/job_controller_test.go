@@ -1552,23 +1552,23 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 		},
 		"not enough failures with backoffLimit 1 - single pod": {
 			1, 1, 1,
-			v1.PodPending, 1, 0,
-			false, true, 1, 0, 0, nil, "",
+			"", 0, 1,
+			true, false, 1, 0, 1, nil, "",
 		},
 		"too many failures with backoffLimit 1 - single pod": {
 			1, 1, 1,
-			"", 0, 1,
-			false, true, 0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
+			"", 0, 2,
+			false, true, 0, 0, 2, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"not enough failures with backoffLimit 6 - multiple pods": {
 			2, 2, 6,
-			v1.PodRunning, 1, 5,
-			true, false, 2, 0, 5, nil, "",
+			v1.PodRunning, 1, 6,
+			true, false, 2, 0, 6, nil, "",
 		},
 		"too many failures with backoffLimit 6 - multiple pods": {
 			2, 2, 6,
-			"", 0, 6,
-			false, true, 0, 0, 6, &jobConditionFailed, "BackoffLimitExceeded",
+			"", 0, 7,
+			false, true, 0, 0, 7, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 	}
 
