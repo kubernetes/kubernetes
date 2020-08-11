@@ -953,28 +953,26 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				t.Fatalf("scheduling timeout after %v", wait.ForeverTestTimeout)
 			}
 			stopFunc()
-			// Wait for scheduling to return an error
+			// Wait for scheduling to return an error or succeed binding.
+			var (
+				gotErr  error
+				gotBind *v1.Binding
+			)
 			select {
-			case err := <-errChan:
-				if item.expectError == nil || !reflect.DeepEqual(item.expectError.Error(), err.Error()) {
-					t.Errorf("err \nWANT=%+v,\nGOT=%+v", item.expectError, err)
-				}
+			case gotErr = <-errChan:
+			case gotBind = <-bindingChan:
 			case <-time.After(chanTimeout):
-				if item.expectError != nil {
-					t.Errorf("did not receive error after %v", chanTimeout)
-				}
+				t.Fatalf("did not receive pod binding or error after %v", chanTimeout)
 			}
-
-			// Wait for pod to succeed binding
-			select {
-			case b := <-bindingChan:
-				if !reflect.DeepEqual(item.expectPodBind, b) {
-					t.Errorf("err \nWANT=%+v,\nGOT=%+v", item.expectPodBind, b)
+			if item.expectError != nil {
+				if gotErr == nil || item.expectError.Error() != gotErr.Error() {
+					t.Errorf("err \nWANT=%+v,\nGOT=%+v", item.expectError, gotErr)
 				}
-			case <-time.After(chanTimeout):
-				if item.expectPodBind != nil {
-					t.Errorf("did not receive pod binding after %v", chanTimeout)
-				}
+			} else if gotErr != nil {
+				t.Errorf("err \nWANT=%+v,\nGOT=%+v", item.expectError, gotErr)
+			}
+			if !cmp.Equal(item.expectPodBind, gotBind) {
+				t.Errorf("err \nWANT=%+v,\nGOT=%+v", item.expectPodBind, gotBind)
 			}
 
 			if item.expectAssumeCalled != fakeVolumeBinder.AssumeCalled {
