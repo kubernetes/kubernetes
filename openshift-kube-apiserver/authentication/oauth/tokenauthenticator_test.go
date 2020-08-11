@@ -56,7 +56,7 @@ func TestAuthenticateTokenFormats(t *testing.T) {
 
 	fakeOAuthClient := oauthfake.NewSimpleClientset(
 		&oauthv1.OAuthAccessToken{
-			ObjectMeta: metav1.ObjectMeta{Name: "sha256:" + tokenSha256, CreationTimestamp: metav1.Time{Time: time.Now()}},
+			ObjectMeta: metav1.ObjectMeta{Name: "sha256~" + tokenSha256, CreationTimestamp: metav1.Time{Time: time.Now()}},
 			ExpiresIn:  600, // 10 minutes
 			UserName:   "tokenUser",
 			UserUID:    "tokenUserID",
@@ -85,13 +85,13 @@ func TestAuthenticateTokenFormats(t *testing.T) {
 	for _, test := range []Test{
 		{"unknown", "unknown", true, false, ""},
 		{"unprefixed token", "token", true, false, ""},
-		{"prefixed token", "sha256:token", false, true, "tokenUser"},
+		{"prefixed token", "sha256~token", false, true, "tokenUser"},
 		{"unprefixed hash token", tokenSha256, true, false, ""},
-		{"prefixed hash token", "sha256:" + tokenSha256, true, false, ""},
+		{"prefixed hash token", "sha256~" + tokenSha256, true, false, ""},
 		{"unprefixed token2", "token2", false, true, "token2User"},
-		{"prefixed token2", "sha256:token2", true, false, ""},
+		{"prefixed token2", "sha256~token2", true, false, ""},
 		{"unprefixed hash token2", token2Sha256, true, false, ""},
-		{"prefixed hash token2", "sha256:" + token2Sha256, true, false, ""},
+		{"prefixed hash token2", "sha256~" + token2Sha256, true, false, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			userInfo, found, err := tokenAuthenticator.AuthenticateToken(context.TODO(), test.bearerToken)
