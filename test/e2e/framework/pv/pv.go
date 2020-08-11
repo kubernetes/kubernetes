@@ -749,7 +749,8 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvcName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
-				continue
+				phaseFoundInAllClaims = false
+				break
 			}
 			if pvc.Status.Phase == phase {
 				framework.Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
