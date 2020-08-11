@@ -8,9 +8,7 @@ reviewers:
   - nikhita
   - parispittman
 approvers:
-  - castrojo
-  - cblecker
-  - nikhita
+  - sig-contribex-approvers
   - parispittman
 emeritus_approvers:
   - Phillels
