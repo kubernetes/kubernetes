@@ -148,7 +148,7 @@ try {
   Configure-GcePdTools
   Configure-Kubelet
 
-  # Even if Stackdriver is already installed, the function will still [re]start the service.
+  # Even if Logging agent is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {
     Install-LoggingAgent
     Configure-LoggingAgent
