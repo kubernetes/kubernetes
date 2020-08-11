@@ -1,4 +1,9 @@
 aliases:
+  sig-architecture-approvers:
+    - dims
+    - derekwaynecarr
+    - johnbelamaric
+
   # sig-auth subproject aliases
   sig-auth-audit-approvers:
     - sttts
@@ -453,6 +458,20 @@ aliases:
   # sig-cluster-lifecycle-api-reviewers:
   #   -
   #   -
+
+  sig-contribex-approvers:
+    - castrojo
+    - mrbobbytables
+    - cblecker
+    - nikhita
+
+  sig-docs-approvers:
+    - jimangel
+    - kbarnard10
+    - zacharysarah
+    - kbhawkey
+    - onlydole
+    - sftim
 
   sig-node-api-reviewers:
     - dchen1107
