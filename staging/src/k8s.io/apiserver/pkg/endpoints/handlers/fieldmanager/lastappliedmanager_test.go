@@ -349,7 +349,7 @@ spec:
 			expectConflictSet: fieldpath.NewSet(
 				fieldpath.MakePathOrDie("metadata", "labels", "app"),
 				fieldpath.MakePathOrDie("spec", "replicas"),
-				fieldpath.MakePathOrDie("spec", "selector", "matchLabels", "app"),
+				fieldpath.MakePathOrDie("spec", "selector"), // selector is atomic
 				fieldpath.MakePathOrDie("spec", "template", "metadata", "labels", "app"),
 				fieldpath.MakePathOrDie("spec", "template", "spec", "containers", fieldpath.KeyByFields("name", "my-c"), "image"),
 			),
