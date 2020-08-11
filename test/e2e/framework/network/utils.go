@@ -275,6 +275,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 
 		// Check against i+1 so we exit if minTries == maxTries.
 		if (responses.Equal(expectedResponses) || responses.Len() == 0 && expectedResponses.Len() == 0) && i+1 >= minTries {
+			framework.Logf("reached %v after %v/%v tries", targetIP, i, maxTries)
 			return nil
 		}
 		// TODO: get rid of this delay #36281
@@ -283,7 +284,10 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 	if dialCommand == echoHostname {
 		config.diagnoseMissingEndpoints(responses)
 	}
-	return fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
+	returnMsg := fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
+	framework.Logf("encountered error during dial (%v)", returnMsg)
+	return returnMsg
+
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.

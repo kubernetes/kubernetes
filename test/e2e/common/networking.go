@@ -18,6 +18,7 @@ package common
 
 import (
 	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -29,21 +30,42 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 	ginkgo.Describe("Granular Checks: Pods", func() {
 
 		checkNodeConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
-			errors := []error{}
+			// breadth first poll to quickly estimate failure.
+			failedPodsByHost := map[string][]*v1.Pod{}
+			// First time, we'll quickly try all pods, breadth first.
 			for _, endpointPod := range config.EndpointPods {
-				if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
-					errors = append(errors, err)
-					framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors)+1, err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
-				} else {
-					framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+				framework.Logf("Breadth first check of %v on host %v...", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+				if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, 1, 0, sets.NewString(endpointPod.Name)); err != nil {
+					if _, ok := failedPodsByHost[endpointPod.Status.HostIP]; !ok {
+						failedPodsByHost[endpointPod.Status.HostIP] = []*v1.Pod{}
+					}
+					failedPodsByHost[endpointPod.Status.HostIP] = append(failedPodsByHost[endpointPod.Status.HostIP], endpointPod)
+					framework.Logf("...failed...will try again in next pass")
 				}
 			}
-			if len(errors) > 0 {
-				framework.Logf("Pod polling failure summary:")
-				for _, e := range errors {
-					framework.Logf("%v", e)
+			errors := []error{}
+			// Second time, we pass through pods more carefully...
+			framework.Logf("Going to retry %v out of %v pods....", len(failedPodsByHost), len(config.EndpointPods))
+			for host, failedPods := range failedPodsByHost {
+				framework.Logf("Doublechecking %v pods in host %v which werent seen the first time.", len(failedPods), host)
+				for _, endpointPod := range failedPods {
+					framework.Logf("Now attempting to probe pod [[[ %v ]]]", endpointPod.Status.PodIP)
+					if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
+						errors = append(errors, err)
+						framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors), err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
+					} else {
+						framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+					}
+					framework.Logf("... Done probing pod [[[ %v ]]]", endpointPod.Status.PodIP)
 				}
-				framework.Failf("Failed due to %v errors polling %v pods", len(errors), len(config.EndpointPods))
+				framework.Logf("succeeded at polling %v out of %v connections", len(config.EndpointPods)-len(errors), len(config.EndpointPods))
+			}
+			if len(errors) > 0 {
+				framework.Logf("pod polling failure summary:")
+				for _, e := range errors {
+					framework.Logf("Collected error: %v", e)
+				}
+				framework.Failf("failed,  %v out of %v connections failed", len(errors), len(config.EndpointPods))
 			}
 		}
 
