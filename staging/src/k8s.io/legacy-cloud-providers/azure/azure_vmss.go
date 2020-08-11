@@ -19,7 +19,6 @@ limitations under the License.
 package azure
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -45,7 +44,7 @@ var (
 	virtualMachineScaleSetsDeallocating = "Deallocating"
 
 	// ErrorNotVmssInstance indicates an instance is not belonging to any vmss.
-	ErrorNotVmssInstance = errors.New("not a vmss instance")
+	ErrorNotVmssInstance = fmt.Errorf("%w: not a vmss instance", cloudprovider.InstanceNotFound)
 
 	scaleSetNameRE         = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
 	resourceGroupRE        = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(?:.*)/virtualMachines(?:.*)`)

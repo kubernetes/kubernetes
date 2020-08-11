@@ -20,6 +20,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -190,7 +191,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
 	_, err := c.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			// if host doesn't exist, no need to detach
 			klog.Warningf("azureDisk - failed to get azure instance id(%q), DetachDisk(%s) will assume disk is already detached",
 				nodeName, diskURI)
@@ -314,7 +315,7 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 	// loop runs after the Attach/Disk OP which will reflect the latest model.
 	disks, err := c.getNodeDataDisks(nodeName, azcache.CacheReadTypeUnsafe)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			// if host doesn't exist, no need to detach
 			klog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
 				nodeName, diskNames)

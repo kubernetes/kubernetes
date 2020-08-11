@@ -300,7 +300,7 @@ func TestVerifyVolumesAttached(t *testing.T) {
 			test: func(testcase *testcase) error {
 				attacher := newAttacher(testcase)
 				_, err := attacher.VolumesAreAttached([]*volume.Spec{diskASpec}, nodeName1)
-				if err != cloudprovider.InstanceNotFound {
+				if !errors.Is(err, cloudprovider.InstanceNotFound) {
 					return fmt.Errorf("expected InstanceNotFound error, but got %v", err)
 				}
 				return err

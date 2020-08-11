@@ -60,7 +60,7 @@ func TestAttachDiskWithVMSS(t *testing.T) {
 			isManagedDisk:  false,
 			existedDisk:    compute.Disk{Name: to.StringPtr("disk-name")},
 			expectedErr:    true,
-			expectedErrMsg: fmt.Errorf("not a vmss instance"),
+			expectedErrMsg: ErrorNotVmssInstance,
 		},
 		{
 			desc:          "no error shall be returned if everything is good with managed disk",
@@ -159,7 +159,7 @@ func TestDetachDiskWithVMSS(t *testing.T) {
 			vmssvmName:     "vm1",
 			existedDisk:    compute.Disk{Name: to.StringPtr(diskName)},
 			expectedErr:    true,
-			expectedErrMsg: fmt.Errorf("not a vmss instance"),
+			expectedErrMsg: ErrorNotVmssInstance,
 		},
 		{
 			desc:        "no error shall be returned if everything is good",

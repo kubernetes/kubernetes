@@ -397,7 +397,7 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	var err error
 
 	machine, err = as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeUnsafe)
-	if err == cloudprovider.InstanceNotFound {
+	if errors.Is(err, cloudprovider.InstanceNotFound) {
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {

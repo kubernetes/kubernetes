@@ -225,7 +225,7 @@ func ensureNodeExistsByProviderID(ctx context.Context, cloud cloudprovider.Inter
 		var err error
 		providerID, err = instances.InstanceID(ctx, types.NodeName(node.Name))
 		if err != nil {
-			if err == cloudprovider.InstanceNotFound {
+			if errors.Is(err, cloudprovider.InstanceNotFound) {
 				return false, nil
 			}
 			return false, err

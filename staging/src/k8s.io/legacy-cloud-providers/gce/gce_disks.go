@@ -21,6 +21,7 @@ package gce
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -585,7 +586,7 @@ func (g *Cloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	inst, err := g.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			// If instance no longer exists, safe to assume volume is not attached.
 			klog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume PD %q is not attached to it.",
@@ -606,7 +607,7 @@ func (g *Cloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, 
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := g.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			// If instance no longer exists, safe to assume volume is not attached.
 			klog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume PD %q is not attached to it.",
@@ -638,7 +639,7 @@ func (g *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (m
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := g.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			// If instance no longer exists, safe to assume volume is not attached.
 			klog.Warningf(
 				"Instance %q does not exist. DisksAreAttached will assume PD %v are not attached to it.",

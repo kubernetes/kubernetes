@@ -20,6 +20,7 @@ package gce
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -244,7 +245,7 @@ func (g *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string)
 func (g *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	_, err := g.instanceByProviderID(providerID)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		return false, err

@@ -20,6 +20,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -191,7 +192,7 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -199,7 +200,7 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 	_, err = az.InstanceID(ctx, name)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -217,7 +218,7 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		// Returns false, so the controller manager will continue to check InstanceExistsByProviderID().
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 
@@ -227,7 +228,7 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 	powerStatus, err := az.vmSet.GetPowerStatusByNodeName(string(nodeName))
 	if err != nil {
 		// Returns false, so the controller manager will continue to check InstanceExistsByProviderID().
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 
