@@ -78,10 +78,6 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*app
 	scaled := false
 	for i := range oldRSs {
 		rs := oldRSs[i]
-		// Scaling not required.
-		if *(rs.Spec.Replicas) == 0 {
-			continue
-		}
 		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
 		if err != nil {
 			return false, err
