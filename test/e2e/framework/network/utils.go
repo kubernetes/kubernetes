@@ -681,6 +681,7 @@ func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
 
 	epCount := len(config.EndpointPods)
 	config.MaxTries = epCount*epCount + testTries
+	framework.Logf("Setting MaxTries for pod polling to %v for networking test based on endpoint count %v", config.MaxTries, epCount)
 }
 
 // setup includes setupCore and also sets up services
