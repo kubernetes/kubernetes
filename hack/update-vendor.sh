@@ -24,8 +24,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
 # Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-# TODO(marun) Revert this change to upstream when we switch to golang 1.14
-export GOFLAGS=
+export GOFLAGS=-mod=mod
 # Ensure sort order doesn't depend on locale
 export LANG=C
 export LC_ALL=C
