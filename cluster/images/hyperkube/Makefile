@@ -21,7 +21,7 @@ REGISTRY?=staging-k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
 
-BASEIMAGE?=us.gcr.io/k8s-artifacts-prod/build-image/debian-hyperkube-base-$(ARCH):v1.1.1
+BASEIMAGE?=k8s.gcr.io/build-image/debian-hyperkube-base-$(ARCH):v1.1.3
 
 LOCAL_OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)/local/bin/linux/$(ARCH)
 DOCKERIZED_OUTPUT_PATH=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)
