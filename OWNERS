@@ -21,16 +21,6 @@ filters:
     emeritus_approvers:
       - jbeda
 
-  # Bazel build infrastructure changes often touch files throughout the tree
-  "\\.bzl$":
-    reviewers:
-      - ixdy
-    approvers:
-      - ixdy
-  "BUILD(\\.bazel)?$":
-    approvers:
-      - ixdy
-
   # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
   # dep-approvers
   "go\\.(mod|sum)$":
@@ -38,3 +28,8 @@ filters:
       - kubernetes/dep-approvers
     labels:
       - area/dependency
+  # metrics.go files are sig-instrumentation related, and should be tagged
+  # and reviewed by sig-instrumentation
+  "metrics\\.go$":
+    labels:
+      - sig/instrumentation
