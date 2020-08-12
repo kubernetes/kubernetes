@@ -29,7 +29,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
+// SetDefaultsCloudControllerManagerConfiguration is used to set default values for
+// some CloudControllerManagerConfiguration's fields
+func SetDefaultsCloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
 	zero := metav1.Duration{}
 	if obj.NodeStatusUpdateFrequency == zero {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
