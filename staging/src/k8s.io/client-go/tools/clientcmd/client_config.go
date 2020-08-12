@@ -371,6 +371,10 @@ func (config *DirectClientConfig) Namespace() (string, bool, error) {
 	}
 
 	if len(configContext.Namespace) == 0 {
+		if os.Getenv("KUBE_NAMESPACE") != "" {
+			ns := os.Getenv("KUBE_NAMESPACE")
+			return ns, false, nil
+		}
 		return "default", false, nil
 	}
 
@@ -425,6 +429,10 @@ func (config *DirectClientConfig) getContextName() (string, bool) {
 		return config.contextName, false
 	}
 
+	if os.Getenv("KUBE_CONTEXT") != "" {
+		ns := os.Getenv("KUBE_CONTEXT")
+		return ns, false
+	}
 	return config.config.CurrentContext, false
 }
 
