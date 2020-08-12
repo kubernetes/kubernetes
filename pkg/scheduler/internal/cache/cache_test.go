@@ -268,7 +268,7 @@ func TestExpirePod(t *testing.T) {
 			{pod: testPods[0], finishBind: true, assumedTime: now},
 		},
 		cleanupTime: now.Add(2 * ttl),
-		wNodeInfo:   framework.NewNodeInfo(),
+		wNodeInfo:   nil,
 	}, { // first one would expire, second and third would not.
 		pods: []*testExpirePodStruct{
 			{pod: testPods[0], finishBind: true, assumedTime: now},
@@ -1142,10 +1142,12 @@ func TestNodeOperators(t *testing.T) {
 			if err := cache.RemoveNode(node); err != nil {
 				t.Error(err)
 			}
-			if _, err := cache.getNodeInfo(node.Name); err == nil {
-				t.Errorf("The node %v should be removed.", node.Name)
+			if n, err := cache.getNodeInfo(node.Name); err != nil {
+				t.Errorf("The node %v should still have a ghost entry: %v", node.Name, err)
+			} else if n != nil {
+				t.Errorf("The node object for %v should be nil", node.Name)
 			}
-			// Check node is removed from nodeTree as well.
+			// Check node is removed from nodeTree.
 			if cache.nodeTree.numNodes != 0 || cache.nodeTree.next() != "" {
 				t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 			}
@@ -1466,7 +1468,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			var i int
 			// Check that cache is in the expected state.
 			for node := cache.headNode; node != nil; node = node.next {
-				if node.info.Node().Name != test.expected[i].Name {
+				if node.info.Node() != nil && node.info.Node().Name != test.expected[i].Name {
 					t.Errorf("unexpected node. Expected: %v, got: %v, index: %v", test.expected[i].Name, node.info.Node().Name, i)
 				}
 				i++
