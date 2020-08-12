@@ -2,8 +2,6 @@ dependencies:
   - name: "cni"
     version: 0.8.6
     refPaths:
-    - path: build/debian-hyperkube-base/Makefile
-      match: CNI_VERSION\?=
     - path: build/workspace.bzl
       match: CNI_VERSION =
     - path: cluster/gce/gci/configure.sh
@@ -100,12 +98,6 @@ dependencies:
       match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
     - path: cluster/images/etcd-empty-dir-cleanup/Dockerfile
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
-
-  - name: "k8s.gcr.io/debian-hyperkube-base"
-    version: 1.1.1
-    refPaths:
-    - path: build/debian-hyperkube-base/Makefile
-      match: TAG\?=
 
   - name: "k8s.gcr.io/debian-hyperkube-base: dependents"
     version: 1.1.1
