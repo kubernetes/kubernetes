@@ -44,6 +44,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -135,6 +136,9 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
+		e2eskipper.SkipUnlessAtLeast(len(nodes.Items), 3, "load-balancer test requires at least 3 schedulable nodes")
 		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
