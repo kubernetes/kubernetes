@@ -15,7 +15,6 @@ filegroup(
         ":package-srcs",
         "//cluster/addons:all-srcs",
         "//cluster/gce:all-srcs",
-        "//cluster/images/conformance:all-srcs",
         "//cluster/images/etcd-version-monitor:all-srcs",
         "//cluster/images/etcd/cp:all-srcs",
         "//cluster/images/etcd/migrate:all-srcs",

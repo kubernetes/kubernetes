@@ -9,7 +9,7 @@ go_library(
         "env.go",
         "tar.go",
     ],
-    importpath = "k8s.io/kubernetes/cluster/images/conformance/go-runner",
+    importpath = "k8s.io/kubernetes/test/images/conformance/go-runner",
     visibility = ["//visibility:private"],
     deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
