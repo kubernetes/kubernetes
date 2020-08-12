@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -650,6 +650,8 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	waitForNumProxyLoops(t, p, 0)
+
+	p.syncProxyRules() // ensure the endpoint has been deleted
 
 	// need to add endpoint here because it got clean up during service delete
 	lb.OnEndpointsAdd(endpoint)
