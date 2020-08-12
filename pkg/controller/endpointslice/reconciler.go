@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -180,8 +179,6 @@ func (r *reconciler) finalize(
 	slicesToDelete []*discovery.EndpointSlice,
 	triggerTime time.Time,
 ) error {
-	errs := []error{}
-
 	// If there are slices to create and delete, change the creates to updates
 	// of the slices that would otherwise be deleted.
 	for i := 0; i < len(slicesToDelete); {
@@ -218,11 +215,10 @@ func (r *reconciler) finalize(
 				if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					return nil
 				}
-				errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
-			} else {
-				r.endpointSliceTracker.Update(createdSlice)
-				metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
+				return fmt.Errorf("failed to create EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err)
 			}
+			r.endpointSliceTracker.Update(createdSlice)
+			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
 
@@ -230,24 +226,22 @@ func (r *reconciler) finalize(
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
 		updatedSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
-		} else {
-			r.endpointSliceTracker.Update(updatedSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
+			return fmt.Errorf("failed to update %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err)
 		}
+		r.endpointSliceTracker.Update(updatedSlice)
+		metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 	}
 
 	for _, endpointSlice := range slicesToDelete {
 		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
-		} else {
-			r.endpointSliceTracker.Delete(endpointSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+			return fmt.Errorf("failed to delete %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err)
 		}
+		r.endpointSliceTracker.Delete(endpointSlice)
+		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
-	return utilerrors.NewAggregate(errs)
+	return nil
 }
 
 // reconcileByPortMapping compares the endpoints found in existing slices with
