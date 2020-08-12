@@ -1,9 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-approvers:
-- msau42
-- cofyc
-reviewers:
-- msau42
-- cofyc
-- lichuqiang
