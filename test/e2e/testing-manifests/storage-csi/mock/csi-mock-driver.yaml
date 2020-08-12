@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: gcr.io/k8s-staging-csi/csi-provisioner:v2.0.0-rc1
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v1.6.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
@@ -29,7 +29,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: gcr.io/k8s-staging-csi/csi-node-driver-registrar:v1.2.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v1.3.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -48,7 +48,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: gcr.io/k8s-staging-csi/mock-driver:v3.1.0
+          image: k8s.gcr.io/sig-storage/mock-driver:v3.1.0
           args:
             - "--name=mock.storage.k8s.io"
             - "--permissive-target-path" # because of https://github.com/kubernetes/kubernetes/issues/75535
