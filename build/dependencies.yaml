@@ -1,7 +1,7 @@
 dependencies:
   # Bazel
   - name: "repo-infra"
-    version: 0.0.11
+    version: 0.0.12
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
