@@ -658,9 +658,6 @@ func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...
 		InvolvedObject: ref,
 		Reason:         reason,
 		Message:        fmt.Sprintf(messageFmt, args...),
-		FirstTimestamp: t,
-		LastTimestamp:  t,
-		Count:          1,
 		Type:           eventType,
 		Source:         corev1.EventSource{Component: "apiserver", Host: host},
 	}
