@@ -17,7 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/aarnaud/k8s-directx-device-plugin/pkg/gpu-detection"
+	"github.com/k8s.io/kubernetes/test/images/directx-device-plugin/pkg/gpu-detection"
 	"github.com/golang/glog"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
