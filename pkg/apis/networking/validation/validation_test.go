@@ -2274,6 +2274,67 @@ func TestValidateIngressTLS(t *testing.T) {
 	}
 }
 
+// TestValidateEmptyIngressTLS verifies that an empty TLS configuration can be
+// specified, which ingress controllers may interpret to mean that TLS should be
+// used with a default certificate that the ingress controller furnishes.
+func TestValidateEmptyIngressTLS(t *testing.T) {
+	pathTypeImplementationSpecific := networking.PathTypeImplementationSpecific
+	serviceBackend := &networking.IngressServiceBackend{
+		Name: "defaultbackend",
+		Port: networking.ServiceBackendPort{
+			Number: 443,
+		},
+	}
+	defaultBackend := networking.IngressBackend{
+		Service: serviceBackend,
+	}
+	newValid := func() networking.Ingress {
+		return networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: networking.IngressSpec{
+				Rules: []networking.IngressRule{
+					{
+						Host: "foo.bar.com",
+						IngressRuleValue: networking.IngressRuleValue{
+							HTTP: &networking.HTTPIngressRuleValue{
+								Paths: []networking.HTTPIngressPath{
+									{
+										PathType: &pathTypeImplementationSpecific,
+										Backend:  defaultBackend,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	validCases := map[string]networking.Ingress{}
+	goodEmptyTLS := newValid()
+	goodEmptyTLS.Spec.TLS = []networking.IngressTLS{
+		{},
+	}
+	validCases[fmt.Sprintf("spec.tls[0]: Valid value: %v", goodEmptyTLS.Spec.TLS[0])] = goodEmptyTLS
+	goodEmptyHosts := newValid()
+	goodEmptyHosts.Spec.TLS = []networking.IngressTLS{
+		{
+			Hosts: []string{},
+		},
+	}
+	validCases[fmt.Sprintf("spec.tls[0]: Valid value: %v", goodEmptyHosts.Spec.TLS[0])] = goodEmptyHosts
+	for k, v := range validCases {
+		errs := validateIngress(&v, IngressValidationOptions{}, networkingv1beta1.SchemeGroupVersion)
+		if len(errs) != 0 {
+			t.Errorf("expected success for %q", k)
+		}
+	}
+}
+
 func TestValidateIngressStatusUpdate(t *testing.T) {
 	serviceBackend := &networking.IngressServiceBackend{
 		Name: "defaultbackend",
