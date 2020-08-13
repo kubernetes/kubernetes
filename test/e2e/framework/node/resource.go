@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	testutils "k8s.io/kubernetes/test/utils"
 	"net"
 	"strings"
 	"time"
@@ -59,20 +60,6 @@ const (
 )
 
 var (
-	// unreachableTaintTemplate is the taint for when a node becomes unreachable.
-	// Copied from pkg/controller/nodelifecycle to avoid pulling extra dependencies
-	unreachableTaintTemplate = &v1.Taint{
-		Key:    v1.TaintNodeUnreachable,
-		Effect: v1.TaintEffectNoExecute,
-	}
-
-	// notReadyTaintTemplate is the taint for when a node is not ready for executing pods.
-	// Copied from pkg/controller/nodelifecycle to avoid pulling extra dependencies
-	notReadyTaintTemplate = &v1.Taint{
-		Key:    v1.TaintNodeNotReady,
-		Effect: v1.TaintEffectNoExecute,
-	}
-
 	// updateTaintBackOff contains the maximum retries and the wait interval between two retries.
 	updateTaintBackOff = wait.Backoff{
 		Steps:    5,
@@ -101,74 +88,14 @@ func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) string {
 	return ""
 }
 
-func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
-	// Check the node readiness condition (logging all).
-	for _, cond := range node.Status.Conditions {
-		// Ensure that the condition type and the status matches as desired.
-		if cond.Type == conditionType {
-			// For NodeReady condition we need to check Taints as well
-			if cond.Type == v1.NodeReady {
-				hasNodeControllerTaints := false
-				// For NodeReady we need to check if Taints are gone as well
-				taints := node.Spec.Taints
-				for _, taint := range taints {
-					if taint.MatchTaint(unreachableTaintTemplate) || taint.MatchTaint(notReadyTaintTemplate) {
-						hasNodeControllerTaints = true
-						break
-					}
-				}
-				if wantTrue {
-					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
-						return true
-					}
-					msg := ""
-					if !hasNodeControllerTaints {
-						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-					} else {
-						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
-					}
-					if !silent {
-						e2elog.Logf(msg)
-					}
-					return false
-				}
-				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-				if cond.Status != v1.ConditionTrue {
-					return true
-				}
-				if !silent {
-					e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-				}
-				return false
-			}
-			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
-				return true
-			}
-			if !silent {
-				e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-			}
-			return false
-		}
-
-	}
-	if !silent {
-		e2elog.Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
-	}
-	return false
-}
-
 // IsConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
 func IsConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
 }
 
 // IsConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
 func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
 // isConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.

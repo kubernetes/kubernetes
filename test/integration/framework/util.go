@@ -31,9 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -148,12 +146,12 @@ func IsNodeReady(node *v1.Node) bool {
 
 // IsConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
 func IsConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
 }
 
 // IsConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
 func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
 // isConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
@@ -164,66 +162,6 @@ func isConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 		}
 	}
 	return true
-}
-
-func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
-	// Check the node readiness condition (logging all).
-	for _, cond := range node.Status.Conditions {
-		// Ensure that the condition type and the status matches as desired.
-		if cond.Type == conditionType {
-			// For NodeReady condition we need to check Taints as well
-			if cond.Type == v1.NodeReady {
-				hasNodeControllerTaints := false
-				// For NodeReady we need to check if Taints are gone as well
-				taints := node.Spec.Taints
-				for _, taint := range taints {
-					if taint.MatchTaint(nodectlr.UnreachableTaintTemplate) || taint.MatchTaint(nodectlr.NotReadyTaintTemplate) {
-						hasNodeControllerTaints = true
-						break
-					}
-				}
-				if wantTrue {
-					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
-						return true
-					}
-					msg := ""
-					if !hasNodeControllerTaints {
-						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-					} else {
-						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
-					}
-					if !silent {
-						klog.Infof(msg)
-					}
-					return false
-				}
-				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-				if cond.Status != v1.ConditionTrue {
-					return true
-				}
-				if !silent {
-					klog.Infof("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-				}
-				return false
-			}
-			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
-				return true
-			}
-			if !silent {
-				klog.Infof("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-			}
-			return false
-		}
-
-	}
-	if !silent {
-		klog.Infof("Couldn't find condition %v on node %v", conditionType, node.Name)
-	}
-	return false
 }
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
