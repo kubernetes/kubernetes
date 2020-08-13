@@ -1142,7 +1142,7 @@ func TestNodeOperators(t *testing.T) {
 			if err := cache.RemoveNode(node); err != nil {
 				t.Error(err)
 			}
-			if _, err := cache.GetNodeInfo(node.Name); err == nil {
+			if _, err := cache.getNodeInfo(node.Name); err == nil {
 				t.Errorf("The node %v should be removed.", node.Name)
 			}
 			// Check node is removed from nodeTree as well.
@@ -1797,4 +1797,17 @@ func isForgottenFromCache(p *v1.Pod, c *schedulerCache) error {
 		return errors.New("still in cache")
 	}
 	return nil
+}
+
+// getNodeInfo returns cached data for the node name.
+func (cache *schedulerCache) getNodeInfo(nodeName string) (*v1.Node, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	n, ok := cache.nodes[nodeName]
+	if !ok {
+		return nil, fmt.Errorf("node %q not found in cache", nodeName)
+	}
+
+	return n.info.Node(), nil
 }
