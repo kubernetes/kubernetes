@@ -219,16 +219,16 @@ aliases:
     - bentheelder
     - cblecker
     - fejta
-    - krzyzacy
     - ixdy
     - spiffxp
   sig-testing-approvers:
     - bentheelder
     - cblecker
     - fejta
-    - krzyzacy
     - ixdy
     - spiffxp
+    # emeritus
+    # - krzyzacy
   sig-node-approvers:
     - Random-Liu
     - dchen1107
