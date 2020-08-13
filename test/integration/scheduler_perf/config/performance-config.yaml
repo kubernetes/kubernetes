@@ -212,6 +212,11 @@
     numPodsToSchedule: 2000
 - template:
     desc: MixedSchedulingBasePod
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      labelNodePrepareStrategy:
+        labelKey: "topology.kubernetes.io/zone"
+        labelValues: ["zone1"]
     initPods:
     - podTemplatePath: config/pod-default.yaml
     - podTemplatePath: config/pod-with-pod-affinity.yaml
