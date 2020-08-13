@@ -709,9 +709,11 @@ func FindVolumeGlobalMountPoints(hostExec HostExec, node *v1.Node) sets.String {
 // CreateDriverNamespace creates a namespace for CSI driver installation.
 // The namespace is still tracked and ensured that gets deleted when test terminates.
 func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
-	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.BaseName))
-	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
-		"e2e-framework": f.BaseName,
+	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.Namespace.Name))
+	// The driver namespace will be bound to the test namespace in the prefix
+	namespace, err := f.CreateNamespace(f.Namespace.Name, map[string]string{
+		"e2e-framework":      f.BaseName,
+		"e2e-test-namespace": f.Namespace.Name,
 	})
 	framework.ExpectNoError(err)
 
