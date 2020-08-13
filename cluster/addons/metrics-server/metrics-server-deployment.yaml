@@ -41,9 +41,10 @@ spec:
       labels:
         k8s-app: metrics-server
         version: v0.3.6
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-cluster-critical
       serviceAccountName: metrics-server
       nodeSelector:
