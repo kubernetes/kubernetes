@@ -60,7 +60,7 @@ var (
 	defaultPathType     = networking.PathTypeImplementationSpecific
 	defaultPathMap      = map[string]string{defaultPath: defaultBackendName}
 	defaultTLS          = []networking.IngressTLS{
-		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
+		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "foosecret"},
 	}
 	serviceBackend = &networking.IngressServiceBackend{
 		Name: "defaultbackend",
@@ -173,7 +173,7 @@ func TestUpdate(t *testing.T) {
 			})
 			object.Spec.TLS = append(object.Spec.TLS, networking.IngressTLS{
 				Hosts:      []string{"*.google.com"},
-				SecretName: "googleSecret",
+				SecretName: "googlesecret",
 			})
 			return object
 		},
