@@ -36,7 +36,6 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -527,12 +526,12 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 				return
 			default:
 			}
-			pods, err := scache.ListPods(labels.Everything())
+			pods, err := scache.PodCount()
 			if err != nil {
 				errChan <- fmt.Errorf("cache.List failed: %v", err)
 				return
 			}
-			if len(pods) == 0 {
+			if pods == 0 {
 				close(waitPodExpireChan)
 				return
 			}
