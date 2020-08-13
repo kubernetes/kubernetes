@@ -3,14 +3,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "doc.go",
-        "elements.go",
-        "equals.go",
-        "schemaschema.go",
+        "conflict.go",
+        "update.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v3/schema",
-    importpath = "sigs.k8s.io/structured-merge-diff/v3/schema",
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v4/merge",
+    importpath = "sigs.k8s.io/structured-merge-diff/v4/merge",
     visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/fieldpath:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/typed:go_default_library",
+    ],
 )
 
 filegroup(

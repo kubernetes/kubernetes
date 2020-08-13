@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/v3/schema"
+	"sigs.k8s.io/structured-merge-diff/v4/schema"
 )
 
 // ToSchema converts openapi definitions into a schema suitable for structured
@@ -263,7 +263,7 @@ func makeUnion(extensions map[string]interface{}) (schema.Union, error) {
 				return schema.Union{}, fmt.Errorf(`"fields-to-discriminateBy"/%v: value must be a string, got: %#v`, field, value)
 			}
 			union.Fields = append(union.Fields, schema.UnionField{
-				FieldName:       field,
+				FieldName:          field,
 				DiscriminatorValue: discriminated,
 			})
 
