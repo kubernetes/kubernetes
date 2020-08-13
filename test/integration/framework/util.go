@@ -166,6 +166,7 @@ func isConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 	return true
 }
 
+// isNodeConditionSetAsExpected checks a node for a condition, and returns 'true' if the wanted value is the same as the condition value, useful for polling until a condition on a node is met.
 func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
