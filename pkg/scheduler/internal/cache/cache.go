@@ -22,13 +22,11 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -316,12 +314,9 @@ func (cache *schedulerCache) removeDeletedNodesFromSnapshot(snapshot *Snapshot) 
 	}
 }
 
-func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
-	alwaysTrue := func(p *v1.Pod) bool { return true }
-	return cache.FilteredList(alwaysTrue, selector)
-}
-
-func (cache *schedulerCache) FilteredList(podFilter schedulerlisters.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+// PodCount returns the number of pods in the cache (including those from deleted nodes).
+// DO NOT use outside of tests.
+func (cache *schedulerCache) PodCount() (int, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 	// podFilter is expected to return true for most or all of the pods. We
@@ -331,15 +326,11 @@ func (cache *schedulerCache) FilteredList(podFilter schedulerlisters.PodFilter, 
 	for _, n := range cache.nodes {
 		maxSize += len(n.info.Pods())
 	}
-	pods := make([]*v1.Pod, 0, maxSize)
+	count := 0
 	for _, n := range cache.nodes {
-		for _, pod := range n.info.Pods() {
-			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
-			}
-		}
+		count += len(n.info.Pods())
 	}
-	return pods, nil
+	return count, nil
 }
 
 func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
@@ -740,19 +731,6 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 	delete(cache.assumedPods, key)
 	delete(cache.podStates, key)
 	return nil
-}
-
-// GetNodeInfo returns cached data for the node name.
-func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	n, ok := cache.nodes[nodeName]
-	if !ok {
-		return nil, fmt.Errorf("node %q not found in cache", nodeName)
-	}
-
-	return n.info.Node(), nil
 }
 
 // updateMetrics updates cache size metric values for pods, assumed pods, and nodes
