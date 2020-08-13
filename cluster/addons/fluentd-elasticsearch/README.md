@@ -79,8 +79,6 @@ avoid Fluentd pods scheduling there.
 [daemonSet]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [k8sElasticsearchDocs]: https://kubernetes.io/docs/tasks/debug-application-cluster/logging-elasticsearch-kibana
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/fluentd-elasticsearch/README.md?pixel)]()
-
 ## Running EFK stack in production
 
 The configurations provided here for Elasticsearch, Fluentd & Kibana (EFK),
