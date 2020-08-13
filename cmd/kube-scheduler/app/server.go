@@ -283,8 +283,9 @@ func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.Recor
 		return cc.EventBroadcaster.NewRecorder(name)
 	}
 }
+
 // startInformers starts the informers that the scheduler needed.
-func startInformers(factory informers.SharedInformerFactory,stopChan <- chan struct{}){
+func startInformers(factory informers.SharedInformerFactory, stopChan <-chan struct{}) {
 	// Start Informers
 	go factory.Core().V1().Pods().Informer().Run(stopChan)
 	go factory.Core().V1().PersistentVolumes().Informer().Run(stopChan)
