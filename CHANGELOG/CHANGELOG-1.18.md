@@ -13,6 +13,15 @@
     - [Added](#added)
     - [Changed](#changed)
     - [Removed](#removed)
+- [v1.18.7](#v1187)
+  - [Downloads for v1.18.7](#downloads-for-v1187)
+  - [Changelog since v1.18.6](#changelog-since-v1186)
+  - [Changes by Kind](#changes-by-kind)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
+  - [Dependencies](#dependencies)
+    - [Added](#added)
+    - [Changed](#changed)
+    - [Removed](#removed)
 - [v1.18.6](#v1186)
   - [Downloads for v1.18.6](#downloads-for-v1186)
     - [Source Code](#source-code-1)
@@ -257,6 +266,52 @@ _Nothing has changed._
 
 ### Changed
 _Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
+# v1.18.7
+
+
+## Downloads for v1.18.7
+
+Release artifacts for 1.18.7 and 1.17.10 are incomplete. __Do not use these releases.__
+
+# Changelog since v1.18.6
+
+## Changes by Kind
+
+### Bug or Regression
+
+- Do not add nodes labeled with kubernetes.azure.com/managed=false to backend pool of load balancer. ([#93034](https://github.com/kubernetes/kubernetes/pull/93034), [@matthias50](https://github.com/matthias50)) [SIG Cloud Provider]
+- Fix an issue with container restarts using a modified configmap or secret subpath volume mount. ([#89629](https://github.com/kubernetes/kubernetes/pull/89629), [@fatedier](https://github.com/fatedier)) [SIG Architecture, Storage and Testing]
+- Fix instance not found issues when an Azure Node is recreated in a short time ([#93316](https://github.com/kubernetes/kubernetes/pull/93316), [@feiskyer](https://github.com/feiskyer)) [SIG Cloud Provider]
+- Fix: initial delay in mounting azure disk & file ([#93052](https://github.com/kubernetes/kubernetes/pull/93052), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Fixed a bug whereby the allocation of reusable CPUs and devices was not being honored when the TopologyManager was enabled ([#93189](https://github.com/kubernetes/kubernetes/pull/93189), [@klueska](https://github.com/klueska)) [SIG Node]
+- Fixed a performance issue applying json patches to deeply nested objects ([#93811](https://github.com/kubernetes/kubernetes/pull/93811), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle and Instrumentation]
+- Fixes a regression in kube-apiserver causing 500 errors from the `/readyz` endpoint ([#93642](https://github.com/kubernetes/kubernetes/pull/93642), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG API Machinery]
+
+### Other (Cleanup or Flake)
+
+- Build: Update Debian base images
+  - debian-base:v2.1.3
+  - debian-iptables:v12.1.2
+  - debian-hyperkube-base:v1.1.3 ([#93754](https://github.com/kubernetes/kubernetes/pull/93754), [@justaugustus](https://github.com/justaugustus)) [SIG API Machinery, Cluster Lifecycle, Release and Testing]
+- Update Golang to v1.13.14
+  - Update bazel to 2.2.0
+  - Update repo-infra to 0.0.8 (to support go1.14.6 and go1.13.14)
+    - Includes:
+      - bazelbuild/bazel-toolchains@3.4.0
+      - bazelbuild/rules_go@v0.22.8 ([#93232](https://github.com/kubernetes/kubernetes/pull/93232), [@justaugustus](https://github.com/justaugustus)) [SIG API Machinery, Release and Testing]
+
+## Dependencies
+
+### Added
+- github.com/jessevdk/go-flags: [v1.4.0](https://github.com/jessevdk/go-flags/tree/v1.4.0)
+
+### Changed
+- github.com/evanphx/json-patch: [v4.2.0+incompatible → 162e562](https://github.com/evanphx/json-patch/compare/v4.2.0...162e562)
 
 ### Removed
 _Nothing has changed._
