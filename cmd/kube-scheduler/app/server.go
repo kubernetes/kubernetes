@@ -186,7 +186,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 	// Start all informers.
 	go cc.PodInformer.Informer().Run(ctx.Done())
-	cc.InformerFactory.Start(ctx.Done())
+	startInformers(cc.InformerFactory, ctx.Done())
 
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
@@ -281,6 +281,16 @@ func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.Recor
 	return func(name string) events.EventRecorder {
 		return cc.EventBroadcaster.NewRecorder(name)
 	}
+}
+// startInformers starts the informers that the scheduler needed.
+func startInformers(factory informers.SharedInformerFactory,stopChan <- chan struct{}){
+	// Start Informers
+	go factory.Core().V1().Pods().Informer().Run(stopChan)
+	go factory.Core().V1().PersistentVolumes().Informer().Run(stopChan)
+	go factory.Core().V1().PersistentVolumeClaims().Informer().Run(stopChan)
+	go factory.Core().V1().Services().Informer().Run(stopChan)
+	go factory.Storage().V1().StorageClasses().Informer().Run(stopChan)
+	go factory.Storage().V1().CSINodes().Informer().Run(stopChan)
 }
 
 // WithPlugin creates an Option based on plugin name and factory. Please don't remove this function: it is used to register out-of-tree plugins,
