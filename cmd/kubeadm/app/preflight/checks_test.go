@@ -266,7 +266,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "Check empty JoinConfiguration",
+			name:     "Check empty JoinConfiguration",
 			cfg:      &kubeadmapi.JoinConfiguration{},
 			expected: false,
 		},
