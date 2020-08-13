@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -53,8 +55,9 @@ func (ds *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.L
 		if err != nil {
 			return nil, err
 		}
-
-		stats = append(stats, containerStats)
+		if containerStats != nil {
+			stats = append(stats, containerStats)
+		}
 	}
 
 	return &runtimeapi.ListContainerStatsResponse{Stats: stats}, nil

@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -39,7 +39,7 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
 )
 
-// NodeStorage includes storage for nodes and all sub resources
+// NodeStorage includes storage for nodes and all sub resources.
 type NodeStorage struct {
 	Node   *REST
 	Status *StatusREST
@@ -48,6 +48,7 @@ type NodeStorage struct {
 	KubeletConnectionInfo client.ConnectionInfoGetter
 }
 
+// REST implements a RESTStorage for nodes.
 type REST struct {
 	*genericregistry.Store
 	connection     client.ConnectionInfoGetter
@@ -59,6 +60,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new Node object.
 func (r *StatusREST) New() runtime.Object {
 	return &api.Node{}
 }

@@ -20,16 +20,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	settingsapi "k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/registry/settings/podpreset"
 )
 
-// rest implements a RESTStorage for replication controllers against etcd
+// REST implements a RESTStorage for pod presets against etcd.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against replication controllers.
+// NewREST returns a RESTStorage object that will work against pod presets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &settingsapi.PodPreset{} },
@@ -39,6 +40,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		CreateStrategy: podpreset.Strategy,
 		UpdateStrategy: podpreset.Strategy,
 		DeleteStrategy: podpreset.Strategy,
+
+		// TODO: define table converter that exposes more than name/creation timestamp
+		TableConvertor: rest.NewDefaultTableConvertor(settingsapi.Resource("podpresets")),
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

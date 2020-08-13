@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -31,33 +32,135 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 			hint:     TopologyHint{nil, false},
 			expected: false,
 		},
+	}
+
+	for _, tc := range tcases {
+		numaNodes := []int{0, 1}
+		policy := NewSingleNumaNodePolicy(numaNodes)
+		result := policy.(*singleNumaNodePolicy).canAdmitPodResult(&tc.hint)
+
+		if result != tc.expected {
+			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
+		}
+	}
+}
+
+func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
+	tcases := []struct {
+		name              string
+		allResources      [][]TopologyHint
+		expectedResources [][]TopologyHint
+	}{
 		{
-			name:     "NUMANodeAffinity has multiple NUMA Nodes masked in topology hints",
-			hint:     TopologyHint{NewTestSocketMask(0, 1), true},
-			expected: false,
+			name:              "filter empty resources",
+			allResources:      [][]TopologyHint{},
+			expectedResources: [][]TopologyHint(nil),
 		},
 		{
-			name:     "NUMANodeAffinity has one NUMA Node masked in topology hints",
-			hint:     TopologyHint{NewTestSocketMask(0), true},
-			expected: true,
+			name: "filter hints with nil socket mask 1/2",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				[]TopologyHint(nil),
+				{
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+		},
+		{
+			name: "filter hints with nil socket mask 2/2",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+		},
+		{
+			name: "filter hints with empty resource socket mask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				[]TopologyHint(nil),
+			},
+		},
+		{
+			name: "filter hints with wide sockemask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 2), Preferred: false},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+				[]TopologyHint(nil),
+				[]TopologyHint(nil),
+			},
 		},
 	}
 
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
-
-		if result.Admit != tc.expected {
-			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
-		}
-
-		if tc.expected == false {
-			if len(result.Reason) == 0 {
-				t.Errorf("Expected Reason field to be not empty")
-			}
-			if len(result.Message) == 0 {
-				t.Errorf("Expected Message field to be not empty")
-			}
+		actual := filterSingleNumaHints(tc.allResources)
+		if !reflect.DeepEqual(tc.expectedResources, actual) {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected result to be %v, got %v", tc.expectedResources, actual)
 		}
 	}
+}
+
+func TestPolicySingleNumaNodeMerge(t *testing.T) {
+	numaNodes := []int{0, 1}
+	policy := NewSingleNumaNodePolicy(numaNodes)
+
+	tcases := commonPolicyMergeTestCases(numaNodes)
+	tcases = append(tcases, policy.(*singleNumaNodePolicy).mergeTestCases(numaNodes)...)
+
+	testPolicyMerge(policy, tcases, t)
 }

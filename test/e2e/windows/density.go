@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -30,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -76,8 +75,6 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 type densityTest struct {
 	// number of pods
 	podsNr int
-	// number of background pods
-	bgPodsNr int
 	// interval between creating pod (rate control)
 	interval time.Duration
 	// create pods in 'batch' or 'sequence'
@@ -85,8 +82,6 @@ type densityTest struct {
 	// API QPS limit
 	APIQPSLimit int
 	// performance limits
-	cpuLimits            e2ekubelet.ContainersCPUSummary
-	memLimits            e2ekubelet.ResourceUsagePerContainer
 	podStartupLimits     e2emetrics.LatencyMetric
 	podBatchStartupLimit time.Duration
 }
@@ -98,7 +93,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	)
 	var (
 		mutex      = &sync.Mutex{}
-		watchTimes = make(map[string]metav1.Time, 0)
+		watchTimes = make(map[string]metav1.Time)
 		stopCh     = make(chan struct{})
 	)
 
@@ -121,7 +116,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
-		e2elog.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
+		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
 	}
 
 	// Analyze results
@@ -191,12 +186,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				obj, err := f.ClientSet.CoreV1().Pods(ns).List(options)
+				obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				return f.ClientSet.CoreV1().Pods(ns).Watch(options)
+				return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Pod{},
@@ -241,7 +236,7 @@ func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}
@@ -270,7 +265,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
+			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
 			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
@@ -279,5 +274,4 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 		}(pod)
 	}
 	wg.Wait()
-	return
 }

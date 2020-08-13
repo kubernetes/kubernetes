@@ -24,14 +24,14 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["patch_test.go"],
-    data = ["//staging/src/k8s.io/kubectl/test/data"],
+    data = ["//staging/src/k8s.io/kubectl/testdata"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",

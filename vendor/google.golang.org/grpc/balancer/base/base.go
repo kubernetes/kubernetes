@@ -42,6 +42,26 @@ type PickerBuilder interface {
 	Build(readySCs map[resolver.Address]balancer.SubConn) balancer.Picker
 }
 
+// V2PickerBuilder creates balancer.V2Picker.
+type V2PickerBuilder interface {
+	// Build returns a picker that will be used by gRPC to pick a SubConn.
+	Build(info PickerBuildInfo) balancer.V2Picker
+}
+
+// PickerBuildInfo contains information needed by the picker builder to
+// construct a picker.
+type PickerBuildInfo struct {
+	// ReadySCs is a map from all ready SubConns to the Addresses used to
+	// create them.
+	ReadySCs map[balancer.SubConn]SubConnInfo
+}
+
+// SubConnInfo contains information about a SubConn created by the base
+// balancer.
+type SubConnInfo struct {
+	Address resolver.Address // the address used to create this SubConn
+}
+
 // NewBalancerBuilder returns a balancer builder. The balancers
 // built by this builder will use the picker builder to build pickers.
 func NewBalancerBuilder(name string, pb PickerBuilder) balancer.Builder {
@@ -60,5 +80,14 @@ func NewBalancerBuilderWithConfig(name string, pb PickerBuilder, config Config) 
 		name:          name,
 		pickerBuilder: pb,
 		config:        config,
+	}
+}
+
+// NewBalancerBuilderV2 returns a base balancer builder configured by the provided config.
+func NewBalancerBuilderV2(name string, pb V2PickerBuilder, config Config) balancer.Builder {
+	return &baseBuilder{
+		name:            name,
+		v2PickerBuilder: pb,
+		config:          config,
 	}
 }

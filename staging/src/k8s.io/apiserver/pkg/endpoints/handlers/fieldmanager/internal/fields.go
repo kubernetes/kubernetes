@@ -21,12 +21,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // EmptyFields represents a set with no paths
 // It looks like metav1.Fields{Raw: []byte("{}")}
-var EmptyFields metav1.FieldsV1 = func() metav1.FieldsV1 {
+var EmptyFields = func() metav1.FieldsV1 {
 	f, err := SetToFields(*fieldpath.NewSet())
 	if err != nil {
 		panic("should never happen")

@@ -49,17 +49,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -86,7 +90,7 @@ func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOpt
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
+	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -188,7 +192,7 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
-		Body(obj).Do().Get()
+		Body(obj).Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to create object: %v: %v", err, resp)
 	}
@@ -197,7 +201,7 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do()
+		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do(context.TODO())
 	var statusCode int
 	result.StatusCode(&statusCode)
 	if statusCode != 422 {
@@ -208,10 +212,56 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do()
+		Body([]byte(`{"metadata":{"annotations":{"foo":["bar"]}}}`)).Do(context.TODO())
 	result.StatusCode(&statusCode)
 	if statusCode != 422 {
 		t.Fatalf("Expected status code to be 422, got %v (%#v)", statusCode, result)
+	}
+}
+
+func TestCacheControl(t *testing.T) {
+	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&framework.MasterConfigOptions{})
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	master, _, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
+
+	rt, err := restclient.TransportFor(master.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := []string{
+		// untyped
+		"/",
+		// health
+		"/healthz",
+		// openapi
+		"/openapi/v2",
+		// discovery
+		"/api",
+		"/api/v1",
+		"/apis",
+		"/apis/apps",
+		"/apis/apps/v1",
+		// apis
+		"/api/v1/namespaces",
+		"/apis/apps/v1/deployments",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest("GET", master.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cc := resp.Header.Get("Cache-Control")
+			if !strings.Contains(cc, "private") {
+				t.Errorf("expected private cache-control, got %q", cc)
+			}
+		})
 	}
 }
 
@@ -227,7 +277,7 @@ func Test202StatusCode(t *testing.T) {
 
 	// 1. Create the resource without any finalizer and then delete it without setting DeleteOptions.
 	// Verify that server returns 200 in this case.
-	rs, err := rsClient.Create(newRS(ns.Name))
+	rs, err := rsClient.Create(context.TODO(), newRS(ns.Name), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -237,7 +287,7 @@ func Test202StatusCode(t *testing.T) {
 	// Verify that the apiserver still returns 200 since DeleteOptions.OrphanDependents is not set.
 	rs = newRS(ns.Name)
 	rs.ObjectMeta.Finalizers = []string{"kube.io/dummy-finalizer"}
-	rs, err = rsClient.Create(rs)
+	rs, err = rsClient.Create(context.TODO(), rs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -246,7 +296,7 @@ func Test202StatusCode(t *testing.T) {
 	// 3. Create the resource and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server still returns 200 since the resource is immediately deleted.
 	rs = newRS(ns.Name)
-	rs, err = rsClient.Create(rs)
+	rs, err = rsClient.Create(context.TODO(), rs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -256,11 +306,238 @@ func Test202StatusCode(t *testing.T) {
 	// Verify that the server returns 202 in this case.
 	rs = newRS(ns.Name)
 	rs.ObjectMeta.Finalizers = []string{"kube.io/dummy-finalizer"}
-	rs, err = rsClient.Create(rs)
+	rs, err = rsClient.Create(context.TODO(), rs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
 	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
+}
+
+var (
+	invalidContinueToken        = "invalidContinueToken"
+	invalidResourceVersion      = "invalid"
+	invalidResourceVersionMatch = metav1.ResourceVersionMatch("InvalidMatch")
+)
+
+// TestListOptions ensures that list works as expected for valid and invalid combinations of limit, continue,
+// resourceVersion and resourceVersionMatch.
+func TestListOptions(t *testing.T) {
+	for _, watchCacheEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
+			etcdOptions := framework.DefaultEtcdOptions()
+			etcdOptions.EnableWatchCache = watchCacheEnabled
+			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			defer closeFn()
+
+			ns := framework.CreateTestingNamespace("list-options", s, t)
+			defer framework.DeleteTestingNamespace(ns, s, t)
+
+			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
+
+			var compactedRv, oldestUncompactedRv string
+			for i := 0; i < 15; i++ {
+				rs := newRS(ns.Name)
+				rs.Name = fmt.Sprintf("test-%d", i)
+				created, err := rsClient.Create(context.Background(), rs, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if i == 0 {
+					compactedRv = created.ResourceVersion // We compact this first resource version below
+				}
+				// delete the first 5, and then compact them
+				if i < 5 {
+					var zero int64
+					if err := rsClient.Delete(context.Background(), rs.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil {
+						t.Fatal(err)
+					}
+					oldestUncompactedRv = created.ResourceVersion
+				}
+			}
+
+			// compact some of the revision history in etcd so we can test "too old" resource versions
+			_, kvClient, err := integration.GetEtcdClients(etcdOptions.StorageConfig.Transport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			revision, err := strconv.Atoi(oldestUncompactedRv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = kvClient.Compact(context.Background(), int64(revision))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			listObj, err := rsClient.List(context.Background(), metav1.ListOptions{
+				Limit: 6,
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			validContinueToken := listObj.Continue
+
+			// test all combinations of these, for both watch cache enabled and disabled:
+			limits := []int64{0, 6}
+			continueTokens := []string{"", validContinueToken, invalidContinueToken}
+			rvs := []string{"", "0", compactedRv, invalidResourceVersion}
+			rvMatches := []metav1.ResourceVersionMatch{
+				"",
+				metav1.ResourceVersionMatchNotOlderThan,
+				metav1.ResourceVersionMatchExact,
+				invalidResourceVersionMatch,
+			}
+
+			for _, limit := range limits {
+				for _, continueToken := range continueTokens {
+					for _, rv := range rvs {
+						for _, rvMatch := range rvMatches {
+							rvName := ""
+							switch rv {
+							case "":
+								rvName = "empty"
+							case "0":
+								rvName = "0"
+							case compactedRv:
+								rvName = "compacted"
+							case invalidResourceVersion:
+								rvName = "invalid"
+							default:
+								rvName = "unknown"
+							}
+
+							continueName := ""
+							switch continueToken {
+							case "":
+								continueName = "empty"
+							case validContinueToken:
+								continueName = "valid"
+							case invalidContinueToken:
+								continueName = "invalid"
+							default:
+								continueName = "unknown"
+							}
+
+							name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueName, rvName, rvMatch)
+							t.Run(name, func(t *testing.T) {
+								opts := metav1.ListOptions{
+									ResourceVersion:      rv,
+									ResourceVersionMatch: rvMatch,
+									Continue:             continueToken,
+									Limit:                limit,
+								}
+								testListOptionsCase(t, rsClient, watchCacheEnabled, opts, compactedRv)
+							})
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watchCacheEnabled bool, opts metav1.ListOptions, compactedRv string) {
+	listObj, err := rsClient.List(context.Background(), opts)
+
+	// check for expected validation errors
+	if opts.ResourceVersion == "" && opts.ResourceVersionMatch != "" {
+		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch is forbidden unless resourceVersion is provided") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
+	if opts.Continue != "" && opts.ResourceVersionMatch != "" {
+		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch is forbidden when continue is provided") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersionMatch == invalidResourceVersionMatch {
+		if err == nil || !strings.Contains(err.Error(), "supported values") {
+			t.Fatalf("expected not supported error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact && opts.ResourceVersion == "0" {
+		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch \"exact\" is forbidden for resourceVersion \"0\"") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
+	if opts.ResourceVersion == invalidResourceVersion {
+		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
+			t.Fatalf("expecting invalid value error, but got: %v", err)
+		}
+		return
+	}
+	if opts.Continue == invalidContinueToken {
+		if err == nil || !strings.Contains(err.Error(), "continue key is not valid") {
+			t.Fatalf("expected continue key not valid error, but got: %v", err)
+		}
+		return
+	}
+	// Should not be allowed for any resource version, but tightening the validation would be a breaking change
+	if opts.Continue != "" && !(opts.ResourceVersion == "" || opts.ResourceVersion == "0") {
+		if err == nil || !strings.Contains(err.Error(), "specifying resource version is not allowed when using continue") {
+			t.Fatalf("expected not allowed error, but got: %v", err)
+		}
+		return
+	}
+
+	// Check for too old errors
+	isExact := opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	// Legacy corner cases that can be avoided by using an explicit resourceVersionMatch value
+	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#the-resourceversion-parameter
+	isLegacyExact := opts.Limit > 0 && opts.ResourceVersionMatch == ""
+
+	if opts.ResourceVersion == compactedRv && (isExact || isLegacyExact) {
+		if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+			t.Fatalf("expected too old error, but got: %v", err)
+		}
+		return
+	}
+
+	// test successful responses
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, err := meta.ExtractList(listObj)
+	if err != nil {
+		t.Fatalf("Failed to extract list from %v", listObj)
+	}
+	count := int64(len(items))
+
+	// Cacher.GetToList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// the limit is respected when testing here.
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	hasContinuation := pagingEnabled && len(opts.Continue) > 0
+	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
+	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
+	usingWatchCache := watchCacheEnabled && !skipWatchCache
+
+	if usingWatchCache { // watch cache does not respect limit and is not used for continue
+		if count != 10 {
+			t.Errorf("Expected list size to be 10 but got %d", count) // limit is ignored if watch cache is hit
+		}
+		return
+	}
+
+	if opts.Continue != "" {
+		if count != 4 {
+			t.Errorf("Expected list size of 4 but got %d", count)
+		}
+		return
+	}
+	if opts.Limit > 0 {
+		if count != opts.Limit {
+			t.Errorf("Expected list size to be limited to %d but got %d", opts.Limit, count)
+		}
+		return
+	}
+	if count != 10 {
+		t.Errorf("Expected list size to be 10 but got %d", count)
+	}
 }
 
 func TestListResourceVersion0(t *testing.T) {
@@ -293,18 +570,32 @@ func TestListResourceVersion0(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				rs := newRS(ns.Name)
 				rs.Name = fmt.Sprintf("test-%d", i)
-				if _, err := rsClient.Create(rs); err != nil {
+				if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
 				}
 			}
 
+			if tc.watchCacheEnabled {
+				// poll until the watch cache has the full list in memory
+				err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+					list, err := clientSet.AppsV1().ReplicaSets(ns.Name).List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+					if err != nil {
+						return false, err
+					}
+					return len(list.Items) == 10, nil
+				})
+				if err != nil {
+					t.Fatalf("error waiting for watch cache to observe the full list: %v", err)
+				}
+			}
+
 			pagerFn := func(opts metav1.ListOptions) (runtime.Object, error) {
-				return rsClient.List(opts)
+				return rsClient.List(context.TODO(), opts)
 			}
 
 			p := pager.New(pager.SimplePageFunc(pagerFn))
 			p.PageSize = 3
-			listObj, err := p.List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+			listObj, _, err := p.List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
 			if err != nil {
 				t.Fatalf("Unexpected list error: %v", err)
 			}
@@ -332,7 +623,7 @@ func TestAPIListChunking(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		rs := newRS(ns.Name)
 		rs.Name = fmt.Sprintf("test-%d", i)
-		if _, err := rsClient.Create(rs); err != nil {
+		if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -343,7 +634,7 @@ func TestAPIListChunking(t *testing.T) {
 		PageSize: 1,
 		PageFn: pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
 			calls++
-			list, err := rsClient.List(opts)
+			list, err := rsClient.List(context.TODO(), opts)
 			if err != nil {
 				return nil, err
 			}
@@ -353,14 +644,14 @@ func TestAPIListChunking(t *testing.T) {
 			if calls == 2 {
 				rs := newRS(ns.Name)
 				rs.Name = "test-5"
-				if _, err := rsClient.Create(rs); err != nil {
+				if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
 					t.Fatal(err)
 				}
 			}
 			return list, err
 		}),
 	}
-	listObj, err := p.List(context.Background(), metav1.ListOptions{})
+	listObj, _, err := p.List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,17 +694,15 @@ func TestNameInFieldSelector(t *testing.T) {
 	defer closeFn()
 
 	numNamespaces := 3
-	namespaces := make([]*v1.Namespace, 0, numNamespaces)
 	for i := 0; i < 3; i++ {
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
-		namespaces = append(namespaces, ns)
 
-		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("foo"))
+		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("foo"), metav1.CreateOptions{})
 		if err != nil {
 			t.Errorf("Couldn't create secret: %v", err)
 		}
-		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("bar"))
+		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("bar"), metav1.CreateOptions{})
 		if err != nil {
 			t.Errorf("Couldn't create secret: %v", err)
 		}
@@ -460,7 +749,7 @@ func TestNameInFieldSelector(t *testing.T) {
 		opts := metav1.ListOptions{
 			FieldSelector: tc.selector,
 		}
-		secrets, err := clientSet.CoreV1().Secrets(tc.namespace).List(opts)
+		secrets, err := clientSet.CoreV1().Secrets(tc.namespace).List(context.TODO(), opts)
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", tc.selector, err)
 		}
@@ -536,7 +825,7 @@ func TestMetadataClient(t *testing.T) {
 			name: "list, get, patch, and delete via metadata client",
 			want: func(t *testing.T) {
 				ns := "metadata-builtin"
-				svc, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
@@ -549,7 +838,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 
 				client := metadata.NewForConfigOrDie(cfg).Resource(v1.SchemeGroupVersion.WithResource("services"))
-				items, err := client.Namespace(ns).List(metav1.ListOptions{})
+				items, err := client.Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -568,7 +857,7 @@ func TestMetadataClient(t *testing.T) {
 				}
 				wrapper.resp = nil
 
-				item, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{})
+				item, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -579,7 +868,7 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected response: %#v", wrapper.resp)
 				}
 
-				item, err = client.Namespace(ns).Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
+				item, err = client.Namespace(ns).Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -587,11 +876,11 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected object: %#v", item)
 				}
 
-				if err := client.Namespace(ns).Delete("test-1", &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
+				if err := client.Namespace(ns).Delete(context.TODO(), "test-1", metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
 					t.Fatal(err)
 				}
 
-				if _, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+				if _, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 					t.Fatal(err)
 				}
 			},
@@ -601,7 +890,7 @@ func TestMetadataClient(t *testing.T) {
 			want: func(t *testing.T) {
 				ns := "metadata-crd"
 				crclient := dynamicClient.Resource(crdGVR).Namespace(ns)
-				cr, err := crclient.Create(&unstructured.Unstructured{
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "cr.bar.com/v1",
 						"kind":       "Foo",
@@ -626,7 +915,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 
 				client := metadata.NewForConfigOrDie(cfg).Resource(crdGVR)
-				items, err := client.Namespace(ns).List(metav1.ListOptions{})
+				items, err := client.Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -645,7 +934,7 @@ func TestMetadataClient(t *testing.T) {
 				}
 				wrapper.resp = nil
 
-				item, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{})
+				item, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -656,7 +945,7 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected response: %#v", wrapper.resp)
 				}
 
-				item, err = client.Namespace(ns).Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
+				item, err = client.Namespace(ns).Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"foo":"baz"}}}`), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -664,10 +953,10 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unexpected object: %#v", item)
 				}
 
-				if err := client.Namespace(ns).Delete("test-1", &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
+				if err := client.Namespace(ns).Delete(context.TODO(), "test-1", metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &item.UID}}); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := client.Namespace(ns).Get("test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+				if _, err := client.Namespace(ns).Get(context.TODO(), "test-1", metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 					t.Fatal(err)
 				}
 			},
@@ -676,11 +965,11 @@ func TestMetadataClient(t *testing.T) {
 			name: "watch via metadata client",
 			want: func(t *testing.T) {
 				ns := "metadata-watch"
-				svc, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(ns).Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(ns).Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 
@@ -692,7 +981,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 
 				client := metadata.NewForConfigOrDie(cfg).Resource(v1.SchemeGroupVersion.WithResource("services"))
-				w, err := client.Namespace(ns).Watch(metav1.ListOptions{ResourceVersion: svc.ResourceVersion, Watch: true})
+				w, err := client.Namespace(ns).Watch(context.TODO(), metav1.ListOptions{ResourceVersion: svc.ResourceVersion, Watch: true})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -729,7 +1018,7 @@ func TestMetadataClient(t *testing.T) {
 			want: func(t *testing.T) {
 				ns := "metadata-watch-crd"
 				crclient := dynamicClient.Resource(crdGVR).Namespace(ns)
-				cr, err := crclient.Create(&unstructured.Unstructured{
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "cr.bar.com/v1",
 						"kind":       "Foo",
@@ -749,7 +1038,7 @@ func TestMetadataClient(t *testing.T) {
 				cfg := metadata.ConfigFor(config)
 				client := metadata.NewForConfigOrDie(cfg).Resource(crdGVR)
 
-				patched, err := client.Namespace(ns).Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{})
+				patched, err := client.Namespace(ns).Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -764,7 +1053,7 @@ func TestMetadataClient(t *testing.T) {
 				})
 				client = metadata.NewForConfigOrDie(cfg).Resource(crdGVR)
 
-				w, err := client.Namespace(ns).Watch(metav1.ListOptions{ResourceVersion: cr.GetResourceVersion(), Watch: true})
+				w, err := client.Namespace(ns).Watch(context.TODO(), metav1.ListOptions{ResourceVersion: cr.GetResourceVersion(), Watch: true})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -860,11 +1149,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			name:   "server returns 406 when asking for protobuf for CRDs, which dynamic client does not support",
 			accept: "application/vnd.kubernetes.protobuf",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -889,11 +1178,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			name:   "server returns JSON when asking for protobuf and json for CRDs",
 			accept: "application/vnd.kubernetes.protobuf,application/json",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -918,11 +1207,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			accept:      "application/vnd.kubernetes.protobuf",
 			subresource: "status",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"3"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"3"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -948,11 +1237,11 @@ func TestAPICRDProtobuf(t *testing.T) {
 			accept:      "application/vnd.kubernetes.protobuf,application/json",
 			subresource: "status",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"4"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"4"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1000,7 +1289,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 			w, err := client.Get().
 				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).SubResource(tc.subresource).
 				SetHeader("Accept", tc.accept).
-				Stream()
+				Stream(context.TODO())
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1081,11 +1370,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on CRDs in json",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1098,11 +1387,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on CRDs in json;stream=watch",
 			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1115,11 +1404,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on CRDs in yaml",
 			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1138,11 +1427,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify columns on services",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				svc, err := clientset.CoreV1().Services(testNamespace).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update service: %v", err)
 				}
 				return svc, "", "services"
@@ -1156,11 +1445,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			includeObject: metav1.IncludeNone,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1174,11 +1463,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			includeObject: metav1.IncludeObject,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-3"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-3"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1198,11 +1487,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify partial metadata object on config maps",
 			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1215,11 +1504,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify partial metadata object on config maps in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1232,11 +1521,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1beta1 verify partial metadata object on CRDs in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1337,11 +1626,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in json",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-5"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-5"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-5", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-5", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1354,11 +1643,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in json;stream=watch",
 			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-6"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-6"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-6", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-6", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1371,11 +1660,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in yaml",
 			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-7"}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-7"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch("test-7", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), "test-7", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1394,11 +1683,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on services",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				svc, err := clientset.CoreV1().Services(testNamespace).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update service: %v", err)
 				}
 				return svc, "", "services"
@@ -1412,11 +1701,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
 			includeObject: metav1.IncludeNone,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1430,11 +1719,11 @@ func TestTransform(t *testing.T) {
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
 			includeObject: metav1.IncludeObject,
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().Services(testNamespace).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-7"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(testNamespace).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-7"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().Services(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().Services(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "services"
@@ -1454,11 +1743,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify partial metadata object on config maps",
 			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-3", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-3", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1471,11 +1760,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify partial metadata object on config maps in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-4", Annotations: map[string]string{"test": "0"}}})
+				obj, err := clientset.CoreV1().ConfigMaps(testNamespace).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-4", Annotations: map[string]string{"test": "0"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
-				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+				if _, err := clientset.CoreV1().ConfigMaps(testNamespace).Patch(context.TODO(), obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
@@ -1488,11 +1777,11 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify partial metadata object on CRDs in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-8", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				cr, err := crclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-8", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
 				}
-				if _, err := crclient.Patch(cr.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+				if _, err := crclient.Patch(context.TODO(), cr.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 				return cr, crdGVR.Group, "foos"
@@ -1613,7 +1902,7 @@ func TestTransform(t *testing.T) {
 					FieldSelector:   fields.OneTermEqualSelector("metadata.name", obj.GetName()).String(),
 				}, metav1.ParameterCodec).
 				Param("includeObject", string(tc.includeObject)).
-				Stream()
+				Stream(context.TODO())
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}

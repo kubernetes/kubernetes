@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -78,16 +79,16 @@ var _ = framework.KubeDescribe("GarbageCollect [Serial][NodeFeature:GarbageColle
 	// They differentiate pods from one another, and allow filtering
 	// by names to identify which containers belong to which pods
 	// They must be unique, and must not end in a number
-	first_suffix := "one-container-no-restarts"
-	second_suffix := "many-containers-many-restarts-one-pod"
-	third_suffix := "many-containers-many-restarts-"
+	firstSuffix := "one-container-no-restarts"
+	secondSuffix := "many-containers-many-restarts-one-pod"
+	thirdSuffix := "many-containers-many-restarts-"
 	tests := []testRun{
 		{
 			testName: "One Non-restarting Container",
 			testPods: []*testPodSpec{
 				{
-					podName:         podNamePrefix + first_suffix,
-					containerPrefix: containerNamePrefix + first_suffix,
+					podName:         podNamePrefix + firstSuffix,
+					containerPrefix: containerNamePrefix + firstSuffix,
 					restartCount:    0,
 					numContainers:   1,
 				},
@@ -97,8 +98,8 @@ var _ = framework.KubeDescribe("GarbageCollect [Serial][NodeFeature:GarbageColle
 			testName: "Many Restarting Containers",
 			testPods: []*testPodSpec{
 				{
-					podName:         podNamePrefix + second_suffix,
-					containerPrefix: containerNamePrefix + second_suffix,
+					podName:         podNamePrefix + secondSuffix,
+					containerPrefix: containerNamePrefix + secondSuffix,
 					restartCount:    4,
 					numContainers:   4,
 				},
@@ -108,20 +109,20 @@ var _ = framework.KubeDescribe("GarbageCollect [Serial][NodeFeature:GarbageColle
 			testName: "Many Pods with Many Restarting Containers",
 			testPods: []*testPodSpec{
 				{
-					podName:         podNamePrefix + third_suffix + "one",
-					containerPrefix: containerNamePrefix + third_suffix + "one",
+					podName:         podNamePrefix + thirdSuffix + "one",
+					containerPrefix: containerNamePrefix + thirdSuffix + "one",
 					restartCount:    3,
 					numContainers:   4,
 				},
 				{
-					podName:         podNamePrefix + third_suffix + "two",
-					containerPrefix: containerNamePrefix + third_suffix + "two",
+					podName:         podNamePrefix + thirdSuffix + "two",
+					containerPrefix: containerNamePrefix + thirdSuffix + "two",
 					restartCount:    2,
 					numContainers:   6,
 				},
 				{
-					podName:         podNamePrefix + third_suffix + "three",
-					containerPrefix: containerNamePrefix + third_suffix + "three",
+					podName:         podNamePrefix + thirdSuffix + "three",
+					containerPrefix: containerNamePrefix + thirdSuffix + "three",
 					restartCount:    3,
 					numContainers:   5,
 				},
@@ -244,7 +245,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func() {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")
@@ -313,7 +314,7 @@ func getRestartingContainerCommand(path string, containerNum int, restarts int32
 }
 
 func verifyPodRestartCount(f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
-	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

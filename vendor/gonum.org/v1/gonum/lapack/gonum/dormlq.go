@@ -11,10 +11,10 @@ import (
 
 // Dormlq multiplies the matrix C by the orthogonal matrix Q defined by the
 // slices a and tau. A and tau are as returned from Dgelqf.
-//  C = Q * C    if side == blas.Left and trans == blas.NoTrans
-//  C = Q^T * C  if side == blas.Left and trans == blas.Trans
-//  C = C * Q    if side == blas.Right and trans == blas.NoTrans
-//  C = C * Q^T  if side == blas.Right and trans == blas.Trans
+//  C = Q * C   if side == blas.Left and trans == blas.NoTrans
+//  C = Qᵀ * C  if side == blas.Left and trans == blas.Trans
+//  C = C * Q   if side == blas.Right and trans == blas.NoTrans
+//  C = C * Qᵀ  if side == blas.Right and trans == blas.Trans
 // If side == blas.Left, A is a matrix of side k×m, and if side == blas.Right
 // A is of size k×n. This uses a blocked algorithm.
 //

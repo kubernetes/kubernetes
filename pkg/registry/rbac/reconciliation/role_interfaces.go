@@ -17,6 +17,7 @@ limitations under the License.
 package reconciliation
 
 import (
+	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,7 +81,7 @@ type RoleModifier struct {
 }
 
 func (c RoleModifier) Get(namespace, name string) (RuleOwner, error) {
-	ret, err := c.Client.Roles(namespace).Get(name, metav1.GetOptions{})
+	ret, err := c.Client.Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 		return nil, err
 	}
 
-	ret, err := c.Client.Roles(in.GetNamespace()).Create(in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Create(context.TODO(), in.(RoleRuleOwner).Role, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 }
 
 func (c RoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Roles(in.GetNamespace()).Update(in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Update(context.TODO(), in.(RoleRuleOwner).Role, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

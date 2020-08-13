@@ -84,6 +84,9 @@ func (x *Extensions) toGoOpenAPI(ret *spec.Schema) {
 	if x.XListType != nil {
 		ret.VendorExtensible.AddExtension("x-kubernetes-list-type", *x.XListType)
 	}
+	if x.XMapType != nil {
+		ret.VendorExtensible.AddExtension("x-kubernetes-map-type", *x.XMapType)
+	}
 }
 
 func (v *ValueValidation) toGoOpenAPI(ret *spec.Schema) {

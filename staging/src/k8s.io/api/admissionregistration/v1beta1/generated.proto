@@ -131,7 +131,7 @@ message MutatingWebhook {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 11;
 
-  // SideEffects states whether this webhookk has side effects.
+  // SideEffects states whether this webhook has side effects.
   // Acceptable values are: Unknown, None, Some, NoneOnDryRun
   // Webhooks with side effects MUST implement a reconciliation system, since a request may be
   // rejected by a future step in the admission change and the side effects therefore need to be undone.
@@ -249,8 +249,8 @@ message Rule {
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
 message RuleWithOperations {
-  // Operations is the operations the admission hook cares about - CREATE, UPDATE, or *
-  // for all operations.
+  // Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
+  // for all of those operations and any future admission operations that are added.
   // If '*' is present, the length of the slice must be one.
   // Required.
   repeated string operations = 1;
@@ -385,7 +385,7 @@ message ValidatingWebhook {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 10;
 
-  // SideEffects states whether this webhookk has side effects.
+  // SideEffects states whether this webhook has side effects.
   // Acceptable values are: Unknown, None, Some, NoneOnDryRun
   // Webhooks with side effects MUST implement a reconciliation system, since a request may be
   // rejected by a future step in the admission change and the side effects therefore need to be undone.

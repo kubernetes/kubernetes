@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,15 +41,15 @@ import (
 
 var (
 	attachExample = templates.Examples(i18n.T(`
-		# Get output from running pod 123456-7890, using the first container by default
-		kubectl attach 123456-7890
+		# Get output from running pod mypod, using the first container by default
+		kubectl attach mypod
 
-		# Get output from ruby-container from pod 123456-7890
-		kubectl attach 123456-7890 -c ruby-container
+		# Get output from ruby-container from pod mypod
+		kubectl attach mypod -c ruby-container
 
-		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
+		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod mypod
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl attach 123456-7890 -c ruby-container -i -t
+		kubectl attach mypod -c ruby-container -i -t
 
 		# Get output from the first pod of a ReplicaSet named nginx
 		kubectl attach rs/nginx

@@ -17,15 +17,17 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	policy "k8s.io/api/policy/v1beta1"
 )
 
 // The EvictionExpansion interface allows manually adding extra methods to the ScaleInterface.
 type EvictionExpansion interface {
-	Evict(eviction *policy.Eviction) error
+	Evict(ctx context.Context, eviction *policy.Eviction) error
 }
 
-func (c *evictions) Evict(eviction *policy.Eviction) error {
+func (c *evictions) Evict(ctx context.Context, eviction *policy.Eviction) error {
 	return c.client.Post().
 		AbsPath("/api/v1").
 		Namespace(eviction.Namespace).
@@ -33,6 +35,6 @@ func (c *evictions) Evict(eviction *policy.Eviction) error {
 		Name(eviction.Name).
 		SubResource("eviction").
 		Body(eviction).
-		Do().
+		Do(ctx).
 		Error()
 }

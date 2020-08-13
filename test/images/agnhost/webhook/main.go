@@ -27,15 +27,16 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	// TODO: try this library to see if it generates correct json patch
 	// https://github.com/mattbaird/jsonpatch
 )
 
 var (
-	certFile string
-	keyFile  string
-	port     int
+	certFile     string
+	keyFile      string
+	port         int
+	sidecarImage string
 )
 
 // CmdWebhook is used by agnhost Cobra.
@@ -56,6 +57,8 @@ func init() {
 		"File containing the default x509 private key matching --tls-cert-file.")
 	CmdWebhook.Flags().IntVar(&port, "port", 443,
 		"Secure port that the webhook listens on")
+	CmdWebhook.Flags().StringVar(&sidecarImage, "sidecar-image", "",
+		"Image to be used as the injected sidecar")
 }
 
 // admitv1beta1Func handles a v1beta1 admission
@@ -181,6 +184,10 @@ func serveMutatePods(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, newDelegateToV1AdmitHandler(mutatePods))
 }
 
+func serveMutatePodsSidecar(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, newDelegateToV1AdmitHandler(mutatePodsSidecar))
+}
+
 func serveConfigmaps(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, newDelegateToV1AdmitHandler(admitConfigMaps))
 }
@@ -213,6 +220,7 @@ func main(cmd *cobra.Command, args []string) {
 	http.HandleFunc("/pods", servePods)
 	http.HandleFunc("/pods/attach", serveAttachingPods)
 	http.HandleFunc("/mutating-pods", serveMutatePods)
+	http.HandleFunc("/mutating-pods-sidecar", serveMutatePodsSidecar)
 	http.HandleFunc("/configmaps", serveConfigmaps)
 	http.HandleFunc("/mutating-configmaps", serveMutateConfigmaps)
 	http.HandleFunc("/custom-resource", serveCustomResource)

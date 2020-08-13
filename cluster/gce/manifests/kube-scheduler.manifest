@@ -13,11 +13,24 @@
   }
 },
 "spec":{
-"priorityClass": "system-node-critical",
+"securityContext": {
+  "runAsUser": {{runAsUser}},
+  "runAsGroup": {{runAsGroup}}
+},
+"priorityClassName": "system-node-critical",
+"priority": 2000001000,
 "hostNetwork": true,
 "containers":[
     {
     "name": "kube-scheduler",
+    "securityContext": {
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+          "all"
+        ]
+      }
+    },
     "image": "{{pillar['kube_docker_registry']}}/kube-scheduler-amd64:{{pillar['kube-scheduler_docker_tag']}}",
     "resources": {
       "requests": {
@@ -25,9 +38,9 @@
       }
     },
     "command": [
-                 "/bin/sh",
-                 "-c",
-                 "exec /usr/local/bin/kube-scheduler {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
+                 "/go-runner", "--log-file=/var/log/kube-scheduler.log", "--also-stdout=false", "--redirect-stderr=true",
+                 "/usr/local/bin/kube-scheduler",
+                 {{params}}
                ],
     "livenessProbe": {
       "httpGet": {

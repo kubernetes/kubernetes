@@ -227,7 +227,9 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 
 	if err == nil { // transport has not been closed
 		if ht.stats != nil {
-			ht.stats.HandleRPC(s.Context(), &stats.OutTrailer{})
+			ht.stats.HandleRPC(s.Context(), &stats.OutTrailer{
+				Trailer: s.trailer.Copy(),
+			})
 		}
 	}
 	ht.Close()
@@ -289,7 +291,9 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 
 	if err == nil {
 		if ht.stats != nil {
-			ht.stats.HandleRPC(s.Context(), &stats.OutHeader{})
+			ht.stats.HandleRPC(s.Context(), &stats.OutHeader{
+				Header: md.Copy(),
+			})
 		}
 	}
 	return err
@@ -334,7 +338,7 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 		Addr: ht.RemoteAddr(),
 	}
 	if req.TLS != nil {
-		pr.AuthInfo = credentials.TLSInfo{State: *req.TLS}
+		pr.AuthInfo = credentials.TLSInfo{State: *req.TLS, CommonAuthInfo: credentials.CommonAuthInfo{credentials.PrivacyAndIntegrity}}
 	}
 	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	s.ctx = peer.NewContext(ctx, pr)

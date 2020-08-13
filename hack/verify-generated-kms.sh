@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of KMS gRPC is needed or not. We should
+# run `hack/update-generated-kms.sh` if KMS gRPC is out of date.
+# Usage: `hack/verify-generated-kms.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

@@ -16,6 +16,7 @@ package strfmt
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -23,9 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/globalsign/mgo/bson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func init() {
@@ -153,53 +152,47 @@ func (d Duration) String() string {
 
 // MarshalJSON returns the Duration as JSON
 func (d Duration) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	d.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the Duration to a easyjson.Writer
-func (d Duration) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(time.Duration(d).String())
+	return json.Marshal(time.Duration(d).String())
 }
 
 // UnmarshalJSON sets the Duration from JSON
 func (d *Duration) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	d.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the Duration from a easyjson.Lexer
-func (d *Duration) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		tt, err := ParseDuration(data)
-		if err != nil {
-			in.AddError(err)
-			return
-		}
-		*d = Duration(tt)
-	}
-}
-
-// GetBSON returns the Duration a bson.M{} map.
-func (d *Duration) GetBSON() (interface{}, error) {
-	return bson.M{"data": int64(*d)}, nil
-}
-
-// SetBSON sets the Duration from raw bson data
-func (d *Duration) SetBSON(raw bson.Raw) error {
-	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
-		return err
-	}
-
-	if data, ok := m["data"].(int64); ok {
-		*d = Duration(data)
+	if string(data) == jsonNull {
 		return nil
 	}
 
-	return errors.New("couldn't unmarshal bson raw value as Duration")
+	var dstr string
+	if err := json.Unmarshal(data, &dstr); err != nil {
+		return err
+	}
+	tt, err := ParseDuration(dstr)
+	if err != nil {
+		return err
+	}
+	*d = Duration(tt)
+	return nil
+}
+
+func (d Duration) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": d.String()})
+}
+
+func (d *Duration) UnmarshalBSON(data []byte) error {
+	var m bson.M
+	if err := bson.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	if data, ok := m["data"].(string); ok {
+		rd, err := ParseDuration(data)
+		if err != nil {
+			return err
+		}
+		*d = Duration(rd)
+		return nil
+	}
+
+	return errors.New("couldn't unmarshal bson bytes value as Date")
 }
 
 // DeepCopyInto copies the receiver and writes its value into out.

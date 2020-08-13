@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
+
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // FlexVolumeUnmounter is the disk that will be cleaned by this plugin.

@@ -15,10 +15,12 @@
 package crio
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -26,6 +28,12 @@ import (
 const (
 	CrioSocket            = "/var/run/crio/crio.sock"
 	maxUnixSocketPathSize = len(syscall.RawSockaddrUnix{}.Path)
+)
+
+var (
+	theClient      CrioClient
+	clientErr      error
+	crioClientOnce sync.Once
 )
 
 // Info represents CRI-O information as sent by the CRI-O server
@@ -45,9 +53,10 @@ type ContainerInfo struct {
 	LogPath     string            `json:"log_path"`
 	Root        string            `json:"root"`
 	IP          string            `json:"ip_address"`
+	IPs         []string          `json:"ip_addresses"`
 }
 
-type crioClient interface {
+type CrioClient interface {
 	Info() (Info, error)
 	ContainerInfo(string) (*ContainerInfo, error)
 }
@@ -62,22 +71,27 @@ func configureUnixTransport(tr *http.Transport, proto, addr string) error {
 	}
 	// No need for compression in local communications.
 	tr.DisableCompression = true
-	tr.Dial = func(_, _ string) (net.Conn, error) {
+	tr.DialContext = func(_ context.Context, _, _ string) (net.Conn, error) {
 		return net.DialTimeout(proto, addr, 32*time.Second)
 	}
 	return nil
 }
 
 // Client returns a new configured CRI-O client
-func Client() (crioClient, error) {
-	tr := new(http.Transport)
-	configureUnixTransport(tr, "unix", CrioSocket)
-	c := &http.Client{
-		Transport: tr,
-	}
-	return &crioClientImpl{
-		client: c,
-	}, nil
+func Client() (CrioClient, error) {
+	crioClientOnce.Do(func() {
+		tr := new(http.Transport)
+		theClient = nil
+		if clientErr = configureUnixTransport(tr, "unix", CrioSocket); clientErr != nil {
+			return
+		}
+		theClient = &crioClientImpl{
+			client: &http.Client{
+				Transport: tr,
+			},
+		}
+	})
+	return theClient, clientErr
 }
 
 func getRequest(path string) (*http.Request, error) {
@@ -117,6 +131,7 @@ func (c *crioClientImpl) ContainerInfo(id string) (*ContainerInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	cInfo := ContainerInfo{}
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -129,9 +144,14 @@ func (c *crioClientImpl) ContainerInfo(id string) (*ContainerInfo, error) {
 		return nil, fmt.Errorf("Error finding container %s: Status %d returned error %s", id, resp.StatusCode, resp.Body)
 	}
 
-	cInfo := ContainerInfo{}
 	if err := json.NewDecoder(resp.Body).Decode(&cInfo); err != nil {
 		return nil, err
+	}
+	if len(cInfo.IP) > 0 {
+		return &cInfo, nil
+	}
+	if len(cInfo.IPs) > 0 {
+		cInfo.IP = cInfo.IPs[0]
 	}
 	return &cInfo, nil
 }

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,9 +34,9 @@ import (
 func TestShouldCallHook(t *testing.T) {
 	a := &Webhook{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
 
-	allScopes := v1beta1.AllScopes
-	exactMatch := v1beta1.Exact
-	equivalentMatch := v1beta1.Equivalent
+	allScopes := v1.AllScopes
+	exactMatch := v1.Exact
+	equivalentMatch := v1.Equivalent
 
 	mapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
 		if resource.Resource == "deployments" {
@@ -64,7 +64,7 @@ func TestShouldCallHook(t *testing.T) {
 	testcases := []struct {
 		name string
 
-		webhook *v1beta1.ValidatingWebhook
+		webhook *v1.ValidatingWebhook
 		attrs   admission.Attributes
 
 		expectCall            bool
@@ -75,19 +75,19 @@ func TestShouldCallHook(t *testing.T) {
 	}{
 		{
 			name:       "no rules (just write)",
-			webhook:    &v1beta1.ValidatingWebhook{Rules: []v1beta1.RuleWithOperations{}},
+			webhook:    &v1.ValidatingWebhook{Rules: []v1.RuleWithOperations{}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
 		{
 			name: "invalid kind lookup",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
 				MatchPolicy:       &equivalentMatch,
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"example.com"}, APIVersions: []string{"v1"}, Resources: []string{"widgets"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"example.com"}, APIVersions: []string{"v1"}, Resources: []string{"widgets"}, Scope: &allScopes},
 				}}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"example.com", "v2", "Widget"}, "ns", "name", schema.GroupVersionResource{"example.com", "v2", "widgets"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
@@ -95,12 +95,12 @@ func TestShouldCallHook(t *testing.T) {
 		},
 		{
 			name: "wildcard rule, match as requested",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
@@ -110,18 +110,18 @@ func TestShouldCallHook(t *testing.T) {
 		},
 		{
 			name: "specific rules, prefer exact match",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
@@ -131,47 +131,47 @@ func TestShouldCallHook(t *testing.T) {
 		},
 		{
 			name: "specific rules, match miss",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
 		{
 			name: "specific rules, exact match miss",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
 		{
 			name: "specific rules, equivalent match, prefer extensions",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
@@ -181,16 +181,16 @@ func TestShouldCallHook(t *testing.T) {
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
@@ -201,18 +201,18 @@ func TestShouldCallHook(t *testing.T) {
 
 		{
 			name: "specific rules, subresource prefer exact match",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
@@ -222,47 +222,47 @@ func TestShouldCallHook(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource match miss",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
 		{
 			name: "specific rules, subresource exact match miss",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
@@ -272,16 +272,16 @@ func TestShouldCallHook(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
-			webhook: &v1beta1.ValidatingWebhook{
+			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				Rules: []v1beta1.RuleWithOperations{{
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}, {
-					Operations: []v1beta1.OperationType{"*"},
-					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,

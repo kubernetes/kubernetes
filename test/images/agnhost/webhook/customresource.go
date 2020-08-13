@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -56,8 +56,10 @@ func mutateCustomResource(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	if cr.Data["mutation-stage-1"] == "yes" {
 		reviewResponse.Patch = []byte(customResourcePatch2)
 	}
-	pt := v1.PatchTypeJSONPatch
-	reviewResponse.PatchType = &pt
+	if len(reviewResponse.Patch) != 0 {
+		pt := v1.PatchTypeJSONPatch
+		reviewResponse.PatchType = &pt
+	}
 	return &reviewResponse
 }
 

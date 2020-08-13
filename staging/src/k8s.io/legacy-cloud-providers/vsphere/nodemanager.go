@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
@@ -281,34 +281,7 @@ func (nm *NodeManager) removeNode(node *v1.Node) {
 //
 // This method is a getter but it can cause side-effect of updating NodeInfo object.
 func (nm *NodeManager) GetNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error) {
-	getNodeInfo := func(nodeName k8stypes.NodeName) *NodeInfo {
-		nm.nodeInfoLock.RLock()
-		nodeInfo := nm.nodeInfoMap[convertToString(nodeName)]
-		nm.nodeInfoLock.RUnlock()
-		return nodeInfo
-	}
-	nodeInfo := getNodeInfo(nodeName)
-	var err error
-	if nodeInfo == nil {
-		// Rediscover node if no NodeInfo found.
-		klog.V(4).Infof("No VM found for node %q. Initiating rediscovery.", convertToString(nodeName))
-		err = nm.RediscoverNode(nodeName)
-		if err != nil {
-			klog.Errorf("Error %q node info for node %q not found", err, convertToString(nodeName))
-			return NodeInfo{}, err
-		}
-		nodeInfo = getNodeInfo(nodeName)
-	} else {
-		// Renew the found NodeInfo to avoid stale vSphere connection.
-		klog.V(4).Infof("Renewing NodeInfo %+v for node %q", nodeInfo, convertToString(nodeName))
-		nodeInfo, err = nm.renewNodeInfo(nodeInfo, true)
-		if err != nil {
-			klog.Errorf("Error %q occurred while renewing NodeInfo for %q", err, convertToString(nodeName))
-			return NodeInfo{}, err
-		}
-		nm.addNodeInfo(convertToString(nodeName), nodeInfo)
-	}
-	return *nodeInfo, nil
+	return nm.getRefreshedNodeInfo(nodeName)
 }
 
 // GetNodeDetails returns NodeDetails for all the discovered nodes.
@@ -330,10 +303,57 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 	return nodeDetails, nil
 }
 
+func (nm *NodeManager) refreshNodes() (errList []error) {
+	nm.registeredNodesLock.Lock()
+	defer nm.registeredNodesLock.Unlock()
+
+	for nodeName := range nm.registeredNodes {
+		nodeInfo, err := nm.getRefreshedNodeInfo(convertToK8sType(nodeName))
+		if err != nil {
+			errList = append(errList, err)
+			continue
+		}
+		klog.V(4).Infof("Updated NodeInfo %v for node %q.", nodeInfo, nodeName)
+	}
+	return errList
+}
+
+func (nm *NodeManager) getRefreshedNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error) {
+	nodeInfo := nm.getNodeInfo(nodeName)
+	var err error
+	if nodeInfo == nil {
+		// Rediscover node if no NodeInfo found.
+		klog.V(4).Infof("No VM found for node %q. Initiating rediscovery.", convertToString(nodeName))
+		err = nm.RediscoverNode(nodeName)
+		if err != nil {
+			klog.Errorf("Error %q node info for node %q not found", err, convertToString(nodeName))
+			return NodeInfo{}, err
+		}
+		nodeInfo = nm.getNodeInfo(nodeName)
+	} else {
+		// Renew the found NodeInfo to avoid stale vSphere connection.
+		klog.V(4).Infof("Renewing NodeInfo %+v for node %q", nodeInfo, convertToString(nodeName))
+		nodeInfo, err = nm.renewNodeInfo(nodeInfo, true)
+		if err != nil {
+			klog.Errorf("Error %q occurred while renewing NodeInfo for %q", err, convertToString(nodeName))
+			return NodeInfo{}, err
+		}
+		nm.addNodeInfo(convertToString(nodeName), nodeInfo)
+	}
+	return *nodeInfo, nil
+}
+
 func (nm *NodeManager) addNodeInfo(nodeName string, nodeInfo *NodeInfo) {
 	nm.nodeInfoLock.Lock()
 	nm.nodeInfoMap[nodeName] = nodeInfo
 	nm.nodeInfoLock.Unlock()
+}
+
+func (nm *NodeManager) getNodeInfo(nodeName k8stypes.NodeName) *NodeInfo {
+	nm.nodeInfoLock.RLock()
+	nodeInfo := nm.nodeInfoMap[convertToString(nodeName)]
+	nm.nodeInfoLock.RUnlock()
+	return nodeInfo
 }
 
 func (nm *NodeManager) GetVSphereInstance(nodeName k8stypes.NodeName) (VSphereInstance, error) {
@@ -417,35 +437,7 @@ func (nm *NodeManager) vcConnect(ctx context.Context, vsphereInstance *VSphereIn
 //
 // This method is a getter but it can cause side-effect of updating NodeInfo object.
 func (nm *NodeManager) GetNodeInfoWithNodeObject(node *v1.Node) (NodeInfo, error) {
-	nodeName := node.Name
-	getNodeInfo := func(nodeName string) *NodeInfo {
-		nm.nodeInfoLock.RLock()
-		nodeInfo := nm.nodeInfoMap[nodeName]
-		nm.nodeInfoLock.RUnlock()
-		return nodeInfo
-	}
-	nodeInfo := getNodeInfo(nodeName)
-	var err error
-	if nodeInfo == nil {
-		// Rediscover node if no NodeInfo found.
-		klog.V(4).Infof("No VM found for node %q. Initiating rediscovery.", nodeName)
-		err = nm.DiscoverNode(node)
-		if err != nil {
-			klog.Errorf("Error %q node info for node %q not found", err, nodeName)
-			return NodeInfo{}, err
-		}
-		nodeInfo = getNodeInfo(nodeName)
-	} else {
-		// Renew the found NodeInfo to avoid stale vSphere connection.
-		klog.V(4).Infof("Renewing NodeInfo %+v for node %q", nodeInfo, nodeName)
-		nodeInfo, err = nm.renewNodeInfo(nodeInfo, true)
-		if err != nil {
-			klog.Errorf("Error %q occurred while renewing NodeInfo for %q", err, nodeName)
-			return NodeInfo{}, err
-		}
-		nm.addNodeInfo(nodeName, nodeInfo)
-	}
-	return *nodeInfo, nil
+	return nm.getRefreshedNodeInfo(convertToK8sType(node.Name))
 }
 
 func (nm *NodeManager) CredentialManager() *SecretCredentialManager {

@@ -287,6 +287,10 @@ func (e *fakeEncoder) Encode(obj runtime.Object, w io.Writer) error {
 	return err
 }
 
+func (e *fakeEncoder) Identifier() runtime.Identifier {
+	return runtime.Identifier("fake")
+}
+
 func gzipContent(data []byte, level int) []byte {
 	buf := &bytes.Buffer{}
 	gw, err := gzip.NewWriterLevel(buf, level)

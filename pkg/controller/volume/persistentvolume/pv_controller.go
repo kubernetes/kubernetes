@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,9 +25,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,8 +39,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	csitranslation "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ==================================================================
@@ -134,6 +134,16 @@ const createProvisionedPVRetryCount = 5
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
 
+// CSINameTranslator can get the CSI Driver name based on the in-tree plugin name
+type CSINameTranslator interface {
+	GetCSINameFromInTreeName(pluginName string) (string, error)
+}
+
+// CSIMigratedPluginManager keeps track of CSI migration status of a plugin
+type CSIMigratedPluginManager interface {
+	IsMigrationEnabledForPlugin(pluginName string) bool
+}
+
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
 // cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
@@ -147,6 +157,7 @@ type PersistentVolumeController struct {
 	classListerSynced  cache.InformerSynced
 	podLister          corelisters.PodLister
 	podListerSynced    cache.InformerSynced
+	podIndexer         cache.Indexer
 	NodeLister         corelisters.NodeLister
 	NodeListerSynced   cache.InformerSynced
 
@@ -200,13 +211,9 @@ type PersistentVolumeController struct {
 	createProvisionedPVRetryCount int
 	createProvisionedPVInterval   time.Duration
 
-	// For testing only: hook to intercept CSI driver name <=> Intree plugin name mapping
-	// Not used when set to nil
-	csiNameFromIntreeNameHook func(pluginName string) (string, error)
-
 	// operationTimestamps caches start timestamp of operations
 	// (currently provision + binding/deletion) for metric recording.
-	// Detailed lifecyle/key for each operation
+	// Detailed lifecycle/key for each operation
 	// 1. provision + binding
 	//     key:        claimKey
 	//     start time: user has NOT provide any volume ref in the claim AND
@@ -225,6 +232,9 @@ type PersistentVolumeController struct {
 	//                 the corresponding timestamp entry will be deleted from cache
 	//     abort:      N.A.
 	operationTimestamps metrics.OperationStartTimeCache
+
+	translator               CSINameTranslator
+	csiMigratedPluginManager CSIMigratedPluginManager
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -235,6 +245,16 @@ type PersistentVolumeController struct {
 // methods.
 func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClaim) error {
 	klog.V(4).Infof("synchronizing PersistentVolumeClaim[%s]: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
+
+	// Set correct "migrated-to" annotations on PVC and update in API server if
+	// necessary
+	newClaim, err := ctrl.updateClaimMigrationAnnotations(claim)
+	if err != nil {
+		// Nothing was saved; we will fall back into the same
+		// condition in the next call to this method
+		return err
+	}
+	claim = newClaim
 
 	if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted) {
 		return ctrl.syncUnboundClaim(claim)
@@ -266,11 +286,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("storageClassName does not match")
 	}
 
-	isMismatch, err := pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec)
-	if err != nil {
-		return fmt.Errorf("error checking volumeMode: %v", err)
-	}
-	if isMismatch {
+	if pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 		return fmt.Errorf("incompatible volumeMode")
 	}
 
@@ -278,6 +294,31 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("incompatible accessMode")
 	}
 
+	return nil
+}
+
+// emitEventForUnboundDelayBindingClaim generates informative event for claim
+// if it's in delay binding mode and not bound yet.
+func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(claim *v1.PersistentVolumeClaim) error {
+	reason := events.WaitForFirstConsumer
+	message := "waiting for first consumer to be created before binding"
+	podNames, err := ctrl.findNonScheduledPodsByPVC(claim)
+	if err != nil {
+		return err
+	}
+	if len(podNames) > 0 {
+		reason = events.WaitForPodScheduled
+		if len(podNames) > 1 {
+			// Although only one pod is taken into account in
+			// volume scheduling, more than one pods can reference
+			// the PVC at the same time. We can't know which pod is
+			// used in scheduling, all pods are included.
+			message = fmt.Sprintf("waiting for pods %s to be scheduled", strings.Join(podNames, ","))
+		} else {
+			message = fmt.Sprintf("waiting for pod %s to be scheduled", podNames[0])
+		}
+	}
+	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, reason, message)
 	return nil
 }
 
@@ -305,7 +346,9 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			// OBSERVATION: pvc is "Pending", will retry
 			switch {
 			case delayBinding && !pvutil.IsDelayBindingProvisioning(claim):
-				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.WaitForFirstConsumer, "waiting for first consumer to be created before binding")
+				if err = ctrl.emitEventForUnboundDelayBindingClaim(claim); err != nil {
+					return err
+				}
 			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
@@ -400,6 +443,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
 				if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBoundByController) {
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
+					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
+					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
 					// User asked for a specific PV, retry later
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
@@ -409,6 +454,9 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					// This should never happen because someone had to remove
 					// AnnBindCompleted annotation on the claim.
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
+					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
+					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
+
 					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 				}
 			}
@@ -488,6 +536,16 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *v1.PersistentVolum
 func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) error {
 	klog.V(4).Infof("synchronizing PersistentVolume[%s]: %s", volume.Name, getVolumeStatusForLogging(volume))
 
+	// Set correct "migrated-to" annotations on PV and update in API server if
+	// necessary
+	newVolume, err := ctrl.updateVolumeMigrationAnnotations(volume)
+	if err != nil {
+		// Nothing was saved; we will fall back into the same
+		// condition in the next call to this method
+		return err
+	}
+	volume = newVolume
+
 	// [Unit test set 4]
 	if volume.Spec.ClaimRef == nil {
 		// Volume is unused
@@ -530,16 +588,16 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			// updated to Released state when PVC does not exist.
 			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
 				obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
-				if err != nil && !apierrs.IsNotFound(err) {
+				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-				found = !apierrs.IsNotFound(err)
+				found = !apierrors.IsNotFound(err)
 				if !found {
-					obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name, metav1.GetOptions{})
-					if err != nil && !apierrs.IsNotFound(err) {
+					obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(context.TODO(), volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
-					found = !apierrs.IsNotFound(err)
+					found = !apierrors.IsNotFound(err)
 				}
 			}
 		}
@@ -579,15 +637,18 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 					return err
 				}
 			}
-
 			if err = ctrl.reclaimVolume(volume); err != nil {
 				// Release failed, we will fall back into the same condition
 				// in the next call to this method
 				return err
 			}
+			if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimRetain {
+				// volume is being retained, it references a claim that does not exist now.
+				klog.V(4).Infof("PersistentVolume[%s] references a claim %q (%s) that is not found", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef), volume.Spec.ClaimRef.UID)
+			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			if isMismatch, err := pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec); err != nil || isMismatch {
+			if pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 				// Binding for the volume won't be called in syncUnboundClaim,
 				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
 				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)
@@ -729,7 +790,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 		return claim, nil
 	}
 
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
 		return newClaim, err
@@ -785,7 +846,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *v1.PersistentV
 	volumeClone.Status.Phase = phase
 	volumeClone.Status.Message = message
 
-	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().UpdateStatus(volumeClone)
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().UpdateStatus(context.TODO(), volumeClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(4).Infof("updating PersistentVolume[%s]: set phase %s failed: %v", volume.Name, phase, err)
 		return newVol, err
@@ -847,7 +908,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 func (ctrl *PersistentVolumeController) updateBindVolumeToClaim(volumeClone *v1.PersistentVolume, updateCache bool) (*v1.PersistentVolume, error) {
 	claimKey := claimrefToClaimKey(volumeClone.Spec.ClaimRef)
 	klog.V(2).Infof("claim %q bound to volume %q", claimKey, volumeClone.Name)
-	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(volumeClone)
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volumeClone.Name, claimKey, err)
 		return newVol, err
@@ -899,7 +960,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 
 	if dirty {
 		klog.V(2).Infof("volume %q bound to claim %q", volume.Name, claimToClaimKey(claim))
-		newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+		newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 		if err != nil {
 			klog.V(4).Infof("updating PersistentVolumeClaim[%s]: binding to %q failed: %v", claimToClaimKey(claim), volume.Name, err)
 			return newClaim, err
@@ -986,7 +1047,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 		volumeClone.Spec.ClaimRef.UID = ""
 	}
 
-	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(volumeClone)
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(4).Infof("updating PersistentVolume[%s]: rollback failed: %v", volume.Name, err)
 		return err
@@ -1006,6 +1067,11 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 // reclaimVolume implements volume.Spec.PersistentVolumeReclaimPolicy and
 // starts appropriate reclaim action.
 func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolume) error {
+	if migrated := volume.Annotations[pvutil.AnnMigratedTo]; len(migrated) > 0 {
+		// PV is Migrated. The PV controller should stand down and the external
+		// provisioner will handle this PV
+		return nil
+	}
 	switch volume.Spec.PersistentVolumeReclaimPolicy {
 	case v1.PersistentVolumeReclaimRetain:
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Retain, nothing to do", volume.Name)
@@ -1052,7 +1118,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 	// This method may have been waiting for a volume lock for some time.
 	// Previous recycleVolumeOperation might just have saved an updated version,
 	// so read current volume state now.
-	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
+	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volume.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.V(3).Infof("error reading persistent volume %q: %v", volume.Name, err)
 		return
@@ -1073,7 +1139,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 	}
 
 	// Verify the claim is in cache: if so, then it is a different PVC with the same name
-	// since the volume is known to be released at this moment. Ths new (cached) PVC must use
+	// since the volume is known to be released at this moment. The new (cached) PVC must use
 	// a different PV -- we checked that the PV is unused in isVolumeReleased.
 	// So the old PV is safe to be recycled.
 	claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
@@ -1148,9 +1214,14 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.Persist
 	// This method may have been waiting for a volume lock for some time.
 	// Previous deleteVolumeOperation might just have saved an updated version, so
 	// read current volume state now.
-	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
+	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volume.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.V(3).Infof("error reading persistent volume %q: %v", volume.Name, err)
+		return "", nil
+	}
+
+	if newVolume.GetDeletionTimestamp() != nil {
+		klog.V(3).Infof("Volume %q is already being deleted", volume.Name)
 		return "", nil
 	}
 	needsReclaim, err := ctrl.isVolumeReleased(newVolume)
@@ -1192,7 +1263,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.Persist
 
 	klog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
 	// Delete the volume
-	if err = ctrl.kubeClient.CoreV1().PersistentVolumes().Delete(volume.Name, nil); err != nil {
+	if err = ctrl.kubeClient.CoreV1().PersistentVolumes().Delete(context.TODO(), volume.Name, metav1.DeleteOptions{}); err != nil {
 		// Oops, could not delete the volume and therefore the controller will
 		// try to delete the volume again on next update. We _could_ maintain a
 		// cache of "recently deleted volumes" and avoid unnecessary deletion,
@@ -1251,30 +1322,59 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 	return true, nil
 }
 
-// isVolumeUsed returns list of pods that use given PV.
+func (ctrl *PersistentVolumeController) findPodsByPVCKey(key string) ([]*v1.Pod, error) {
+	pods := []*v1.Pod{}
+	objs, err := ctrl.podIndexer.ByIndex(common.PodPVCIndex, key)
+	if err != nil {
+		return pods, err
+	}
+	for _, obj := range objs {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+	return pods, err
+}
+
+// isVolumeUsed returns list of active pods that use given PV.
 func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([]string, bool, error) {
 	if pv.Spec.ClaimRef == nil {
 		return nil, false, nil
 	}
-	claimName := pv.Spec.ClaimRef.Name
-
 	podNames := sets.NewString()
-	pods, err := ctrl.podLister.Pods(pv.Spec.ClaimRef.Namespace).List(labels.Everything())
+	pvcKey := fmt.Sprintf("%s/%s", pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	pods, err := ctrl.findPodsByPVCKey(pvcKey)
 	if err != nil {
-		return nil, false, fmt.Errorf("error listing pods: %s", err)
+		return nil, false, fmt.Errorf("error finding pods by pvc %q: %s", pvcKey, err)
 	}
 	for _, pod := range pods {
 		if util.IsPodTerminated(pod, pod.Status) {
 			continue
 		}
-		for i := range pod.Spec.Volumes {
-			usedPV := &pod.Spec.Volumes[i]
-			if usedPV.PersistentVolumeClaim != nil && usedPV.PersistentVolumeClaim.ClaimName == claimName {
-				podNames.Insert(pod.Namespace + "/" + pod.Name)
-			}
-		}
+		podNames.Insert(pod.Namespace + "/" + pod.Name)
 	}
 	return podNames.List(), podNames.Len() != 0, nil
+}
+
+// findNonScheduledPodsByPVC returns list of non-scheduled active pods that reference given PVC.
+func (ctrl *PersistentVolumeController) findNonScheduledPodsByPVC(pvc *v1.PersistentVolumeClaim) ([]string, error) {
+	pvcKey := fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
+	pods, err := ctrl.findPodsByPVCKey(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+	podNames := []string{}
+	for _, pod := range pods {
+		if util.IsPodTerminated(pod, pod.Status) {
+			continue
+		}
+		if len(pod.Spec.NodeName) == 0 {
+			podNames = append(podNames, pod.Name)
+		}
+	}
+	return podNames, nil
 }
 
 // doDeleteVolume finds appropriate delete plugin and deletes given volume, returning
@@ -1326,6 +1426,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 	klog.V(4).Infof("provisionClaim[%s]: started", claimToClaimKey(claim))
 	opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
+	// findProvisionablePlugin does not return err for external provisioners
 	if err != nil {
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, err.Error())
 		klog.Errorf("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
@@ -1340,8 +1441,8 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		claimKey := claimToClaimKey(claim)
 		ctrl.operationTimestamps.AddIfNotExist(claimKey, ctrl.getProvisionerName(plugin, storageClass), "provision")
 		var err error
-		if plugin == nil || plugin.IsMigratedToCSI() {
-			_, err = ctrl.provisionClaimOperationExternal(claim, plugin, storageClass)
+		if plugin == nil {
+			_, err = ctrl.provisionClaimOperationExternal(claim, storageClass)
 		} else {
 			_, err = ctrl.provisionClaimOperation(claim, plugin, storageClass)
 		}
@@ -1355,13 +1456,6 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName string) (string, error) {
-	if ctrl.csiNameFromIntreeNameHook != nil {
-		return ctrl.csiNameFromIntreeNameHook(pluginName)
-	}
-	return csitranslation.GetCSINameFromInTreeName(pluginName)
-}
-
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) provisionClaimOperation(
@@ -1371,8 +1465,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
-	// called from provisionClaim(), in this case, plugin MUST NOT be nil and
-	// plugin.IsMigratedToCSI() MUST return FALSE
+	// called from provisionClaim(), in this case, plugin MUST NOT be nil
 	// NOTE: checks on plugin/storageClass has been saved
 	pluginName := plugin.GetPluginName()
 	provisionerName := storageClass.Provisioner
@@ -1393,8 +1486,8 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	//  yet.
 
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
-	volume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-	if err != nil && !apierrs.IsNotFound(err) {
+	volume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
 		klog.V(3).Infof("error reading persistent volume %q: %v", pvName, err)
 		return pluginName, err
 	}
@@ -1492,7 +1585,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 		klog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
 		var newVol *v1.PersistentVolume
-		if newVol, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Create(volume); err == nil || apierrs.IsAlreadyExists(err) {
+		if newVol, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Create(context.TODO(), volume, metav1.CreateOptions{}); err == nil || apierrors.IsAlreadyExists(err) {
 			// Save succeeded.
 			if err != nil {
 				klog.V(3).Infof("volume %q for claim %q already exists, reusing", volume.Name, claimToClaimKey(claim))
@@ -1562,16 +1655,15 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 // This method will be running in a standalone go-routine scheduled in "provisionClaim"
 func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	claim *v1.PersistentVolumeClaim,
-	plugin vol.ProvisionableVolumePlugin,
 	storageClass *storage.StorageClass) (string, error) {
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperationExternal [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
 	provisionerName := storageClass.Provisioner
-	if plugin != nil {
-		// update the provisioner name to use the CSI in-tree name
-		provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
+	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(storageClass.Provisioner) {
+		// update the provisioner name to use the migrated CSI plugin name
+		provisionerName, err = ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
 			strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
 			klog.V(2).Infof("%s", strerr)
@@ -1609,7 +1701,7 @@ func (ctrl *PersistentVolumeController) rescheduleProvisioning(claim *v1.Persist
 	newClaim := claim.DeepCopy()
 	delete(newClaim.Annotations, pvutil.AnnSelectedNode)
 	// Try to update the PVC object
-	if _, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(newClaim); err != nil {
+	if _, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(context.TODO(), newClaim, metav1.UpdateOptions{}); err != nil {
 		klog.V(4).Infof("Failed to delete annotation 'pvutil.AnnSelectedNode' for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
 		return
 	}
@@ -1669,6 +1761,10 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 	}
 
 	// Find a plugin for the class
+	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(class.Provisioner) {
+		// CSI migration scenario - do not depend on in-tree plugin
+		return nil, class, nil
+	}
 	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(class.Provisioner)
 	if err != nil {
 		if !strings.HasPrefix(class.Provisioner, "kubernetes.io/") {
@@ -1717,7 +1813,7 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	if err != nil {
 		return "N/A"
 	}
-	if plugin != nil && !plugin.IsMigratedToCSI() {
+	if plugin != nil {
 		return plugin.GetPluginName()
 	}
 	// If reached here, Either an external provisioner was used for provisioning
@@ -1731,23 +1827,26 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	if err != nil {
 		return "N/A"
 	}
-	if plugin != nil {
-		provisionerName, err := ctrl.getCSINameFromIntreeName(class.Provisioner)
-		if err == nil {
-			return provisionerName
+	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(class.Provisioner) {
+		provisionerName, err := ctrl.translator.GetCSINameFromInTreeName(class.Provisioner)
+		if err != nil {
+			return "N/A"
 		}
+		return provisionerName
 	}
 	return class.Provisioner
 }
 
-// obtain plugin/external provisioner name from plugin and storage class
+// obtain plugin/external provisioner name from plugin and storage class for timestamp logging purposes
 func (ctrl *PersistentVolumeController) getProvisionerName(plugin vol.ProvisionableVolumePlugin, storageClass *storage.StorageClass) string {
-	// intree plugin, returns the plugin's name
-	if plugin != nil && !plugin.IsMigratedToCSI() {
+	// non CSI-migrated in-tree plugin, returns the plugin's name
+	if plugin != nil {
 		return plugin.GetPluginName()
-	} else if plugin != nil {
-		// get the CSI in-tree name from storage class provisioner name
-		provisionerName, err := ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
+	}
+	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(storageClass.Provisioner) {
+		// get the name of the CSI plugin that the in-tree storage class
+		// provisioner has migrated to
+		provisionerName, err := ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
 			return "N/A"
 		}

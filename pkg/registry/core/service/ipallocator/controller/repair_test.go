@@ -270,13 +270,13 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 
 			fakeClient := makeFakeClientSet()
 			primaryRegistry := makeRangeRegistry(t, tc.primaryNet.String())
-			var secondaryRegistery *mockRangeRegistry
+			var secondaryRegistry *mockRangeRegistry
 
 			if tc.secondaryNet != nil {
-				secondaryRegistery = makeRangeRegistry(t, tc.secondaryNet.String())
+				secondaryRegistry = makeRangeRegistry(t, tc.secondaryNet.String())
 			}
 
-			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistery)
+			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistry)
 			if repair.shouldWorkOnSecondary() != tc.expectedResult {
 				t.Errorf("shouldWorkOnSecondary should be %v and found %v", tc.expectedResult, repair.shouldWorkOnSecondary())
 			}
@@ -529,7 +529,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	if !secondaryAfter.Has(net.ParseIP("2000::1")) || !secondaryAfter.Has(net.ParseIP("2000::2")) {
 		t.Errorf("unexpected ipallocator state: %#v", secondaryAfter)
 	}
-	if free := secondaryAfter.Free(); free != 65532 {
+	if free := secondaryAfter.Free(); free != 65533 {
 		t.Errorf("unexpected ipallocator state: %d free (number of free ips is not 65532)", free)
 	}
 

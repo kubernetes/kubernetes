@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -85,7 +87,7 @@ func deletePods(f *framework.Framework, podNames []string) {
 		delOpts := metav1.DeleteOptions{
 			GracePeriodSeconds: &gp,
 		}
-		f.PodClient().DeleteSync(podName, &delOpts, framework.DefaultPodDeletionTimeout)
+		f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
 	}
 }
 
@@ -123,7 +125,7 @@ func waitForContainerRemoval(containerName, podName, podNS string) {
 
 func waitForStateFileCleanedUp() {
 	gomega.Eventually(func() bool {
-		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static")
+		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static", nil)
 		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
 		assignments := restoredState.GetCPUAssignments()
 		if len(assignments) == 0 {
@@ -143,8 +145,24 @@ func isHTEnabled() bool {
 	return threadsPerCore > 1
 }
 
+func isMultiNUMA() bool {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return numaNodes > 1
+}
+
 func getCPUSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
+	framework.ExpectNoError(err)
+	return string(out)
+}
+
+func getCoreSiblingList(cpuRes int64) string {
+	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/core_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
 	framework.ExpectNoError(err)
 	return string(out)
 }
@@ -179,8 +197,9 @@ func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.K
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
@@ -231,247 +250,337 @@ func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (old
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
 }
 
-func runCPUManagerTests(f *framework.Framework) {
-	var cpuCap, cpuAlloc int64
-	var oldCfg *kubeletconfig.KubeletConfiguration
+func runGuPodTest(f *framework.Framework) {
+	var ctnAttrs []ctnAttribute
+	var cpu1 int
+	var err error
+	var cpuList []int
+	var pod *v1.Pod
+	var expAllowedCPUsListRegex string
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	cpu1 = 1
+	if isHTEnabled() {
+		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		cpu1 = cpuList[1]
+	} else if isMultiNUMA() {
+		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpu1 = cpuList[1]
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
+	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod.Name})
+	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+}
+
+func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
+	var ctnAttrs []ctnAttribute
+	var err error
+	var pod *v1.Pod
+	var expAllowedCPUsListRegex string
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "non-gu-container",
+			cpuRequest: "100m",
+			cpuLimit:   "200m",
+		},
+	}
+	pod = makeCPUManagerPod("non-gu-pod", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
+	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod.Name})
+	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+}
+
+func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64) {
+
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
-	var cpu1, cpu2 int
+	var cpu1 int
 	var cset cpuset.CPUSet
 	var err error
 	var ctnAttrs []ctnAttribute
-	var pod, pod1, pod2 *v1.Pod
+	var pod1, pod2 *v1.Pod
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod1 = makeCPUManagerPod("gu-pod", ctnAttrs)
+	pod1 = f.PodClient().CreateSync(pod1)
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "non-gu-container",
+			cpuRequest: "200m",
+			cpuLimit:   "300m",
+		},
+	}
+	pod2 = makeCPUManagerPod("non-gu-pod", ctnAttrs)
+	pod2 = f.PodClient().CreateSync(pod2)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	cpu1 = 1
+	if isHTEnabled() {
+		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		cpu1 = cpuList[1]
+	} else if isMultiNUMA() {
+		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpu1 = cpuList[1]
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
+	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod1.Spec.Containers[0].Name, pod1.Name)
+
+	cpuListString = "0"
+	if cpuAlloc > 2 {
+		cset = cpuset.MustParse(fmt.Sprintf("0-%d", cpuCap-1))
+		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.NewCPUSet(cpu1)))
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
+	err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod2.Spec.Containers[0].Name, pod2.Name)
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod1.Name, pod2.Name})
+	waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
+	waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
+}
+
+func runMultipleCPUGuPod(f *framework.Framework) {
+	var cpuListString, expAllowedCPUsListRegex string
+	var cpuList []int
+	var cset cpuset.CPUSet
+	var err error
+	var ctnAttrs []ctnAttribute
+	var pod *v1.Pod
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container",
+			cpuRequest: "2000m",
+			cpuLimit:   "2000m",
+		},
+	}
+	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	cpuListString = "1-2"
+	if isMultiNUMA() {
+		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		if !isHTEnabled() {
+			cset = cpuset.MustParse(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
+		} else {
+			cset = cpuset.MustParse(getCPUSiblingList(int64(cpuList[1])))
+		}
+		cpuListString = fmt.Sprintf("%s", cset)
+	} else if isHTEnabled() {
+		cpuListString = "2-3"
+		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		if cpuList[1] != 1 {
+			cset = cpuset.MustParse(getCPUSiblingList(1))
+			cpuListString = fmt.Sprintf("%s", cset)
+		}
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
+	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod.Name})
+	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+}
+
+func runMultipleCPUContainersGuPod(f *framework.Framework) {
+
+	var expAllowedCPUsListRegex string
+	var cpuList []int
+	var cpu1, cpu2 int
+	var err error
+	var ctnAttrs []ctnAttribute
+	var pod *v1.Pod
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container1",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+		{
+			ctnName:    "gu-container2",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	cpu1, cpu2 = 1, 2
+	if isHTEnabled() {
+		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		if cpuList[1] != 1 {
+			cpu1, cpu2 = cpuList[1], 1
+		}
+		if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpu2 = cpuList[1]
+		}
+	} else if isMultiNUMA() {
+		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpu1, cpu2 = cpuList[1], cpuList[2]
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
+	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[1].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[1].Name, pod.Name)
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod.Name})
+	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+	waitForContainerRemoval(pod.Spec.Containers[1].Name, pod.Name, pod.Namespace)
+}
+
+func runMultipleGuPods(f *framework.Framework) {
+	var expAllowedCPUsListRegex string
+	var cpuList []int
+	var cpu1, cpu2 int
+	var err error
+	var ctnAttrs []ctnAttribute
+	var pod1, pod2 *v1.Pod
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container1",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod1 = makeCPUManagerPod("gu-pod1", ctnAttrs)
+	pod1 = f.PodClient().CreateSync(pod1)
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container2",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs)
+	pod2 = f.PodClient().CreateSync(pod2)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	cpu1, cpu2 = 1, 2
+	if isHTEnabled() {
+		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		if cpuList[1] != 1 {
+			cpu1, cpu2 = cpuList[1], 1
+		}
+		if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpu2 = cpuList[1]
+		}
+	} else if isMultiNUMA() {
+		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpu1, cpu2 = cpuList[1], cpuList[2]
+	}
+	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
+	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod1.Spec.Containers[0].Name, pod1.Name)
+
+	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu2)
+	err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod2.Spec.Containers[0].Name, pod2.Name)
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(f, []string{pod1.Name, pod2.Name})
+	waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
+	waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
+}
+
+func runCPUManagerTests(f *framework.Framework) {
+	var cpuCap, cpuAlloc int64
+	var oldCfg *kubeletconfig.KubeletConfiguration
+	var expAllowedCPUsListRegex string
+	var cpuList []int
+	var cpu1 int
+	var err error
+	var ctnAttrs []ctnAttribute
+	var pod *v1.Pod
 
 	ginkgo.It("should assign CPUs as expected based on the Pod spec", func() {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
 		// Skip CPU Manager tests altogether if the CPU capacity < 2.
 		if cpuCap < 2 {
-			framework.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
 		}
 
 		// Enable CPU Manager in the kubelet.
 		oldCfg = enableCPUManagerInKubelet(f, true)
 
 		ginkgo.By("running a non-Gu pod")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "non-gu-container",
-				cpuRequest: "100m",
-				cpuLimit:   "200m",
-			},
-		}
-		pod = makeCPUManagerPod("non-gu-pod", ctnAttrs)
-		pod = f.PodClient().CreateSync(pod)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod.Spec.Containers[0].Name, pod.Name)
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+		runNonGuPodTest(f, cpuCap)
 
 		ginkgo.By("running a Gu pod")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-		}
-		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
-		pod = f.PodClient().CreateSync(pod)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		cpu1 = 1
-		if isHTEnabled() {
-			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
-			cpu1 = cpuList[1]
-		}
-		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod.Spec.Containers[0].Name, pod.Name)
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+		runGuPodTest(f)
 
 		ginkgo.By("running multiple Gu and non-Gu pods")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-		}
-		pod1 = makeCPUManagerPod("gu-pod", ctnAttrs)
-		pod1 = f.PodClient().CreateSync(pod1)
-
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "non-gu-container",
-				cpuRequest: "200m",
-				cpuLimit:   "300m",
-			},
-		}
-		pod2 = makeCPUManagerPod("non-gu-pod", ctnAttrs)
-		pod2 = f.PodClient().CreateSync(pod2)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		cpu1 = 1
-		if isHTEnabled() {
-			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
-			cpu1 = cpuList[1]
-		}
-		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-		err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod1.Spec.Containers[0].Name, pod1.Name)
-
-		cpuListString = "0"
-		if cpuAlloc > 2 {
-			cset = cpuset.MustParse(fmt.Sprintf("0-%d", cpuCap-1))
-			cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.NewCPUSet(cpu1)))
-		}
-		expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
-		err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod2.Spec.Containers[0].Name, pod2.Name)
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(f, []string{pod1.Name, pod2.Name})
-		waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
-		waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
+		runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
 
 		// Skip rest of the tests if CPU capacity < 3.
 		if cpuCap < 3 {
-			framework.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
+			e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 		}
 
 		ginkgo.By("running a Gu pod requesting multiple CPUs")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container",
-				cpuRequest: "2000m",
-				cpuLimit:   "2000m",
-			},
-		}
-		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
-		pod = f.PodClient().CreateSync(pod)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		cpuListString = "1-2"
-		if isHTEnabled() {
-			cpuListString = "2-3"
-			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
-			if cpuList[1] != 1 {
-				cset = cpuset.MustParse(getCPUSiblingList(1))
-				cpuListString = fmt.Sprintf("%s", cset)
-			}
-		}
-		expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod.Spec.Containers[0].Name, pod.Name)
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+		runMultipleCPUGuPod(f)
 
 		ginkgo.By("running a Gu pod with multiple containers requesting integer CPUs")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container1",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-			{
-				ctnName:    "gu-container2",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-		}
-		pod = makeCPUManagerPod("gu-pod", ctnAttrs)
-		pod = f.PodClient().CreateSync(pod)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		cpu1, cpu2 = 1, 2
-		if isHTEnabled() {
-			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
-			if cpuList[1] != 1 {
-				cpu1, cpu2 = cpuList[1], 1
-			}
-		}
-
-		expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod.Spec.Containers[0].Name, pod.Name)
-
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod.Spec.Containers[1].Name, pod.Name)
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
-		waitForContainerRemoval(pod.Spec.Containers[1].Name, pod.Name, pod.Namespace)
+		runMultipleCPUContainersGuPod(f)
 
 		ginkgo.By("running multiple Gu pods")
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container1",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-		}
-		pod1 = makeCPUManagerPod("gu-pod1", ctnAttrs)
-		pod1 = f.PodClient().CreateSync(pod1)
-
-		ctnAttrs = []ctnAttribute{
-			{
-				ctnName:    "gu-container2",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-		}
-		pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs)
-		pod2 = f.PodClient().CreateSync(pod2)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		cpu1, cpu2 = 1, 2
-		if isHTEnabled() {
-			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
-			if cpuList[1] != 1 {
-				cpu1, cpu2 = cpuList[1], 1
-			}
-		}
-
-		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-		err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod1.Spec.Containers[0].Name, pod1.Name)
-
-		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu2)
-		err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-			pod2.Spec.Containers[0].Name, pod2.Name)
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(f, []string{pod1.Name, pod2.Name})
-		waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
-		waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
+		runMultipleGuPods(f)
 
 		ginkgo.By("test for automatically remove inactive pods from cpumanager state file.")
 		// First running a Gu Pod,
@@ -495,6 +604,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		cpu1 = 1
 		if isHTEnabled() {
 			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+			cpu1 = cpuList[1]
+		} else if isMultiNUMA() {
+			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
 			cpu1 = cpuList[1]
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)

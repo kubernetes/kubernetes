@@ -17,15 +17,16 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,7 +46,7 @@ func TestPatchConflicts(t *testing.T) {
 	UIDs := make([]types.UID, numOfConcurrentPatches)
 	ownerRefs := []metav1.OwnerReference{}
 	for i := 0; i < numOfConcurrentPatches; i++ {
-		uid := types.UID(uuid.NewRandom().String())
+		uid := types.UID(uuid.New().String())
 		ownerName := fmt.Sprintf("owner-%d", i)
 		UIDs[i] = uid
 		ownerRefs = append(ownerRefs, metav1.OwnerReference{
@@ -63,7 +64,7 @@ func TestPatchConflicts(t *testing.T) {
 	}
 
 	// Create the object we're going to conflict on
-	clientSet.CoreV1().Secrets(ns.Name).Create(secret)
+	clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 	client := clientSet.CoreV1().RESTClient()
 
 	successes := int32(0)
@@ -76,17 +77,17 @@ func TestPatchConflicts(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			labelName := fmt.Sprintf("label-%d", i)
-			value := uuid.NewRandom().String()
+			value := uuid.New().String()
 
 			obj, err := client.Patch(types.StrategicMergePatchType).
 				Namespace(ns.Name).
 				Resource("secrets").
 				Name("test").
 				Body([]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}, "ownerReferences":[{"$patch":"delete","uid":"%s"}]}}`, labelName, value, UIDs[i]))).
-				Do().
+				Do(context.TODO()).
 				Get()
 
-			if errors.IsConflict(err) {
+			if apierrors.IsConflict(err) {
 				t.Logf("tolerated conflict error patching %s: %v", "secrets", err)
 				return
 			}
@@ -107,10 +108,6 @@ func TestPatchConflicts(t *testing.T) {
 			}
 			// make sure the patch directive didn't get lost, and that an entry in the ownerReference list was deleted.
 			found := findOwnerRefByUID(accessor.GetOwnerReferences(), UIDs[i])
-			if err != nil {
-				t.Errorf("%v", err)
-				return
-			}
 			if found {
 				t.Errorf("patch of %s with $patch directive was ineffective, didn't delete the entry in the ownerReference slice: %#v", "secrets", UIDs[i])
 			}

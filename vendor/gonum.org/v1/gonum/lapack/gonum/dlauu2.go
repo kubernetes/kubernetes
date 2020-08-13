@@ -10,8 +10,8 @@ import (
 )
 
 // Dlauu2 computes the product
-//  U * U^T  if uplo is blas.Upper
-//  L^T * L  if uplo is blas.Lower
+//  U * Uᵀ  if uplo is blas.Upper
+//  Lᵀ * L  if uplo is blas.Lower
 // where U or L is stored in the upper or lower triangular part of A.
 // Only the upper or lower triangle of the result is stored, overwriting
 // the corresponding factor in A.
@@ -37,7 +37,7 @@ func (impl Implementation) Dlauu2(uplo blas.Uplo, n int, a []float64, lda int) {
 	bi := blas64.Implementation()
 
 	if uplo == blas.Upper {
-		// Compute the product U*U^T.
+		// Compute the product U*Uᵀ.
 		for i := 0; i < n; i++ {
 			aii := a[i*lda+i]
 			if i < n-1 {
@@ -49,7 +49,7 @@ func (impl Implementation) Dlauu2(uplo blas.Uplo, n int, a []float64, lda int) {
 			}
 		}
 	} else {
-		// Compute the product L^T*L.
+		// Compute the product Lᵀ*L.
 		for i := 0; i < n; i++ {
 			aii := a[i*lda+i]
 			if i < n-1 {

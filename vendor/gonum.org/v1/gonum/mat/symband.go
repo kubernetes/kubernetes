@@ -12,6 +12,8 @@ import (
 var (
 	symBandDense *SymBandDense
 	_            Matrix           = symBandDense
+	_            allMatrix        = symBandDense
+	_            denseMatrix      = symBandDense
 	_            Symmetric        = symBandDense
 	_            Banded           = symBandDense
 	_            SymBanded        = symBandDense
@@ -157,6 +159,26 @@ func (s *SymBandDense) SetRawSymBand(mat blas64.SymmetricBand) {
 	s.mat = mat
 }
 
+// IsEmpty returns whether the receiver is empty. Empty matrices can be the
+// receiver for size-restricted operations. The receiver can be emptied using
+// Reset.
+func (s *SymBandDense) IsEmpty() bool {
+	return s.mat.Stride == 0
+}
+
+// Reset empties the matrix so that it can be reused as the
+// receiver of a dimensionally restricted operation.
+//
+// Reset should not be used when the matrix shares backing data.
+// See the Reseter interface for more information.
+func (s *SymBandDense) Reset() {
+	s.mat.N = 0
+	s.mat.K = 0
+	s.mat.Stride = 0
+	s.mat.Uplo = 0
+	s.mat.Data = s.mat.Data[:0:0]
+}
+
 // Zero sets all of the matrix elements to zero.
 func (s *SymBandDense) Zero() {
 	for i := 0; i < s.mat.N; i++ {
@@ -218,4 +240,14 @@ func (s *SymBandDense) DoColNonZero(j int, fn func(i, j int, v float64)) {
 			}
 		}
 	}
+}
+
+// Trace returns the trace.
+func (s *SymBandDense) Trace() float64 {
+	rb := s.RawSymBand()
+	var tr float64
+	for i := 0; i < rb.N; i++ {
+		tr += rb.Data[i*rb.Stride]
+	}
+	return tr
 }

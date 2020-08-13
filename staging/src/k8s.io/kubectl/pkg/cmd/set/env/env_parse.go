@@ -81,7 +81,7 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 				return nil, nil, err
 			}
 			env = append(env, fileEnv...)
-		case strings.Index(envSpec, "=") != -1:
+		case strings.Contains(envSpec, "="):
 			parts := strings.SplitN(envSpec, "=", 2)
 			if len(parts) != 2 {
 				return nil, nil, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
@@ -119,7 +119,8 @@ func readEnv(r io.Reader, envVarType string) ([]v1.EnvVar, error) {
 		if pos := strings.Index(envSpec, "#"); pos != -1 {
 			envSpec = envSpec[:pos]
 		}
-		if strings.Index(envSpec, "=") != -1 {
+
+		if strings.Contains(envSpec, "=") {
 			parts := strings.SplitN(envSpec, "=", 2)
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
@@ -130,8 +131,10 @@ func readEnv(r io.Reader, envVarType string) ([]v1.EnvVar, error) {
 			})
 		}
 	}
+
 	if err := scanner.Err(); err != nil && err != io.EOF {
 		return nil, err
 	}
+
 	return env, nil
 }

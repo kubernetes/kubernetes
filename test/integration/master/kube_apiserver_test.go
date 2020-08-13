@@ -18,6 +18,7 @@ package master
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,12 +28,13 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/kubernetes"
@@ -60,7 +62,7 @@ func TestRun(t *testing.T) {
 	// test whether the server is really healthy after /healthz told us so
 	t.Logf("Creating Deployment directly after being healthy")
 	var replicas int32 = 1
-	_, err = client.AppsV1().Deployments("default").Create(&appsv1.Deployment{
+	_, err = client.AppsV1().Deployments("default").Create(context.TODO(), &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
@@ -90,17 +92,21 @@ func TestRun(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
 	}
 }
 
-func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
-	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do()
+func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) (bool, error) {
+	res := client.CoreV1().RESTClient().Get().RequestURI(path).Do(context.TODO())
 	var status int
 	res.StatusCode(&status)
-	return status == http.StatusOK
+	_, err := res.Raw()
+	if err != nil {
+		return false, err
+	}
+	return status == http.StatusOK, nil
 }
 
 func TestLivezAndReadyz(t *testing.T) {
@@ -111,11 +117,11 @@ func TestLivezAndReadyz(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !endpointReturnsStatusOK(client, "/livez") {
-		t.Fatalf("livez should be healthy")
+	if statusOK, err := endpointReturnsStatusOK(client, "/livez"); err != nil || !statusOK {
+		t.Fatalf("livez should be healthy, got %v and error %v", statusOK, err)
 	}
-	if !endpointReturnsStatusOK(client, "/readyz") {
-		t.Fatalf("readyz should be healthy")
+	if statusOK, err := endpointReturnsStatusOK(client, "/readyz"); err != nil || !statusOK {
+		t.Fatalf("readyz should be healthy, got %v and error %v", statusOK, err)
 	}
 }
 
@@ -132,7 +138,7 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result := kubeclient.RESTClient().Get().AbsPath("/openapi/v2").Do()
+	result := kubeclient.RESTClient().Get().AbsPath("/openapi/v2").Do(context.TODO())
 	status := 0
 	result.StatusCode(&status)
 	if status != http.StatusOK {
@@ -155,7 +161,7 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 	}
 
 	matchedExtension := false
-	extensionsPrefix := "/apis/" + apiextensions.GroupName
+	extensionsPrefix := "/apis/" + apiextensionsv1beta1.GroupName
 
 	matchedRegistration := false
 	registrationPrefix := "/apis/" + apiregistration.GroupName
@@ -297,6 +303,9 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 		t.Fatalf("unexpected error: apiextensions definition doesn't exist")
 	}
 	bytes, err := json.Marshal(apiextensionsDefinition)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if exist := strings.Contains(string(bytes), testApiextensionsOverlapProbeString); exist {
 		t.Fatalf("unexpected error: apiextensions definition gets overlapped")
 	}
@@ -340,7 +349,7 @@ func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensi
 }
 
 func specHasProbe(clientset *apiextensionsclientset.Clientset, probe string) (bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 	if err != nil {
 		return false, err
 	}
@@ -348,7 +357,7 @@ func specHasProbe(clientset *apiextensionsclientset.Clientset, probe string) (bo
 }
 
 func getOpenAPIPath(clientset *apiextensionsclientset.Clientset, path string) (spec.PathItem, bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 	if err != nil {
 		return spec.PathItem{}, false, err
 	}
@@ -364,7 +373,7 @@ func getOpenAPIPath(clientset *apiextensionsclientset.Clientset, path string) (s
 }
 
 func getOpenAPIDefinition(clientset *apiextensionsclientset.Clientset, definition string) (spec.Schema, bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw(context.TODO())
 	if err != nil {
 		return spec.Schema{}, false, err
 	}
@@ -428,7 +437,11 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	// 2. verify master count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
 		client, err := kubernetes.NewForConfig(masterCountServers[0].ClientConfig)
-		endpoints, err := client.CoreV1().Endpoints("default").Get("kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error creating client: %v", err)
+			return false, nil
+		}
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -463,7 +476,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 			t.Logf("create client error: %v", err)
 			return false, nil
 		}
-		endpoints, err := client.CoreV1().Endpoints("default").Get("kubernetes", metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -484,4 +497,85 @@ func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
 
 func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
 	testReconcilersMasterLease(t, 3, 3)
+}
+
+func TestMultiMasterNodePortAllocation(t *testing.T) {
+	var kubeAPIServers []*kubeapiservertesting.TestServer
+	var clientAPIServers []*kubernetes.Clientset
+	etcd := framework.SharedEtcd()
+
+	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
+		DisableStorageCleanup: true,
+	}
+
+	// cleanup the registry storage
+	defer registry.CleanupStorage()
+
+	// create 2 api servers and 2 clients
+	for i := 0; i < 2; i++ {
+		// start master count api server
+		t.Logf("starting api server: %d", i)
+		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
+		}, etcd)
+		kubeAPIServers = append(kubeAPIServers, server)
+
+		// verify kube API servers have registered and create a client
+		if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+			client, err := kubernetes.NewForConfig(kubeAPIServers[i].ClientConfig)
+			if err != nil {
+				t.Logf("create client error: %v", err)
+				return false, nil
+			}
+			clientAPIServers = append(clientAPIServers, client)
+			endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+			if err != nil {
+				t.Logf("error fetching endpoints: %v", err)
+				return false, nil
+			}
+			return verifyEndpointsWithIPs(kubeAPIServers, getEndpointIPs(endpoints)), nil
+		}); err != nil {
+			t.Fatalf("did not find only lease endpoints: %v", err)
+		}
+	}
+
+	serviceObject := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"foo": "bar"},
+			Name:   "test-node-port",
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "nodeport-test",
+					Port:       443,
+					TargetPort: intstr.IntOrString{IntVal: 443},
+					NodePort:   32080,
+					Protocol:   "TCP",
+				},
+			},
+			Type:     "NodePort",
+			Selector: map[string]string{"foo": "bar"},
+		},
+	}
+
+	// create and delete the same nodePortservice using different APIservers
+	// to check that API servers are using the same port allocation bitmap
+	for i := 0; i < 2; i++ {
+		// Create the service using the first API server
+		_, err := clientAPIServers[0].CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), serviceObject, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unable to create service: %v", err)
+		}
+		// Delete the service using the second API server
+		if err := clientAPIServers[1].CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), serviceObject.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("got unexpected error: %v", err)
+		}
+	}
+
+	// shutdown the api servers
+	for _, server := range kubeAPIServers {
+		server.TearDownFn()
+	}
+
 }

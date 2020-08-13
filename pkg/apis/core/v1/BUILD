@@ -41,10 +41,11 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/fuzzer:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

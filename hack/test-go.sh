@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a vestigial redirection.  Please do not add "real" logic.
+# This script runs all *_test.go files. It is equivalent to `make test`.
+# Usage: `hack/test-go.sh` or `make test`.
+# Note: This script is a vestigial redirection. Please do not add "real" logic.
 
 set -o errexit
 set -o nounset

@@ -19,6 +19,8 @@ package ipvs
 import (
 	"net"
 	"strconv"
+	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
 )
@@ -45,6 +47,8 @@ type Interface interface {
 	DeleteRealServer(*VirtualServer, *RealServer) error
 	// UpdateRealServer updates the specified real server from the specified virtual server.
 	UpdateRealServer(*VirtualServer, *RealServer) error
+	// ConfigureTimeouts is the equivalent to running "ipvsadm --set" to configure tcp, tcpfin and udp timeouts
+	ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error
 }
 
 // VirtualServer is an user-oriented definition of an IPVS virtual server in its entirety.
@@ -129,4 +133,9 @@ func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
 	}
 	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack}
 
+}
+
+// IsRsGracefulTerminationNeeded returns true if protocol requires graceful termination for the stale connections
+func IsRsGracefulTerminationNeeded(proto string) bool {
+	return !strings.EqualFold(proto, "UDP") && !strings.EqualFold(proto, "SCTP")
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -360,13 +361,13 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
 		},
 	}
 
-	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(configMap)
+	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
 	expectNoError(t, err, "failed to create audit-configmap")
 
-	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap.Name, metav1.GetOptions{})
 	expectNoError(t, err, "failed to get audit-configmap")
 
-	configMapChan, err := kubeclient.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
+	configMapChan, err := kubeclient.CoreV1().ConfigMaps(namespace).Watch(context.TODO(), watchOptions)
 	expectNoError(t, err, "failed to create watch for config maps")
 	for range configMapChan.ResultChan() {
 		// Block until watchOptions.TimeoutSeconds expires.
@@ -374,16 +375,16 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
 		// event at stage ResponseComplete will not be generated.
 	}
 
-	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(configMap)
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	expectNoError(t, err, "failed to update audit-configmap")
 
-	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Patch(context.TODO(), configMap.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 	expectNoError(t, err, "failed to patch configmap")
 
-	_, err = kubeclient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 	expectNoError(t, err, "failed to list config maps")
 
-	err = kubeclient.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+	err = kubeclient.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 	expectNoError(t, err, "failed to delete audit-configmap")
 }
 
@@ -427,7 +428,7 @@ func admitFunc(review *v1beta1.AdmissionReview) error {
 func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) error {
 	fail := admissionv1beta1.Fail
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: testWebhookConfigurationName},
 		Webhooks: []admissionv1beta1.MutatingWebhook{{
 			Name: testWebhookName,
@@ -442,6 +443,6 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) e
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
 		}},
-	})
+	}, metav1.CreateOptions{})
 	return err
 }

@@ -1,7 +1,7 @@
 // +build !providerless
 
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,126 +22,495 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient/mockloadbalancerclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/routeclient/mockrouteclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient/mocksecuritygroupclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient"
+	"k8s.io/legacy-cloud-providers/azure/retry"
+
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestShouldRetryHTTPRequest(t *testing.T) {
+func TestGetVirtualMachineWithRetry(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
-		code     int
-		err      error
-		expected bool
+		vmClientErr *retry.Error
+		expectedErr error
 	}{
 		{
-			code:     http.StatusBadRequest,
-			expected: true,
+			vmClientErr: &retry.Error{HTTPStatusCode: http.StatusNotFound},
+			expectedErr: cloudprovider.InstanceNotFound,
 		},
 		{
-			code:     http.StatusInternalServerError,
-			expected: true,
-		},
-		{
-			code:     http.StatusOK,
-			err:      fmt.Errorf("some error"),
-			expected: true,
-		},
-		{
-			code:     http.StatusOK,
-			expected: false,
-		},
-		{
-			code:     399,
-			expected: false,
+			vmClientErr: &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"),
 		},
 	}
+
 	for _, test := range tests {
-		resp := &http.Response{
-			StatusCode: test.code,
-		}
-		res := shouldRetryHTTPRequest(resp, test.err)
-		if res != test.expected {
-			t.Errorf("expected: %v, saw: %v", test.expected, res)
-		}
+		az := GetTestCloud(ctrl)
+		mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm", gomock.Any()).Return(compute.VirtualMachine{}, test.vmClientErr)
+
+		vm, err := az.GetVirtualMachineWithRetry("vm", cache.CacheReadTypeDefault)
+		assert.Empty(t, vm)
+		assert.Equal(t, test.expectedErr, err)
 	}
 }
 
-func TestIsSuccessResponse(t *testing.T) {
+func TestGetPrivateIPsForMachine(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
-		code     int
-		expected bool
+		vmClientErr        *retry.Error
+		expectedPrivateIPs []string
+		expectedErr        error
 	}{
 		{
-			code:     http.StatusNotFound,
-			expected: false,
+			expectedPrivateIPs: []string{"1.2.3.4"},
 		},
 		{
-			code:     http.StatusInternalServerError,
-			expected: false,
+			vmClientErr:        &retry.Error{HTTPStatusCode: http.StatusNotFound},
+			expectedErr:        cloudprovider.InstanceNotFound,
+			expectedPrivateIPs: []string{},
 		},
 		{
-			code:     http.StatusOK,
-			expected: true,
+			vmClientErr:        &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
+			expectedErr:        wait.ErrWaitTimeout,
+			expectedPrivateIPs: []string{},
+		},
+	}
+
+	expectedVM := compute.VirtualMachine{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
+			AvailabilitySet: &compute.SubResource{ID: to.StringPtr("availability-set")},
+			NetworkProfile: &compute.NetworkProfile{
+				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+					{
+						NetworkInterfaceReferenceProperties: &compute.NetworkInterfaceReferenceProperties{
+							Primary: to.BoolPtr(true),
+						},
+						ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic"),
+					},
+				},
+			},
+		},
+	}
+
+	expectedInterface := network.Interface{
+		InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
+			IPConfigurations: &[]network.InterfaceIPConfiguration{
+				{
+					InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
+						PrivateIPAddress: to.StringPtr("1.2.3.4"),
+					},
+				},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		resp := http.Response{
-			StatusCode: test.code,
-		}
-		res := isSuccessHTTPResponse(&resp)
-		if res != test.expected {
-			t.Errorf("expected: %v, saw: %v", test.expected, res)
-		}
+		az := GetTestCloud(ctrl)
+		mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm", gomock.Any()).Return(expectedVM, test.vmClientErr)
+
+		mockInterfaceClient := az.InterfacesClient.(*mockinterfaceclient.MockInterface)
+		mockInterfaceClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "nic", gomock.Any()).Return(expectedInterface, nil).MaxTimes(1)
+
+		privateIPs, err := az.getPrivateIPsForMachine("vm")
+		assert.Equal(t, test.expectedErr, err)
+		assert.Equal(t, test.expectedPrivateIPs, privateIPs)
 	}
 }
 
-func TestProcessRetryResponse(t *testing.T) {
-	az := &Cloud{}
+func TestGetIPForMachineWithRetry(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
-		code int
-		err  error
-		stop bool
+		clientErr         *retry.Error
+		expectedPrivateIP string
+		expectedPublicIP  string
+		expectedErr       error
 	}{
 		{
-			code: http.StatusBadRequest,
-			stop: false,
+			expectedPrivateIP: "1.2.3.4",
+			expectedPublicIP:  "5.6.7.8",
 		},
 		{
-			code: http.StatusInternalServerError,
-			stop: false,
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusNotFound},
+			expectedErr: wait.ErrWaitTimeout,
 		},
-		{
-			code: http.StatusSeeOther,
-			err:  fmt.Errorf("some error"),
-			stop: false,
+	}
+
+	expectedVM := compute.VirtualMachine{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
+			AvailabilitySet: &compute.SubResource{ID: to.StringPtr("availability-set")},
+			NetworkProfile: &compute.NetworkProfile{
+				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+					{
+						NetworkInterfaceReferenceProperties: &compute.NetworkInterfaceReferenceProperties{
+							Primary: to.BoolPtr(true),
+						},
+						ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic"),
+					},
+				},
+			},
 		},
-		{
-			code: http.StatusSeeOther,
-			stop: true,
+	}
+
+	expectedInterface := network.Interface{
+		InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
+			IPConfigurations: &[]network.InterfaceIPConfiguration{
+				{
+					InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
+						PrivateIPAddress: to.StringPtr("1.2.3.4"),
+						PublicIPAddress: &network.PublicIPAddress{
+							ID: to.StringPtr("test/pip"),
+						},
+					},
+				},
+			},
 		},
-		{
-			code: http.StatusOK,
-			stop: true,
-		},
-		{
-			code: http.StatusOK,
-			err:  fmt.Errorf("some error"),
-			stop: false,
-		},
-		{
-			code: 399,
-			stop: true,
+	}
+
+	expectedPIP := network.PublicIPAddress{
+		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+			IPAddress: to.StringPtr("5.6.7.8"),
 		},
 	}
 
 	for _, test := range tests {
-		resp := &http.Response{
-			StatusCode: test.code,
-		}
-		res, err := az.processHTTPRetryResponse(nil, "", resp, test.err)
-		if res != test.stop {
-			t.Errorf("expected: %v, saw: %v", test.stop, res)
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		az := GetTestCloud(ctrl)
+		mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm", gomock.Any()).Return(expectedVM, test.clientErr)
+
+		mockInterfaceClient := az.InterfacesClient.(*mockinterfaceclient.MockInterface)
+		mockInterfaceClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "nic", gomock.Any()).Return(expectedInterface, nil).MaxTimes(1)
+
+		mockPIPClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
+		mockPIPClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "pip", gomock.Any()).Return(expectedPIP, nil).MaxTimes(1)
+
+		privateIP, publicIP, err := az.GetIPForMachineWithRetry("vm")
+		assert.Equal(t, test.expectedErr, err)
+		assert.Equal(t, test.expectedPrivateIP, privateIP)
+		assert.Equal(t, test.expectedPublicIP, publicIP)
 	}
+}
+
+func TestCreateOrUpdateSecurityGroupCanceled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	az.nsgCache.Set("sg", "test")
+
+	mockSGClient := az.SecurityGroupsClient.(*mocksecuritygroupclient.MockInterface)
+	mockSGClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(&retry.Error{
+		RawError: fmt.Errorf(operationCanceledErrorMessage),
+	})
+	mockSGClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "sg", gomock.Any()).Return(network.SecurityGroup{}, nil)
+
+	err := az.CreateOrUpdateSecurityGroup(&v1.Service{}, network.SecurityGroup{Name: to.StringPtr("sg")})
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: canceledandsupersededduetoanotheroperation"), err)
+
+	// security group should be removed from cache if the operation is canceled
+	shouldBeEmpty, err := az.nsgCache.Get("sg", cache.CacheReadTypeDefault)
+	assert.NoError(t, err)
+	assert.Empty(t, shouldBeEmpty)
+}
+
+func TestCreateOrUpdateLB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		clientErr   *retry.Error
+		expectedErr error
+	}{
+		{
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusPreconditionFailed},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 412, RawError: <nil>"),
+		},
+		{
+			clientErr:   &retry.Error{RawError: fmt.Errorf(operationCanceledErrorMessage)},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: canceledandsupersededduetoanotheroperation"),
+		},
+	}
+
+	for _, test := range tests {
+		az := GetTestCloud(ctrl)
+		az.lbCache.Set("lb", "test")
+
+		mockLBClient := az.LoadBalancerClient.(*mockloadbalancerclient.MockInterface)
+		mockLBClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(test.clientErr)
+		mockLBClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "lb", gomock.Any()).Return(network.LoadBalancer{}, nil)
+
+		err := az.CreateOrUpdateLB(&v1.Service{}, network.LoadBalancer{
+			Name: to.StringPtr("lb"),
+			Etag: to.StringPtr("etag"),
+		})
+		assert.Equal(t, test.expectedErr, err)
+
+		// loadbalancer should be removed from cache if the etag is mismatch or the operation is canceled
+		shouldBeEmpty, err := az.lbCache.Get("lb", cache.CacheReadTypeDefault)
+		assert.NoError(t, err)
+		assert.Empty(t, shouldBeEmpty)
+	}
+}
+
+func TestListLB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	mockLBClient := az.LoadBalancerClient.(*mockloadbalancerclient.MockInterface)
+	mockLBClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(nil, &retry.Error{HTTPStatusCode: http.StatusInternalServerError})
+
+	pips, err := az.ListLB(&v1.Service{})
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"), err)
+	assert.Empty(t, pips)
+}
+
+func TestListPIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	mockPIPClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
+	mockPIPClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(nil, &retry.Error{HTTPStatusCode: http.StatusInternalServerError})
+
+	pips, err := az.ListPIP(&v1.Service{}, az.ResourceGroup)
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"), err)
+	assert.Empty(t, pips)
+}
+
+func TestCreateOrUpdatePIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	mockPIPClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
+	mockPIPClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, "nic", gomock.Any()).Return(&retry.Error{HTTPStatusCode: http.StatusInternalServerError})
+
+	err := az.CreateOrUpdatePIP(&v1.Service{}, az.ResourceGroup, network.PublicIPAddress{Name: to.StringPtr("nic")})
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"), err)
+}
+
+func TestCreateOrUpdateInterface(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	mockInterfaceClient := az.InterfacesClient.(*mockinterfaceclient.MockInterface)
+	mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, "nic", gomock.Any()).Return(&retry.Error{HTTPStatusCode: http.StatusInternalServerError})
+
+	err := az.CreateOrUpdateInterface(&v1.Service{}, network.Interface{Name: to.StringPtr("nic")})
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"), err)
+}
+
+func TestDeletePublicIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	mockPIPClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
+	mockPIPClient.EXPECT().Delete(gomock.Any(), az.ResourceGroup, "pip").Return(&retry.Error{HTTPStatusCode: http.StatusInternalServerError})
+
+	err := az.DeletePublicIP(&v1.Service{}, az.ResourceGroup, "pip")
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"), err)
+}
+
+func TestDeleteLB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	mockLBClient := az.LoadBalancerClient.(*mockloadbalancerclient.MockInterface)
+	mockLBClient.EXPECT().Delete(gomock.Any(), az.ResourceGroup, "lb").Return(&retry.Error{HTTPStatusCode: http.StatusInternalServerError})
+
+	err := az.DeleteLB(&v1.Service{}, "lb")
+	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"), err)
+}
+
+func TestCreateOrUpdateRouteTable(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		clientErr   *retry.Error
+		expectedErr error
+	}{
+		{
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusPreconditionFailed},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 412, RawError: <nil>"),
+		},
+		{
+			clientErr:   &retry.Error{RawError: fmt.Errorf(operationCanceledErrorMessage)},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: canceledandsupersededduetoanotheroperation"),
+		},
+	}
+
+	for _, test := range tests {
+		az := GetTestCloud(ctrl)
+		az.rtCache.Set("rt", "test")
+
+		mockRTClient := az.RouteTablesClient.(*mockroutetableclient.MockInterface)
+		mockRTClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(test.clientErr)
+		mockRTClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "rt", gomock.Any()).Return(network.RouteTable{}, nil)
+
+		err := az.CreateOrUpdateRouteTable(network.RouteTable{
+			Name: to.StringPtr("rt"),
+			Etag: to.StringPtr("etag"),
+		})
+		assert.Equal(t, test.expectedErr, err)
+
+		// route table should be removed from cache if the etag is mismatch or the operation is canceled
+		shouldBeEmpty, err := az.rtCache.Get("rt", cache.CacheReadTypeDefault)
+		assert.NoError(t, err)
+		assert.Empty(t, shouldBeEmpty)
+	}
+}
+
+func TestCreateOrUpdateRoute(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		clientErr   *retry.Error
+		expectedErr error
+	}{
+		{
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusPreconditionFailed},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 412, RawError: <nil>"),
+		},
+		{
+			clientErr:   &retry.Error{RawError: fmt.Errorf(operationCanceledErrorMessage)},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: canceledandsupersededduetoanotheroperation"),
+		},
+		{
+			clientErr:   nil,
+			expectedErr: nil,
+		},
+	}
+
+	for _, test := range tests {
+		az := GetTestCloud(ctrl)
+		az.rtCache.Set("rt", "test")
+
+		mockRTClient := az.RoutesClient.(*mockrouteclient.MockInterface)
+		mockRTClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, "rt", gomock.Any(), gomock.Any(), gomock.Any()).Return(test.clientErr)
+
+		mockRTableClient := az.RouteTablesClient.(*mockroutetableclient.MockInterface)
+		mockRTableClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "rt", gomock.Any()).Return(network.RouteTable{}, nil)
+
+		err := az.CreateOrUpdateRoute(network.Route{
+			Name: to.StringPtr("rt"),
+			Etag: to.StringPtr("etag"),
+		})
+		assert.Equal(t, test.expectedErr, err)
+
+		shouldBeEmpty, err := az.rtCache.Get("rt", cache.CacheReadTypeDefault)
+		assert.NoError(t, err)
+		assert.Empty(t, shouldBeEmpty)
+	}
+}
+
+func TestDeleteRouteWithName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		clientErr   *retry.Error
+		expectedErr error
+	}{
+		{
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"),
+		},
+		{
+			clientErr:   nil,
+			expectedErr: nil,
+		},
+	}
+
+	for _, test := range tests {
+		az := GetTestCloud(ctrl)
+
+		mockRTClient := az.RoutesClient.(*mockrouteclient.MockInterface)
+		mockRTClient.EXPECT().Delete(gomock.Any(), az.ResourceGroup, "rt", "rt").Return(test.clientErr)
+
+		err := az.DeleteRouteWithName("rt")
+		assert.Equal(t, test.expectedErr, err)
+	}
+}
+
+func TestCreateOrUpdateVMSS(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		vmss        compute.VirtualMachineScaleSet
+		clientErr   *retry.Error
+		expectedErr *retry.Error
+	}{
+		{
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
+			expectedErr: &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
+		},
+		{
+			clientErr:   &retry.Error{HTTPStatusCode: http.StatusTooManyRequests},
+			expectedErr: &retry.Error{HTTPStatusCode: http.StatusTooManyRequests},
+		},
+		{
+			clientErr:   &retry.Error{RawError: fmt.Errorf("azure cloud provider rate limited(write) for operation CreateOrUpdate")},
+			expectedErr: &retry.Error{RawError: fmt.Errorf("azure cloud provider rate limited(write) for operation CreateOrUpdate")},
+		},
+		{
+			vmss: compute.VirtualMachineScaleSet{
+				VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+					ProvisioningState: &virtualMachineScaleSetsDeallocating,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		az := GetTestCloud(ctrl)
+
+		mockVMSSClient := az.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
+		mockVMSSClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, testVMSSName).Return(test.vmss, test.clientErr)
+
+		err := az.CreateOrUpdateVMSS(az.ResourceGroup, testVMSSName, compute.VirtualMachineScaleSet{})
+		assert.Equal(t, test.expectedErr, err)
+	}
+}
+
+func TestRequestBackoff(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	az := GetTestCloud(ctrl)
+	az.CloudProviderBackoff = true
+	az.ResourceRequestBackoff = wait.Backoff{Steps: 3}
+
+	backoff := az.RequestBackoff()
+	assert.Equal(t, wait.Backoff{Steps: 3}, backoff)
+
 }

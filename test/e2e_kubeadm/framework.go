@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import "k8s.io/kubernetes/test/e2e/framework"
 
-// KubeadmDescribe annotates the test with the Kubeadm label.
-func KubeadmDescribe(text string, body func()) bool {
+// Describe annotates the test with the Kubeadm label.
+func Describe(text string, body func()) bool {
 	return framework.KubeDescribe("[sig-cluster-lifecycle] [area-kubeadm] "+text, body)
 }

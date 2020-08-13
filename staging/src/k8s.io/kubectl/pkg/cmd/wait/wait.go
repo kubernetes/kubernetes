@@ -263,7 +263,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
 
 		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
-		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
+		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: nameSelector})
 		if apierrors.IsNotFound(err) {
 			return info.Object, true, nil
 		}
@@ -289,7 +289,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		watchOptions := metav1.ListOptions{}
 		watchOptions.FieldSelector = nameSelector
 		watchOptions.ResourceVersion = gottenObjList.GetResourceVersion()
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
+		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
 		if err != nil {
 			return gottenObj, false, err
 		}
@@ -361,7 +361,7 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 
 		var gottenObj *unstructured.Unstructured
 		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
-		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
+		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: nameSelector})
 
 		resourceVersion := ""
 		switch {
@@ -384,7 +384,7 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 		watchOptions := metav1.ListOptions{}
 		watchOptions.FieldSelector = nameSelector
 		watchOptions.ResourceVersion = resourceVersion
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
+		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
 		if err != nil {
 			return gottenObj, false, err
 		}
@@ -426,14 +426,14 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 	for _, conditionUncast := range conditions {
 		condition := conditionUncast.(map[string]interface{})
 		name, found, err := unstructured.NestedString(condition, "type")
-		if !found || err != nil || strings.ToLower(name) != strings.ToLower(w.conditionName) {
+		if !found || err != nil || !strings.EqualFold(name, w.conditionName) {
 			continue
 		}
 		status, found, err := unstructured.NestedString(condition, "status")
 		if !found || err != nil {
 			continue
 		}
-		return strings.ToLower(status) == strings.ToLower(w.conditionStatus), nil
+		return strings.EqualFold(status, w.conditionStatus), nil
 	}
 
 	return false, nil

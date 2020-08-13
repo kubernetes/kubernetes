@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,7 +23,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/blang/semver"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
@@ -346,6 +347,27 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 				NetworkMode: "default",
 			},
 		},
+		{
+			name: "Pod PID NamespaceOption (for sandbox is same as container ns option)",
+			nsOpt: &runtimeapi.NamespaceOption{
+				Pid: runtimeapi.NamespaceMode_POD,
+			},
+			expected: &dockercontainer.HostConfig{
+				PidMode:     "",
+				NetworkMode: "default",
+			},
+		},
+		{
+			name: "Target PID NamespaceOption (invalid for sandbox)",
+			nsOpt: &runtimeapi.NamespaceOption{
+				Pid:      runtimeapi.NamespaceMode_TARGET,
+				TargetId: "same-container",
+			},
+			expected: &dockercontainer.HostConfig{
+				PidMode:     "",
+				NetworkMode: "default",
+			},
+		},
 	}
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
@@ -396,61 +418,34 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 				PidMode:     namespaceModeHost,
 			},
 		},
+		{
+			name: "Pod PID NamespaceOption",
+			nsOpt: &runtimeapi.NamespaceOption{
+				Pid: runtimeapi.NamespaceMode_POD,
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+				PidMode:     dockercontainer.PidMode(sandboxNSMode),
+			},
+		},
+		{
+			name: "Target PID NamespaceOption",
+			nsOpt: &runtimeapi.NamespaceOption{
+				Pid:      runtimeapi.NamespaceMode_TARGET,
+				TargetId: "some-container",
+			},
+			expected: &dockercontainer.HostConfig{
+				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+				PidMode:     dockercontainer.PidMode("container:some-container"),
+			},
+		},
 	}
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyContainerNamespaceOptions(tc.nsOpt, sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
-	}
-}
-
-func TestModifyContainerNamespacePIDOverride(t *testing.T) {
-	cases := []struct {
-		name            string
-		version         *semver.Version
-		input, expected dockercontainer.PidMode
-	}{
-		{
-			name:     "mode:CONTAINER docker:NEW",
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "mode:CONTAINER docker:OLD",
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "mode:HOST docker:NEW",
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "mode:HOST docker:OLD",
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "mode:POD docker:NEW",
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "container:sandbox",
-			expected: "container:sandbox",
-		},
-		{
-			name:     "mode:POD docker:OLD",
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "container:sandbox",
-			expected: "",
-		},
-	}
-	for _, tc := range cases {
-		dockerCfg := &dockercontainer.HostConfig{PidMode: tc.input}
-		modifyContainerPIDNamespaceOverrides(tc.version, dockerCfg, "sandbox")
-		assert.Equal(t, tc.expected, dockerCfg.PidMode, "[Test case %q]", tc.name)
 	}
 }
 

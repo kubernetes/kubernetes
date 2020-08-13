@@ -4,11 +4,13 @@ package fs
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
@@ -51,12 +53,12 @@ func (s *CpuGroup) ApplyDir(path string, cgroup *configs.Cgroup, pid int) error 
 
 func (s *CpuGroup) SetRtSched(path string, cgroup *configs.Cgroup) error {
 	if cgroup.Resources.CpuRtPeriod != 0 {
-		if err := writeFile(path, "cpu.rt_period_us", strconv.FormatUint(cgroup.Resources.CpuRtPeriod, 10)); err != nil {
+		if err := fscommon.WriteFile(path, "cpu.rt_period_us", strconv.FormatUint(cgroup.Resources.CpuRtPeriod, 10)); err != nil {
 			return err
 		}
 	}
 	if cgroup.Resources.CpuRtRuntime != 0 {
-		if err := writeFile(path, "cpu.rt_runtime_us", strconv.FormatInt(cgroup.Resources.CpuRtRuntime, 10)); err != nil {
+		if err := fscommon.WriteFile(path, "cpu.rt_runtime_us", strconv.FormatInt(cgroup.Resources.CpuRtRuntime, 10)); err != nil {
 			return err
 		}
 	}
@@ -65,17 +67,29 @@ func (s *CpuGroup) SetRtSched(path string, cgroup *configs.Cgroup) error {
 
 func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if cgroup.Resources.CpuShares != 0 {
-		if err := writeFile(path, "cpu.shares", strconv.FormatUint(cgroup.Resources.CpuShares, 10)); err != nil {
+		shares := cgroup.Resources.CpuShares
+		if err := fscommon.WriteFile(path, "cpu.shares", strconv.FormatUint(shares, 10)); err != nil {
 			return err
+		}
+		// read it back
+		sharesRead, err := fscommon.GetCgroupParamUint(path, "cpu.shares")
+		if err != nil {
+			return err
+		}
+		// ... and check
+		if shares > sharesRead {
+			return fmt.Errorf("the maximum allowed cpu-shares is %d", sharesRead)
+		} else if shares < sharesRead {
+			return fmt.Errorf("the minimum allowed cpu-shares is %d", sharesRead)
 		}
 	}
 	if cgroup.Resources.CpuPeriod != 0 {
-		if err := writeFile(path, "cpu.cfs_period_us", strconv.FormatUint(cgroup.Resources.CpuPeriod, 10)); err != nil {
+		if err := fscommon.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(cgroup.Resources.CpuPeriod, 10)); err != nil {
 			return err
 		}
 	}
 	if cgroup.Resources.CpuQuota != 0 {
-		if err := writeFile(path, "cpu.cfs_quota_us", strconv.FormatInt(cgroup.Resources.CpuQuota, 10)); err != nil {
+		if err := fscommon.WriteFile(path, "cpu.cfs_quota_us", strconv.FormatInt(cgroup.Resources.CpuQuota, 10)); err != nil {
 			return err
 		}
 	}
@@ -98,7 +112,7 @@ func (s *CpuGroup) GetStats(path string, stats *cgroups.Stats) error {
 
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		t, v, err := getCgroupParamKeyValue(sc.Text())
+		t, v, err := fscommon.GetCgroupParamKeyValue(sc.Text())
 		if err != nil {
 			return err
 		}

@@ -1,0 +1,9 @@
+inverseRules:
+  # Allow Internal packages only in apiextensions-apiserver itself, discourage use elsewhere.
+  - selectorRegexp: k8s[.]io/apiextensions-apiserver
+    allowedPrefixes:
+      - ''
+  # Forbid use of this package in other k8s.io packages.
+  - selectorRegexp: k8s[.]io
+    forbiddenPrefixes:
+      - ''

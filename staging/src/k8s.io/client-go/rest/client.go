@@ -17,8 +17,6 @@ limitations under the License.
 package rest
 
 import (
-	"fmt"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -51,6 +49,28 @@ type Interface interface {
 	APIVersion() schema.GroupVersion
 }
 
+// ClientContentConfig controls how RESTClient communicates with the server.
+//
+// TODO: ContentConfig will be updated to accept a Negotiator instead of a
+//   NegotiatedSerializer and NegotiatedSerializer will be removed.
+type ClientContentConfig struct {
+	// AcceptContentTypes specifies the types the client will accept and is optional.
+	// If not set, ContentType will be used to define the Accept header
+	AcceptContentTypes string
+	// ContentType specifies the wire format used to communicate with the server.
+	// This value will be set as the Accept header on requests made to the server if
+	// AcceptContentTypes is not set, and as the default content type on any object
+	// sent to the server. If not set, "application/json" is used.
+	ContentType string
+	// GroupVersion is the API version to talk to. Must be provided when initializing
+	// a RESTClient directly. When initializing a Client, will be set with the default
+	// code version. This is used as the default group version for VersionedParams.
+	GroupVersion schema.GroupVersion
+	// Negotiator is used for obtaining encoders and decoders for multiple
+	// supported media types.
+	Negotiator runtime.ClientNegotiator
+}
+
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
 // The baseURL is expected to point to an HTTP or HTTPS path that is the parent
 // of one or more resources.  The server should return a decodable API resource
@@ -64,34 +84,31 @@ type RESTClient struct {
 	// versionedAPIPath is a path segment connecting the base URL to the resource root
 	versionedAPIPath string
 
-	// contentConfig is the information used to communicate with the server.
-	contentConfig ContentConfig
-
-	// serializers contain all serializers for underlying content type.
-	serializers Serializers
+	// content describes how a RESTClient encodes and decodes responses.
+	content ClientContentConfig
 
 	// creates BackoffManager that is passed to requests.
 	createBackoffMgr func() BackoffManager
 
-	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
-	Throttle flowcontrol.RateLimiter
+	// rateLimiter is shared among all requests created by this client unless specifically
+	// overridden.
+	rateLimiter flowcontrol.RateLimiter
+
+	// warningHandler is shared among all requests created by this client.
+	// If not set, defaultWarningHandler is used.
+	warningHandler WarningHandler
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
 }
 
-type Serializers struct {
-	Encoder             runtime.Encoder
-	Decoder             runtime.Decoder
-	StreamingSerializer runtime.Serializer
-	Framer              runtime.Framer
-	RenegotiatedDecoder func(contentType string, params map[string]string) (runtime.Decoder, error)
-}
-
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
-// such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
-// decoding of responses from the server.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+// such as Get, Put, Post, and Delete on specified paths.
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+	if len(config.ContentType) == 0 {
+		config.ContentType = "application/json"
+	}
+
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -99,31 +116,14 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	base.RawQuery = ""
 	base.Fragment = ""
 
-	if config.GroupVersion == nil {
-		config.GroupVersion = &schema.GroupVersion{}
-	}
-	if len(config.ContentType) == 0 {
-		config.ContentType = "application/json"
-	}
-	serializers, err := createSerializers(config)
-	if err != nil {
-		return nil, err
-	}
-
-	var throttle flowcontrol.RateLimiter
-	if maxQPS > 0 && rateLimiter == nil {
-		throttle = flowcontrol.NewTokenBucketRateLimiter(maxQPS, maxBurst)
-	} else if rateLimiter != nil {
-		throttle = rateLimiter
-	}
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
-		contentConfig:    config,
-		serializers:      *serializers,
+		content:          config,
 		createBackoffMgr: readExpBackoffConfig,
-		Throttle:         throttle,
-		Client:           client,
+		rateLimiter:      rateLimiter,
+
+		Client: client,
 	}, nil
 }
 
@@ -132,7 +132,7 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	if c == nil {
 		return nil
 	}
-	return c.Throttle
+	return c.rateLimiter
 }
 
 // readExpBackoffConfig handles the internal logic of determining what the
@@ -153,58 +153,6 @@ func readExpBackoffConfig() BackoffManager {
 			time.Duration(backoffDurationInt)*time.Second)}
 }
 
-// createSerializers creates all necessary serializers for given contentType.
-// TODO: the negotiated serializer passed to this method should probably return
-//   serializers that control decoding and versioning without this package
-//   being aware of the types. Depends on whether RESTClient must deal with
-//   generic infrastructure.
-func createSerializers(config ContentConfig) (*Serializers, error) {
-	mediaTypes := config.NegotiatedSerializer.SupportedMediaTypes()
-	contentType := config.ContentType
-	mediaType, _, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		return nil, fmt.Errorf("the content type specified in the client configuration is not recognized: %v", err)
-	}
-	info, ok := runtime.SerializerInfoForMediaType(mediaTypes, mediaType)
-	if !ok {
-		if len(contentType) != 0 || len(mediaTypes) == 0 {
-			return nil, fmt.Errorf("no serializers registered for %s", contentType)
-		}
-		info = mediaTypes[0]
-	}
-
-	internalGV := schema.GroupVersions{
-		{
-			Group:   config.GroupVersion.Group,
-			Version: runtime.APIVersionInternal,
-		},
-		// always include the legacy group as a decoding target to handle non-error `Status` return types
-		{
-			Group:   "",
-			Version: runtime.APIVersionInternal,
-		},
-	}
-
-	s := &Serializers{
-		Encoder: config.NegotiatedSerializer.EncoderForVersion(info.Serializer, *config.GroupVersion),
-		Decoder: config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV),
-
-		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			info, ok := runtime.SerializerInfoForMediaType(mediaTypes, contentType)
-			if !ok {
-				return nil, fmt.Errorf("serializer for %s not registered", contentType)
-			}
-			return config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV), nil
-		},
-	}
-	if info.StreamSerializer != nil {
-		s.StreamingSerializer = info.StreamSerializer.Serializer
-		s.Framer = info.StreamSerializer.Framer
-	}
-
-	return s, nil
-}
-
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of RESTClient's request building interface:
@@ -219,12 +167,7 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 // list, ok := resp.(*api.PodList)
 //
 func (c *RESTClient) Verb(verb string) *Request {
-	backoff := c.createBackoffMgr()
-
-	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, 0)
-	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.Client.Timeout)
+	return NewRequest(c).Verb(verb)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -254,5 +197,5 @@ func (c *RESTClient) Delete() *Request {
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() schema.GroupVersion {
-	return *c.contentConfig.GroupVersion
+	return c.content.GroupVersion
 }

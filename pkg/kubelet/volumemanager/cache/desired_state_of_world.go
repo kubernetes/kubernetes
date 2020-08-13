@@ -263,7 +263,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				if volumeSpec.Volume.EmptyDir != nil &&
 					volumeSpec.Volume.EmptyDir.SizeLimit != nil &&
 					volumeSpec.Volume.EmptyDir.SizeLimit.Value() > 0 &&
-					volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value() {
+					(sizeLimit.Value() == 0 || volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value()) {
 					sizeLimit = resource.NewQuantity(volumeSpec.Volume.EmptyDir.SizeLimit.Value(), resource.BinarySI)
 				}
 			}
@@ -362,8 +362,8 @@ func (dsw *desiredStateOfWorld) VolumeExistsWithSpecName(podName types.UniquePod
 	dsw.RLock()
 	defer dsw.RUnlock()
 	for _, volumeObj := range dsw.volumesToMount {
-		for name, podObj := range volumeObj.podsToMount {
-			if podName == name && podObj.volumeSpec.Name() == volumeSpecName {
+		if podObj, podExists := volumeObj.podsToMount[podName]; podExists {
+			if podObj.volumeSpec.Name() == volumeSpecName {
 				return true
 			}
 		}
@@ -378,9 +378,7 @@ func (dsw *desiredStateOfWorld) GetPods() map[types.UniquePodName]bool {
 	podList := make(map[types.UniquePodName]bool)
 	for _, volumeObj := range dsw.volumesToMount {
 		for podName := range volumeObj.podsToMount {
-			if !podList[podName] {
-				podList[podName] = true
-			}
+			podList[podName] = true
 		}
 	}
 	return podList

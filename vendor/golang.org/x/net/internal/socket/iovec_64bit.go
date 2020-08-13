@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build arm64 amd64 ppc64 ppc64le mips64 mips64le s390x
-// +build darwin dragonfly freebsd linux netbsd openbsd
+// +build arm64 amd64 ppc64 ppc64le mips64 mips64le riscv64 s390x
+// +build aix darwin dragonfly freebsd linux netbsd openbsd
 
 package socket
 

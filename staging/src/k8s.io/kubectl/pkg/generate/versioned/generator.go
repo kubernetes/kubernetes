@@ -22,10 +22,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -39,7 +35,6 @@ const (
 	// TODO(sig-cli): Enforce consistent naming for generators here.
 	// See discussion in https://github.com/kubernetes/kubernetes/issues/46237
 	// before you add any more.
-	RunV1GeneratorName                      = "run/v1"
 	RunPodV1GeneratorName                   = "run-pod/v1"
 	ServiceV1GeneratorName                  = "service/v1"
 	ServiceV2GeneratorName                  = "service/v2"
@@ -49,15 +44,9 @@ const (
 	ServiceExternalNameGeneratorV1Name      = "service-externalname/v1"
 	ServiceAccountV1GeneratorName           = "serviceaccount/v1"
 	HorizontalPodAutoscalerV1GeneratorName  = "horizontalpodautoscaler/v1"
-	DeploymentV1Beta1GeneratorName          = "deployment/v1beta1"
-	DeploymentAppsV1Beta1GeneratorName      = "deployment/apps.v1beta1"
-	DeploymentAppsV1GeneratorName           = "deployment/apps.v1"
 	DeploymentBasicV1Beta1GeneratorName     = "deployment-basic/v1beta1"
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
 	DeploymentBasicAppsV1GeneratorName      = "deployment-basic/apps.v1"
-	JobV1GeneratorName                      = "job/v1"
-	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
-	CronJobV1Beta1GeneratorName             = "cronjob/v1beta1"
 	NamespaceV1GeneratorName                = "namespace/v1"
 	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
 	SecretV1GeneratorName                   = "secret/v1"
@@ -104,14 +93,7 @@ func DefaultGenerators(cmdName string) map[string]generate.Generator {
 		generator = map[string]generate.Generator{}
 	case "run":
 		generator = map[string]generate.Generator{
-			RunV1GeneratorName:                 BasicReplicationController{},
-			RunPodV1GeneratorName:              BasicPod{},
-			DeploymentV1Beta1GeneratorName:     DeploymentV1Beta1{},
-			DeploymentAppsV1Beta1GeneratorName: DeploymentAppsV1Beta1{},
-			DeploymentAppsV1GeneratorName:      DeploymentAppsV1{},
-			JobV1GeneratorName:                 JobV1{},
-			CronJobV2Alpha1GeneratorName:       CronJobV2Alpha1{},
-			CronJobV1Beta1GeneratorName:        CronJobV1Beta1{},
+			RunPodV1GeneratorName: BasicPod{},
 		}
 	case "namespace":
 		generator = map[string]generate.Generator{
@@ -150,30 +132,6 @@ func FallbackGeneratorNameIfNecessary(
 	cmdErr io.Writer,
 ) (string, error) {
 	switch generatorName {
-	case DeploymentAppsV1GeneratorName:
-		hasResource, err := HasResource(discoveryClient, appsv1.SchemeGroupVersion.WithResource("deployments"))
-		if err != nil {
-			return "", err
-		}
-		if !hasResource {
-			return FallbackGeneratorNameIfNecessary(DeploymentAppsV1Beta1GeneratorName, discoveryClient, cmdErr)
-		}
-	case DeploymentAppsV1Beta1GeneratorName:
-		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
-		if err != nil {
-			return "", err
-		}
-		if !hasResource {
-			return FallbackGeneratorNameIfNecessary(DeploymentV1Beta1GeneratorName, discoveryClient, cmdErr)
-		}
-	case DeploymentV1Beta1GeneratorName:
-		hasResource, err := HasResource(discoveryClient, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"))
-		if err != nil {
-			return "", err
-		}
-		if !hasResource {
-			return RunV1GeneratorName, nil
-		}
 	case DeploymentBasicAppsV1GeneratorName:
 		hasResource, err := HasResource(discoveryClient, appsv1.SchemeGroupVersion.WithResource("deployments"))
 		if err != nil {
@@ -189,30 +147,6 @@ func FallbackGeneratorNameIfNecessary(
 		}
 		if !hasResource {
 			return DeploymentBasicV1Beta1GeneratorName, nil
-		}
-	case JobV1GeneratorName:
-		hasResource, err := HasResource(discoveryClient, batchv1.SchemeGroupVersion.WithResource("jobs"))
-		if err != nil {
-			return "", err
-		}
-		if !hasResource {
-			return RunPodV1GeneratorName, nil
-		}
-	case CronJobV1Beta1GeneratorName:
-		hasResource, err := HasResource(discoveryClient, batchv1beta1.SchemeGroupVersion.WithResource("cronjobs"))
-		if err != nil {
-			return "", err
-		}
-		if !hasResource {
-			return FallbackGeneratorNameIfNecessary(CronJobV2Alpha1GeneratorName, discoveryClient, cmdErr)
-		}
-	case CronJobV2Alpha1GeneratorName:
-		hasResource, err := HasResource(discoveryClient, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs"))
-		if err != nil {
-			return "", err
-		}
-		if !hasResource {
-			return JobV1GeneratorName, nil
 		}
 	}
 	return generatorName, nil

@@ -73,6 +73,15 @@ func ToStructuralOpenAPIV2(in *structuralschema.Structural) *structuralschema.St
 				changed = true
 			}
 
+			for f, fs := range s.Properties {
+				if fs.Nullable {
+					s.ValueValidation.Required, changed = filterOut(s.ValueValidation.Required, f)
+				}
+			}
+			if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil && s.AdditionalProperties.Structural.Nullable {
+				s.ValueValidation.Required, changed = nil, true
+			}
+
 			return changed
 		},
 		// we drop all junctors above, and hence, never reach nested value validations
@@ -81,4 +90,25 @@ func ToStructuralOpenAPIV2(in *structuralschema.Structural) *structuralschema.St
 	mapper.Visit(out)
 
 	return out
+}
+
+func filterOut(ss []string, x string) ([]string, bool) {
+	var filtered []string
+	for i, s := range ss {
+		if s == x {
+			if filtered == nil {
+				filtered = make([]string, i, len(ss))
+				copy(filtered, ss[:i])
+			}
+		} else if filtered != nil {
+			filtered = append(filtered, s)
+		}
+	}
+	if filtered != nil {
+		if len(filtered) == 0 {
+			return nil, true
+		}
+		return filtered, true
+	}
+	return ss, false
 }

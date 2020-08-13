@@ -46,16 +46,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceConversion)(nil), (*apiextensions.CustomResourceConversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(a.(*CustomResourceConversion), b.(*apiextensions.CustomResourceConversion), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceConversion)(nil), (*CustomResourceConversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(a.(*apiextensions.CustomResourceConversion), b.(*CustomResourceConversion), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinition)(nil), (*apiextensions.CustomResourceDefinition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(a.(*CustomResourceDefinition), b.(*apiextensions.CustomResourceDefinition), scope)
 	}); err != nil {
@@ -93,16 +83,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionNames)(nil), (*CustomResourceDefinitionNames)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(a.(*apiextensions.CustomResourceDefinitionNames), b.(*CustomResourceDefinitionNames), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionSpec)(nil), (*apiextensions.CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(a.(*CustomResourceDefinitionSpec), b.(*apiextensions.CustomResourceDefinitionSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionSpec)(nil), (*CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(a.(*apiextensions.CustomResourceDefinitionSpec), b.(*CustomResourceDefinitionSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -176,23 +156,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JSON)(nil), (*apiextensions.JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSON_To_apiextensions_JSON(a.(*JSON), b.(*apiextensions.JSON), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSON)(nil), (*JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSON_To_v1_JSON(a.(*apiextensions.JSON), b.(*JSON), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*JSONSchemaProps)(nil), (*apiextensions.JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(a.(*JSONSchemaProps), b.(*apiextensions.JSONSchemaProps), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaProps)(nil), (*JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(a.(*apiextensions.JSONSchemaProps), b.(*JSONSchemaProps), scope)
 	}); err != nil {
 		return err
 	}
@@ -559,6 +524,8 @@ func autoConvert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResou
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
+	out.Deprecated = in.Deprecated
+	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(apiextensions.CustomResourceValidation)
@@ -582,6 +549,8 @@ func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResou
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
+	out.Deprecated = in.Deprecated
+	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(CustomResourceValidation)
@@ -912,6 +881,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	out.XIntOrString = in.XIntOrString
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
+	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
 	return nil
 }
 
@@ -1099,6 +1069,7 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiexte
 	out.XIntOrString = in.XIntOrString
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
+	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
 	return nil
 }
 

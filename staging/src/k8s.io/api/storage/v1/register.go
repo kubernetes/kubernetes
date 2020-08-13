@@ -49,6 +49,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 		&VolumeAttachment{},
 		&VolumeAttachmentList{},
+
+		&CSINode{},
+		&CSINodeList{},
+
+		&CSIDriver{},
+		&CSIDriverList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

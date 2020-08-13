@@ -14,7 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# GoFmt apparently is changing @ head...
+# This script checks whether the source codes need to be formatted or not by
+# `gofmt`. We should run `hack/update-gofmt.sh` if actually formats them.
+# Usage: `hack/verify-gofmt.sh`.
+# Note: GoFmt apparently is changing @ head...
 
 set -o errexit
 set -o nounset

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/blang/semver"
@@ -87,16 +88,24 @@ func checkIPTables() (err error) {
 func checkPublicGCR() error {
 	const image = "k8s.gcr.io/busybox"
 	output, err := runCommand("docker", "images", "-q", image)
+	if err != nil {
+		return err
+	}
+
 	if len(output) != 0 {
 		if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
 			return err
 		}
 	}
 	output, err = runCommand("docker", "pull", image)
+	if err != nil {
+		return err
+	}
+
 	if len(output) == 0 {
 		return fmt.Errorf("failed to pull %s", image)
 	}
-	if _, err = runCommand("docker", "rmi", "-f", image); err != nil {
+	if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
 		return err
 	}
 	return nil
@@ -313,7 +322,7 @@ func checkDockerStorageDriver() error {
 
 var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
 	ginkgo.BeforeEach(func() {
-		framework.RunIfSystemSpecNameIs("gke")
+		e2eskipper.RunIfSystemSpecNameIs("gke")
 	})
 
 	ginkgo.It("The required processes should be running", func() {
@@ -337,21 +346,21 @@ var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Featur
 		framework.ExpectNoError(checkPublicGCR())
 	})
 	ginkgo.It("The docker configuration validation should pass", func() {
-		framework.RunIfContainerRuntimeIs("docker")
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		framework.ExpectNoError(checkDockerConfig())
 	})
 	ginkgo.It("The docker container network should work", func() {
-		framework.RunIfContainerRuntimeIs("docker")
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		framework.ExpectNoError(checkDockerNetworkServer())
 		framework.ExpectNoError(checkDockerNetworkClient())
 	})
 	ginkgo.It("The docker daemon should support AppArmor and seccomp", func() {
-		framework.RunIfContainerRuntimeIs("docker")
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		framework.ExpectNoError(checkDockerAppArmor())
 		framework.ExpectNoError(checkDockerSeccomp())
 	})
 	ginkgo.It("The docker storage driver should work", func() {
-		framework.Skipf("GKE does not currently require overlay")
+		e2eskipper.Skipf("GKE does not currently require overlay")
 		framework.ExpectNoError(checkDockerStorageDriver())
 	})
 })

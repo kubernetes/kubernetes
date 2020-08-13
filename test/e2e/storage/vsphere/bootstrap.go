@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sync"
@@ -45,11 +46,11 @@ func bootstrapOnce() {
 		framework.Failf("Failed to bootstrap vSphere with error: %v", err)
 	}
 	// 2. Get all nodes
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Failed to get nodes: %v", err)
 	}
-	TestContext = VSphereContext{NodeMapper: &NodeMapper{}, VSphereInstances: vsphereInstances}
+	TestContext = Context{NodeMapper: &NodeMapper{}, VSphereInstances: vsphereInstances}
 	// 3. Get Node to VSphere mapping
 	err = TestContext.NodeMapper.GenerateNodeMap(vsphereInstances, *nodeList)
 	if err != nil {

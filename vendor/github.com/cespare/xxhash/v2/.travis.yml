@@ -1,0 +1,8 @@
+language: go
+go:
+  - "1.x"
+  - master
+env:
+  - TAGS=""
+  - TAGS="-tags purego"
+script: go test $TAGS -v ./...

@@ -21,7 +21,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("Read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -29,7 +29,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("Read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func jsonschemaDraft04JSON() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "jsonschema-draft-04.json", size: 4357, mode: os.FileMode(436), modTime: time.Unix(1540282154, 0)}
+	info := bindataFileInfo{name: "jsonschema-draft-04.json", size: 4357, mode: os.FileMode(0644), modTime: time.Unix(1567900649, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe1, 0x48, 0x9d, 0xb, 0x47, 0x55, 0xf0, 0x27, 0x93, 0x30, 0x25, 0x91, 0xd3, 0xfc, 0xb8, 0xf0, 0x7b, 0x68, 0x93, 0xa8, 0x2a, 0x94, 0xf2, 0x48, 0x95, 0xf8, 0xe4, 0xed, 0xf1, 0x1b, 0x82, 0xe2}}
 	return a, nil
 }
@@ -105,7 +105,7 @@ func v2SchemaJSON() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "v2/schema.json", size: 40249, mode: os.FileMode(436), modTime: time.Unix(1540282154, 0)}
+	info := bindataFileInfo{name: "v2/schema.json", size: 40249, mode: os.FileMode(0644), modTime: time.Unix(1567900649, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcb, 0x25, 0x27, 0xe8, 0x46, 0xae, 0x22, 0xc4, 0xf4, 0x8b, 0x1, 0x32, 0x4d, 0x1f, 0xf8, 0xdf, 0x75, 0x15, 0xc8, 0x2d, 0xc7, 0xed, 0xe, 0x7e, 0x0, 0x75, 0xc0, 0xf9, 0xd2, 0x1f, 0x75, 0x57}}
 	return a, nil
 }

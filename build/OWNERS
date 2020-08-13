@@ -4,14 +4,17 @@ reviewers:
   - bentheelder
   - cblecker
   - fejta
+  - justaugustus
   - lavalamp
   - spiffxp
 approvers:
   - bentheelder
   - cblecker
   - fejta
+  - justaugustus
   - lavalamp
   - mikedanese
+  - spiffxp
 emeritus_approvers:
   - jbeda
   - zmerlynn

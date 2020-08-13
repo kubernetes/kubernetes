@@ -19,8 +19,9 @@ package term
 import (
 	"io"
 	"os"
+	"runtime"
 
-	"github.com/docker/docker/pkg/term"
+	"github.com/moby/term"
 
 	"k8s.io/kubectl/pkg/util/interrupt"
 )
@@ -68,6 +69,32 @@ func (t TTY) IsTerminalOut() bool {
 func IsTerminal(i interface{}) bool {
 	_, terminal := term.GetFdInfo(i)
 	return terminal
+}
+
+// AllowsColorOutput returns true if the specified writer is a terminal and
+// the process environment indicates color output is supported and desired.
+func AllowsColorOutput(w io.Writer) bool {
+	if !IsTerminal(w) {
+		return false
+	}
+
+	// https://en.wikipedia.org/wiki/Computer_terminal#Dumb_terminals
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+
+	// https://no-color.org/
+	if _, nocolor := os.LookupEnv("NO_COLOR"); nocolor {
+		return false
+	}
+
+	// On Windows WT_SESSION is set by the modern terminal component.
+	// Older terminals have poor support for UTF-8, VT escape codes, etc.
+	if runtime.GOOS == "windows" && os.Getenv("WT_SESSION") == "" {
+		return false
+	}
+
+	return true
 }
 
 // Safe invokes the provided function and will attempt to ensure that when the

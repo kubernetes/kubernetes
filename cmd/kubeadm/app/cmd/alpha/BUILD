@@ -21,13 +21,12 @@ go_library(
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
+        "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/certs/renewal:go_default_library",
         "//cmd/kubeadm/app/phases/copycerts:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
-        "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
@@ -36,7 +35,7 @@ go_library(
         "//vendor/github.com/lithammer/dedent:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 
@@ -62,6 +61,8 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
@@ -71,5 +72,8 @@ go_test(
         "//cmd/kubeadm/test/kubeconfig:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )

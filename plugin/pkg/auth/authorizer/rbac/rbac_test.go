@@ -17,6 +17,7 @@ limitations under the License.
 package rbac
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -248,13 +249,13 @@ func TestAuthorizer(t *testing.T) {
 		ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
-			if decision, _, _ := a.Authorize(attr); decision != authorizer.DecisionAllow {
+			if decision, _, _ := a.Authorize(context.Background(), attr); decision != authorizer.DecisionAllow {
 				t.Errorf("case %d: incorrectly restricted %s", i, attr)
 			}
 		}
 
 		for _, attr := range tt.shouldFail {
-			if decision, _, _ := a.Authorize(attr); decision == authorizer.DecisionAllow {
+			if decision, _, _ := a.Authorize(context.Background(), attr); decision == authorizer.DecisionAllow {
 				t.Errorf("case %d: incorrectly passed %s", i, attr)
 			}
 		}
@@ -516,7 +517,7 @@ func BenchmarkAuthorize(b *testing.B) {
 	for _, request := range requests {
 		b.Run(request.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				authz.Authorize(request.attrs)
+				authz.Authorize(context.Background(), request.attrs)
 			}
 		})
 	}

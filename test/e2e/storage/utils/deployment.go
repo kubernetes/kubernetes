@@ -23,8 +23,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 // PatchCSIDeployment modifies the CSI driver deployment:
@@ -90,10 +90,6 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 				// Driver name is expected to be the same
 				// as the provisioner here.
 				container.Args = append(container.Args, "--provisioner="+o.NewDriverName)
-			case o.SnapshotterContainerName:
-				// Driver name is expected to be the same
-				// as the snapshotter here.
-				container.Args = append(container.Args, "--snapshotter="+o.NewDriverName)
 			}
 		}
 	}
@@ -102,7 +98,7 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		patchContainers(spec.Containers)
 		patchVolumes(spec.Volumes)
 		if o.NodeName != "" {
-			spec.NodeName = o.NodeName
+			e2epod.SetNodeSelection(spec, e2epod.NodeSelection{Name: o.NodeName})
 		}
 	}
 
@@ -121,12 +117,15 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			// as the provisioner name here.
 			object.Provisioner = o.NewDriverName
 		}
-	case *storagev1beta1.CSIDriver:
+	case *storagev1.CSIDriver:
 		if o.NewDriverName != "" {
 			object.Name = o.NewDriverName
 		}
 		if o.PodInfo != nil {
 			object.Spec.PodInfoOnMount = o.PodInfo
+		}
+		if o.StorageCapacity != nil {
+			object.Spec.StorageCapacity = o.StorageCapacity
 		}
 		if o.CanAttach != nil {
 			object.Spec.AttachRequired = o.CanAttach
@@ -173,8 +172,12 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	CanAttach *bool
+	// If not nil, the value to use for the CSIDriver.Spec.StorageCapacity
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	StorageCapacity *bool
 	// If not nil, the value to use for the CSIDriver.Spec.VolumeLifecycleModes
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
-	VolumeLifecycleModes *[]storagev1beta1.VolumeLifecycleMode
+	VolumeLifecycleModes *[]storagev1.VolumeLifecycleMode
 }

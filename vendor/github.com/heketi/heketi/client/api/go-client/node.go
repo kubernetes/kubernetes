@@ -16,7 +16,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
@@ -54,7 +53,7 @@ func (c *Client) NodeAdd(request *api.NodeAddRequest) (*api.NodeInfoResponse, er
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Millisecond*250)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +130,7 @@ func (c *Client) NodeDelete(id string) error {
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Millisecond*250)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}
@@ -175,7 +174,7 @@ func (c *Client) NodeState(id string, request *api.StateRequest) error {
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}

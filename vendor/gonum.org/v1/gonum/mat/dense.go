@@ -12,10 +12,12 @@ import (
 var (
 	dense *Dense
 
-	_ Matrix  = dense
-	_ Mutable = dense
+	_ Matrix      = dense
+	_ allMatrix   = dense
+	_ denseMatrix = dense
+	_ Mutable     = dense
 
-	_ Cloner       = dense
+	_ ClonerFrom   = dense
 	_ RowViewer    = dense
 	_ ColViewer    = dense
 	_ RawRowViewer = dense
@@ -47,7 +49,7 @@ func NewDense(r, c int, data []float64) *Dense {
 		if r == 0 || c == 0 {
 			panic(ErrZeroLength)
 		}
-		panic("mat: negative dimension")
+		panic(ErrNegativeDimension)
 	}
 	if data != nil && r*c != len(data) {
 		panic(ErrShape)
@@ -67,11 +69,32 @@ func NewDense(r, c int, data []float64) *Dense {
 	}
 }
 
-// reuseAs resizes an empty matrix to a r×c matrix,
-// or checks that a non-empty matrix is r×c.
+// ReuseAs changes the receiver if it IsEmpty() to be of size r×c.
 //
-// reuseAs must be kept in sync with reuseAsZeroed.
-func (m *Dense) reuseAs(r, c int) {
+// ReuseAs re-uses the backing data slice if it has sufficient capacity,
+// otherwise a new slice is allocated. The backing data is zero on return.
+//
+// ReuseAs panics if the receiver is not empty, and panics if
+// the input sizes are less than one. To empty the receiver for re-use,
+// Reset should be used.
+func (m *Dense) ReuseAs(r, c int) {
+	if r <= 0 || c <= 0 {
+		if r == 0 || c == 0 {
+			panic(ErrZeroLength)
+		}
+		panic(ErrNegativeDimension)
+	}
+	if !m.IsEmpty() {
+		panic(ErrReuseNonEmpty)
+	}
+	m.reuseAsZeroed(r, c)
+}
+
+// reuseAsNonZeroed resizes an empty matrix to a r×c matrix,
+// or checks that a non-empty matrix is r×c. It does not zero
+// the data in the receiver.
+func (m *Dense) reuseAsNonZeroed(r, c int) {
+	// reuseAs must be kept in sync with reuseAsZeroed.
 	if m.mat.Rows > m.capRows || m.mat.Cols > m.capCols {
 		// Panic as a string, not a mat.Error.
 		panic("mat: caps not correctly set")
@@ -79,7 +102,7 @@ func (m *Dense) reuseAs(r, c int) {
 	if r == 0 || c == 0 {
 		panic(ErrZeroLength)
 	}
-	if m.IsZero() {
+	if m.IsEmpty() {
 		m.mat = blas64.General{
 			Rows:   r,
 			Cols:   c,
@@ -98,9 +121,8 @@ func (m *Dense) reuseAs(r, c int) {
 // reuseAsZeroed resizes an empty matrix to a r×c matrix,
 // or checks that a non-empty matrix is r×c. It zeroes
 // all the elements of the matrix.
-//
-// reuseAsZeroed must be kept in sync with reuseAs.
 func (m *Dense) reuseAsZeroed(r, c int) {
+	// reuseAsZeroed must be kept in sync with reuseAsNonZeroed.
 	if m.mat.Rows > m.capRows || m.mat.Cols > m.capCols {
 		// Panic as a string, not a mat.Error.
 		panic("mat: caps not correctly set")
@@ -108,7 +130,7 @@ func (m *Dense) reuseAsZeroed(r, c int) {
 	if r == 0 || c == 0 {
 		panic(ErrZeroLength)
 	}
-	if m.IsZero() {
+	if m.IsEmpty() {
 		m.mat = blas64.General{
 			Rows:   r,
 			Cols:   c,
@@ -149,9 +171,10 @@ func (m *Dense) isolatedWorkspace(a Matrix) (w *Dense, restore func()) {
 	}
 }
 
-// Reset zeros the dimensions of the matrix so that it can be reused as the
+// Reset empties the matrix so that it can be reused as the
 // receiver of a dimensionally restricted operation.
 //
+// Reset should not be used when the matrix shares backing data.
 // See the Reseter interface for more information.
 func (m *Dense) Reset() {
 	// Row, Cols and Stride must be zeroed in unison.
@@ -160,9 +183,10 @@ func (m *Dense) Reset() {
 	m.mat.Data = m.mat.Data[:0]
 }
 
-// IsZero returns whether the receiver is zero-sized. Zero-sized matrices can be the
-// receiver for size-restricted operations. Dense matrices can be zeroed using Reset.
-func (m *Dense) IsZero() bool {
+// IsEmpty returns whether the receiver is empty. Empty matrices can be the
+// receiver for size-restricted operations. The receiver can be emptied using
+// Reset.
+func (m *Dense) IsEmpty() bool {
 	// It must be the case that m.Dims() returns
 	// zeros in this case. See comment in Reset().
 	return m.mat.Stride == 0
@@ -186,7 +210,7 @@ func (m *Dense) asTriDense(n int, diag blas.Diag, uplo blas.Uplo) *TriDense {
 // DenseCopyOf returns a newly allocated copy of the elements of a.
 func DenseCopyOf(a Matrix) *Dense {
 	d := &Dense{}
-	d.Clone(a)
+	d.CloneFrom(a)
 	return d
 }
 
@@ -375,12 +399,12 @@ func (m *Dense) Grow(r, c int) Matrix {
 	return &t
 }
 
-// Clone makes a copy of a into the receiver, overwriting the previous value of
-// the receiver. The clone operation does not make any restriction on shape and
+// CloneFrom makes a copy of a into the receiver, overwriting the previous value of
+// the receiver. The clone from operation does not make any restriction on shape and
 // will not cause shadowing.
 //
-// See the Cloner interface for more information.
-func (m *Dense) Clone(a Matrix) {
+// See the ClonerFrom interface for more information.
+func (m *Dense) CloneFrom(a Matrix) {
 	r, c := a.Dims()
 	mat := blas64.General{
 		Rows:   r,
@@ -389,10 +413,10 @@ func (m *Dense) Clone(a Matrix) {
 	}
 	m.capRows, m.capCols = r, c
 
-	aU, trans := untranspose(a)
+	aU, trans := untransposeExtract(a)
 	switch aU := aU.(type) {
-	case RawMatrixer:
-		amat := aU.RawMatrix()
+	case *Dense:
+		amat := aU.mat
 		mat.Data = make([]float64, r*c)
 		if trans {
 			for i := 0; i < r; i++ {
@@ -442,10 +466,10 @@ func (m *Dense) Copy(a Matrix) (r, c int) {
 		return 0, 0
 	}
 
-	aU, trans := untranspose(a)
+	aU, trans := untransposeExtract(a)
 	switch aU := aU.(type) {
-	case RawMatrixer:
-		amat := aU.RawMatrix()
+	case *Dense:
+		amat := aU.mat
 		if trans {
 			if amat.Stride != 1 {
 				m.checkOverlap(amat)
@@ -518,7 +542,7 @@ func (m *Dense) Stack(a, b Matrix) {
 		panic(ErrShape)
 	}
 
-	m.reuseAs(ar+br, ac)
+	m.reuseAsNonZeroed(ar+br, ac)
 
 	m.Copy(a)
 	w := m.Slice(ar, ar+br, 0, bc).(*Dense)
@@ -536,7 +560,7 @@ func (m *Dense) Augment(a, b Matrix) {
 		panic(ErrShape)
 	}
 
-	m.reuseAs(ar, ac+bc)
+	m.reuseAsNonZeroed(ar, ac+bc)
 
 	m.Copy(a)
 	w := m.Slice(0, br, ac, ac+bc).(*Dense)

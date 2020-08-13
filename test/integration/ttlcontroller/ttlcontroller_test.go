@@ -17,6 +17,7 @@ limitations under the License.
 package ttlcontroller
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"strconv"
@@ -59,7 +60,7 @@ func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 					Name: fmt.Sprintf("node-%d", idx),
 				},
 			}
-			if _, err := client.CoreV1().Nodes().Create(node); err != nil {
+			if _, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create node: %v", err)
 			}
 		}(i)
@@ -74,7 +75,7 @@ func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("node-%d", idx)
-			if err := client.CoreV1().Nodes().Delete(name, &metav1.DeleteOptions{}); err != nil {
+			if err := client.CoreV1().Nodes().Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 				t.Fatalf("Failed to delete node: %v", err)
 			}
 		}(i)

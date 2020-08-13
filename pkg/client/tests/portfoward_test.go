@@ -34,7 +34,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 )
 
 // fakePortForwarder simulates port forwarding for testing. It implements
@@ -173,7 +173,7 @@ func TestForwardPorts(t *testing.T) {
 				continue
 			}
 			b := make([]byte, 4)
-			n, err = clientConn.Read(b)
+			_, err = clientConn.Read(b)
 			if err != nil && err != io.EOF {
 				t.Errorf("%s: Error reading data: %s", testName, err)
 				server.Close()

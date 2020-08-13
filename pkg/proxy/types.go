@@ -30,6 +30,7 @@ type Provider interface {
 	config.EndpointsHandler
 	config.EndpointSliceHandler
 	config.ServiceHandler
+	config.NodeHandler
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
 	Sync()
@@ -43,11 +44,19 @@ type Provider interface {
 // identifier for a load-balanced service.
 type ServicePortName struct {
 	types.NamespacedName
-	Port string
+	Port     string
+	Protocol v1.Protocol
 }
 
 func (spn ServicePortName) String() string {
-	return fmt.Sprintf("%s:%s", spn.NamespacedName.String(), spn.Port)
+	return fmt.Sprintf("%s%s", spn.NamespacedName.String(), fmtPortName(spn.Port))
+}
+
+func fmtPortName(in string) string {
+	if in == "" {
+		return ""
+	}
+	return fmt.Sprintf(":%s", in)
 }
 
 // ServicePort is an interface which abstracts information about a service.
@@ -76,6 +85,8 @@ type ServicePort interface {
 	NodePort() int
 	// GetOnlyNodeLocalEndpoints returns if a service has only node local endpoints
 	OnlyNodeLocalEndpoints() bool
+	// TopologyKeys returns service TopologyKeys as a string array.
+	TopologyKeys() []string
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
@@ -86,6 +97,8 @@ type Endpoint interface {
 	String() string
 	// GetIsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
 	GetIsLocal() bool
+	// GetTopology returns the topology information of the endpoint.
+	GetTopology() map[string]string
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.

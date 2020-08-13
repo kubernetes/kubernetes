@@ -40,7 +40,6 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util/printers:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/liggitt/tabwriter:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

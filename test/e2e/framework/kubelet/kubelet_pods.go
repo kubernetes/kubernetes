@@ -19,8 +19,7 @@ package kubelet
 import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/master/ports"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // GetKubeletPods retrieves the list of pods on the kubelet.
@@ -37,7 +36,7 @@ func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, err
 
 func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
 	result := &v1.PodList{}
-	client, err := ProxyRequest(c, node, resource, ports.KubeletPort)
+	client, err := ProxyRequest(c, node, resource, framework.KubeletPort)
 	if err != nil {
 		return &v1.PodList{}, err
 	}
@@ -45,20 +44,4 @@ func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, 
 		return &v1.PodList{}, err
 	}
 	return result, nil
-}
-
-// PrintAllKubeletPods outputs status of all kubelet pods into log.
-func PrintAllKubeletPods(c clientset.Interface, nodeName string) {
-	podList, err := GetKubeletPods(c, nodeName)
-	if err != nil {
-		e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
-		return
-	}
-	for _, p := range podList.Items {
-		e2elog.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
-		for _, c := range p.Status.ContainerStatuses {
-			e2elog.Logf("\tContainer %v ready: %v, restart count %v",
-				c.Name, c.Ready, c.RestartCount)
-		}
-	}
 }

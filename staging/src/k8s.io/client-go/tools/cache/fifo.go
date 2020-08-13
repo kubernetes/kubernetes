@@ -24,7 +24,7 @@ import (
 )
 
 // PopProcessFunc is passed to Pop() method of Queue interface.
-// It is supposed to process the element popped from the queue.
+// It is supposed to process the accumulator popped from the queue.
 type PopProcessFunc func(interface{}) error
 
 // ErrRequeue may be returned by a PopProcessFunc to safely requeue
@@ -44,26 +44,38 @@ func (e ErrRequeue) Error() string {
 	return e.Err.Error()
 }
 
-// Queue is exactly like a Store, but has a Pop() method too.
+// Queue extends Store with a collection of Store keys to "process".
+// Every Add, Update, or Delete may put the object's key in that collection.
+// A Queue has a way to derive the corresponding key given an accumulator.
+// A Queue can be accessed concurrently from multiple goroutines.
+// A Queue can be "closed", after which Pop operations return an error.
 type Queue interface {
 	Store
 
-	// Pop blocks until it has something to process.
-	// It returns the object that was process and the result of processing.
-	// The PopProcessFunc may return an ErrRequeue{...} to indicate the item
-	// should be requeued before releasing the lock on the queue.
+	// Pop blocks until there is at least one key to process or the
+	// Queue is closed.  In the latter case Pop returns with an error.
+	// In the former case Pop atomically picks one key to process,
+	// removes that (key, accumulator) association from the Store, and
+	// processes the accumulator.  Pop returns the accumulator that
+	// was processed and the result of processing.  The PopProcessFunc
+	// may return an ErrRequeue{inner} and in this case Pop will (a)
+	// return that (key, accumulator) association to the Queue as part
+	// of the atomic processing and (b) return the inner error from
+	// Pop.
 	Pop(PopProcessFunc) (interface{}, error)
 
-	// AddIfNotPresent adds a value previously
-	// returned by Pop back into the queue as long
-	// as nothing else (presumably more recent)
-	// has since been added.
+	// AddIfNotPresent puts the given accumulator into the Queue (in
+	// association with the accumulator's key) if and only if that key
+	// is not already associated with a non-empty accumulator.
 	AddIfNotPresent(interface{}) error
 
-	// HasSynced returns true if the first batch of items has been popped
+	// HasSynced returns true if the first batch of keys have all been
+	// popped.  The first batch of keys are those of the first Replace
+	// operation if that happened before any Add, AddIfNotPresent,
+	// Update, or Delete; otherwise the first batch is empty.
 	HasSynced() bool
 
-	// Close queue
+	// Close the queue
 	Close()
 }
 
@@ -79,11 +91,16 @@ func Pop(queue Queue) interface{} {
 	return result
 }
 
-// FIFO receives adds and updates from a Reflector, and puts them in a queue for
-// FIFO order processing. If multiple adds/updates of a single item happen while
-// an item is in the queue before it has been processed, it will only be
-// processed once, and when it is processed, the most recent version will be
-// processed. This can't be done with a channel.
+// FIFO is a Queue in which (a) each accumulator is simply the most
+// recently provided object and (b) the collection of keys to process
+// is a FIFO.  The accumulators all start out empty, and deleting an
+// object from its accumulator empties the accumulator.  The Resync
+// operation is a no-op.
+//
+// Thus: if multiple adds/updates of a single object happen while that
+// object's key is in the queue before it has been processed then it
+// will only be processed once, and when it is processed the most
+// recent version will be processed. This can't be done with a channel
 //
 // FIFO solves this use case:
 //  * You want to process every object (exactly) once.
@@ -94,7 +111,7 @@ func Pop(queue Queue) interface{} {
 type FIFO struct {
 	lock sync.RWMutex
 	cond sync.Cond
-	// We depend on the property that items in the set are in the queue and vice versa.
+	// We depend on the property that every key in `items` is also in `queue`
 	items map[string]interface{}
 	queue []string
 
@@ -111,8 +128,7 @@ type FIFO struct {
 	// Indication the queue is closed.
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
 	// Currently, not used to gate any of CRED operations.
-	closed     bool
-	closedLock sync.Mutex
+	closed bool
 }
 
 var (
@@ -121,14 +137,14 @@ var (
 
 // Close the queue.
 func (f *FIFO) Close() {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.closed = true
 	f.cond.Broadcast()
 }
 
 // HasSynced returns true if an Add/Update/Delete/AddIfNotPresent are called first,
-// or an Update called first but the first batch of items inserted by Replace() has been popped
+// or the first batch of items inserted by Replace() has been popped.
 func (f *FIFO) HasSynced() bool {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -245,8 +261,8 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 
 // IsClosed checks if the queue is closed
 func (f *FIFO) IsClosed() bool {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	if f.closed {
 		return true
 	}
@@ -267,7 +283,7 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 			// When Close() is called, the f.closed is set and the condition is broadcasted.
 			// Which causes this loop to continue and return from the Pop().
-			if f.IsClosed() {
+			if f.closed {
 				return nil, ErrFIFOClosed
 			}
 
@@ -326,7 +342,8 @@ func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	return nil
 }
 
-// Resync will touch all objects to put them into the processing queue
+// Resync will ensure that every object in the Store has its key in the queue.
+// This should be a no-op, because that property is maintained by all operations.
 func (f *FIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()

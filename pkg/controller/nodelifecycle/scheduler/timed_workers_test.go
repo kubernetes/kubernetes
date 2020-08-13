@@ -47,7 +47,7 @@ func TestExecute(t *testing.T) {
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
 	if lastVal != 5 {
-		t.Errorf("Espected testVal = 5, got %v", lastVal)
+		t.Errorf("Expected testVal = 5, got %v", lastVal)
 	}
 }
 
@@ -75,7 +75,7 @@ func TestExecuteDelayed(t *testing.T) {
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
 	if lastVal != 5 {
-		t.Errorf("Espected testVal = 5, got %v", lastVal)
+		t.Errorf("Expected testVal = 5, got %v", lastVal)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestCancel(t *testing.T) {
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
 	if lastVal != 3 {
-		t.Errorf("Espected testVal = 3, got %v", lastVal)
+		t.Errorf("Expected testVal = 3, got %v", lastVal)
 	}
 }
 
@@ -136,6 +136,6 @@ func TestCancelAndReadd(t *testing.T) {
 	wg.Wait()
 	lastVal := atomic.LoadInt32(&testVal)
 	if lastVal != 4 {
-		t.Errorf("Espected testVal = 4, got %v", lastVal)
+		t.Errorf("Expected testVal = 4, got %v", lastVal)
 	}
 }

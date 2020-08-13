@@ -14,14 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of kubelet plugin registration API is
+# needed or not. We should run
+# `hack/update-generated-kubelet-plugin-registration.sh` if kubelet plugin
+# registration API is out of date.
+# Usage: `hack/verify-generated-kubelet-plugin-registration.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 ERROR="Kubelet Plugin Registration api is out of date. Please run hack/update-generated-kubelet-plugin-registration.sh"
-KUBELET_PLUGIN_REGISTRATION_V1ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration/v1alpha1/"
-KUBELET_PLUGIN_REGISTRATION_V1BETA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration/v1beta1/"
+KUBELET_PLUGIN_REGISTRATION_V1ALPHA="${KUBE_ROOT}/staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1alpha1/"
+KUBELET_PLUGIN_REGISTRATION_V1BETA="${KUBE_ROOT}/staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1beta1/"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::golang::setup_env

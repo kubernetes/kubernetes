@@ -28,7 +28,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/cmd/server:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -47,11 +47,13 @@ filegroup(
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/generated/openapi:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice:all-srcs",
     ],
     tags = ["automanaged"],

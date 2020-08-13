@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -68,7 +69,7 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			_, err := client.CoreV1().Nodes().Create(&tc.node)
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), &tc.node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}
@@ -105,7 +106,7 @@ func TestCreateOrMutateConfigMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating ConfigMap: %v", err)
 	}
-	_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error retrieving ConfigMap: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestCreateOrMutateConfigMap(t *testing.T) {
 
 func createClientAndConfigMap(t *testing.T) *fake.Clientset {
 	client := fake.NewSimpleClientset()
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&v1.ConfigMap{
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: metav1.NamespaceSystem,
@@ -121,7 +122,7 @@ func createClientAndConfigMap(t *testing.T) *fake.Clientset {
 		Data: map[string]string{
 			"key": "some-value",
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ConfigMap: %v", err)
 	}
@@ -142,7 +143,7 @@ func TestMutateConfigMap(t *testing.T) {
 		t.Fatalf("error mutating regular ConfigMap: %v", err)
 	}
 
-	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	if cm.Data["key"] != "some-other-value" {
 		t.Fatalf("ConfigMap mutation was invalid, has: %q", cm.Data["key"])
 	}
@@ -174,7 +175,7 @@ func TestMutateConfigMapWithConflict(t *testing.T) {
 		t.Fatalf("error mutating conflicting ConfigMap: %v", err)
 	}
 
-	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	if cm.Data["key"] != "some-other-value" {
 		t.Fatalf("ConfigMap mutation with conflict was invalid, has: %q", cm.Data["key"])
 	}

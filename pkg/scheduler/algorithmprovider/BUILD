@@ -8,20 +8,63 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["plugins.go"],
+    srcs = ["registry.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithmprovider",
-    deps = ["//pkg/scheduler/algorithmprovider/defaults:go_default_library"],
+    deps = [
+        "//pkg/features:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
+        "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
+        "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodename:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeports:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodepreferavoidpods:go_default_library",
+        "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeunschedulable:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodevolumelimits:go_default_library",
+        "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
+        "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
+        "//pkg/scheduler/framework/plugins/selectorspread:go_default_library",
+        "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
+        "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
+        "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
+        "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
+    ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["plugins_test.go"],
+    srcs = ["registry_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/factory:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
+        "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
+        "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodename:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeports:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodepreferavoidpods:go_default_library",
+        "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeunschedulable:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodevolumelimits:go_default_library",
+        "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
+        "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
+        "//pkg/scheduler/framework/plugins/selectorspread:go_default_library",
+        "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
+        "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
+        "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
+        "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )
 
@@ -34,9 +77,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/scheduler/algorithmprovider/defaults:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

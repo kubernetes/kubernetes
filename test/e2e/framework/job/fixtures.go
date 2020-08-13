@@ -20,6 +20,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -30,6 +31,13 @@ import (
 // policy of the containers in which the Pod is running. Parallelism is the Job's parallelism, and completions is the
 // Job's required number of completions.
 func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batchv1.Job {
+	anyNode := ""
+	return NewTestJobOnNode(behavior, name, rPol, parallelism, completions, activeDeadlineSeconds, backoffLimit, anyNode)
+}
+
+// NewTestJobOnNode is similar to NewTestJob but supports specifying a Node on which the Job's Pods will run.
+// Empty nodeName means no node selection constraints.
+func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32, nodeName string) *batchv1.Job {
 	manualSelector := false
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -72,6 +80,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 							SecurityContext: &v1.SecurityContext{},
 						},
 					},
+					NodeName: nodeName,
 				},
 			},
 		},
@@ -89,22 +98,22 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit $(( $RANDOM / 16384 ))"}
 	case "failOnce":
 		// Fail the first the container of the pod is run, and
-		// succeed the second time. Checks for file on emptydir.
+		// succeed the second time. Checks for file on a data volume.
 		// If present, succeed.  If not, create but fail.
-		// Note that this cannot be used with RestartNever because
-		// it always fails the first time for a pod.
+		// If RestartPolicy is Never, the nodeName should be set to
+		// ensure all job pods run on a single node and the volume
+		// will be mounted from a hostPath instead.
+		if len(nodeName) > 0 {
+			randomDir := "/tmp/job-e2e/" + rand.String(10)
+			hostPathType := v1.HostPathDirectoryOrCreate
+			job.Spec.Template.Spec.Volumes[0].VolumeSource = v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: randomDir, Type: &hostPathType}}
+			// Tests involving r/w operations on hostPath volume needs to run in
+			// privileged mode for SELinux enabled distro, while Windows platform
+			// neither supports nor needs privileged mode.
+			privileged := !framework.NodeOSDistroIs("windows")
+			job.Spec.Template.Spec.Containers[0].SecurityContext.Privileged = &privileged
+		}
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; else touch /data/foo ; exit 1 ; fi"}
 	}
 	return job
-}
-
-// FinishTime returns finish time of the specified job.
-func FinishTime(finishedJob *batchv1.Job) metav1.Time {
-	var finishTime metav1.Time
-	for _, c := range finishedJob.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
-			return c.LastTransitionTime
-		}
-	}
-	return finishTime
 }

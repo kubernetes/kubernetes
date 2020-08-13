@@ -176,23 +176,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JSON)(nil), (*apiextensions.JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_JSON_To_apiextensions_JSON(a.(*JSON), b.(*apiextensions.JSON), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSON)(nil), (*JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSON_To_v1beta1_JSON(a.(*apiextensions.JSON), b.(*JSON), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*JSONSchemaProps)(nil), (*apiextensions.JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(a.(*JSONSchemaProps), b.(*apiextensions.JSONSchemaProps), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaProps)(nil), (*JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(a.(*apiextensions.JSONSchemaProps), b.(*JSONSchemaProps), scope)
 	}); err != nil {
 		return err
 	}
@@ -592,6 +577,8 @@ func autoConvert_v1beta1_CustomResourceDefinitionVersion_To_apiextensions_Custom
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
+	out.Deprecated = in.Deprecated
+	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(apiextensions.CustomResourceValidation)
@@ -615,6 +602,8 @@ func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1beta1_Custom
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
+	out.Deprecated = in.Deprecated
+	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(CustomResourceValidation)
@@ -945,6 +934,7 @@ func autoConvert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JS
 	out.XIntOrString = in.XIntOrString
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
+	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
 	return nil
 }
 
@@ -1132,6 +1122,7 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *ap
 	out.XIntOrString = in.XIntOrString
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
+	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
 	return nil
 }
 

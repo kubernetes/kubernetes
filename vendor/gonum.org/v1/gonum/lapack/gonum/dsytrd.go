@@ -11,7 +11,7 @@ import (
 
 // Dsytrd reduces a symmetric n×n matrix A to symmetric tridiagonal form by an
 // orthogonal similarity transformation
-//  Q^T * A * Q = T
+//  Qᵀ * A * Q = T
 // where Q is an orthonormal matrix and T is symmetric and tridiagonal.
 //
 // On entry, a contains the elements of the input matrix in the triangle specified
@@ -23,7 +23,7 @@ import (
 // If uplo == blas.Upper, Q is constructed with
 //  Q = H_{n-2} * ... * H_1 * H_0
 // where
-//  H_i = I - tau_i * v * v^T
+//  H_i = I - tau_i * v * vᵀ
 // v is constructed as v[i+1:n] = 0, v[i] = 1, v[0:i-1] is stored in A[0:i-1, i+1].
 // The elements of A are
 //  [ d   e  v1  v2  v3]
@@ -35,7 +35,7 @@ import (
 // If uplo == blas.Lower, Q is constructed with
 //  Q = H_0 * H_1 * ... * H_{n-2}
 // where
-//  H_i = I - tau_i * v * v^T
+//  H_i = I - tau_i * v * vᵀ
 // v is constructed as v[0:i+1] = 0, v[i+1] = 1, v[i+2:n] is stored in A[i+2:n, i].
 // The elements of A are
 //  [ d                ]
@@ -134,7 +134,7 @@ func (impl Implementation) Dsytrd(uplo blas.Uplo, n int, a []float64, lda int, d
 			impl.Dlatrd(uplo, i+nb, nb, a, lda, e, tau, work, ldwork)
 
 			// Update the unreduced submatrix A[0:i-1,0:i-1], using an update
-			// of the form A = A - V*W^T - W*V^T.
+			// of the form A = A - V*Wᵀ - W*Vᵀ.
 			bi.Dsyr2k(uplo, blas.NoTrans, i, nb, -1, a[i:], lda, work, ldwork, 1, a, lda)
 
 			// Copy superdiagonal elements back into A, and diagonal elements into D.
@@ -155,7 +155,7 @@ func (impl Implementation) Dsytrd(uplo blas.Uplo, n int, a []float64, lda int, d
 			impl.Dlatrd(uplo, n-i, nb, a[i*lda+i:], lda, e[i:], tau[i:], work, ldwork)
 
 			// Update the unreduced submatrix A[i+ib:n, i+ib:n], using an update
-			// of the form A = A + V*W^T - W*V^T.
+			// of the form A = A + V*Wᵀ - W*Vᵀ.
 			bi.Dsyr2k(uplo, blas.NoTrans, n-i-nb, nb, -1, a[(i+nb)*lda+i:], lda,
 				work[nb*ldwork:], ldwork, 1, a[(i+nb)*lda+i+nb:], lda)
 

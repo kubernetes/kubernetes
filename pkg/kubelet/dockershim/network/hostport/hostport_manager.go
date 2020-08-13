@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -21,13 +23,14 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -82,10 +85,16 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return nil
 	}
 
-	if podPortMapping.IP.To4() == nil {
+	// IP.To16() returns nil if IP is not a valid IPv4 or IPv6 address
+	if podPortMapping.IP.To16() == nil {
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
 	}
 	podIP := podPortMapping.IP.String()
+	isIPv6 := utilnet.IsIPv6(podPortMapping.IP)
+
+	if isIPv6 != hm.iptables.IsIPv6() {
+		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIPv6)
+	}
 
 	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
 		return err
@@ -142,10 +151,11 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 			"-j", string(iptablesproxy.KubeMarkMasqChain))
 
 		// DNAT to the podIP:containerPort
+		hostPortBinding := net.JoinHostPort(podIP, strconv.Itoa(int(pm.ContainerPort)))
 		writeLine(natRules, "-A", string(chain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
 			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", podIP, pm.ContainerPort))
+			"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding))
 	}
 
 	// getHostportChain should be able to provide unique hostport chain name using hash
@@ -166,16 +176,15 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		// clean up opened host port if encounter any error
 		return utilerrors.NewAggregate([]error{err, hm.closeHostports(hostportMappings)})
 	}
-	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
 
 	// Remove conntrack entries just after adding the new iptables rules. If the conntrack entry is removed along with
 	// the IP tables rule, it can be the case that the packets received by the node after iptables rule removal will
 	// create a new conntrack entry without any DNAT. That will result in blackhole of the traffic even after correct
 	// iptables rules have been added back.
 	if hm.execer != nil && hm.conntrackFound {
-		klog.Infof("Starting to delete udp conntrack entries: %v, isIPv6 - %v", conntrackPortsToRemove, isIpv6)
+		klog.Infof("Starting to delete udp conntrack entries: %v, isIPv6 - %v", conntrackPortsToRemove, isIPv6)
 		for _, port := range conntrackPortsToRemove {
-			err = conntrack.ClearEntriesForPort(hm.execer, port, isIpv6, v1.ProtocolUDP)
+			err = conntrack.ClearEntriesForPort(hm.execer, port, isIPv6, v1.ProtocolUDP)
 			if err != nil {
 				klog.Errorf("Failed to clear udp conntrack for port %d, error: %v", port, err)
 			}

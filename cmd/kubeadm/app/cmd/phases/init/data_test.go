@@ -49,3 +49,4 @@ func (t *testInitData) OutputWriter() io.Writer              { return nil }
 func (t *testInitData) Client() (clientset.Interface, error) { return nil, nil }
 func (t *testInitData) Tokens() []string                     { return nil }
 func (t *testInitData) KustomizeDir() string                 { return "" }
+func (t *testInitData) PatchesDir() string                   { return "" }

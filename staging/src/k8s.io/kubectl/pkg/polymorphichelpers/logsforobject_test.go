@@ -17,6 +17,7 @@ limitations under the License.
 package polymorphichelpers
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -44,102 +45,149 @@ func TestLogsForObject(t *testing.T) {
 		obj           runtime.Object
 		opts          *corev1.PodLogOptions
 		allContainers bool
-		pods          []runtime.Object
+		clientsetPods []runtime.Object
 		actions       []testclient.Action
+
+		expectedErr     string
+		expectedSources []corev1.ObjectReference
 	}{
 		{
 			name: "pod logs",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-			},
-			pods: []runtime.Object{testPod()},
+			obj:  testPodWithOneContainers(),
 			actions: []testclient.Action{
 				getLogsAction("test", nil),
 			},
-		},
-		{
-			name: "pod logs: all containers",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
-						{Name: "initc1"},
-						{Name: "initc2"},
-					},
-					Containers: []corev1.Container{
-						{Name: "c1"},
-						{Name: "c2"},
-					},
-					EphemeralContainers: []corev1.EphemeralContainer{
-						{
-							EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "e1"},
-						},
-					},
+			expectedSources: []corev1.ObjectReference{
+				{
+					Kind:       testPodWithOneContainers().Kind,
+					APIVersion: testPodWithOneContainers().APIVersion,
+					Name:       testPodWithOneContainers().Name,
+					Namespace:  testPodWithOneContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
 				},
 			},
+		},
+		{
+			name:          "pod logs: all containers",
+			obj:           testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers(),
 			opts:          &corev1.PodLogOptions{},
 			allContainers: true,
-			pods:          []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "e1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-initc1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-initc2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-e1"}),
 			},
+			expectedSources: []corev1.ObjectReference{
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.initContainers{%s}", testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Spec.InitContainers[0].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.initContainers{%s}", testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Spec.InitContainers[1].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Spec.Containers[0].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Spec.Containers[1].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.ephemeralContainers{%s}", testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Spec.EphemeralContainers[0].Name),
+				},
+			},
+		},
+		{
+			name:        "pod logs: error - must provide container name",
+			obj:         testPodWithTwoContainers(),
+			expectedErr: "a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]",
 		},
 		{
 			name: "pods list logs",
 			obj: &corev1.PodList{
-				Items: []corev1.Pod{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{Name: "initc1"},
-								{Name: "initc2"},
-							},
-							Containers: []corev1.Container{
-								{Name: "c1"},
-								{Name: "c2"},
-							},
-						},
-					},
-				},
+				Items: []corev1.Pod{*testPodWithOneContainers()},
 			},
-			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
 				getLogsAction("test", nil),
 			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       testPodWithOneContainers().Kind,
+				APIVersion: testPodWithOneContainers().APIVersion,
+				Name:       testPodWithOneContainers().Name,
+				Namespace:  testPodWithOneContainers().Namespace,
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
 		},
 		{
 			name: "pods list logs: all containers",
 			obj: &corev1.PodList{
-				Items: []corev1.Pod{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{
-								{Name: "initc1"},
-								{Name: "initc2"},
-							},
-							Containers: []corev1.Container{
-								{Name: "c1"},
-								{Name: "c2"},
-							},
-						},
-					},
-				},
+				Items: []corev1.Pod{*testPodWithTwoContainersAndTwoInitContainers()},
 			},
 			opts:          &corev1.PodLogOptions{},
 			allContainers: true,
-			pods:          []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-initc1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-initc2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-c1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-c2"}),
 			},
+			expectedSources: []corev1.ObjectReference{
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.initContainers{%s}", testPodWithTwoContainersAndTwoInitContainers().Spec.InitContainers[0].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.initContainers{%s}", testPodWithTwoContainersAndTwoInitContainers().Spec.InitContainers[1].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithTwoContainersAndTwoInitContainers().Spec.Containers[0].Name),
+				},
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithTwoContainersAndTwoInitContainers().Spec.Containers[1].Name),
+				},
+			},
+		},
+		{
+			name: "pods list logs: error - must provide container name",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{*testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers()},
+			},
+			expectedErr: "a container name must be specified for pod foo-two-containers-and-two-init-containers, choose one of: [foo-2-and-2-and-1-c1 foo-2-and-2-and-1-c2] or one of the init containers: [foo-2-and-2-and-1-initc1 foo-2-and-2-and-1-initc2] or one of the ephemeral containers: [foo-2-and-2-and-1-e1]",
 		},
 		{
 			name: "replication controller logs",
@@ -149,11 +197,18 @@ func TestLogsForObject(t *testing.T) {
 					Selector: map[string]string{"foo": "bar"},
 				},
 			},
-			pods: []runtime.Object{testPod()},
+			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       testPodWithOneContainers().Kind,
+				APIVersion: testPodWithOneContainers().APIVersion,
+				Name:       testPodWithOneContainers().Name,
+				Namespace:  testPodWithOneContainers().Namespace,
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
 		},
 		{
 			name: "replica set logs",
@@ -163,11 +218,18 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
+			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       testPodWithOneContainers().Kind,
+				APIVersion: testPodWithOneContainers().APIVersion,
+				Name:       testPodWithOneContainers().Name,
+				Namespace:  testPodWithOneContainers().Namespace,
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
 		},
 		{
 			name: "deployment logs",
@@ -177,11 +239,18 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
+			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       testPodWithOneContainers().Kind,
+				APIVersion: testPodWithOneContainers().APIVersion,
+				Name:       testPodWithOneContainers().Name,
+				Namespace:  testPodWithOneContainers().Namespace,
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
 		},
 		{
 			name: "job logs",
@@ -191,11 +260,18 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
+			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       testPodWithOneContainers().Kind,
+				APIVersion: testPodWithOneContainers().APIVersion,
+				Name:       testPodWithOneContainers().Name,
+				Namespace:  testPodWithOneContainers().Namespace,
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
 		},
 		{
 			name: "stateful set logs",
@@ -205,20 +281,48 @@ func TestLogsForObject(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			pods: []runtime.Object{testPod()},
+			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
+			expectedSources: []corev1.ObjectReference{{
+				Kind:       testPodWithOneContainers().Kind,
+				APIVersion: testPodWithOneContainers().APIVersion,
+				Name:       testPodWithOneContainers().Name,
+				Namespace:  testPodWithOneContainers().Namespace,
+				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
+			}},
 		},
 	}
 
 	for _, test := range tests {
-		fakeClientset := fakeexternal.NewSimpleClientset(test.pods...)
-		_, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, test.allContainers)
-		if err != nil {
+		fakeClientset := fakeexternal.NewSimpleClientset(test.clientsetPods...)
+		responses, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, test.allContainers)
+		if test.expectedErr == "" && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
+		}
+
+		if err != nil && test.expectedErr != err.Error() {
+			t.Errorf("%s: expected error: %v, got: %v", test.name, test.expectedErr, err)
+			continue
+		}
+
+		if len(test.expectedSources) != len(responses) {
+			t.Errorf(
+				"%s: the number of expected sources doesn't match the number of responses: %v, got: %v",
+				test.name,
+				len(test.expectedSources),
+				len(responses),
+			)
+			continue
+		}
+
+		for _, ref := range test.expectedSources {
+			if _, ok := responses[ref]; !ok {
+				t.Errorf("%s: didn't find expected log source object reference: %#v", test.name, ref)
+			}
 		}
 
 		var i int
@@ -240,8 +344,12 @@ func TestLogsForObject(t *testing.T) {
 	}
 }
 
-func testPod() runtime.Object {
+func testPodWithOneContainers() *corev1.Pod {
 	return &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "pod",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "test",
@@ -252,7 +360,180 @@ func testPod() runtime.Object {
 			DNSPolicy:     corev1.DNSClusterFirst,
 			Containers: []corev1.Container{
 				{Name: "c1"},
-				{Name: "c2"},
+			},
+		},
+	}
+}
+
+func testPodWithTwoContainers() *corev1.Pod {
+	return &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo-two-containers",
+			Namespace: "test",
+			Labels:    map[string]string{"foo": "bar"},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyAlways,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			Containers: []corev1.Container{
+				{Name: "foo-2-c1"},
+				{Name: "foo-2-c2"},
+			},
+		},
+	}
+}
+
+func testPodWithTwoContainersAndTwoInitContainers() *corev1.Pod {
+	return &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo-two-containers-and-two-init-containers",
+			Namespace: "test",
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{Name: "foo-2-and-2-initc1"},
+				{Name: "foo-2-and-2-initc2"},
+			},
+			Containers: []corev1.Container{
+				{Name: "foo-2-and-2-c1"},
+				{Name: "foo-2-and-2-c2"},
+			},
+		},
+	}
+}
+
+func TestLogsForObjectWithClient(t *testing.T) {
+	cases := []struct {
+		name              string
+		podFn             func() *corev1.Pod
+		podLogOptions     *corev1.PodLogOptions
+		expectedFieldPath string
+		allContainers     bool
+		expectedError     string
+	}{
+		{
+			name:          "two container pod without default container selected",
+			podFn:         testPodWithTwoContainers,
+			podLogOptions: &corev1.PodLogOptions{},
+			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+		},
+		{
+			name: "two container pod with default container selected",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				return pod
+			},
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c1}`,
+		},
+		{
+			name: "two container pod with default container selected but also container set explicitly",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				return pod
+			},
+			podLogOptions: &corev1.PodLogOptions{
+				Container: "foo-2-c2",
+			},
+			expectedFieldPath: `spec.containers{foo-2-c2}`,
+		},
+		{
+			name: "two container pod with non-existing default container selected",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "non-existing"}
+				return pod
+			},
+			podLogOptions: &corev1.PodLogOptions{},
+			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+		},
+		{
+			name: "two container pod with default container set, but allContainers also set",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				return pod
+			},
+			allContainers:     true,
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c2}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := tc.podFn()
+			fakeClientset := fakeexternal.NewSimpleClientset(pod)
+			responses, err := logsForObjectWithClient(fakeClientset.CoreV1(), pod, tc.podLogOptions, 20*time.Second, tc.allContainers)
+			if err != nil {
+				if len(tc.expectedError) > 0 {
+					if err.Error() == tc.expectedError {
+						return
+					}
+				}
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if len(tc.expectedError) > 0 {
+				t.Errorf("expected error %q, got none", tc.expectedError)
+				return
+			}
+			if !tc.allContainers && len(responses) != 1 {
+				t.Errorf("expected one response, got %d", len(responses))
+				return
+			}
+			if tc.allContainers && len(responses) != 2 {
+				t.Errorf("expected 2 responses for allContainers, got %d", len(responses))
+				return
+			}
+			// do not check actual responses in this case as we know there are at least two, which means the preselected
+			// container was not used (which is desired).
+			if tc.allContainers {
+				return
+			}
+			for r := range responses {
+				if r.FieldPath != tc.expectedFieldPath {
+					t.Errorf("expected %q container to be preselected, got %q", tc.expectedFieldPath, r.FieldPath)
+				}
+			}
+		})
+	}
+
+}
+
+func testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers() *corev1.Pod {
+	return &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo-two-containers-and-two-init-containers",
+			Namespace: "test",
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{Name: "foo-2-and-2-and-1-initc1"},
+				{Name: "foo-2-and-2-and-1-initc2"},
+			},
+			Containers: []corev1.Container{
+				{Name: "foo-2-and-2-and-1-c1"},
+				{Name: "foo-2-and-2-and-1-c2"},
+			},
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "foo-2-and-2-and-1-e1"},
+				},
 			},
 		},
 	}

@@ -22,21 +22,22 @@ limitations under the License.
 package framework
 
 import (
-	"bufio"
-	"bytes"
+	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
-	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -46,21 +47,17 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epsp "k8s.io/kubernetes/test/e2e/framework/psp"
-	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
 const (
-	maxKubectlExecRetries = 5
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
-	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
-	// ref https://github.com/kubernetes/kubernetes/issues/47135
-	DefaultNamespaceDeletionTimeout = 10 * time.Minute
+	DefaultNamespaceDeletionTimeout = 5 * time.Minute
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -73,6 +70,7 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
+	clientConfig                     *rest.Config
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 
@@ -104,6 +102,14 @@ type Framework struct {
 	// should abort, the AfterSuite hook should run all Cleanup actions.
 	cleanupHandle CleanupActionHandle
 
+	// afterEaches is a map of name to function to be called after each test.  These are not
+	// cleared.  The call order is randomized so that no dependencies can grow between
+	// the various afterEaches
+	afterEaches map[string]AfterEachActionFunc
+
+	// beforeEachStarted indicates that BeforeEach has started
+	beforeEachStarted bool
+
 	// configuration for framework's client
 	Options Options
 
@@ -114,6 +120,9 @@ type Framework struct {
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
 	clusterAutoscalerMetricsBeforeTest e2emetrics.Collection
 }
+
+// AfterEachActionFunc is a function that can be called after each test
+type AfterEachActionFunc func(f *Framework, failed bool)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -148,6 +157,20 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		ClientSet:                client,
 	}
 
+	f.AddAfterEach("dumpNamespaceInfo", func(f *Framework, failed bool) {
+		if !failed {
+			return
+		}
+		if !TestContext.DumpLogsOnFailure {
+			return
+		}
+		if !f.SkipNamespaceCreation {
+			for _, ns := range f.namespacesToDelete {
+				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+			}
+		}
+	})
+
 	ginkgo.BeforeEach(f.BeforeEach)
 	ginkgo.AfterEach(f.AfterEach)
 
@@ -156,6 +179,8 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
+	f.beforeEachStarted = true
+
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
@@ -163,14 +188,6 @@ func (f *Framework) BeforeEach() {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		ExpectNoError(err)
-		testDesc := ginkgo.CurrentGinkgoTestDescription()
-		if len(testDesc.ComponentTexts) > 0 {
-			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-			config.UserAgent = fmt.Sprintf(
-				"%v -- %v",
-				rest.DefaultKubernetesUserAgent(),
-				componentTexts)
-		}
 
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
@@ -180,6 +197,7 @@ func (f *Framework) BeforeEach() {
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
+		f.clientConfig = rest.CopyConfig(config)
 		f.ClientSet, err = clientset.NewForConfig(config)
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
@@ -288,9 +306,71 @@ func (f *Framework) BeforeEach() {
 	f.flakeReport = NewFlakeReport()
 }
 
+// printSummaries prints summaries of tests.
+func printSummaries(summaries []TestDataSummary, testBaseName string) {
+	now := time.Now()
+	for i := range summaries {
+		Logf("Printing summary: %v", summaries[i].SummaryKind())
+		switch TestContext.OutputPrintType {
+		case "hr":
+			if TestContext.ReportDir == "" {
+				Logf(summaries[i].PrintHumanReadable())
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		case "json":
+			fallthrough
+		default:
+			if TestContext.OutputPrintType != "json" {
+				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
+			}
+			if TestContext.ReportDir == "" {
+				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+				Logf("Finished")
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				Logf("Writing to %s", filePath)
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		}
+	}
+}
+
+// AddAfterEach is a way to add a function to be called after every test.  The execution order is intentionally random
+// to avoid growing dependencies.  If you register the same name twice, it is a coding error and will panic.
+func (f *Framework) AddAfterEach(name string, fn AfterEachActionFunc) {
+	if _, ok := f.afterEaches[name]; ok {
+		panic(fmt.Sprintf("%q is already registered", name))
+	}
+
+	if f.afterEaches == nil {
+		f.afterEaches = map[string]AfterEachActionFunc{}
+	}
+	f.afterEaches[name] = fn
+}
+
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
+	// If BeforeEach never started AfterEach should be skipped.
+	// Currently some tests under e2e/storage have this condition.
+	if !f.beforeEachStarted {
+		return
+	}
+
 	RemoveCleanupAction(f.cleanupHandle)
+
+	// This should not happen. Given ClientSet is a public field a test must have updated it!
+	// Error out early before any API calls during cleanup.
+	if f.ClientSet == nil {
+		Failf("The framework ClientSet must not be nil at this point")
+	}
 
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
@@ -302,13 +382,14 @@ func (f *Framework) AfterEach() {
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				timeout := DefaultNamespaceDeletionTimeout
-				if f.NamespaceDeletionTimeout != 0 {
-					timeout = f.NamespaceDeletionTimeout
-				}
-				if err := deleteNS(f.ClientSet, f.DynamicClient, ns.Name, timeout); err != nil {
+				if err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
+
+						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
+						if !ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+							DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
@@ -324,6 +405,7 @@ func (f *Framework) AfterEach() {
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = nil
+		f.clientConfig = nil
 		f.ClientSet = nil
 		f.namespacesToDelete = nil
 
@@ -337,12 +419,9 @@ func (f *Framework) AfterEach() {
 		}
 	}()
 
-	// Print events if the test failed.
-	if ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
-		// Pass both unversioned client and versioned clientset, till we have removed all uses of the unversioned client.
-		if !f.SkipNamespaceCreation {
-			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
-		}
+	// run all aftereach functions in random order to ensure no dependencies grow
+	for _, afterEachFn := range f.afterEaches {
+		afterEachFn(f, ginkgo.CurrentGinkgoTestDescription().Failed)
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
@@ -384,7 +463,7 @@ func (f *Framework) AfterEach() {
 		f.flakeReport = nil
 	}
 
-	PrintSummaries(f.TestSummaries, f.BaseName)
+	printSummaries(f.TestSummaries, f.BaseName)
 
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
@@ -406,7 +485,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
-		e2epsp.CreatePrivilegedPSPBinding(f.ClientSet, ns.Name)
+		CreatePrivilegedPSPBinding(f.ClientSet, ns.Name)
 	}
 
 	return ns, err
@@ -430,36 +509,13 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 	}
 }
 
-// WaitForPodTerminated waits for the pod to be terminated with the given reason.
-func (f *Framework) WaitForPodTerminated(podName, reason string) error {
-	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
-}
-
-// WaitForPodNotFound waits for the pod to be completely terminated (not "Get-able").
-func (f *Framework) WaitForPodNotFound(podName string, timeout time.Duration) error {
-	return e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
-}
-
-// WaitForPodRunning waits for the pod to run in the namespace.
-func (f *Framework) WaitForPodRunning(podName string) error {
-	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
-}
-
-// WaitForPodReady waits for the pod to flip to ready in the namespace.
-func (f *Framework) WaitForPodReady(podName string) error {
-	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
-}
-
-// WaitForPodRunningSlow waits for the pod to run in the namespace.
-// It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
-func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
-}
-
-// WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
-// success or failure.
-func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+// ClientConfig an externally accessible method for reading the kube client config.
+func (f *Framework) ClientConfig() *rest.Config {
+	ret := rest.CopyConfig(f.clientConfig)
+	// json is least common denominator
+	ret.ContentType = runtime.ContentTypeJSON
+	ret.AcceptContentTypes = runtime.ContentTypeJSON
+	return ret
 }
 
 // TestContainerOutput runs the given pod in the given namespace and waits
@@ -474,118 +530,6 @@ func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, contai
 // the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
-}
-
-// WriteFileViaContainer writes a file using kubectl exec echo <contents> > <path> via specified container
-// because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
-func (f *Framework) WriteFileViaContainer(podName, containerName string, path string, contents string) error {
-	ginkgo.By("writing a file in the container")
-	allowedCharacters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for _, c := range contents {
-		if !strings.ContainsRune(allowedCharacters, c) {
-			return fmt.Errorf("Unsupported character in string to write: %v", c)
-		}
-	}
-	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
-	if err != nil {
-		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return err
-}
-
-// ReadFileViaContainer reads a file using kubectl exec cat <path>.
-func (f *Framework) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
-	ginkgo.By("reading a file in the container")
-
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
-	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return string(stdout), err
-}
-
-// CheckFileSizeViaContainer returns the list of file size under the specified path.
-func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path string) (string, error) {
-	ginkgo.By("checking a file size in the container")
-
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "ls", "-l", path)
-	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return string(stdout), err
-}
-
-// CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
-func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
-	var err error
-	theService := f.CreateServiceForSimpleApp(contPort, svcPort, appName)
-	f.CreatePodsPerNodeForSimpleApp(appName, podSpec, count)
-	if block {
-		err = testutils.WaitForPodsWithLabelRunning(f.ClientSet, f.Namespace.Name, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
-	}
-	return theService, err
-}
-
-// CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
-func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName string) *v1.Service {
-	if appName == "" {
-		panic(fmt.Sprintf("no app name provided"))
-	}
-
-	serviceSelector := map[string]string{
-		"app": appName + "-pod",
-	}
-
-	// For convenience, user sending ports are optional.
-	portsFunc := func() []v1.ServicePort {
-		if contPort < 1 || svcPort < 1 {
-			return nil
-		}
-		return []v1.ServicePort{{
-			Protocol:   v1.ProtocolTCP,
-			Port:       int32(svcPort),
-			TargetPort: intstr.FromInt(contPort),
-		}}
-	}
-	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "service-for-" + appName,
-			Labels: map[string]string{
-				"app": appName + "-service",
-			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports:    portsFunc(),
-			Selector: serviceSelector,
-		},
-	})
-	ExpectNoError(err)
-	return service
-}
-
-// CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
-func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
-	nodes := GetReadySchedulableNodesOrDie(f.ClientSet)
-	podLabels := map[string]string{
-		"app": appName + "-pod",
-	}
-	for i, node := range nodes.Items {
-		// one per node, but no more than maxCount.
-		if i <= maxCount {
-			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   fmt.Sprintf(appName+"-pod-%v", i),
-					Labels: podLabels,
-				},
-				Spec: podSpec(node),
-			})
-			ExpectNoError(err)
-		}
-	}
-	return podLabels
 }
 
 // KubeUser is a struct for managing kubernetes user info.
@@ -640,51 +584,6 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 		}
 	}
 	return nil
-}
-
-func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
-	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
-		if numRetries > 0 {
-			Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
-		}
-
-		stdOutBytes, stdErrBytes, err := kubectlExec(namespace, podName, containerName, args...)
-		if err != nil {
-			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
-				// Retry on "i/o timeout" errors
-				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
-				continue
-			}
-			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
-				// Retry on "container not found" errors
-				Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
-				time.Sleep(2 * time.Second)
-				continue
-			}
-		}
-
-		return stdOutBytes, stdErrBytes, err
-	}
-	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up", maxKubectlExecRetries)
-	return nil, nil, err
-}
-
-func kubectlExec(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
-	var stdout, stderr bytes.Buffer
-	cmdArgs := []string{
-		"exec",
-		fmt.Sprintf("--namespace=%v", namespace),
-		podName,
-		fmt.Sprintf("-c=%v", containerName),
-	}
-	cmdArgs = append(cmdArgs, args...)
-
-	cmd := KubectlCmd(cmdArgs...)
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
-	err := cmd.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
 }
 
 // KubeDescribe is wrapper function for ginkgo describe.  Adds namespacing.
@@ -772,9 +671,9 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pl, err = cli.CoreV1().Pods(ns).List(options)
+		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), options)
 	} else {
-		pl, err = cli.CoreV1().Pods(ns).List(metav1.ListOptions{})
+		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	}
 	return pl, err
 }
@@ -871,31 +770,4 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	}
 
 	return err
-}
-
-// GetLogToFileFunc is a convenience function that returns a function that have the same interface as
-// e2elog.Logf, but writes to a specified file.
-func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
-	return func(format string, args ...interface{}) {
-		writer := bufio.NewWriter(file)
-		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
-			Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
-		}
-		writer.Flush()
-	}
-}
-
-const (
-	// preconfiguredRuntimeHandler is the name of the runtime handler that is expected to be
-	// preconfigured in the test environment.
-	preconfiguredRuntimeHandler = "test-handler"
-)
-
-// PreconfiguredRuntimeClassHandler returns configured runtime handler.
-func PreconfiguredRuntimeClassHandler() string {
-	if TestContext.ContainerRuntime == "docker" {
-		return TestContext.ContainerRuntime
-	}
-
-	return preconfiguredRuntimeHandler
 }

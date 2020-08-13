@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -118,8 +119,12 @@ func TestDeleteSystemPriorityClass(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	key := "test/system-node-critical"
 	ctx := genericapirequest.NewContext()
-	pc := scheduling.SystemPriorityClasses()[0]
-	if err := storage.Store.Storage.Create(ctx, key, pc, nil, 0, false); err != nil {
+	pc := schedulingapiv1.SystemPriorityClasses()[0]
+	internalPc := &scheduling.PriorityClass{}
+	if err := schedulingapiv1.Convert_v1_PriorityClass_To_scheduling_PriorityClass(pc, internalPc, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.Store.Storage.Create(ctx, key, internalPc, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, _, err := storage.Delete(ctx, pc.Name, rest.ValidateAllObjectFunc, nil); err == nil {

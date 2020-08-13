@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.
@@ -137,7 +137,7 @@ func (q *TimedWorkerQueue) CancelWork(key string) bool {
 }
 
 // GetWorkerUnsafe returns a TimedWorker corresponding to the given key.
-// Unsafe method - workers have attached goroutines which can fire afater this function is called.
+// Unsafe method - workers have attached goroutines which can fire after this function is called.
 func (q *TimedWorkerQueue) GetWorkerUnsafe(key string) *TimedWorker {
 	q.Lock()
 	defer q.Unlock()

@@ -17,193 +17,157 @@ limitations under the License.
 package util
 
 import (
-	"reflect"
+	"fmt"
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
-// TestGetPodPriority tests GetPodPriority function.
-func TestGetPodPriority(t *testing.T) {
-	p := int32(20)
-	tests := []struct {
-		name             string
-		pod              *v1.Pod
-		expectedPriority int32
-	}{
-		{
-			name: "no priority pod resolves to static default priority",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
-				},
-			},
-			expectedPriority: scheduling.DefaultPriorityWhenNoDefaultClassExists,
-		},
-		{
-			name: "pod with priority resolves correctly",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
-					Priority: &p,
-				},
-			},
-			expectedPriority: p,
+func TestGetPodFullName(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "pod",
 		},
 	}
-	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
+	got := GetPodFullName(pod)
+	expected := fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
+	if got != expected {
+		t.Errorf("Got wrong full name, got: %s, expected: %s", got, expected)
 	}
 }
 
-// TestSortableList tests SortableList by storing pods in the list and sorting
-// them by their priority.
-func TestSortableList(t *testing.T) {
-	higherPriority := func(pod1, pod2 interface{}) bool {
-		return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+func newPriorityPodWithStartTime(name string, priority int32, startTime time.Time) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+		Status: v1.PodStatus{
+			StartTime: &metav1.Time{Time: startTime},
+		},
 	}
-	podList := SortableList{CompFunc: higherPriority}
-	// Add a few Pods with different priorities from lowest to highest priority.
-	for i := 0; i < 10; i++ {
-		var p = int32(i)
-		pod := &v1.Pod{
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "container",
-						Image: "image",
-					},
-				},
-				Priority: &p,
-			},
-		}
-		podList.Items = append(podList.Items, pod)
+}
+
+func TestGetEarliestPodStartTime(t *testing.T) {
+	currentTime := time.Now()
+	pod1 := newPriorityPodWithStartTime("pod1", 1, currentTime.Add(time.Second))
+	pod2 := newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
+	pod3 := newPriorityPodWithStartTime("pod3", 2, currentTime)
+	victims := &extenderv1.Victims{
+		Pods: []*v1.Pod{pod1, pod2, pod3},
 	}
-	podList.Sort()
-	if len(podList.Items) != 10 {
-		t.Errorf("expected length of list was 10, got: %v", len(podList.Items))
+	startTime := GetEarliestPodStartTime(victims)
+	if !startTime.Equal(pod3.Status.StartTime) {
+		t.Errorf("Got wrong earliest pod start time")
 	}
-	var prevPriority = int32(10)
-	for _, p := range podList.Items {
-		if *p.(*v1.Pod).Spec.Priority >= prevPriority {
-			t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
+
+	pod1 = newPriorityPodWithStartTime("pod1", 2, currentTime)
+	pod2 = newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
+	pod3 = newPriorityPodWithStartTime("pod3", 2, currentTime.Add(2*time.Second))
+	victims = &extenderv1.Victims{
+		Pods: []*v1.Pod{pod1, pod2, pod3},
+	}
+	startTime = GetEarliestPodStartTime(victims)
+	if !startTime.Equal(pod1.Status.StartTime) {
+		t.Errorf("Got wrong earliest pod start time, got %v, expected %v", startTime, pod1.Status.StartTime)
+	}
+}
+
+func TestMoreImportantPod(t *testing.T) {
+	currentTime := time.Now()
+	pod1 := newPriorityPodWithStartTime("pod1", 1, currentTime)
+	pod2 := newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
+	pod3 := newPriorityPodWithStartTime("pod3", 2, currentTime)
+
+	tests := map[string]struct {
+		p1       *v1.Pod
+		p2       *v1.Pod
+		expected bool
+	}{
+		"Pod with higher priority": {
+			p1:       pod1,
+			p2:       pod2,
+			expected: false,
+		},
+		"Pod with older created time": {
+			p1:       pod2,
+			p2:       pod3,
+			expected: false,
+		},
+		"Pods with same start time": {
+			p1:       pod3,
+			p2:       pod1,
+			expected: true,
+		},
+	}
+
+	for k, v := range tests {
+		got := MoreImportantPod(v.p1, v.p2)
+		if got != v.expected {
+			t.Errorf("%s failed, expected %t but got %t", k, v.expected, got)
 		}
 	}
 }
 
-func TestGetContainerPorts(t *testing.T) {
+func TestRemoveNominatedNodeName(t *testing.T) {
 	tests := []struct {
-		pod1     *v1.Pod
-		pod2     *v1.Pod
-		expected []*v1.ContainerPort
+		name                     string
+		currentNominatedNodeName string
+		newNominatedNodeName     string
+		expectedPatchRequests    int
+		expectedPatchData        string
 	}{
 		{
-			pod1: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8001,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8002,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8003,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8004,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-					},
-				},
-			},
-			pod2: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8011,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8012,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8013,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8014,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: []*v1.ContainerPort{
-				{
-					ContainerPort: 8001,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8002,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8003,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8004,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8011,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8012,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8013,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8014,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
+			name:                     "Should make patch request to clear node name",
+			currentNominatedNodeName: "node1",
+			expectedPatchRequests:    1,
+			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
+		},
+		{
+			name:                     "Should not make patch request if nominated node is already cleared",
+			currentNominatedNodeName: "",
+			expectedPatchRequests:    0,
 		},
 	}
-
 	for _, test := range tests {
-		result := GetContainerPorts(test.pod1, test.pod2)
-		if !reflect.DeepEqual(test.expected, result) {
-			t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(test.expected, result))
-		}
+		t.Run(test.name, func(t *testing.T) {
+			actualPatchRequests := 0
+			var actualPatchData string
+			cs := &clientsetfake.Clientset{}
+			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				actualPatchRequests++
+				patch := action.(clienttesting.PatchAction)
+				actualPatchData = string(patch.GetPatch())
+				// For this test, we don't care about the result of the patched pod, just that we got the expected
+				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
+				return true, &v1.Pod{}, nil
+			})
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
+			}
+
+			if err := ClearNominatedNodeName(cs, pod); err != nil {
+				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
+			}
+
+			if actualPatchRequests != test.expectedPatchRequests {
+				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
+			}
+
+			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
+				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
+			}
+		})
 	}
 }

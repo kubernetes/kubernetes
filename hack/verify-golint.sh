@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks coding style for go language files in each
+# Kubernetes package by golint.
+# Usage: `hack/verify-golint.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -29,9 +33,11 @@ kube::golang::verify_go_version
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install golint from vendor
-echo 'installing golint from vendor'
-go install k8s.io/kubernetes/vendor/golang.org/x/lint/golint
+# Install golint
+echo 'installing golint'
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install golang.org/x/lint/golint
+popd >/dev/null
 
 
 cd "${KUBE_ROOT}"
@@ -46,8 +52,10 @@ export IFS=$'\n'
 # with a leading underscore. We'll need to support both scenarios for all_packages.
 all_packages=()
 while IFS='' read -r line; do all_packages+=("$line"); done < <(go list -e ./... | grep -vE "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
+# The regex below removes any "#" character and anything behind it and including any
+# whitespace before it. Then it removes empty lines.
 failing_packages=()
-while IFS='' read -r line; do failing_packages+=("$line"); done < <(cat "$failure_file")
+while IFS='' read -r line; do failing_packages+=("$line"); done < <(sed -e 's/[[:blank:]]*#.*//' -e '/^$/d' "$failure_file")
 unset IFS
 errors=()
 not_failing=()

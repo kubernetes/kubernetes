@@ -530,6 +530,25 @@ func (mi *mergeInfo) computeMergeInfo() {
 			}
 		case reflect.Struct:
 			switch {
+			case isSlice && !isPointer: // E.g. []pb.T
+				mergeInfo := getMergeInfo(tf)
+				zero := reflect.Zero(tf)
+				mfi.merge = func(dst, src pointer) {
+					// TODO: Make this faster?
+					dstsp := dst.asPointerTo(f.Type)
+					dsts := dstsp.Elem()
+					srcs := src.asPointerTo(f.Type).Elem()
+					for i := 0; i < srcs.Len(); i++ {
+						dsts = reflect.Append(dsts, zero)
+						srcElement := srcs.Index(i).Addr()
+						dstElement := dsts.Index(dsts.Len() - 1).Addr()
+						mergeInfo.merge(valToPointer(dstElement), valToPointer(srcElement))
+					}
+					if dsts.IsNil() {
+						dsts = reflect.MakeSlice(f.Type, 0, 0)
+					}
+					dstsp.Elem().Set(dsts)
+				}
 			case !isPointer:
 				mergeInfo := getMergeInfo(tf)
 				mfi.merge = func(dst, src pointer) {

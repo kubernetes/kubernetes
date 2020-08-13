@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -23,7 +25,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 	dockerapi "github.com/docker/docker/client"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -73,7 +75,7 @@ type Interface interface {
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
 		klog.Infof("Connecting to docker on %s", dockerEndpoint)
-		return dockerapi.NewClient(dockerEndpoint, "", nil, nil)
+		return dockerapi.NewClientWithOpts(dockerapi.WithHost(dockerEndpoint), dockerapi.WithVersion(""))
 	}
 	return dockerapi.NewClientWithOpts(dockerapi.FromEnv)
 }
@@ -84,19 +86,7 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // is the timeout for docker requests. If timeout is exceeded, the request
 // will be cancelled and throw out an error. If requestTimeout is 0, a default
 // value will be applied.
-func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration,
-	withTraceDisabled bool, enableSleep bool) Interface {
-	if dockerEndpoint == FakeDockerEndpoint {
-		fakeClient := NewFakeDockerClient()
-		if withTraceDisabled {
-			fakeClient = fakeClient.WithTraceDisabled()
-		}
-
-		if enableSleep {
-			fakeClient.EnableSleep = true
-		}
-		return fakeClient
-	}
+func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
 		klog.Fatalf("Couldn't connect to docker: %v", err)

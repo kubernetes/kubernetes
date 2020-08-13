@@ -17,6 +17,7 @@ limitations under the License.
 package nodelease
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -30,7 +31,7 @@ import (
 	coordclientset "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/utils/pointer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -108,7 +109,7 @@ func (c *controller) sync() {
 	lease, created := c.backoffEnsureLease()
 	c.latestLease = lease
 	// we don't need to update the lease if we just created it
-	if !created {
+	if !created && lease != nil {
 		if err := c.retryUpdateLease(lease); err != nil {
 			klog.Errorf("%v, will retry after %v", err, c.renewInterval)
 		}
@@ -142,10 +143,17 @@ func (c *controller) backoffEnsureLease() (*coordinationv1.Lease, bool) {
 // ensureLease creates the lease if it does not exist. Returns the lease and
 // a bool (true if this call created the lease), or any error that occurs.
 func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
-	lease, err := c.leaseClient.Get(c.holderIdentity, metav1.GetOptions{})
+	lease, err := c.leaseClient.Get(context.TODO(), c.holderIdentity, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		// lease does not exist, create it
-		lease, err := c.leaseClient.Create(c.newLease(nil))
+		// lease does not exist, create it.
+		leaseToCreate := c.newLease(nil)
+		if len(leaseToCreate.OwnerReferences) == 0 {
+			// We want to ensure that a lease will always have OwnerReferences set.
+			// Thus, given that we weren't able to set it correctly, we simply
+			// not create it this time - we will retry in the next iteration.
+			return nil, false, nil
+		}
+		lease, err := c.leaseClient.Create(context.TODO(), leaseToCreate, metav1.CreateOptions{})
 		if err != nil {
 			return nil, false, err
 		}
@@ -162,7 +170,7 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
-		lease, err := c.leaseClient.Update(c.newLease(base))
+		lease, err := c.leaseClient.Update(context.TODO(), c.newLease(base), metav1.UpdateOptions{})
 		if err == nil {
 			c.latestLease = lease
 			return nil
@@ -206,8 +214,8 @@ func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease 
 	// kubelet.nodeRef.UID. When lease is initially created, it is possible that
 	// the connection between master and node is not ready yet. So try to set
 	// owner reference every time when renewing the lease, until successful.
-	if lease.OwnerReferences == nil || len(lease.OwnerReferences) == 0 {
-		if node, err := c.client.CoreV1().Nodes().Get(c.holderIdentity, metav1.GetOptions{}); err == nil {
+	if len(lease.OwnerReferences) == 0 {
+		if node, err := c.client.CoreV1().Nodes().Get(context.TODO(), c.holderIdentity, metav1.GetOptions{}); err == nil {
 			lease.OwnerReferences = []metav1.OwnerReference{
 				{
 					APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,

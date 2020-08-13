@@ -35,16 +35,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.EndpointSliceControllerConfiguration)(nil), (*config.EndpointSliceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_EndpointSliceControllerConfiguration_To_config_EndpointSliceControllerConfiguration(a.(*v1alpha1.EndpointSliceControllerConfiguration), b.(*config.EndpointSliceControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.EndpointSliceControllerConfiguration)(nil), (*v1alpha1.EndpointSliceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_EndpointSliceControllerConfiguration_To_v1alpha1_EndpointSliceControllerConfiguration(a.(*config.EndpointSliceControllerConfiguration), b.(*v1alpha1.EndpointSliceControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*v1alpha1.GroupResource), b.(*v1.GroupResource), scope)
 	}); err != nil {
@@ -71,12 +61,14 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_EndpointSliceControllerConfiguration_To_config_EndpointSliceControllerConfiguration(in *v1alpha1.EndpointSliceControllerConfiguration, out *config.EndpointSliceControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentServiceEndpointSyncs = in.ConcurrentServiceEndpointSyncs
 	out.MaxEndpointsPerSlice = in.MaxEndpointsPerSlice
+	out.EndpointUpdatesBatchPeriod = in.EndpointUpdatesBatchPeriod
 	return nil
 }
 
 func autoConvert_config_EndpointSliceControllerConfiguration_To_v1alpha1_EndpointSliceControllerConfiguration(in *config.EndpointSliceControllerConfiguration, out *v1alpha1.EndpointSliceControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentServiceEndpointSyncs = in.ConcurrentServiceEndpointSyncs
 	out.MaxEndpointsPerSlice = in.MaxEndpointsPerSlice
+	out.EndpointUpdatesBatchPeriod = in.EndpointUpdatesBatchPeriod
 	return nil
 }
 

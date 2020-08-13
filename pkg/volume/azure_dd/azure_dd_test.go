@@ -37,7 +37,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(azureDataDiskPluginName)
 	if err != nil {
@@ -66,6 +66,10 @@ func TestGetMaxDataDiskCount(t *testing.T) {
 		{
 			instanceType: "standard_d2_v2",
 			expectResult: 8,
+		},
+		{
+			instanceType: "Standard_DS14_V2",
+			expectResult: 64,
 		},
 		{
 			instanceType: "NOT_EXISTING",

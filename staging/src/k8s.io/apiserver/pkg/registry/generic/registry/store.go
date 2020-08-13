@@ -24,12 +24,11 @@ import (
 	"sync"
 	"time"
 
-	kubeerr "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,8 +45,9 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -221,13 +221,13 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
-		return "", kubeerr.NewBadRequest("Namespace parameter required.")
+		return "", apierrors.NewBadRequest("Namespace parameter required.")
 	}
 	if len(name) == 0 {
-		return "", kubeerr.NewBadRequest("Name parameter required.")
+		return "", apierrors.NewBadRequest("Name parameter required.")
 	}
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
-		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
+		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key = key + "/" + name
 	return key, nil
@@ -237,10 +237,10 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 // to a resource relative to the given prefix without a namespace.
 func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
-		return "", kubeerr.NewBadRequest("Name parameter required.")
+		return "", apierrors.NewBadRequest("Name parameter required.")
 	}
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
-		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
+		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key := prefix + "/" + name
 	return key, nil
@@ -322,15 +322,16 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	p.Continue = options.Continue
 	list := e.NewListFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
+	storageOpts := storage.ListOptions{ResourceVersion: options.ResourceVersion, ResourceVersionMatch: options.ResourceVersionMatch, Predicate: p}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			err := e.Storage.GetToList(ctx, key, options.ResourceVersion, p, list)
+			err := e.Storage.GetToList(ctx, key, storageOpts, list)
 			return list, storeerr.InterpretListError(err, qualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), storageOpts, list)
 	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
@@ -364,10 +365,10 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
-		if !kubeerr.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
-		if errGet := e.Storage.Get(ctx, key, "", out, false); errGet != nil {
+		if errGet := e.Storage.Get(ctx, key, storage.GetOptions{}, out); errGet != nil {
 			return nil, err
 		}
 		accessor, errGetAcc := meta.Accessor(out)
@@ -375,7 +376,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, err
 		}
 		if accessor.GetDeletionTimestamp() != nil {
-			msg := &err.(*kubeerr.StatusError).ErrStatus.Message
+			msg := &err.(*apierrors.StatusError).ErrStatus.Message
 			*msg = fmt.Sprintf("object is being deleted: %s", *msg)
 		}
 		return nil, err
@@ -472,6 +473,16 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		existingResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(existing)
+		if err != nil {
+			return nil, nil, err
+		}
+		if existingResourceVersion == 0 {
+			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
+				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
+			}
+		}
+
 		// Given the existing object, get the new object
 		obj, err := objInfo.UpdatedObject(ctx, existing)
 		if err != nil {
@@ -482,20 +493,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// the user does not have a resource version, then we populate it with
 		// the latest version. Else, we check that the version specified by
 		// the user matches the version of latest storage object.
-		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+		newResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 		if err != nil {
 			return nil, nil, err
 		}
-		doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
+		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
-		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
-		if err != nil {
-			return nil, nil, err
-		}
-		if version == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
-				return nil, nil, kubeerr.NewNotFound(qualifiedResource, name)
-			}
+		if existingResourceVersion == 0 {
 			creating = true
 			creatingObj = obj
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -528,16 +532,16 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		} else {
 			// Check if the object's resource version matches the latest
 			// resource version.
-			if resourceVersion == 0 {
+			if newResourceVersion == 0 {
 				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
 				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
-				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), resourceVersion, "must be specified for an update")}
-				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
+				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newResourceVersion, "must be specified for an update")}
+				return nil, nil, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
-			if resourceVersion != version {
-				return nil, nil, kubeerr.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
+			if newResourceVersion != existingResourceVersion {
+				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
@@ -608,7 +612,7 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 	if err != nil {
 		return nil, err
 	}
-	if err := e.Storage.Get(ctx, key, options.ResourceVersion, obj, false); err != nil {
+	if err := e.Storage.Get(ctx, key, storage.GetOptions{ResourceVersion: options.ResourceVersion}, obj); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
 	if e.Decorator != nil {
@@ -892,7 +896,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	}
 	obj := e.NewFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	if err = e.Storage.Get(ctx, key, "", obj, false); err != nil {
+	if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
 
@@ -917,7 +921,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	// check if obj has pending finalizers
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, false, kubeerr.NewInternalError(err)
+		return nil, false, apierrors.NewInternalError(err)
 	}
 	pendingFinalizers := len(accessor.GetFinalizers()) != 0
 	var ignoreNotFound bool
@@ -930,6 +934,15 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	// TODO: remove the check, because we support no-op updates now.
 	if graceful || pendingFinalizers || shouldUpdateFinalizers {
 		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, deleteValidation, obj)
+		// Update the preconditions.ResourceVersion if set since we updated the object.
+		if err == nil && deleteImmediately && preconditions.ResourceVersion != nil {
+			accessor, err = meta.Accessor(out)
+			if err != nil {
+				return out, false, apierrors.NewInternalError(err)
+			}
+			resourceVersion := accessor.GetResourceVersion()
+			preconditions.ResourceVersion = &resourceVersion
+		}
 	}
 
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
@@ -967,6 +980,11 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	return out, true, err
 }
 
+// DeleteReturnsDeletedObject implements the rest.MayReturnFullObjectDeleter interface
+func (e *Store) DeleteReturnsDeletedObject() bool {
+	return e.ReturnDeletedObject
+}
+
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
@@ -992,12 +1010,19 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if err != nil {
 		return nil, err
 	}
+	if len(items) == 0 {
+		// Nothing to delete, return now
+		return listObj, nil
+	}
 	// Spawn a number of goroutines, so that we can issue requests to storage
 	// in parallel to speed up deletion.
-	// TODO: Make this proportional to the number of items to delete, up to
+	// It is proportional to the number of items to delete, up to
 	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
 	// workers to delete 10 items).
 	workersNumber := e.DeleteCollectionWorkers
+	if workersNumber > len(items) {
+		workersNumber = len(items)
+	}
 	if workersNumber < 1 {
 		workersNumber = 1
 	}
@@ -1030,7 +1055,7 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 					errs <- err
 					return
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !kubeerr.IsNotFound(err) {
+				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
 					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
@@ -1105,9 +1130,10 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 
 // WatchPredicate starts a watch for the items that matches.
 func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
+			w, err := e.Storage.Watch(ctx, key, storageOpts)
 			if err != nil {
 				return nil, err
 			}
@@ -1120,7 +1146,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		// optimization is skipped
 	}
 
-	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
+	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), storageOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -1203,6 +1229,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.DefaultQualifiedResource.String())
 	}
 
+	if e.TableConvertor == nil {
+		return fmt.Errorf("store for %s must set TableConvertor; rest.NewDefaultTableConvertor(e.DefaultQualifiedResource) can be used to output just name/creation time", e.DefaultQualifiedResource.String())
+	}
+
 	var isNamespaced bool
 	switch {
 	case e.CreateStrategy != nil:
@@ -1237,6 +1267,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 				GetAttrs: attrFunc,
 			}
 		}
+	}
+
+	err := validateIndexers(options.Indexers)
+	if err != nil {
+		return err
 	}
 
 	opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource)
@@ -1314,6 +1349,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			e.NewListFunc,
 			attrFunc,
 			options.TriggerFunc,
+			options.Indexers,
 		)
 		if err != nil {
 			return err
@@ -1353,13 +1389,26 @@ func (e *Store) startObservingCount(period time.Duration) func() {
 	return func() { close(stopCh) }
 }
 
-func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
-	return rest.NewDefaultTableConvertor(e.qualifiedResourceFromContext(ctx)).ConvertToTable(ctx, object, tableOptions)
+	return rest.NewDefaultTableConvertor(e.DefaultQualifiedResource).ConvertToTable(ctx, object, tableOptions)
 }
 
 func (e *Store) StorageVersion() runtime.GroupVersioner {
 	return e.StorageVersioner
+}
+
+// validateIndexers will check the prefix of indexers.
+func validateIndexers(indexers *cache.Indexers) error {
+	if indexers == nil {
+		return nil
+	}
+	for indexName := range *indexers {
+		if len(indexName) <= 2 || (indexName[:2] != "l:" && indexName[:2] != "f:") {
+			return fmt.Errorf("index must prefix with \"l:\" or \"f:\"")
+		}
+	}
+	return nil
 }

@@ -19,9 +19,8 @@ package ipconfig
 import (
 	"runtime"
 	"strings"
-	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	utilexec "k8s.io/utils/exec"
 )
@@ -42,7 +41,6 @@ const (
 
 // runner implements Interface in terms of exec("ipconfig").
 type runner struct {
-	mu   sync.Mutex
 	exec utilexec.Interface
 }
 

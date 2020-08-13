@@ -19,25 +19,24 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 func TestExtractNotFound(t *testing.T) {
-	notFound := autorest.DetailedError{StatusCode: http.StatusNotFound}
-	otherHTTP := autorest.DetailedError{StatusCode: http.StatusForbidden}
-	otherErr := fmt.Errorf("other error")
+	notFound := &retry.Error{HTTPStatusCode: http.StatusNotFound}
+	otherHTTP := &retry.Error{HTTPStatusCode: http.StatusForbidden}
+	otherErr := &retry.Error{HTTPStatusCode: http.StatusTooManyRequests}
 
 	tests := []struct {
-		err         error
-		expectedErr error
+		err         *retry.Error
+		expectedErr *retry.Error
 		exists      bool
 	}{
 		{nil, nil, true},
@@ -47,7 +46,7 @@ func TestExtractNotFound(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		exists, _, err := checkResourceExistsFromError(test.err)
+		exists, err := checkResourceExistsFromError(test.err)
 		if test.exists != exists {
 			t.Errorf("expected: %v, saw: %v", test.exists, exists)
 		}
@@ -58,6 +57,9 @@ func TestExtractNotFound(t *testing.T) {
 }
 
 func TestIsNodeUnmanaged(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		name           string
 		unmanagedNodes sets.String
@@ -91,7 +93,7 @@ func TestIsNodeUnmanaged(t *testing.T) {
 		},
 	}
 
-	az := getTestCloud()
+	az := GetTestCloud(ctrl)
 	for _, test := range tests {
 		az.unmanagedNodes = test.unmanagedNodes
 		if test.expectErr {
@@ -112,6 +114,9 @@ func TestIsNodeUnmanaged(t *testing.T) {
 }
 
 func TestIsNodeUnmanagedByProviderID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		providerID string
 		expected   bool
@@ -139,7 +144,7 @@ func TestIsNodeUnmanagedByProviderID(t *testing.T) {
 		},
 	}
 
-	az := getTestCloud()
+	az := GetTestCloud(ctrl)
 	for _, test := range tests {
 		isUnmanagedNode := az.IsNodeUnmanagedByProviderID(test.providerID)
 		assert.Equal(t, test.expected, isUnmanagedNode, test.providerID)
@@ -262,6 +267,14 @@ func TestIsBackendPoolOnSameLB(t *testing.T) {
 				"wrong-existing-backendpool-id",
 			},
 			expectError: true,
+		},
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/malformed-lb1-internal/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/malformed-lb1-lanretni/backendAddressPools/pool2",
+			},
+			expected:       false,
+			expectedLBName: "malformed-lb1-lanretni",
 		},
 	}
 

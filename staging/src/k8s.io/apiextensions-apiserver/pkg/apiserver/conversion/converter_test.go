@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -159,16 +159,16 @@ func TestConversion(t *testing.T) {
 		t.Fatalf("Cannot create conversion factory: %v", err)
 	}
 	for _, test := range tests {
-		testCRD := apiextensions.CustomResourceDefinition{
-			Spec: apiextensions.CustomResourceDefinitionSpec{
-				Conversion: &apiextensions.CustomResourceConversion{
-					Strategy: apiextensions.NoneConverter,
+		testCRD := apiextensionsv1.CustomResourceDefinition{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Conversion: &apiextensionsv1.CustomResourceConversion{
+					Strategy: apiextensionsv1.NoneConverter,
 				},
 			},
 		}
 		for _, v := range test.ValidVersions {
 			gv, _ := schema.ParseGroupVersion(v)
-			testCRD.Spec.Versions = append(testCRD.Spec.Versions, apiextensions.CustomResourceDefinitionVersion{Name: gv.Version, Served: true})
+			testCRD.Spec.Versions = append(testCRD.Spec.Versions, apiextensionsv1.CustomResourceDefinitionVersion{Name: gv.Version, Served: true})
 			testCRD.Spec.Group = gv.Group
 		}
 		safeConverter, _, err := CRConverterFactory.NewConverter(&testCRD)

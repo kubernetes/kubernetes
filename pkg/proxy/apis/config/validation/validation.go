@@ -26,10 +26,13 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	netutils "k8s.io/utils/net"
 )
 
 // Validate validates the configuration of kube-proxy
@@ -37,6 +40,11 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	newPath := field.NewPath("KubeProxyConfiguration")
+
+	effectiveFeatures := utilfeature.DefaultFeatureGate.DeepCopy()
+	if err := effectiveFeatures.SetFromMap(config.FeatureGates); err != nil {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("featureGates"), config.FeatureGates, err.Error()))
+	}
 
 	allErrs = append(allErrs, validateKubeProxyIPTablesConfiguration(config.IPTables, newPath.Child("KubeProxyIPTablesConfiguration"))...)
 	if config.Mode == kubeproxyconfig.ProxyModeIPVS {
@@ -68,16 +76,26 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
 	if config.ClusterCIDR != "" {
-		if config.FeatureGates[string(kubefeatures.IPv6DualStack)] {
-			cidrs := strings.Split(config.ClusterCIDR, ",")
-			for _, cidr := range cidrs {
-				if _, _, err := net.ParseCIDR(cidr); err != nil {
-					allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), cidr, "must be a valid CIDR block (e.g. 10.100.0.0/16 or FD02::0:0:0/96)"))
-				}
+		cidrs := strings.Split(config.ClusterCIDR, ",")
+		dualStackEnabled := effectiveFeatures.Enabled(kubefeatures.IPv6DualStack)
+
+		switch {
+		// if DualStack only valid one cidr or two cidrs with one of each IP family
+		case dualStackEnabled && len(cidrs) > 2:
+			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed or a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
+		// if DualStack and two cidrs validate if there is at least one of each IP family
+		case dualStackEnabled && len(cidrs) == 2:
+			isDual, err := netutils.IsDualStackCIDRStrings(cidrs)
+			if err != nil || !isDual {
+				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
 			}
-		} else {
+		// if not DualStack only one CIDR allowed
+		case !dualStackEnabled && len(cidrs) > 1:
+			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
+		// if we are here means that len(cidrs) == 1, we need to validate it
+		default:
 			if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
-				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16 or FD02::0:0:0/96)"))
+				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
 			}
 		}
 	}
@@ -87,6 +105,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
+	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
 
 	return allErrs
 }
@@ -128,6 +147,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
 	}
 
+	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
 	allErrs = append(allErrs, validateIPVSSchedulerMethod(kubeproxyconfig.IPVSSchedulerMethod(config.Scheduler), fldPath.Child("Scheduler"))...)
 	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
@@ -264,6 +284,24 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 	return allErrs
 }
 
+func validateIPVSTimeout(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if config.TCPTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPTimeout"), config.TCPTimeout, "must be greater than or equal to 0"))
+	}
+
+	if config.TCPFinTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPFinTimeout"), config.TCPFinTimeout, "must be greater than or equal to 0"))
+	}
+
+	if config.UDPTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("UDPTimeout"), config.UDPTimeout, "must be greater than or equal to 0"))
+	}
+
+	return allErrs
+}
+
 func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -272,5 +310,15 @@ func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.
 			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
 		}
 	}
+	return allErrs
+}
+
+func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	errs := metrics.ValidateShowHiddenMetricsVersion(version)
+	for _, e := range errs {
+		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
+	}
+
 	return allErrs
 }

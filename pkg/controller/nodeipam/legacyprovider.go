@@ -24,7 +24,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
@@ -37,7 +37,7 @@ func startLegacyIPAM(
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
-	nodeCIDRMaskSize int,
+	nodeCIDRMaskSizes []int,
 ) {
 	cfg := &ipam.Config{
 		Resync:       ipamResyncInterval,
@@ -59,7 +59,7 @@ func startLegacyIPAM(
 	if len(clusterCIDRs) > 1 {
 		klog.Warningf("Multiple cidrs were configured with FromCluster or FromCloud. cidrs except first one were discarded")
 	}
-	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSize)
+	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0])
 	if err != nil {
 		klog.Fatalf("Error creating ipam controller: %v", err)
 	}

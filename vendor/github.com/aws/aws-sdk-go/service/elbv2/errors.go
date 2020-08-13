@@ -211,6 +211,14 @@ const (
 	// You've reached the limit on the number of targets.
 	ErrCodeTooManyTargetsException = "TooManyTargets"
 
+	// ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException for service response error code
+	// "TooManyUniqueTargetGroupsPerLoadBalancer".
+	//
+	// You've reached the limit on the number of unique target groups per load balancer
+	// across all listeners. If a target group is used by multiple actions for a
+	// load balancer, it is counted as only one use.
+	ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException = "TooManyUniqueTargetGroupsPerLoadBalancer"
+
 	// ErrCodeUnsupportedProtocolException for service response error code
 	// "UnsupportedProtocol".
 	//

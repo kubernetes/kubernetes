@@ -19,8 +19,10 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var zero int64
@@ -150,6 +152,18 @@ func (p *PodWrapper) Name(s string) *PodWrapper {
 	return p
 }
 
+// UID sets `s` as the UID of the inner pod.
+func (p *PodWrapper) UID(s string) *PodWrapper {
+	p.SetUID(types.UID(s))
+	return p
+}
+
+// SchedulerName sets `s` as the scheduler name of the inner pod.
+func (p *PodWrapper) SchedulerName(s string) *PodWrapper {
+	p.Spec.SchedulerName = s
+	return p
+}
+
 // Namespace sets `s` as the namespace of the inner pod.
 func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	p.SetNamespace(s)
@@ -168,6 +182,13 @@ func (p *PodWrapper) Container(s string) *PodWrapper {
 // Priority sets a priority value into PodSpec of the inner pod.
 func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	p.Spec.Priority = &val
+	return p
+}
+
+// Terminating sets the inner pod's deletionTimestamp to current timestamp.
+func (p *PodWrapper) Terminating() *PodWrapper {
+	now := metav1.Now()
+	p.DeletionTimestamp = &now
 	return p
 }
 
@@ -190,7 +211,7 @@ func (p *PodWrapper) NodeSelector(m map[string]string) *PodWrapper {
 }
 
 // NodeAffinityIn creates a HARD node affinity (with the operator In)
-// and injects into the innner pod.
+// and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
 		p.Spec.Affinity = &v1.Affinity{}
@@ -204,7 +225,7 @@ func (p *PodWrapper) NodeAffinityIn(key string, vals []string) *PodWrapper {
 }
 
 // NodeAffinityNotIn creates a HARD node affinity (with the operator NotIn)
-// and injects into the innner pod.
+// and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
 		p.Spec.Affinity = &v1.Affinity{}
@@ -214,6 +235,116 @@ func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	}
 	nodeSelector := MakeNodeSelector().NotIn(key, vals).Obj()
 	p.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+	return p
+}
+
+// StartTime sets `t` as .status.startTime for the inner pod.
+func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
+	p.Status.StartTime = &t
+	return p
+}
+
+// NominatedNodeName sets `n` as the .Status.NominatedNodeName of the inner pod.
+func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
+	p.Status.NominatedNodeName = n
+	return p
+}
+
+// PodAffinityKind represents different kinds of PodAffinity.
+type PodAffinityKind int
+
+const (
+	// NilPodAffinity is a no-op which doesn't apply any PodAffinity.
+	NilPodAffinity PodAffinityKind = iota
+	// PodAffinityWithRequiredReq applies a HARD requirement to pod.spec.affinity.PodAffinity.
+	PodAffinityWithRequiredReq
+	// PodAffinityWithPreferredReq applies a SOFT requirement to pod.spec.affinity.PodAffinity.
+	PodAffinityWithPreferredReq
+	// PodAffinityWithRequiredPreferredReq applies HARD and SOFT requirements to pod.spec.affinity.PodAffinity.
+	PodAffinityWithRequiredPreferredReq
+	// PodAntiAffinityWithRequiredReq applies a HARD requirement to pod.spec.affinity.PodAntiAffinity.
+	PodAntiAffinityWithRequiredReq
+	// PodAntiAffinityWithPreferredReq applies a SOFT requirement to pod.spec.affinity.PodAntiAffinity.
+	PodAntiAffinityWithPreferredReq
+	// PodAntiAffinityWithRequiredPreferredReq applies HARD and SOFT requirements to pod.spec.affinity.PodAntiAffinity.
+	PodAntiAffinityWithRequiredPreferredReq
+)
+
+// PodAffinityExists creates an PodAffinity with the operator "Exists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	if kind == NilPodAffinity {
+		return p
+	}
+
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	if p.Spec.Affinity.PodAffinity == nil {
+		p.Spec.Affinity.PodAffinity = &v1.PodAffinity{}
+	}
+	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
+	term := v1.PodAffinityTerm{LabelSelector: labelSelector, TopologyKey: topologyKey}
+	switch kind {
+	case PodAffinityWithRequiredReq:
+		p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+	case PodAffinityWithPreferredReq:
+		p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	case PodAffinityWithRequiredPreferredReq:
+		p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+		p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	}
+	return p
+}
+
+// PodAntiAffinityExists creates an PodAntiAffinity with the operator "Exists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	if kind == NilPodAffinity {
+		return p
+	}
+
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	if p.Spec.Affinity.PodAntiAffinity == nil {
+		p.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+	}
+	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
+	term := v1.PodAffinityTerm{LabelSelector: labelSelector, TopologyKey: topologyKey}
+	switch kind {
+	case PodAntiAffinityWithRequiredReq:
+		p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+	case PodAntiAffinityWithPreferredReq:
+		p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	case PodAntiAffinityWithRequiredPreferredReq:
+		p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+		p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	}
 	return p
 }
 
@@ -239,12 +370,37 @@ func (p *PodWrapper) Label(k, v string) *PodWrapper {
 	return p
 }
 
+// Req adds a new container to the inner pod with given resource map.
+func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
+	if len(resMap) == 0 {
+		return p
+	}
+
+	res := v1.ResourceList{}
+	for k, v := range resMap {
+		res[k] = resource.MustParse(v)
+	}
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Resources: v1.ResourceRequirements{
+			Requests: res,
+		},
+	})
+	return p
+}
+
+// PreemptionPolicy sets the give preemption policy to the inner pod.
+func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
+	p.Spec.PreemptionPolicy = &policy
+	return p
+}
+
 // NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 
 // MakeNode creates a Node wrapper.
 func MakeNode() *NodeWrapper {
-	return &NodeWrapper{v1.Node{}}
+	w := &NodeWrapper{v1.Node{}}
+	return w.Capacity(nil)
 }
 
 // Obj returns the inner Node.
@@ -258,11 +414,42 @@ func (n *NodeWrapper) Name(s string) *NodeWrapper {
 	return n
 }
 
+// UID sets `s` as the UID of the inner pod.
+func (n *NodeWrapper) UID(s string) *NodeWrapper {
+	n.SetUID(types.UID(s))
+	return n
+}
+
 // Label applies a {k,v} label pair to the inner node.
 func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 	if n.Labels == nil {
 		n.Labels = make(map[string]string)
 	}
 	n.Labels[k] = v
+	return n
+}
+
+// Capacity sets the capacity and the allocatable resources of the inner node.
+// Each entry in `resources` corresponds to a resource name and its quantity.
+// By default, the capacity and allocatable number of pods are set to 32.
+func (n *NodeWrapper) Capacity(resources map[v1.ResourceName]string) *NodeWrapper {
+	res := v1.ResourceList{
+		v1.ResourcePods: resource.MustParse("32"),
+	}
+	for name, value := range resources {
+		res[name] = resource.MustParse(value)
+	}
+	n.Status.Capacity, n.Status.Allocatable = res, res
+	return n
+}
+
+// Images sets the images of the inner node. Each entry in `images` corresponds
+// to an image name and its size in bytes.
+func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
+	var containerImages []v1.ContainerImage
+	for name, size := range images {
+		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
+	}
+	n.Status.Images = containerImages
 	return n
 }

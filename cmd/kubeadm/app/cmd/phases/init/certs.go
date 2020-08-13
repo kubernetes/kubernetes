@@ -30,7 +30,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -67,7 +66,9 @@ func NewCertsPhase() workflow.Phase {
 func localFlags() *pflag.FlagSet {
 	set := pflag.NewFlagSet("csr", pflag.ExitOnError)
 	options.AddCSRFlag(set, &csrOnly)
+	set.MarkDeprecated(options.CSROnly, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
 	options.AddCSRDirFlag(set, &csrDir)
+	set.MarkDeprecated(options.CSRDir, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
 	return set
 }
 
@@ -161,11 +162,14 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(defaultConfig)
-	err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
-	kubeadmutil.CheckErr(err)
+	if err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil); err != nil {
+		return ""
+	}
 
 	certConfig, err := certSpec.GetConfig(defaultInternalConfig)
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return ""
+	}
 
 	if len(certConfig.AltNames.DNSNames) == 0 && len(certConfig.AltNames.IPs) == 0 {
 		return ""
@@ -198,7 +202,7 @@ func runCertsSa(c workflow.RunData) error {
 	}
 
 	// create the new service account key (or use existing)
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir())
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.PublicKeyAlgorithm())
 }
 
 func runCerts(c workflow.RunData) error {

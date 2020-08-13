@@ -18,7 +18,7 @@ import (
 // On the initial call, kase must be 0.
 // In between calls, x must be overwritten by
 //  A * X    if kase was returned as 1,
-//  A^T * X  if kase was returned as 2,
+//  Aᵀ * X   if kase was returned as 2,
 // and all other parameters must not be changed.
 // On the final return, kase is returned as 0, v contains A*W where W is a
 // vector, and est = norm(V)/norm(W) is a lower bound for 1-norm of A.

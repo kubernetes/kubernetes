@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin dragonfly freebsd netbsd openbsd
+// +build aix darwin dragonfly freebsd netbsd openbsd
 
 package ipv4
 
@@ -35,6 +35,7 @@ func marshalInterface(b []byte, cm *ControlMessage) []byte {
 }
 
 func parseInterface(cm *ControlMessage, b []byte) {
-	sadl := (*syscall.SockaddrDatalink)(unsafe.Pointer(&b[0]))
+	var sadl syscall.SockaddrDatalink
+	copy((*[unsafe.Sizeof(sadl)]byte)(unsafe.Pointer(&sadl))[:], b)
 	cm.IfIndex = int(sadl.Index)
 }

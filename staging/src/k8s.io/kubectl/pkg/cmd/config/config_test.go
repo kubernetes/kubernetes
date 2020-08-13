@@ -72,7 +72,7 @@ func Example_view() {
 	// users:
 	// - name: red-user
 	//   user:
-	//     token: red-token
+	//     token: REDACTED
 }
 
 func TestCurrentContext(t *testing.T) {
@@ -136,7 +136,7 @@ func TestSetNonExistentContext(t *testing.T) {
 
 func TestSetIntoExistingStruct(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
-	expectedConfig.AuthInfos["red-user"].Password = "new-path-value"
+	expectedConfig.AuthInfos["red-user"].Password = "new-path-value" // Fake value for testing.
 	test := configCommandTest{
 		args:           []string{"set", "users.red-user.password", "new-path-value"},
 		startingConfig: newRedFederalCowHammerConfig(),
@@ -391,7 +391,7 @@ func TestBasicClearsToken(t *testing.T) {
 
 	authInfoWithBasic := clientcmdapi.NewAuthInfo()
 	authInfoWithBasic.Username = "myuser"
-	authInfoWithBasic.Password = "mypass"
+	authInfoWithBasic.Password = "mypass" // Fake value for testing.
 
 	startingConfig := newRedFederalCowHammerConfig()
 	startingConfig.AuthInfos["another-user"] = authInfoWithToken
@@ -411,7 +411,7 @@ func TestBasicClearsToken(t *testing.T) {
 func TestTokenClearsBasic(t *testing.T) {
 	authInfoWithBasic := clientcmdapi.NewAuthInfo()
 	authInfoWithBasic.Username = "myuser"
-	authInfoWithBasic.Password = "mypass"
+	authInfoWithBasic.Password = "mypass" // Fake value for testing.
 
 	authInfoWithToken := clientcmdapi.NewAuthInfo()
 	authInfoWithToken.Token = "token"

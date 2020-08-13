@@ -28,12 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/networking/networkpolicy"
 )
 
-// rest implements a RESTStorage for NetworkPolicies against etcd
+// REST implements a RESTStorage for NetworkPolicies against etcd.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against NetworkPolicies
+// NewREST returns a RESTStorage object that will work against NetworkPolicies.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &networkingapi.NetworkPolicy{} },

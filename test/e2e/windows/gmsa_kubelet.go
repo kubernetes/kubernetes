@@ -29,14 +29,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Kubelet [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
 
 	ginkgo.Describe("kubelet GMSA support", func() {
@@ -99,17 +98,17 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Kubelet [Slow]
 					// note that the "eventually" part seems to be needed to account for the fact that powershell containers
 					// are a bit slow to become responsive, even when docker reports them as running.
 					gomega.Eventually(func() bool {
-						output, err = framework.RunKubectl("exec", namespaceOption, podName, containerOption, "--", "nltest", "/PARENTDOMAIN")
+						output, err = framework.RunKubectl(f.Namespace.Name, "exec", namespaceOption, podName, containerOption, "--", "nltest", "/PARENTDOMAIN")
 						return err == nil
 					}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 
 					if !strings.HasPrefix(output, domain) {
-						e2elog.Failf("Expected %q to start with %q", output, domain)
+						framework.Failf("Expected %q to start with %q", output, domain)
 					}
 
 					expectedSubstr := "The command completed successfully"
 					if !strings.Contains(output, expectedSubstr) {
-						e2elog.Failf("Expected %q to contain %q", output, expectedSubstr)
+						framework.Failf("Expected %q to contain %q", output, expectedSubstr)
 					}
 				}
 

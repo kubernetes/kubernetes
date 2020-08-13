@@ -17,8 +17,10 @@ limitations under the License.
 package drain
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -133,8 +135,11 @@ func makePodDeleteStatusWithError(message string) podDeleteStatus {
 	}
 }
 
+// The filters are applied in a specific order, only the last filter's
+// message will be retained if there are any warnings.
 func (d *Helper) makeFilters() []podFilter {
 	return []podFilter{
+		d.skipDeletedFilter,
 		d.daemonSetFilter,
 		d.mirrorPodFilter,
 		d.localStorageFilter,
@@ -168,7 +173,7 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) podDeleteStatus {
 		return makePodDeleteStatusOkay()
 	}
 
-	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
+	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{}); err != nil {
 		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && d.Force {
 			return makePodDeleteStatusWithWarning(true, err.Error())
@@ -203,6 +208,9 @@ func (d *Helper) localStorageFilter(pod corev1.Pod) podDeleteStatus {
 		return makePodDeleteStatusWithError(localStorageFatal)
 	}
 
+	// TODO: this warning gets dropped by subsequent filters;
+	// consider accounting for multiple warning conditions or at least
+	// preserving the last warning message.
 	return makePodDeleteStatusWithWarning(true, localStorageWarning)
 }
 
@@ -220,4 +228,17 @@ func (d *Helper) unreplicatedFilter(pod corev1.Pod) podDeleteStatus {
 		return makePodDeleteStatusWithWarning(true, unmanagedWarning)
 	}
 	return makePodDeleteStatusWithError(unmanagedFatal)
+}
+
+func shouldSkipPod(pod corev1.Pod, skipDeletedTimeoutSeconds int) bool {
+	return skipDeletedTimeoutSeconds > 0 &&
+		!pod.ObjectMeta.DeletionTimestamp.IsZero() &&
+		int(time.Now().Sub(pod.ObjectMeta.GetDeletionTimestamp().Time).Seconds()) > skipDeletedTimeoutSeconds
+}
+
+func (d *Helper) skipDeletedFilter(pod corev1.Pod) podDeleteStatus {
+	if shouldSkipPod(pod, d.SkipWaitForDeleteTimeoutSeconds) {
+		return makePodDeleteStatusSkip()
+	}
+	return makePodDeleteStatusOkay()
 }

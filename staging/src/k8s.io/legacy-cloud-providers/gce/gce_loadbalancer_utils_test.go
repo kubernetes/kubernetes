@@ -43,10 +43,10 @@ import (
 // TODO(yankaiz): Create shared error types for both test/non-test codes.
 const (
 	eventReasonManualChange = "LoadBalancerManualChange"
-	eventMsgFirewallChange  = "Firewall change required by network admin"
 	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
+	fakeSvcName             = "fakesvc"
 )
 
 func fakeLoadbalancerService(lbType string) *v1.Service {
@@ -60,7 +60,7 @@ func fakeLoadBalancerServiceDeprecatedAnnotation(lbType string) *v1.Service {
 func fakeLoadbalancerServiceHelper(lbType string, annotationKey string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "",
+			Name:        fakeSvcName,
 			Annotations: map[string]string{annotationKey: lbType},
 		},
 		Spec: v1.ServiceSpec{
@@ -207,7 +207,7 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
-		lbName, // Firewalls for internal LBs are named the same name as the loadbalancer.
+		MakeFirewallName(lbName),
 		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
 	}
 

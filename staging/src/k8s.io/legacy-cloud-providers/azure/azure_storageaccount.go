@@ -22,11 +22,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
+
+// AccountOptions contains the fields which are used to create storage account.
+type AccountOptions struct {
+	Name, Type, Kind, ResourceGroup, Location string
+	EnableHTTPSTrafficOnly                    bool
+	Tags                                      map[string]string
+}
 
 type accountWithLocation struct {
 	Name, StorageType, Location string
@@ -36,16 +42,13 @@ type accountWithLocation struct {
 func (az *Cloud) getStorageAccounts(matchingAccountType, matchingAccountKind, resourceGroup, matchingLocation string) ([]accountWithLocation, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	result, err := az.StorageAccountClient.ListByResourceGroup(ctx, resourceGroup)
-	if err != nil {
-		return nil, err
-	}
-	if result.Value == nil {
-		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", resourceGroup)
+	result, rerr := az.StorageAccountClient.ListByResourceGroup(ctx, resourceGroup)
+	if rerr != nil {
+		return nil, rerr.Error()
 	}
 
 	accounts := []accountWithLocation{}
-	for _, acct := range *result.Value {
+	for _, acct := range result {
 		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
 			storageType := string((*acct.Sku).Name)
 			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {
@@ -72,9 +75,9 @@ func (az *Cloud) GetStorageAccesskey(account, resourceGroup string) (string, err
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	result, err := az.StorageAccountClient.ListKeys(ctx, resourceGroup, account)
-	if err != nil {
-		return "", err
+	result, rerr := az.StorageAccountClient.ListKeys(ctx, resourceGroup, account)
+	if rerr != nil {
+		return "", rerr.Error()
 	}
 	if result.Keys == nil {
 		return "", fmt.Errorf("empty keys")
@@ -93,7 +96,16 @@ func (az *Cloud) GetStorageAccesskey(account, resourceGroup string) (string, err
 }
 
 // EnsureStorageAccount search storage account, create one storage account(with genAccountNamePrefix) if not found, return accountName, accountKey
-func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, genAccountNamePrefix string) (string, string, error) {
+func (az *Cloud) EnsureStorageAccount(accountOptions *AccountOptions, genAccountNamePrefix string) (string, string, error) {
+	if accountOptions == nil {
+		return "", "", fmt.Errorf("account options is nil")
+	}
+	accountName := accountOptions.Name
+	accountType := accountOptions.Type
+	accountKind := accountOptions.Kind
+	resourceGroup := accountOptions.ResourceGroup
+	location := accountOptions.Location
+	enableHTTPSTrafficOnly := accountOptions.EnableHTTPSTrafficOnly
 	if len(accountName) == 0 {
 		// find a storage account that matches accountType
 		accounts, err := az.getStorageAccounts(accountType, accountKind, resourceGroup, location)
@@ -121,20 +133,27 @@ func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, res
 			if accountKind != "" {
 				kind = storage.Kind(accountKind)
 			}
-			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s",
-				accountName, resourceGroup, location, accountType, kind)
+			if len(accountOptions.Tags) == 0 {
+				accountOptions.Tags = make(map[string]string)
+			}
+			accountOptions.Tags["created-by"] = "azure"
+			tags := convertMaptoMapPointer(accountOptions.Tags)
+
+			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s, tags: %+v",
+				accountName, resourceGroup, location, accountType, kind, accountOptions.Tags)
+
 			cp := storage.AccountCreateParameters{
 				Sku:                               &storage.Sku{Name: storage.SkuName(accountType)},
 				Kind:                              kind,
-				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: to.BoolPtr(true)},
-				Tags:                              map[string]*string{"created-by": to.StringPtr("azure")},
+				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: &enableHTTPSTrafficOnly},
+				Tags:                              tags,
 				Location:                          &location}
 
 			ctx, cancel := getContextWithCancel()
 			defer cancel()
-			_, err := az.StorageAccountClient.Create(ctx, resourceGroup, accountName, cp)
-			if err != nil {
-				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %s", accountName, err))
+			rerr := az.StorageAccountClient.Create(ctx, resourceGroup, accountName, cp)
+			if rerr != nil {
+				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %v", accountName, rerr))
 			}
 		}
 	}

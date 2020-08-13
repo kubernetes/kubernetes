@@ -72,7 +72,7 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new EndpointSlice.
 func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	err := validation.ValidateEndpointSlice(endpointSlice)
+	err := validation.ValidateEndpointSliceCreate(endpointSlice)
 	return err
 }
 

@@ -120,7 +120,7 @@ func TestHelperDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs,
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Resp:                 tt.Resp,
 				Err:                  tt.HttpErr,
 			}
@@ -227,7 +227,7 @@ func TestHelperCreate(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			_, err := modifier.Create("bar", tt.Modify, tt.Object, nil)
+			_, err := modifier.Create("bar", tt.Modify, tt.Object)
 			if (err != nil) != tt.Err {
 				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
 			}
@@ -312,7 +312,7 @@ func TestHelperGet(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			obj, err := modifier.Get("bar", "foo", false)
+			obj, err := modifier.Get("bar", "foo")
 
 			if (err != nil) != tt.Err {
 				t.Errorf("unexpected error: %d %t %v", i, tt.Err, err)
@@ -393,7 +393,7 @@ func TestHelperList(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			obj, err := modifier.List("bar", corev1GV.String(), false, &metav1.ListOptions{LabelSelector: "foo=baz"})
+			obj, err := modifier.List("bar", corev1GV.String(), &metav1.ListOptions{LabelSelector: "foo=baz"})
 			if (err != nil) != tt.Err {
 				t.Errorf("unexpected error: %t %v", tt.Err, err)
 			}
@@ -464,7 +464,6 @@ func TestHelperListSelectorCombination(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			_, err := modifier.List("bar",
 				corev1GV.String(),
-				false,
 				&metav1.ListOptions{LabelSelector: tt.LabelSelector, FieldSelector: tt.FieldSelector})
 			if tt.Err {
 				if err == nil {
@@ -592,7 +591,7 @@ func TestHelperReplace(t *testing.T) {
 			Req:             expectPut,
 		},
 	}
-	for i, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			client := &fake.RESTClient{
 				GroupVersion:         corev1GV,
@@ -607,24 +606,24 @@ func TestHelperReplace(t *testing.T) {
 			}
 			_, err := modifier.Replace(tt.Namespace, "foo", tt.Overwrite, tt.Object)
 			if (err != nil) != tt.Err {
-				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
+				t.Fatalf("unexpected error: %t %v", tt.Err, err)
 			}
 			if err != nil {
 				return
 			}
-			if tt.Req != nil && !tt.Req(tt.ExpectPath, client.Req) {
-				t.Errorf("%d: unexpected request: %#v", i, client.Req)
+			if tt.Req != nil && (client.Req == nil || !tt.Req(tt.ExpectPath, client.Req)) {
+				t.Fatalf("unexpected request: %#v", client.Req)
 			}
 			body, err := ioutil.ReadAll(client.Req.Body)
 			if err != nil {
-				t.Fatalf("%d: unexpected error: %#v", i, err)
+				t.Fatalf("unexpected error: %#v", err)
 			}
 			expect := []byte{}
 			if tt.ExpectObject != nil {
 				expect = []byte(runtime.EncodeOrDie(corev1Codec, tt.ExpectObject))
 			}
 			if !reflect.DeepEqual(expect, body) {
-				t.Errorf("%d: unexpected body: %s", i, string(body))
+				t.Fatalf("unexpected body: %s", string(body))
 			}
 		})
 	}

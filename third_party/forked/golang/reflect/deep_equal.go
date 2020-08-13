@@ -229,7 +229,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 //
 // An empty slice *is* equal to a nil slice for our purposes; same for maps.
 //
-// Unexported field members cannot be compared and will cause an imformative panic; you must add an Equality
+// Unexported field members cannot be compared and will cause an informative panic; you must add an Equality
 // function for these types.
 func (e Equalities) DeepEqual(a1, a2 interface{}) bool {
 	if a1 == nil || a2 == nil {

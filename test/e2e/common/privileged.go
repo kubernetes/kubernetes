@@ -27,6 +27,7 @@ import (
 )
 
 // PrivilegedPodTestConfig is configuration struct for privileged pod test
+// TODO: Merge with tests in security_context.go
 type PrivilegedPodTestConfig struct {
 	f *framework.Framework
 

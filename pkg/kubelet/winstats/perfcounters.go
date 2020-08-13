@@ -54,11 +54,6 @@ func newPerfCounter(counter string) (*perfCounter, error) {
 		return nil, errors.New("unable to open query through DLL call")
 	}
 
-	ret = win_pdh.PdhValidatePath(counter)
-	if ret != win_pdh.ERROR_SUCCESS {
-		return nil, fmt.Errorf("unable to valid path to counter. Error code is %x", ret)
-	}
-
 	ret = win_pdh.PdhAddEnglishCounter(queryHandle, counter, 0, &counterHandle)
 	if ret != win_pdh.ERROR_SUCCESS {
 		return nil, fmt.Errorf("unable to add process counter. Error code is %x", ret)

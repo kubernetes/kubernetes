@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -38,7 +39,7 @@ func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unst
 }
 
 func instantiateVersionedCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition, version string) (*unstructured.Unstructured, error) {
-	createdInstance, err := client.Create(instanceToCreate, metav1.CreateOptions{})
+	createdInstance, err := client.Create(context.TODO(), instanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Logf("%#v", createdInstance)
 		return nil, err
@@ -80,12 +81,12 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 // UpdateCustomResourceDefinitionWithRetry updates a CRD, retrying up to 5 times on version conflict errors.
 func UpdateCustomResourceDefinitionWithRetry(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
 	for i := 0; i < 5; i++ {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
 		}
 		update(crd)
-		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		if err == nil {
 			return crd, nil
 		}
@@ -99,12 +100,12 @@ func UpdateCustomResourceDefinitionWithRetry(client clientset.Interface, name st
 // UpdateV1CustomResourceDefinitionWithRetry updates a CRD, retrying up to 5 times on version conflict errors.
 func UpdateV1CustomResourceDefinitionWithRetry(client clientset.Interface, name string, update func(*apiextensionsv1.CustomResourceDefinition)) (*apiextensionsv1.CustomResourceDefinition, error) {
 	for i := 0; i < 5; i++ {
-		crd, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		crd, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
 		}
 		update(crd)
-		crd, err = client.ApiextensionsV1().CustomResourceDefinitions().Update(crd)
+		crd, err = client.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 		if err == nil {
 			return crd, nil
 		}

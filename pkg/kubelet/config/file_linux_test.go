@@ -33,8 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -91,7 +90,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 					if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 					}
-					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+					if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
 						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 					}
 				}
@@ -200,12 +199,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 }
 
 func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
-	var versionedPod runtime.Object
-	err := legacyscheme.Scheme.Convert(&tc.pod, &versionedPod, nil)
-	if err != nil {
-		t.Fatalf("%s: error in versioning the pod: %v", tc.desc, err)
-	}
-	fileContents, err := runtime.Encode(testapi.Default.Codec(), versionedPod)
+	fileContents, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), tc.pod)
 	if err != nil {
 		t.Fatalf("%s: error in encoding the pod: %v", tc.desc, err)
 	}
@@ -375,7 +369,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 				}
-				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+				if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
 					t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 				}
 			}

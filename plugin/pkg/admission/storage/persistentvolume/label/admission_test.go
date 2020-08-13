@@ -31,6 +31,7 @@ import (
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	persistentvolume "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 type mockVolumes struct {
@@ -222,6 +223,136 @@ func Test_PVLAdmission(t *testing.T) {
 											Key:      v1.LabelZoneFailureDomain,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"1", "2", "3"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			err: nil,
+		},
+		{
+			name:    "existing labels from dynamic provisioning are not changed",
+			handler: newPersistentVolumeLabel(),
+			pvlabeler: mockVolumeLabels(map[string]string{
+				v1.LabelZoneFailureDomain: "domain1",
+				v1.LabelZoneRegion:        "region1",
+			}),
+			preAdmissionPV: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "awsebs", Namespace: "myns",
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "existingDomain",
+						v1.LabelZoneRegion:        "existingRegion",
+					},
+					Annotations: map[string]string{
+						persistentvolume.AnnDynamicallyProvisioned: "kubernetes.io/aws-ebs",
+					},
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+							VolumeID: "123",
+						},
+					},
+				},
+			},
+			postAdmissionPV: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "awsebs",
+					Namespace: "myns",
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "existingDomain",
+						v1.LabelZoneRegion:        "existingRegion",
+					},
+					Annotations: map[string]string{
+						persistentvolume.AnnDynamicallyProvisioned: "kubernetes.io/aws-ebs",
+					},
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+							VolumeID: "123",
+						},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      v1.LabelZoneRegion,
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"existingRegion"},
+										},
+										{
+											Key:      v1.LabelZoneFailureDomain,
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"existingDomain"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			err: nil,
+		},
+		{
+			name:    "existing labels from user are changed",
+			handler: newPersistentVolumeLabel(),
+			pvlabeler: mockVolumeLabels(map[string]string{
+				v1.LabelZoneFailureDomain: "domain1",
+				v1.LabelZoneRegion:        "region1",
+			}),
+			preAdmissionPV: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "awsebs", Namespace: "myns",
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "existingDomain",
+						v1.LabelZoneRegion:        "existingRegion",
+					},
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+							VolumeID: "123",
+						},
+					},
+				},
+			},
+			postAdmissionPV: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "awsebs",
+					Namespace: "myns",
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "domain1",
+						v1.LabelZoneRegion:        "region1",
+					},
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+							VolumeID: "123",
+						},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      v1.LabelZoneRegion,
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"region1"},
+										},
+										{
+											Key:      v1.LabelZoneFailureDomain,
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"domain1"},
 										},
 									},
 								},

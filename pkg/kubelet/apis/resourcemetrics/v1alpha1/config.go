@@ -16,66 +16,8 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	"time"
-
-	summary "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-)
+// TODO(RainbowMango): We don't need to maintain this package anymore.
+//  This package will be remove in release 1.20.0+. More details please refer to https://github.com/kubernetes/kubernetes/pull/86282.
 
 // Version is the string representation of the version of this configuration
 const Version = "v1alpha1"
-
-// Config is the v1alpha1 resource metrics definition
-func Config() stats.ResourceMetricsConfig {
-	return stats.ResourceMetricsConfig{
-		NodeMetrics: []stats.NodeResourceMetric{
-			{
-				Name:        "node_cpu_usage_seconds_total",
-				Description: "Cumulative cpu time consumed by the node in core-seconds",
-				ValueFn: func(s summary.NodeStats) (*float64, time.Time) {
-					if s.CPU == nil {
-						return nil, time.Time{}
-					}
-					v := float64(*s.CPU.UsageCoreNanoSeconds) / float64(time.Second)
-					return &v, s.CPU.Time.Time
-				},
-			},
-			{
-				Name:        "node_memory_working_set_bytes",
-				Description: "Current working set of the node in bytes",
-				ValueFn: func(s summary.NodeStats) (*float64, time.Time) {
-					if s.Memory == nil {
-						return nil, time.Time{}
-					}
-					v := float64(*s.Memory.WorkingSetBytes)
-					return &v, s.Memory.Time.Time
-				},
-			},
-		},
-		ContainerMetrics: []stats.ContainerResourceMetric{
-			{
-				Name:        "container_cpu_usage_seconds_total",
-				Description: "Cumulative cpu time consumed by the container in core-seconds",
-				ValueFn: func(s summary.ContainerStats) (*float64, time.Time) {
-					if s.CPU == nil {
-						return nil, time.Time{}
-					}
-					v := float64(*s.CPU.UsageCoreNanoSeconds) / float64(time.Second)
-					return &v, s.CPU.Time.Time
-				},
-			},
-			{
-				Name:        "container_memory_working_set_bytes",
-				Description: "Current working set of the container in bytes",
-				ValueFn: func(s summary.ContainerStats) (*float64, time.Time) {
-					if s.Memory == nil {
-						return nil, time.Time{}
-					}
-					v := float64(*s.Memory.WorkingSetBytes)
-					return &v, s.Memory.Time.Time
-				},
-			},
-		},
-	}
-}

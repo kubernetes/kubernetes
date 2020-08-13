@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -39,7 +39,7 @@ func TestFlockerUtil_CreateVolume(t *testing.T) {
 	}
 
 	fakeFlockerClient := newFakeFlockerClient()
-	dir, p := newTestableProvisioner(assert, options)
+	dir, p := newTestableProvisioner(t, assert, options)
 	provisioner := p.(*flockerVolumeProvisioner)
 	defer os.RemoveAll(dir)
 	provisioner.flockerClient = fakeFlockerClient

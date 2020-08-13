@@ -44,10 +44,9 @@ function kfind() {
         \(                         \
         -not \(                    \
             \(                     \
-                -path ./vendor -o  \
                 -path ./_\* -o     \
                 -path ./.\* -o     \
-                -path ./docs       \
+                -path ./vendor     \
             \) -prune              \
         \)                         \
         \)                         \

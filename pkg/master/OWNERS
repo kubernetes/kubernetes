@@ -31,14 +31,12 @@ reviewers:
 - janetkuo
 - justinsb
 - ncdc
-- tallclair
 - mwielgus
 - timothysc
 - soltysh
 - piosz
 - madhusudancs
 - hongchaodeng
-- jszczepkowski
 - enj
 labels:
 - sig/api-machinery

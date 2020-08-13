@@ -6,12 +6,11 @@
 package rate
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 // Limit defines the maximum frequency of some events.
@@ -224,7 +223,12 @@ func (lim *Limiter) Wait(ctx context.Context) (err error) {
 // canceled, or the expected wait time exceeds the Context's Deadline.
 // The burst limit is ignored if the rate limit is Inf.
 func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
-	if n > lim.burst && lim.limit != Inf {
+	lim.mu.Lock()
+	burst := lim.burst
+	limit := lim.limit
+	lim.mu.Unlock()
+
+	if n > burst && limit != Inf {
 		return fmt.Errorf("rate: Wait(n=%d) exceeds limiter's burst %d", n, lim.burst)
 	}
 	// Check if ctx is already cancelled
@@ -244,8 +248,12 @@ func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
 	if !r.ok {
 		return fmt.Errorf("rate: Wait(n=%d) would exceed context deadline", n)
 	}
-	// Wait
-	t := time.NewTimer(r.DelayFrom(now))
+	// Wait if necessary
+	delay := r.DelayFrom(now)
+	if delay == 0 {
+		return nil
+	}
+	t := time.NewTimer(delay)
 	defer t.Stop()
 	select {
 	case <-t.C:
@@ -276,6 +284,23 @@ func (lim *Limiter) SetLimitAt(now time.Time, newLimit Limit) {
 	lim.last = now
 	lim.tokens = tokens
 	lim.limit = newLimit
+}
+
+// SetBurst is shorthand for SetBurstAt(time.Now(), newBurst).
+func (lim *Limiter) SetBurst(newBurst int) {
+	lim.SetBurstAt(time.Now(), newBurst)
+}
+
+// SetBurstAt sets a new burst size for the limiter.
+func (lim *Limiter) SetBurstAt(now time.Time, newBurst int) {
+	lim.mu.Lock()
+	defer lim.mu.Unlock()
+
+	now, _, tokens := lim.advance(now)
+
+	lim.last = now
+	lim.tokens = tokens
+	lim.burst = newBurst
 }
 
 // reserveN is a helper method for AllowN, ReserveN, and WaitN.
@@ -367,5 +392,9 @@ func (limit Limit) durationFromTokens(tokens float64) time.Duration {
 // tokensFromDuration is a unit conversion function from a time duration to the number of tokens
 // which could be accumulated during that duration at a rate of limit tokens per second.
 func (limit Limit) tokensFromDuration(d time.Duration) float64 {
-	return d.Seconds() * float64(limit)
+	// Split the integer and fractional parts ourself to minimize rounding errors.
+	// See golang.org/issues/34861.
+	sec := float64(d/time.Second) * float64(limit)
+	nsec := float64(d%time.Second) * float64(limit)
+	return sec + nsec/1e9
 }

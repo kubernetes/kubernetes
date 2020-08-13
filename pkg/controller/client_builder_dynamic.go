@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"golang.org/x/oauth2"
 
 	v1authenticationapi "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -32,7 +34,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -174,11 +176,11 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 			return false, nil
 		}
 
-		tr, inErr := ts.coreClient.ServiceAccounts(ts.namespace).CreateToken(ts.serviceAccountName, &v1authenticationapi.TokenRequest{
+		tr, inErr := ts.coreClient.ServiceAccounts(ts.namespace).CreateToken(context.TODO(), ts.serviceAccountName, &v1authenticationapi.TokenRequest{
 			Spec: v1authenticationapi.TokenRequestSpec{
 				ExpirationSeconds: utilpointer.Int64Ptr(ts.expirationSeconds),
 			},
-		})
+		}, metav1.CreateOptions{})
 		if inErr != nil {
 			klog.Warningf("get token failed: %v", inErr)
 			return false, nil

@@ -316,7 +316,7 @@ message DeploymentSpec {
   // The number of old ReplicaSets to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
   // This is set to the max value of int32 (i.e. 2147483647) by default, which
-  // means "retaining all old RelicaSets".
+  // means "retaining all old ReplicaSets".
   // +optional
   optional int32 revisionHistoryLimit = 6;
 
@@ -408,18 +408,32 @@ message FSGroupStrategyOptions {
   repeated IDRange ranges = 2;
 }
 
-// HTTPIngressPath associates a path regex with a backend. Incoming urls matching
-// the path are forwarded to the backend.
+// HTTPIngressPath associates a path with a backend. Incoming urls matching the
+// path are forwarded to the backend.
 message HTTPIngressPath {
-  // Path is an extended POSIX regex as defined by IEEE Std 1003.1,
-  // (i.e this follows the egrep/unix syntax, not the perl syntax)
-  // matched against the path of an incoming request. Currently it can
-  // contain characters disallowed from the conventional "path"
-  // part of a URL as defined by RFC 3986. Paths must begin with
-  // a '/'. If unspecified, the path defaults to a catch all sending
-  // traffic to the backend.
+  // Path is matched against the path of an incoming request. Currently it can
+  // contain characters disallowed from the conventional "path" part of a URL
+  // as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
+  // all paths from incoming requests are matched.
   // +optional
   optional string path = 1;
+
+  // PathType determines the interpretation of the Path matching. PathType can
+  // be one of the following values:
+  // * Exact: Matches the URL path exactly.
+  // * Prefix: Matches based on a URL path prefix split by '/'. Matching is
+  //   done on a path element by element basis. A path element refers is the
+  //   list of labels in the path split by the '/' separator. A request is a
+  //   match for path p if every p is an element-wise prefix of p of the
+  //   request path. Note that if the last element of the path is a substring
+  //   of the last element in request path, it is not a match (e.g. /foo/bar
+  //   matches /foo/bar/baz, but does not match /foo/barbaz).
+  // * ImplementationSpecific: Interpretation of the Path matching is up to
+  //   the IngressClass. Implementations can treat this as a separate PathType
+  //   or treat it identically to Prefix or Exact path types.
+  // Implementations are required to support all path types.
+  // Defaults to ImplementationSpecific.
+  optional string pathType = 3;
 
   // Backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
@@ -458,16 +472,16 @@ message IDRange {
 }
 
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
-// matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
-// not be included within this rule.
+// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
+// that should not be included within this rule.
 message IPBlock {
   // CIDR is a string representing the IP Block
-  // Valid examples are "192.168.1.1/24"
+  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
-  // Valid examples are "192.168.1.1/24"
+  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
   repeated string except = 2;
@@ -498,10 +512,18 @@ message Ingress {
 // IngressBackend describes all endpoints for a given service and port.
 message IngressBackend {
   // Specifies the name of the referenced service.
+  // +optional
   optional string serviceName = 1;
 
   // Specifies the port of the referenced service.
+  // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
+
+  // Resource is an ObjectRef to another Kubernetes resource in the namespace
+  // of the Ingress object. If resource is specified, serviceName and servicePort
+  // must not be specified.
+  // +optional
+  optional k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
 }
 
 // IngressList is a collection of Ingress.
@@ -519,18 +541,28 @@ message IngressList {
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
 message IngressRule {
-  // Host is the fully qualified domain name of a network host, as defined
-  // by RFC 3986. Note the following deviations from the "host" part of the
-  // URI as defined in the RFC:
-  // 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the
-  // 	  IP in the Spec of the parent Ingress.
+  // Host is the fully qualified domain name of a network host, as defined by RFC 3986.
+  // Note the following deviations from the "host" part of the
+  // URI as defined in RFC 3986:
+  // 1. IPs are not allowed. Currently an IngressRuleValue can only apply to
+  //    the IP in the Spec of the parent Ingress.
   // 2. The `:` delimiter is not respected because ports are not allowed.
   // 	  Currently the port of an Ingress is implicitly :80 for http and
   // 	  :443 for https.
   // Both these may change in the future.
-  // Incoming requests are matched against the host before the IngressRuleValue.
-  // If the host is unspecified, the Ingress routes all traffic based on the
-  // specified IngressRuleValue.
+  // Incoming requests are matched against the host before the
+  // IngressRuleValue. If the host is unspecified, the Ingress routes all
+  // traffic based on the specified IngressRuleValue.
+  //
+  // Host can be "precise" which is a domain name without the terminating dot of
+  // a network host (e.g. "foo.bar.com") or "wildcard", which is a domain name
+  // prefixed with a single wildcard label (e.g. "*.foo.com").
+  // The wildcard character '*' must appear by itself as the first DNS label and
+  // matches only a single label. You cannot have a wildcard label by itself (e.g. Host == "*").
+  // Requests will be matched against the Host field in the following way:
+  // 1. If Host is precise, the request matches this rule if the http host header is equal to Host.
+  // 2. If Host is a wildcard, then the request matches this rule if the http host header
+  // is to equal to the suffix (removing the first label) of the wildcard rule.
   // +optional
   optional string host = 1;
 
@@ -554,6 +586,19 @@ message IngressRuleValue {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 message IngressSpec {
+  // IngressClassName is the name of the IngressClass cluster resource. The
+  // associated IngressClass defines which controller will implement the
+  // resource. This replaces the deprecated `kubernetes.io/ingress.class`
+  // annotation. For backwards compatibility, when that annotation is set, it
+  // must be given precedence over this field. The controller may emit a
+  // warning if the field and annotation have different values.
+  // Implementations of this API should ignore Ingresses without a class
+  // specified. An IngressClass resource may be marked as default, which can
+  // be used to set a default value for this field. For more information,
+  // refer to the IngressClass documentation.
+  // +optional
+  optional string ingressClassName = 4;
+
   // A default backend capable of servicing requests that don't match any
   // rule. At least one of 'backend' or 'rules' must be specified. This field
   // is optional to allow the loadbalancer controller or defaulting logic to
@@ -803,7 +848,7 @@ message PodSecurityPolicySpec {
   // +optional
   repeated string allowedCapabilities = 4;
 
-  // volumes is a white list of allowed volume plugins. Empty indicates that
+  // volumes is an allowlist of volume plugins. Empty indicates that
   // no volumes may be used. To allow all volumes you may use '*'.
   // +optional
   repeated string volumes = 5;
@@ -860,18 +905,18 @@ message PodSecurityPolicySpec {
   // +optional
   optional bool allowPrivilegeEscalation = 16;
 
-  // allowedHostPaths is a white list of allowed host paths. Empty indicates
+  // allowedHostPaths is an allowlist of host paths. Empty indicates
   // that all host paths may be used.
   // +optional
   repeated AllowedHostPath allowedHostPaths = 17;
 
-  // allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+  // allowedFlexVolumes is an allowlist of Flexvolumes.  Empty or nil indicates that all
   // Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
   // is allowed in the "volumes" field.
   // +optional
   repeated AllowedFlexVolume allowedFlexVolumes = 18;
 
-  // AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
+  // AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
   // An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
   // +optional
   repeated AllowedCSIDriver allowedCSIDrivers = 23;
@@ -879,7 +924,7 @@ message PodSecurityPolicySpec {
   // allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
-  // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
+  // Kubelet has to allowlist all unsafe sysctls explicitly to avoid rejection.
   //
   // Examples:
   // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
@@ -897,7 +942,7 @@ message PodSecurityPolicySpec {
   // +optional
   repeated string forbiddenSysctls = 20;
 
-  // AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+  // AllowedProcMountTypes is an allowlist of allowed ProcMountTypes.
   // Empty or nil indicates that only the DefaultProcMountType may be used.
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
@@ -1025,10 +1070,6 @@ message ReplicaSetStatus {
   repeated ReplicaSetCondition conditions = 6;
 }
 
-// Dummy definition
-message ReplicationControllerDummy {
-}
-
 // DEPRECATED.
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.
@@ -1113,7 +1154,7 @@ message RunAsUserStrategyOptions {
 // RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
 // for a pod.
 message RuntimeClassStrategyOptions {
-  // allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a pod.
+  // allowedRuntimeClassNames is an allowlist of RuntimeClass names that may be specified on a pod.
   // A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
   // list. An empty list requires the RuntimeClassName field to be unset.
   repeated string allowedRuntimeClassNames = 1;

@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -78,4 +77,19 @@ type PromRegistry interface {
 	MustRegister(...prometheus.Collector)
 	Unregister(prometheus.Collector) bool
 	Gather() ([]*dto.MetricFamily, error)
+}
+
+// Gatherer is the interface for the part of a registry in charge of gathering
+// the collected metrics into a number of MetricFamilies.
+type Gatherer interface {
+	prometheus.Gatherer
+}
+
+// GaugeFunc is a Gauge whose value is determined at collect time by calling a
+// provided function.
+//
+// To create GaugeFunc instances, use NewGaugeFunc.
+type GaugeFunc interface {
+	Metric
+	Collector
 }

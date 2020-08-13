@@ -54,10 +54,10 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: pdb.Name, Namespace: pdb.Namespace},
 		Spec:       pdb.Spec,
 		Status: policy.PodDisruptionBudgetStatus{
-			PodDisruptionsAllowed: 1,
-			CurrentHealthy:        3,
-			DesiredHealthy:        3,
-			ExpectedPods:          3,
+			DisruptionsAllowed: 1,
+			CurrentHealthy:     3,
+			DesiredHealthy:     3,
+			ExpectedPods:       3,
 		},
 	}
 
@@ -117,10 +117,10 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 			MinAvailable: &oldMinAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
-			PodDisruptionsAllowed: 1,
-			CurrentHealthy:        3,
-			DesiredHealthy:        3,
-			ExpectedPods:          3,
+			DisruptionsAllowed: 1,
+			CurrentHealthy:     3,
+			DesiredHealthy:     3,
+			ExpectedPods:       3,
 		},
 	}
 	newPdb := &policy.PodDisruptionBudget{
@@ -130,10 +130,10 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 			MinAvailable: &newMinAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
-			PodDisruptionsAllowed: 0,
-			CurrentHealthy:        2,
-			DesiredHealthy:        3,
-			ExpectedPods:          3,
+			DisruptionsAllowed: 0,
+			CurrentHealthy:     2,
+			DesiredHealthy:     3,
+			ExpectedPods:       3,
 		},
 	}
 	StatusStrategy.PrepareForUpdate(ctx, newPdb, oldPdb)

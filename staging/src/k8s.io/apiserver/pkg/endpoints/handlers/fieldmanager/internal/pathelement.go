@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/value"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 const (
@@ -77,7 +77,7 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 		if err != nil {
 			return fieldpath.PathElement{}, err
 		}
-		fields := []value.Field{}
+		fields := value.FieldList{}
 		for k, v := range kv {
 			b, err := json.Marshal(v)
 			if err != nil {
@@ -94,7 +94,7 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 			})
 		}
 		return fieldpath.PathElement{
-			Key: &value.Map{Items: fields},
+			Key: &fields,
 		}, nil
 	default:
 		// Ignore unknown key types
@@ -109,8 +109,8 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 		return Field + Separator + *pe.FieldName, nil
 	case pe.Key != nil:
 		kv := map[string]json.RawMessage{}
-		for _, k := range pe.Key.Items {
-			b, err := k.Value.ToJSON()
+		for _, k := range *pe.Key {
+			b, err := value.ToJSON(k.Value)
 			if err != nil {
 				return "", err
 			}
@@ -127,7 +127,7 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 		}
 		return Key + ":" + string(b), nil
 	case pe.Value != nil:
-		b, err := pe.Value.ToJSON()
+		b, err := value.ToJSON(*pe.Value)
 		if err != nil {
 			return "", err
 		}

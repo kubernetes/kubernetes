@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"fmt"
@@ -48,7 +48,7 @@ var (
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the kubelet-config ConfigMap, that it is properly configured
 // and that all the related RBAC rules are in place
-var _ = KubeadmDescribe("kubelet-config ConfigMap", func() {
+var _ = Describe("kubelet-config ConfigMap", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubelet-config")

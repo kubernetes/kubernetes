@@ -24,7 +24,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/volume"
@@ -34,7 +34,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -46,7 +46,7 @@ var attachStatus = "Attach"
 var detachStatus = "Detach"
 
 func TestGetDeviceName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := "my-cinder-volume"
 	spec := createVolSpec(name, false)
 
@@ -60,7 +60,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 }
 
 func TestGetDeviceName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := "my-cinder-pv"
 	spec := createPVSpec(name, true)
 
@@ -77,7 +77,7 @@ func TestGetDeviceMountPath(t *testing.T) {
 	name := "cinder-volume-id"
 	spec := createVolSpec(name, false)
 	rootDir := "/var/lib/kubelet/"
-	host := volumetest.NewFakeVolumeHost(rootDir, nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, rootDir, nil, nil)
 
 	attacher := &cinderDiskAttacher{
 		host: host,
@@ -355,8 +355,8 @@ func serializeAttachments(attachments map[*volume.Spec]bool) string {
 
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *cinderPlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+func newPlugin(t *testing.T) *cinderPlugin {
+	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -645,6 +645,10 @@ func (testcase *testcase) Instances() (cloudprovider.Instances, bool) {
 	return &instances{testcase.instanceID}, true
 }
 
+func (testcase *testcase) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return nil, false
+}
+
 func (testcase *testcase) DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error) {
 	expected := &testcase.disksAreAttached
 
@@ -732,6 +736,10 @@ func (instances *instances) InstanceExistsByProviderID(ctx context.Context, prov
 
 func (instances *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("unimplemented")
+}
+
+func (instances *instances) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func (instances *instances) List(filter string) ([]types.NodeName, error) {

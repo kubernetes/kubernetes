@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
@@ -31,9 +32,9 @@ var _ = SIGDescribe("crictl", func() {
 
 	ginkgo.BeforeEach(func() {
 		// `crictl` is not available on all cloud providers.
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		// The test requires $HOME/.ssh/id_rsa key to be present.
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 	})
 
 	ginkgo.It("should be able to run crictl on the node", func() {

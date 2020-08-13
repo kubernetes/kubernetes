@@ -10,12 +10,14 @@ go_library(
         "service.go",
         "sys_386.s",
         "sys_amd64.s",
+        "sys_arm.s",
     ],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/sys/windows/svc",
     importpath = "golang.org/x/sys/windows/svc",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/internal/unsafeheader:go_default_library",
             "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],

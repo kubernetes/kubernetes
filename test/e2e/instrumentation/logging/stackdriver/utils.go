@@ -30,6 +30,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 	sd "google.golang.org/api/logging/v2beta1"
+	"google.golang.org/api/option"
 	pubsub "google.golang.org/api/pubsub/v1"
 )
 
@@ -85,7 +86,8 @@ type sdLogProvider struct {
 func newSdLogProvider(f *framework.Framework, scope logProviderScope) (*sdLogProvider, error) {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, sd.CloudPlatformScope)
-	sdService, err := sd.New(hc)
+	framework.ExpectNoError(err)
+	sdService, err := sd.NewService(ctx, option.WithHTTPClient(hc))
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +96,7 @@ func newSdLogProvider(f *framework.Framework, scope logProviderScope) (*sdLogPro
 		return nil, err
 	}
 
-	pubsubService, err := pubsub.New(hc)
+	pubsubService, err := pubsub.NewService(ctx, option.WithHTTPClient(hc))
 	if err != nil {
 		return nil, err
 	}

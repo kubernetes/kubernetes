@@ -11,6 +11,7 @@ go_library(
         "hcnnamespace.go",
         "hcnnetwork.go",
         "hcnpolicy.go",
+        "hcnroute.go",
         "hcnsupport.go",
         "zsyscall_windows.go",
     ],
@@ -18,8 +19,9 @@ go_library(
     importpath = "github.com/Microsoft/hcsshim/hcn",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/cni:go_default_library",
-        "//vendor/github.com/Microsoft/hcsshim/internal/guid:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/hcs:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/hcserror:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/interop:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/regstate:go_default_library",

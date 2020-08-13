@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "codec_test.go",
-        "conversion_test.go",
         "converter_test.go",
         "embedded_test.go",
         "extension_test.go",
@@ -50,6 +49,7 @@ go_library(
         "helper.go",
         "interfaces.go",
         "mapper.go",
+        "negotiate.go",
         "register.go",
         "scheme.go",
         "scheme_builder.go",
@@ -70,7 +70,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/value:go_default_library",
     ],
 )
 

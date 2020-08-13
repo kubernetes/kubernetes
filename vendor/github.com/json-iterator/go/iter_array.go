@@ -28,26 +28,32 @@ func (iter *Iterator) ReadArray() (ret bool) {
 func (iter *Iterator) ReadArrayCB(callback func(*Iterator) bool) (ret bool) {
 	c := iter.nextToken()
 	if c == '[' {
+		if !iter.incrementDepth() {
+			return false
+		}
 		c = iter.nextToken()
 		if c != ']' {
 			iter.unreadByte()
 			if !callback(iter) {
+				iter.decrementDepth()
 				return false
 			}
 			c = iter.nextToken()
 			for c == ',' {
 				if !callback(iter) {
+					iter.decrementDepth()
 					return false
 				}
 				c = iter.nextToken()
 			}
 			if c != ']' {
 				iter.ReportError("ReadArrayCB", "expect ] in the end, but found "+string([]byte{c}))
+				iter.decrementDepth()
 				return false
 			}
-			return true
+			return iter.decrementDepth()
 		}
-		return true
+		return iter.decrementDepth()
 	}
 	if c == 'n' {
 		iter.skipThreeBytes('u', 'l', 'l')

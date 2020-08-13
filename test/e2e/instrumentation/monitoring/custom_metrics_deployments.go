@@ -21,13 +21,14 @@ import (
 	"os/exec"
 	"strings"
 
-	gcm "google.golang.org/api/monitoring/v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	gcm "google.golang.org/api/monitoring/v3"
 )
 
 var (
@@ -251,11 +252,11 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 
 // CreateAdapter creates Custom Metrics - Stackdriver adapter
 // adapterDeploymentFile should be a filename for adapter deployment located in StagingDeploymentLocation
-func CreateAdapter(adapterDeploymentFile string) error {
+func CreateAdapter(namespace, adapterDeploymentFile string) error {
 	// A workaround to make the work on GKE. GKE doesn't normally allow to create cluster roles,
 	// which the adapter deployment does. The solution is to create cluster role binding for
 	// cluster-admin role and currently used service account.
-	err := createClusterAdminBinding()
+	err := createClusterAdminBinding(namespace)
 	if err != nil {
 		return err
 	}
@@ -264,12 +265,12 @@ func CreateAdapter(adapterDeploymentFile string) error {
 	if err != nil {
 		return err
 	}
-	stat, err := framework.RunKubectl("create", "-f", adapterURL)
+	stat, err := framework.RunKubectl(namespace, "create", "-f", adapterURL)
 	framework.Logf(stat)
 	return err
 }
 
-func createClusterAdminBinding() error {
+func createClusterAdminBinding(namespace string) error {
 	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
 	if err != nil {
 		framework.Logf(stderr)
@@ -277,7 +278,7 @@ func createClusterAdminBinding() error {
 	}
 	serviceAccount := strings.TrimSpace(stdout)
 	framework.Logf("current service account: %q", serviceAccount)
-	stat, err := framework.RunKubectl("create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
+	stat, err := framework.RunKubectl(namespace, "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
 	framework.Logf(stat)
 	return err
 }
@@ -316,8 +317,8 @@ func CleanupDescriptors(service *gcm.Service, projectID string) {
 }
 
 // CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
-func CleanupAdapter(adapterDeploymentFile string) {
-	stat, err := framework.RunKubectl("delete", "-f", adapterDeploymentFile)
+func CleanupAdapter(namespace, adapterDeploymentFile string) {
+	stat, err := framework.RunKubectl(namespace, "delete", "-f", adapterDeploymentFile)
 	framework.Logf(stat)
 	if err != nil {
 		framework.Logf("Failed to delete adapter deployments: %s", err)
@@ -326,11 +327,11 @@ func CleanupAdapter(adapterDeploymentFile string) {
 	if err != nil {
 		framework.Logf("Failed to delete adapter deployment file: %s", err)
 	}
-	cleanupClusterAdminBinding()
+	cleanupClusterAdminBinding(namespace)
 }
 
-func cleanupClusterAdminBinding() {
-	stat, err := framework.RunKubectl("delete", "clusterrolebinding", ClusterAdminBinding)
+func cleanupClusterAdminBinding(namespace string) {
+	stat, err := framework.RunKubectl(namespace, "delete", "clusterrolebinding", ClusterAdminBinding)
 	framework.Logf(stat)
 	if err != nil {
 		framework.Logf("Failed to delete cluster admin binding: %s", err)

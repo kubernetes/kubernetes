@@ -5,8 +5,11 @@ go_library(
     srcs = ["metrics.pb.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_model/go",
     importpath = "github.com/prometheus/client_model/go",
-    visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
+    deps = [
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
+    ],
 )
 
 filegroup(

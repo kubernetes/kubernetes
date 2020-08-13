@@ -20,7 +20,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -28,13 +28,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	v1 "k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 const (
@@ -65,8 +64,6 @@ type Controller struct {
 	nodeInformerSynced cache.InformerSynced
 
 	cidrAllocator ipam.CIDRAllocator
-
-	forcefullyDeletePod func(*v1.Pod) error
 }
 
 // NewNodeIpamController returns a new node IP Address Management controller to
@@ -81,7 +78,7 @@ func NewNodeIpamController(
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
 	secondaryServiceCIDR *net.IPNet,
-	nodeCIDRMaskSize int,
+	nodeCIDRMaskSizes []int,
 	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 
 	if kubeClient == nil {
@@ -89,7 +86,7 @@ func NewNodeIpamController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 
 	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(
@@ -98,7 +95,7 @@ func NewNodeIpamController(
 		})
 
 	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("node_ipam_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("node_ipam_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	// Cloud CIDR allocator does not rely on clusterCIDR or nodeCIDRMaskSize for allocation.
@@ -111,11 +108,11 @@ func NewNodeIpamController(
 		// - modify mask to allow flexible masks for IPv4 and IPv6
 		// - for alpha status they are the same
 
-		// for each cidr, node mask size must be < cidr mask
-		for _, cidr := range clusterCIDRs {
+		// for each cidr, node mask size must be <= cidr mask
+		for idx, cidr := range clusterCIDRs {
 			mask := cidr.Mask
-			if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
-				klog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than --node-cidr-mask-size")
+			if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSizes[idx] {
+				klog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than or equal to --node-cidr-mask-size configured for CIDR family")
 			}
 		}
 	}
@@ -132,10 +129,18 @@ func NewNodeIpamController(
 
 	// TODO: Abstract this check into a generic controller manager should run method.
 	if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
-		startLegacyIPAM(ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSize)
+		startLegacyIPAM(ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
 	} else {
 		var err error
-		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, clusterCIDRs, ic.serviceCIDR, ic.secondaryServiceCIDR, nodeCIDRMaskSize)
+
+		allocatorParams := ipam.CIDRAllocatorParams{
+			ClusterCIDRs:         clusterCIDRs,
+			ServiceCIDR:          ic.serviceCIDR,
+			SecondaryServiceCIDR: ic.secondaryServiceCIDR,
+			NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
+		}
+
+		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
 		if err != nil {
 			return nil, err
 		}

@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
+# from dnsutils image
+# install necessary packages:
+# - bind-tools: contains dig, which can used in DNS tests.
+# - CoreDNS: used in some DNS tests.
 # from hostexec image
 # install necessary packages:
 # - curl, nc: used by a lot of e2e tests
@@ -26,10 +31,14 @@ RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash && rm -r
   && ln -s /usr/bin/iperf /usr/local/bin/iperf \
   && ls -altrh /usr/local/bin/iperf
 
-# PORT 8080 needed by: netexec, nettest
+ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_BASEARCH.tgz /coredns.tgz
+RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
+
+# PORT 80 needed by: test-webserver
+# PORT 8080 needed by: netexec, nettest, resource-consumer, resource-consumer-controller
 # PORT 8081 needed by: netexec
 # PORT 9376 needed by: serve-hostname
-EXPOSE 8080 8081 9376
+EXPOSE 80 8080 8081 9376
 
 # from netexec
 RUN mkdir /uploads

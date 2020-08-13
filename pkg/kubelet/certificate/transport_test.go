@@ -17,6 +17,7 @@ limitations under the License.
 package certificate
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -198,7 +199,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := client.Get().Do().Error(); err != nil {
+	if err := client.Get().Do(context.TODO()).Error(); err != nil {
 		t.Fatal(err)
 	}
 	firstCertSerial := lastSerialNumber()
@@ -209,7 +210,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		time.Sleep(time.Millisecond * 10)
-		client.Get().Do()
+		client.Get().Do(context.TODO())
 		if firstCertSerial.Cmp(lastSerialNumber()) != 0 {
 			// The certificate changed!
 			return

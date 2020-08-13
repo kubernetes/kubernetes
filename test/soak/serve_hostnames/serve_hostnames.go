@@ -23,6 +23,7 @@ a serivce
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -30,7 +31,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -41,7 +42,7 @@ import (
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/service"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -93,7 +94,7 @@ func main() {
 
 	var nodes *v1.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodes, err = client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -115,19 +116,19 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create the namespace
-	got, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}}, metav1.CreateOptions{})
 	if err != nil {
 		klog.Fatalf("Failed to create namespace: %v", err)
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := client.CoreV1().Namespaces().Delete(ns, nil); err != nil {
+		if err := client.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{}); err != nil {
 			klog.Warningf("Failed to delete namespace %s: %v", ns, err)
 		} else {
 			// wait until the namespace disappears
 			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
-				if _, err := client.CoreV1().Namespaces().Get(ns, metav1.GetOptions{}); err != nil {
-					if errors.IsNotFound(err) {
+				if _, err := client.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{}); err != nil {
+					if apierrors.IsNotFound(err) {
 						return
 					}
 				}
@@ -143,7 +144,7 @@ func main() {
 	var svc *v1.Service
 	for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(2 * time.Second) {
 		t := time.Now()
-		svc, err = client.CoreV1().Services(ns).Create(&v1.Service{
+		svc, err = client.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "serve-hostnames",
 				Labels: map[string]string{
@@ -160,7 +161,7 @@ func main() {
 					"name": "serve-hostname",
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		klog.V(4).Infof("Service create %s/server-hostnames took %v", ns, time.Since(t))
 		if err == nil {
 			break
@@ -176,7 +177,7 @@ func main() {
 		klog.Infof("Cleaning up service %s/serve-hostnames", ns)
 		// Make several attempts to delete the service.
 		for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-			if err := client.CoreV1().Services(ns).Delete(svc.Name, nil); err == nil {
+			if err := client.CoreV1().Services(ns).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{}); err == nil {
 				return
 			}
 			klog.Warningf("After %v unable to delete service %s/%s: %v", time.Since(start), ns, svc.Name, err)
@@ -193,7 +194,7 @@ func main() {
 			for start := time.Now(); time.Since(start) < podCreateTimeout; time.Sleep(2 * time.Second) {
 				klog.Infof("Creating pod %s/%s on node %s", ns, podName, node.Name)
 				t := time.Now()
-				_, err = client.CoreV1().Pods(ns).Create(&v1.Pod{
+				_, err = client.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 						Labels: map[string]string{
@@ -210,7 +211,7 @@ func main() {
 						},
 						NodeName: node.Name,
 					},
-				})
+				}, metav1.CreateOptions{})
 				klog.V(4).Infof("Pod create %s/%s request took %v", ns, podName, time.Since(t))
 				if err == nil {
 					break
@@ -229,7 +230,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = client.CoreV1().Pods(ns).Delete(podName, nil); err == nil {
+				if err = client.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err == nil {
 					break
 				}
 				klog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)
@@ -241,7 +242,7 @@ func main() {
 	for _, podName := range podNames {
 		var pod *v1.Pod
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-			pod, err = client.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+			pod, err = client.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
 				klog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
@@ -273,7 +274,7 @@ func main() {
 		hostname, err := proxyRequest.
 			Namespace(ns).
 			Name("serve-hostnames").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			klog.Infof("After %v while making a proxy call got error %v", time.Since(start), err)
 			continue
@@ -303,7 +304,7 @@ func main() {
 				hostname, err := proxyRequest.
 					Namespace(ns).
 					Name("serve-hostnames").
-					DoRaw()
+					DoRaw(context.TODO())
 				klog.V(4).Infof("Proxy call in namespace %s took %v", ns, time.Since(t))
 				if err != nil {
 					klog.Warningf("Call failed during iteration %d query %d : %v", i, query, err)

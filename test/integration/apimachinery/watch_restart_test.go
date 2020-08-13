@@ -34,7 +34,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -75,8 +74,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	defer closeFn()
 
 	config := &restclient.Config{
-		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[corev1.GroupName].GroupVersion()},
+		Host: s.URL,
 	}
 
 	namespaceObject := framework.CreateTestingNamespace("retry-watch", s, t)
@@ -85,7 +83,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
 		return func(options metav1.ListOptions) *corev1.SecretList {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", secret.Name).String()
-			res, err := c.CoreV1().Secrets(secret.Namespace).List(options)
+			res, err := c.CoreV1().Secrets(secret.Namespace).List(context.TODO(), options)
 			if err != nil {
 				t.Fatalf("Failed to list Secrets: %v", err)
 			}
@@ -96,7 +94,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	getWatchFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) (watch.Interface, error) {
 		return func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", secret.Name).String()
-			res, err := c.CoreV1().Secrets(secret.Namespace).Watch(options)
+			res, err := c.CoreV1().Secrets(secret.Namespace).Watch(context.TODO(), options)
 			if err != nil {
 				t.Fatalf("Failed to create a watcher on Secrets: %v", err)
 			}
@@ -121,7 +119,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				counter = counter + 1
 
 				patch := fmt.Sprintf(`{"metadata": {"annotations": {"count": "%d"}}}`, counter)
-				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(secret.Name, types.StrategicMergePatchType, []byte(patch))
+				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
 					t.Fatalf("Failed to patch secret: %v", err)
 				}
@@ -214,7 +212,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				t.Fatalf("Failed to create clientset: %v", err)
 			}
 
-			secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(tc.secret)
+			secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create testing secret %s/%s: %v", tc.secret.Namespace, tc.secret.Name, err)
 			}

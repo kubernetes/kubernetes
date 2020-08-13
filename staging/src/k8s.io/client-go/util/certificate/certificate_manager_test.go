@@ -27,12 +27,19 @@ import (
 	"testing"
 	"time"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	clienttesting "k8s.io/client-go/testing"
 )
 
 var storeCertData = newCertificateData(`-----BEGIN CERTIFICATE-----
@@ -58,6 +65,68 @@ XSCcosCktbkXvpYrS30CIQDPDxgqlwDEJQ0uKuHkZI38/SPWWqfUmkecwlbpXABK
 iQIgZX08DA8VfvcA5/Xj1Zjdey9FVY6POLXen6RPiabE97UCICp6eUW7ht+2jjar
 e35EltCRCjoejRHTuN9TC0uCoVipAiAXaJIx/Q47vGwiw6Y8KXsNU6y54gTbOSxX
 54LzHNk/+Q==
+-----END RSA PRIVATE KEY-----`)
+var storeTwoCertsData = newCertificateData(`-----BEGIN CERTIFICATE-----
+MIIDfTCCAyegAwIBAgIUFBl4gUoqZDP/wUJDn37/VJ9upD0wDQYJKoZIhvcNAQEF
+BQAwfjELMAkGA1UEBhMCR0IxDzANBgNVBAgMBkxvbmRvbjEPMA0GA1UEBwwGTG9u
+ZG9uMRgwFgYDVQQKDA9HbG9iYWwgU2VjdXJpdHkxFjAUBgNVBAsMDUlUIERlcGFy
+dG1lbnQxGzAZBgNVBAMMEnRlc3QtY2VydGlmaWNhdGUtMDAeFw0yMDAzMDIxOTM3
+MDBaFw0yMTAzMDIxOTM3MDBaMIGIMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2Fs
+aWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZyYW5jaXNjbzEdMBsGA1UEChMURXhhbXBs
+ZSBDb21wYW55LCBMTEMxEzARBgNVBAsTCk9wZXJhdGlvbnMxGDAWBgNVBAMTD3d3
+dy5leGFtcGxlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMiR
+DNpmwTICFr+P16fKDVjbNCzSjWq+MTu8vAfS6GrLpBTUEe+6zVqxUza/fZenxo8O
+ucV2JTUv5J4nkT/vG6Qm/mToVJ4vQzLQ5jR2w7v/7cf3oWCwTAKUafgo6/Ga95gn
+lQB3+Fd8sy96zfFr/7wDSMPPueR5kSFax+cEd30wwv5O7tWj0ro1mrxLssBlwPaR
+ZlzkkvxBYTzWCqKZsWktQlXciqlFSos0ua7uvwqKN5CTxfC/xoyMxx9kfZm7BzPN
+ZDqYMFw2HiWdEiLzI4jj+Gh0D5t47tnvlpUMihcX9x0jP6/+hnfcQ8GAP2jR/BXY
+5YZRRY70LiCXPevlRAECAwEAAaOBqTCBpjAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0l
+BBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYE
+FOoiE+kh7gGDpyx0KZuCc1lrlTRKMB8GA1UdIwQYMBaAFNtosvGlpDUsb9JwcRcX
+q37L52VTMCcGA1UdEQQgMB6CC2V4YW1wbGUuY29tgg93d3cuZXhhbXBsZS5jb20w
+DQYJKoZIhvcNAQEFBQADQQAw6mxQONAD2sivfzIf1eDFd6LU7aE+MnkdlEQjjPCi
+tlUITFIuO3XavISupP6V9wE0b1wTF1pTlVWArf/0YQXs
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIICRzCCAfGgAwIBAgIJALMb7ecMIk3MMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
+BAYTAkdCMQ8wDQYDVQQIDAZMb25kb24xDzANBgNVBAcMBkxvbmRvbjEYMBYGA1UE
+CgwPR2xvYmFsIFNlY3VyaXR5MRYwFAYDVQQLDA1JVCBEZXBhcnRtZW50MRswGQYD
+VQQDDBJ0ZXN0LWNlcnRpZmljYXRlLTAwIBcNMTcwNDI2MjMyNjUyWhgPMjExNzA0
+MDIyMzI2NTJaMH4xCzAJBgNVBAYTAkdCMQ8wDQYDVQQIDAZMb25kb24xDzANBgNV
+BAcMBkxvbmRvbjEYMBYGA1UECgwPR2xvYmFsIFNlY3VyaXR5MRYwFAYDVQQLDA1J
+VCBEZXBhcnRtZW50MRswGQYDVQQDDBJ0ZXN0LWNlcnRpZmljYXRlLTAwXDANBgkq
+hkiG9w0BAQEFAANLADBIAkEAtBMa7NWpv3BVlKTCPGO/LEsguKqWHBtKzweMY2CV
+tAL1rQm913huhxF9w+ai76KQ3MHK5IVnLJjYYA5MzP2H5QIDAQABo1AwTjAdBgNV
+HQ4EFgQU22iy8aWkNSxv0nBxFxerfsvnZVMwHwYDVR0jBBgwFoAU22iy8aWkNSxv
+0nBxFxerfsvnZVMwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAANBAEOefGbV
+NcHxklaW06w6OBYJPwpIhCVozC1qdxGX1dg8VkEKzjOzjgqVD30m59OFmSlBmHsl
+nkVA6wyOSDYBf3o=
+-----END CERTIFICATE-----`, `-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAyJEM2mbBMgIWv4/Xp8oNWNs0LNKNar4xO7y8B9LoasukFNQR
+77rNWrFTNr99l6fGjw65xXYlNS/knieRP+8bpCb+ZOhUni9DMtDmNHbDu//tx/eh
+YLBMApRp+Cjr8Zr3mCeVAHf4V3yzL3rN8Wv/vANIw8+55HmRIVrH5wR3fTDC/k7u
+1aPSujWavEuywGXA9pFmXOSS/EFhPNYKopmxaS1CVdyKqUVKizS5ru6/Coo3kJPF
+8L/GjIzHH2R9mbsHM81kOpgwXDYeJZ0SIvMjiOP4aHQPm3ju2e+WlQyKFxf3HSM/
+r/6Gd9xDwYA/aNH8FdjlhlFFjvQuIJc96+VEAQIDAQABAoIBAQCc6R3tH8a1oPy7
+EYXeNy0J/zRqfK82e2V5HsbcOByssHTF9sOxkatm8KPxiQ5wv0mQUiz0VuH1Imrx
+cHMqWZ5+ZiNQPpM0zjT8ZII1OVUYl7knYIxYYJSW0BW3mAw/EMXzu8POgg1AJMbq
+tmC4J44DQW6EAtej75ejSKpsCgqRXVoi3iEk9eMLHUFIHqkzl/aKEc7k/P+eKo2h
+PHsDoKZdmOmZA3OKzw61xAqJICYyplRHatQcEiWJgnLer+9qvUGc4k8eqAYeDGm7
+T78XcUvsXOug2GClVWGZu1quFhf7MxjzFfOjz4q9HwPex7X6nQL0IX2hzMECkaMC
+iUMZGGEhAoGBAOLY1KSNOjvt54MkKznI8stHkx8V73c0Nxbz5Rj8gM0Gwk1FWVas
+jgoAbKPQ2UL/RglLX1JZvztKvNuWSEeZGqggDvhzB38leiEH+OY7DZ7a0c5sWwdF
+CpcT1mJb91ww5xEC09WO8Oq3i5olVBBivOl5EjwKHOQn2TUh2OSLhqf/AoGBAOJX
+mxqdTEUwFU9ecsAOK9labjI7mA5so0vIq8eq1Q670NFszChfSMKJAqQ90N1LEu9z
+L0f6CBXYCn7sMmOlF4CKE+u2/ieJfD1OkKq7RwEd3pi4X3xtAlcPK8F/QprmQWo0
+wi33BDBb4zYkuQB6Q5RYIV2di7k+HBpoQPottBP/AoGAIB4xJUc1qoyJjeDOGfVg
+ovV0WB9j8026Sw6nLj16Aw1k70nVV1dBGRtsRllomXrJMMGyMleworV3PePuQezk
+gE9hrz2iHxdwTkLxs69Cw24Z7I8c6E+XK0LMxMpeoHfwD1GGKqN9as4n/uAwIc3J
+D4lr0oJgCtG1iDdNnTZAD4MCgYAkOpWPCwJ8SJgAnkOLzjjij4D39WX/WRBCPxqP
+2R5FP3bLLrj29Vl2GewcUfCumyeqwCsfQDwvEueLLU9bd79tSayqnB3OQklqnrq1
+OUjCOv+4Pjq6ddBcEweT70S/+n8Z+tvh85nuC6cwsWwTUX6jrf+ZNnB49CIXb/yG
+ju42DQKBgAPtbB/ON3+GtnSTHBSY6HwZvGJrBDicrXmr1U9zuA8yYxv8qaRXZkpn
+2cpLLvO2MJutwXMYf+T3x1ZCFMkE56pOswSTGrCQWRl3hOiJayLHQyAOYHPnYeZB
+78iRJPUZ0biEQUZQ62GBxWkcB0qkxa9m759h/TvLwvV0RrO5Uzd0
 -----END RSA PRIVATE KEY-----`)
 var expiredStoreCertData = newCertificateData(`-----BEGIN CERTIFICATE-----
 MIIBFzCBwgIJALhygXnxXmN1MA0GCSqGSIb3DQEBCwUAMBMxETAPBgNVBAMMCGhv
@@ -156,19 +225,24 @@ func TestNewManagerNoRotation(t *testing.T) {
 	}
 	if _, err := NewManager(&Config{
 		Template:         &x509.CertificateRequest{},
-		Usages:           []certificates.KeyUsage{},
+		Usages:           []certificatesv1.KeyUsage{},
 		CertificateStore: store,
 	}); err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
 }
 
-type gaugeMock struct {
+type metricMock struct {
 	calls     int
 	lastValue float64
 }
 
-func (g *gaugeMock) Set(v float64) {
+func (g *metricMock) Set(v float64) {
+	g.calls++
+	g.lastValue = v
+}
+
+func (g *metricMock) Observe(v float64) {
 	g.calls++
 	g.lastValue = v
 }
@@ -195,7 +269,6 @@ func TestSetRotationDeadline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := gaugeMock{}
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
@@ -203,9 +276,9 @@ func TestSetRotationDeadline(t *testing.T) {
 						NotAfter:  tc.notAfter,
 					},
 				},
-				getTemplate:           func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-				usages:                []certificates.KeyUsage{},
-				certificateExpiration: &g,
+				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+				usages:      []certificatesv1.KeyUsage{},
+				now:         func() time.Time { return now },
 			}
 			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
@@ -218,12 +291,6 @@ func TestSetRotationDeadline(t *testing.T) {
 					tc.notAfter,
 					deadline,
 					lowerBound)
-			}
-			if g.calls != 1 {
-				t.Errorf("%d metrics were recorded, wanted %d", g.calls, 1)
-			}
-			if g.lastValue != float64(tc.notAfter.Unix()) {
-				t.Errorf("%f value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
 			}
 		})
 	}
@@ -383,6 +450,7 @@ func TestCertSatisfiesTemplate(t *testing.T) {
 			m := manager{
 				cert:        tlsCert,
 				getTemplate: func() *x509.CertificateRequest { return tc.template },
+				now:         time.Now,
 			}
 
 			result := m.certSatisfiesTemplate()
@@ -403,10 +471,11 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 			},
 		},
 		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificates.KeyUsage{},
-		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
-			return fakeClient{failureType: createError}, nil
+		usages:      []certificatesv1.KeyUsage{},
+		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+			return newClientset(fakeClient{failureType: createError}), nil
 		},
+		now: func() time.Time { return now },
 	}
 
 	if success, err := m.rotateCerts(); success {
@@ -426,10 +495,11 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 			},
 		},
 		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificates.KeyUsage{},
-		clientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
-			return fakeClient{failureType: watchError}, nil
+		usages:      []certificatesv1.KeyUsage{},
+		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+			return newClientset(fakeClient{failureType: watchError}), nil
 		},
+		now: func() time.Time { return now },
 	}
 
 	defer func(t time.Duration) { certificateWaitTimeout = t }(certificateWaitTimeout)
@@ -447,7 +517,7 @@ func TestNewManagerBootstrap(t *testing.T) {
 	var cm Manager
 	cm, err := NewManager(&Config{
 		Template:                &x509.CertificateRequest{},
-		Usages:                  []certificates.KeyUsage{},
+		Usages:                  []certificatesv1.KeyUsage{},
 		CertificateStore:        store,
 		BootstrapCertificatePEM: bootstrapCertData.certificatePEM,
 		BootstrapKeyPEM:         bootstrapCertData.keyPEM,
@@ -484,7 +554,7 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 
 	cm, err := NewManager(&Config{
 		Template:                &x509.CertificateRequest{},
-		Usages:                  []certificates.KeyUsage{},
+		Usages:                  []certificatesv1.KeyUsage{},
 		CertificateStore:        store,
 		BootstrapCertificatePEM: bootstrapCertData.certificatePEM,
 		BootstrapKeyPEM:         bootstrapCertData.keyPEM,
@@ -580,6 +650,8 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 		storeCert               *certificateData
 		bootstrapCert           *certificateData
 		apiCert                 *certificateData
+		noV1                    bool
+		noV1beta1               bool
 		expectedCertBeforeStart *certificateData
 		expectedCertAfterStart  *certificateData
 	}{
@@ -590,6 +662,24 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 			apiCert:                 apiServerCertData,
 			expectedCertBeforeStart: nilCertificate,
 			expectedCertAfterStart:  apiServerCertData,
+		},
+		{
+			description:             "No current certificate, no bootstrap certificate, no v1 API",
+			storeCert:               nilCertificate,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: nilCertificate,
+			expectedCertAfterStart:  apiServerCertData,
+			noV1:                    true,
+		},
+		{
+			description:             "No current certificate, no bootstrap certificate, no v1beta1 API",
+			storeCert:               nilCertificate,
+			bootstrapCert:           nilCertificate,
+			apiCert:                 apiServerCertData,
+			expectedCertBeforeStart: nilCertificate,
+			expectedCertAfterStart:  apiServerCertData,
+			noV1beta1:               true,
 		},
 		{
 			description:             "No current certificate, bootstrap certificate",
@@ -638,18 +728,21 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 						CommonName:   "system:node:fake-node-name",
 					},
 				},
-				Usages: []certificates.KeyUsage{
-					certificates.UsageDigitalSignature,
-					certificates.UsageKeyEncipherment,
-					certificates.UsageClientAuth,
+				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				Usages: []certificatesv1.KeyUsage{
+					certificatesv1.UsageDigitalSignature,
+					certificatesv1.UsageKeyEncipherment,
+					certificatesv1.UsageClientAuth,
 				},
 				CertificateStore:        certificateStore,
 				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
 				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
-				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
-					return &fakeClient{
+				ClientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+					return newClientset(fakeClient{
+						noV1:           tc.noV1,
+						noV1beta1:      tc.noV1beta1,
 						certificatePEM: tc.apiCert.certificatePEM,
-					}, nil
+					}), nil
 				},
 			})
 			if err != nil {
@@ -750,18 +843,18 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 						CommonName:   "system:node:fake-node-name",
 					},
 				},
-				Usages: []certificates.KeyUsage{
-					certificates.UsageDigitalSignature,
-					certificates.UsageKeyEncipherment,
-					certificates.UsageClientAuth,
+				Usages: []certificatesv1.KeyUsage{
+					certificatesv1.UsageDigitalSignature,
+					certificatesv1.UsageKeyEncipherment,
+					certificatesv1.UsageClientAuth,
 				},
 				CertificateStore:        certificateStore,
 				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
 				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
-				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
-					return &fakeClient{
+				ClientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+					return newClientset(fakeClient{
 						certificatePEM: tc.apiCert.certificatePEM,
-					}, nil
+					}), nil
 				},
 			})
 			if err != nil {
@@ -895,20 +988,20 @@ func TestServerHealth(t *testing.T) {
 						CommonName:   "system:node:fake-node-name",
 					},
 				},
-				Usages: []certificates.KeyUsage{
-					certificates.UsageDigitalSignature,
-					certificates.UsageKeyEncipherment,
-					certificates.UsageClientAuth,
+				Usages: []certificatesv1.KeyUsage{
+					certificatesv1.UsageDigitalSignature,
+					certificatesv1.UsageKeyEncipherment,
+					certificatesv1.UsageClientAuth,
 				},
 				CertificateStore:        certificateStore,
 				BootstrapCertificatePEM: tc.bootstrapCert.certificatePEM,
 				BootstrapKeyPEM:         tc.bootstrapCert.keyPEM,
-				ClientFn: func(_ *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
-					return &fakeClient{
+				ClientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+					return newClientset(fakeClient{
 						certificatePEM: tc.apiCert.certificatePEM,
 						failureType:    tc.failureType,
 						err:            tc.clientErr,
-					}, nil
+					}), nil
 				},
 			})
 			if err != nil {
@@ -945,6 +1038,40 @@ func TestServerHealth(t *testing.T) {
 	}
 }
 
+func TestRotationLogsDuration(t *testing.T) {
+	h := metricMock{}
+	now := time.Now()
+	certIss := now.Add(-2 * time.Hour)
+	m := manager{
+		cert: &tls.Certificate{
+			Leaf: &x509.Certificate{
+				NotBefore: certIss,
+				NotAfter:  now.Add(-1 * time.Hour),
+			},
+		},
+		certStore:   &fakeStore{cert: expiredStoreCertData.certificate},
+		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+			return newClientset(fakeClient{
+				certificatePEM: apiServerCertData.certificatePEM,
+			}), nil
+		},
+		certificateRotation: &h,
+		now:                 func() time.Time { return now },
+	}
+	ok, err := m.rotateCerts()
+	if err != nil || !ok {
+		t.Errorf("failed to rotate certs: %v", err)
+	}
+	if h.calls != 1 {
+		t.Errorf("rotation metric was not called")
+	}
+	if h.lastValue != now.Sub(certIss).Seconds() {
+		t.Errorf("rotation metric did not record the right value got: %f; want %f", h.lastValue, now.Sub(certIss).Seconds())
+	}
+
+}
+
 type fakeClientFailureType int
 
 const (
@@ -955,53 +1082,101 @@ const (
 )
 
 type fakeClient struct {
+	noV1      bool
+	noV1beta1 bool
 	certificatesclient.CertificateSigningRequestInterface
 	failureType    fakeClientFailureType
 	certificatePEM []byte
 	err            error
 }
 
-func (c fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
-	if c.failureType == watchError {
-		if c.err != nil {
-			return nil, c.err
-		}
-		return nil, fmt.Errorf("Watch error")
-	}
-	csrReply := certificates.CertificateSigningRequestList{
-		Items: []certificates.CertificateSigningRequest{
-			{ObjectMeta: v1.ObjectMeta{UID: "fake-uid"}},
-		},
-	}
-	return &csrReply, nil
-}
+func newClientset(opts fakeClient) *fake.Clientset {
+	f := fake.NewSimpleClientset()
+	switch opts.failureType {
+	case createError:
+		f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			if opts.err != nil {
+				return true, nil, opts.err
+			}
+			return true, nil, fmt.Errorf("create error")
+		})
+	case watchError:
+		f.PrependReactor("list", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			if opts.err != nil {
+				return true, nil, opts.err
+			}
+			return true, nil, fmt.Errorf("watch error")
+		})
+		f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+			if opts.err != nil {
+				return true, nil, opts.err
+			}
+			return true, nil, fmt.Errorf("watch error")
+		})
+	default:
+		f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				if opts.noV1 {
+					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+				}
+				return true, &certificatesv1.CertificateSigningRequest{ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"}}, nil
+			case "v1beta1":
+				if opts.noV1beta1 {
+					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+				}
+				return true, &certificatesv1beta1.CertificateSigningRequest{ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"}}, nil
+			default:
+				return false, nil, nil
+			}
+		})
+		f.PrependReactor("list", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				if opts.noV1 {
+					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+				}
+				return true, &certificatesv1.CertificateSigningRequestList{Items: []certificatesv1.CertificateSigningRequest{{ObjectMeta: v1.ObjectMeta{UID: "fake-uid"}}}}, nil
+			case "v1beta1":
+				if opts.noV1beta1 {
+					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+				}
+				return true, &certificatesv1beta1.CertificateSigningRequestList{Items: []certificatesv1beta1.CertificateSigningRequest{{ObjectMeta: v1.ObjectMeta{UID: "fake-uid"}}}}, nil
+			default:
+				return false, nil, nil
+			}
+		})
+		f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				if opts.noV1 {
+					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+				}
+				return true, &fakeWatch{
+					version:        action.GetResource().Version,
+					failureType:    opts.failureType,
+					certificatePEM: opts.certificatePEM,
+				}, nil
 
-func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
-	if c.failureType == createError {
-		if c.err != nil {
-			return nil, c.err
-		}
-		return nil, fmt.Errorf("create error")
+			case "v1beta1":
+				if opts.noV1beta1 {
+					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+				}
+				return true, &fakeWatch{
+					version:        action.GetResource().Version,
+					failureType:    opts.failureType,
+					certificatePEM: opts.certificatePEM,
+				}, nil
+			default:
+				return false, nil, nil
+			}
+		})
 	}
-	csrReply := certificates.CertificateSigningRequest{}
-	csrReply.UID = "fake-uid"
-	return &csrReply, nil
-}
-
-func (c fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	if c.failureType == watchError {
-		if c.err != nil {
-			return nil, c.err
-		}
-		return nil, fmt.Errorf("watch error")
-	}
-	return &fakeWatch{
-		failureType:    c.failureType,
-		certificatePEM: c.certificatePEM,
-	}, nil
+	return f
 }
 
 type fakeWatch struct {
+	version        string
 	failureType    fakeClientFailureType
 	certificatePEM []byte
 }
@@ -1010,31 +1185,58 @@ func (w *fakeWatch) Stop() {
 }
 
 func (w *fakeWatch) ResultChan() <-chan watch.Event {
-	var condition certificates.CertificateSigningRequestCondition
-	if w.failureType == certificateSigningRequestDenied {
-		condition = certificates.CertificateSigningRequestCondition{
-			Type: certificates.CertificateDenied,
-		}
-	} else {
-		condition = certificates.CertificateSigningRequestCondition{
-			Type: certificates.CertificateApproved,
-		}
-	}
+	var csr runtime.Object
 
-	csr := certificates.CertificateSigningRequest{
-		Status: certificates.CertificateSigningRequestStatus{
-			Conditions: []certificates.CertificateSigningRequestCondition{
-				condition,
+	switch w.version {
+	case "v1":
+		var condition certificatesv1.CertificateSigningRequestCondition
+		if w.failureType == certificateSigningRequestDenied {
+			condition = certificatesv1.CertificateSigningRequestCondition{
+				Type: certificatesv1.CertificateDenied,
+			}
+		} else {
+			condition = certificatesv1.CertificateSigningRequestCondition{
+				Type: certificatesv1.CertificateApproved,
+			}
+		}
+
+		csr = &certificatesv1.CertificateSigningRequest{
+			ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"},
+			Status: certificatesv1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1.CertificateSigningRequestCondition{
+					condition,
+				},
+				Certificate: []byte(w.certificatePEM),
 			},
-			Certificate: []byte(w.certificatePEM),
-		},
+		}
+
+	case "v1beta1":
+		var condition certificatesv1beta1.CertificateSigningRequestCondition
+		if w.failureType == certificateSigningRequestDenied {
+			condition = certificatesv1beta1.CertificateSigningRequestCondition{
+				Type: certificatesv1beta1.CertificateDenied,
+			}
+		} else {
+			condition = certificatesv1beta1.CertificateSigningRequestCondition{
+				Type: certificatesv1beta1.CertificateApproved,
+			}
+		}
+
+		csr = &certificatesv1beta1.CertificateSigningRequest{
+			ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"},
+			Status: certificatesv1beta1.CertificateSigningRequestStatus{
+				Conditions: []certificatesv1beta1.CertificateSigningRequestCondition{
+					condition,
+				},
+				Certificate: []byte(w.certificatePEM),
+			},
+		}
 	}
-	csr.UID = "fake-uid"
 
 	c := make(chan watch.Event, 1)
 	c <- watch.Event{
 		Type:   watch.Added,
-		Object: &csr,
+		Object: csr,
 	}
 	return c
 }

@@ -45,25 +45,6 @@ func Equals(a corev1.ResourceList, b corev1.ResourceList) bool {
 	return true
 }
 
-// V1Equals returns true if the two lists are equivalent
-func V1Equals(a corev1.ResourceList, b corev1.ResourceList) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for key, value1 := range a {
-		value2, found := b[key]
-		if !found {
-			return false
-		}
-		if value1.Cmp(value2) != 0 {
-			return false
-		}
-	}
-
-	return true
-}
-
 // LessThanOrEqual returns true if a < b for each key in b
 // If false, it returns the keys in a that exceeded b
 func LessThanOrEqual(a corev1.ResourceList, b corev1.ResourceList) (bool, []corev1.ResourceName) {

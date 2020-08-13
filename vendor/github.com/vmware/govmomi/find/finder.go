@@ -906,6 +906,12 @@ func (f *Finder) DefaultFolder(ctx context.Context) (*object.Folder, error) {
 	}
 	folder := object.NewFolder(f.client, ref.Reference())
 
+	// Set the InventoryPath of the newly created folder object
+	// The default foler becomes the datacenter's "vm" folder.
+	// The "vm" folder always exists for a datacenter. It cannot be
+	// removed or replaced
+	folder.SetInventoryPath(path.Join(f.dc.InventoryPath, "vm"))
+
 	return folder, nil
 }
 

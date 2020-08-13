@@ -23,19 +23,19 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/utils/keymutex"
+	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -81,10 +81,6 @@ func (plugin *localVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error
 func (plugin *localVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	// This volume is only supported as a PersistentVolumeSource
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Local != nil)
-}
-
-func (plugin *localVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *localVolumePlugin) RequiresRemount() bool {
@@ -191,6 +187,34 @@ func (plugin *localVolumePlugin) NewBlockVolumeUnmapper(volName string,
 // TODO: check if no path and no topology constraints are ok
 func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	fs := v1.PersistentVolumeFilesystem
+	// The main purpose of reconstructed volume is to clean unused mount points
+	// and directories.
+	// For filesystem volume with directory source, no global mount path is
+	// needed to clean. Empty path is ok.
+	// For filesystem volume with block source, we should resolve to its device
+	// path if global mount path exists.
+	var path string
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	refs, err := mounter.GetMountRefs(mountPath)
+	if err != nil {
+		return nil, err
+	}
+	baseMountPath := plugin.generateBlockDeviceBaseGlobalPath()
+	for _, ref := range refs {
+		if mount.PathWithinBase(ref, baseMountPath) {
+			// If the global mount for block device exists, the source is block
+			// device.
+			// The resolved device path may not be the exact same as path in
+			// local PV object if symbolic link is used. However, it's the true
+			// source and can be used in reconstructed volume.
+			path, _, err = mount.GetDeviceNameFromMount(mounter, ref)
+			if err != nil {
+				return nil, err
+			}
+			klog.V(4).Infof("local: reconstructing volume %q (pod volume mount: %q) with device %q", volumeName, mountPath, path)
+			break
+		}
+	}
 	localVolume := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volumeName,
@@ -198,7 +222,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Local: &v1.LocalVolumeSource{
-					Path: "",
+					Path: path,
 				},
 			},
 			VolumeMode: &fs,
@@ -218,6 +242,7 @@ func (plugin *localVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volu
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Local: &v1.LocalVolumeSource{
+					// Not needed because we don't need to detach local device from the host.
 					Path: "",
 				},
 			},
@@ -317,7 +342,7 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 		if rmErr := os.Remove(deviceMountPath); rmErr != nil {
 			klog.Warningf("local: failed to remove %s: %v", deviceMountPath, rmErr)
 		}
-		return fmt.Errorf("local: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
+		return fmt.Errorf("local: failed to mount device %s at %s (fstype: %s), error %w", devicePath, deviceMountPath, fstype, err)
 	}
 	klog.V(3).Infof("local: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
 	return nil
@@ -335,8 +360,7 @@ func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, devic
 	switch fileType {
 	case hostutil.FileTypeBlockDev:
 		// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
-		devicePath = spec.PersistentVolume.Spec.Local.Path
-		return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
+		return dm.mountLocalBlockDevice(spec, spec.PersistentVolume.Spec.Local.Path, deviceMountPath)
 	case hostutil.FileTypeDirectory:
 		// if the given local volume path is of already filesystem directory, return directly
 		return nil
@@ -542,7 +566,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	if !m.readOnly {
 		// Volume owner will be written only once on the first volume mount
 		if len(refs) == 0 {
-			return volume.SetVolumeOwnership(m, mounterArgs.FsGroup)
+			return volume.SetVolumeOwnership(m, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 		}
 	}
 	return nil
@@ -583,16 +607,23 @@ type localVolumeMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &localVolumeMapper{}
+var _ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
 
-// SetUpDevice provides physical device path for the local PV.
+// SetUpDevice prepares the volume to the node by the plugin specific way.
 func (m *localVolumeMapper) SetUpDevice() (string, error) {
+	return "", nil
+}
+
+// MapPodDevice provides physical device path for the local PV.
+func (m *localVolumeMapper) MapPodDevice() (string, error) {
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	klog.V(4).Infof("SetupDevice returning path %s", globalPath)
+	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)
 	return globalPath, nil
 }
 
-func (m *localVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+// GetStagingPath returns
+func (m *localVolumeMapper) GetStagingPath() string {
+	return ""
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
@@ -601,12 +632,6 @@ type localVolumeUnmapper struct {
 }
 
 var _ volume.BlockVolumeUnmapper = &localVolumeUnmapper{}
-
-// TearDownDevice will undo SetUpDevice procedure. In local PV, all of this already handled by operation_generator.
-func (u *localVolumeUnmapper) TearDownDevice(mapPath, _ string) error {
-	klog.V(4).Infof("local: TearDownDevice completed for: %s", mapPath)
-	return nil
-}
 
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}

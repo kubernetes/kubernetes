@@ -35,6 +35,7 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/component-base/metrics"
 
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -42,9 +43,7 @@ import (
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	volumes_v3 "github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"github.com/prometheus/client_golang/prometheus"
-
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type volumeService interface {
@@ -420,7 +419,12 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 	}
 	if volume.Status != volumeAvailableStatus {
 		// cinder volume can not be expanded if its status is not available
-		return oldSize, fmt.Errorf("volume in %s status can not be expanded, it must be available and not attached to a node", volume.Status)
+		if volume.Status == volumeInUseStatus {
+			// Send a nice event when the volume is used
+			return oldSize, fmt.Errorf("PVC used by a Pod can not be expanded, please ensure the PVC is not used by any Pod and is fully detached from a node")
+		}
+		// Send not so nice event when the volume is in any other state (deleted, error)
+		return oldSize, fmt.Errorf("volume in state %q can not be expanded, it must be \"available\"", volume.Status)
 	}
 
 	// Cinder works with gigabytes, convert to GiB with rounding up
@@ -727,6 +731,11 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 		return nil, nil
 	}
 
+	// if volume az is to be ignored we should return nil from here
+	if os.bsOpts.IgnoreVolumeAZ {
+		return nil, nil
+	}
+
 	// Get Volume
 	volume, err := os.getVolume(pv.Spec.Cinder.VolumeID)
 	if err != nil {
@@ -745,8 +754,8 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 // recordOpenstackOperationMetric records openstack operation metrics
 func recordOpenstackOperationMetric(operation string, timeTaken float64, err error) {
 	if err != nil {
-		openstackAPIRequestErrors.With(prometheus.Labels{"request": operation}).Inc()
+		openstackAPIRequestErrors.With(metrics.Labels{"request": operation}).Inc()
 	} else {
-		openstackOperationsLatency.With(prometheus.Labels{"request": operation}).Observe(timeTaken)
+		openstackOperationsLatency.With(metrics.Labels{"request": operation}).Observe(timeTaken)
 	}
 }

@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.StatefulSetControllerConfiguration)(nil), (*config.StatefulSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StatefulSetControllerConfiguration_To_config_StatefulSetControllerConfiguration(a.(*v1alpha1.StatefulSetControllerConfiguration), b.(*config.StatefulSetControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.StatefulSetControllerConfiguration)(nil), (*v1alpha1.StatefulSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_StatefulSetControllerConfiguration_To_v1alpha1_StatefulSetControllerConfiguration(a.(*config.StatefulSetControllerConfiguration), b.(*v1alpha1.StatefulSetControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.StatefulSetControllerConfiguration)(nil), (*v1alpha1.StatefulSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_StatefulSetControllerConfiguration_To_v1alpha1_StatefulSetControllerConfiguration(a.(*config.StatefulSetControllerConfiguration), b.(*v1alpha1.StatefulSetControllerConfiguration), scope)
 	}); err != nil {

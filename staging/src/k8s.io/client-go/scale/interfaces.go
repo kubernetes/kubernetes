@@ -17,7 +17,10 @@ limitations under the License.
 package scale
 
 import (
+	"context"
+
 	autoscalingapi "k8s.io/api/autoscaling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -34,11 +37,11 @@ type ScalesGetter interface {
 // the scale subresource.
 type ScaleInterface interface {
 	// Get fetches the scale of the given scalable resource.
-	Get(resource schema.GroupResource, name string) (*autoscalingapi.Scale, error)
+	Get(ctx context.Context, resource schema.GroupResource, name string, opts metav1.GetOptions) (*autoscalingapi.Scale, error)
 
 	// Update updates the scale of the given scalable resource.
-	Update(resource schema.GroupResource, scale *autoscalingapi.Scale) (*autoscalingapi.Scale, error)
+	Update(ctx context.Context, resource schema.GroupResource, scale *autoscalingapi.Scale, opts metav1.UpdateOptions) (*autoscalingapi.Scale, error)
 
 	// Patch patches the scale of the given scalable resource.
-	Patch(gvr schema.GroupVersionResource, name string, pt types.PatchType, data []byte) (*autoscalingapi.Scale, error)
+	Patch(ctx context.Context, gvr schema.GroupVersionResource, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions) (*autoscalingapi.Scale, error)
 }

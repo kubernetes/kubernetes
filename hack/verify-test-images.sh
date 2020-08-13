@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether the latest or untagged  gcr.io image is in
+# `test/e2e/*.go` files.
+# Usage: `hack/verify-test-images.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

@@ -22,23 +22,8 @@ import (
 	v1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
 	scheme "k8s.io/client-go/scale/scheme"
 )
-
-// addConversions registers conversions between the internal version
-// of Scale and supported external versions of Scale.
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	err := scheme.AddConversionFuncs(
-		Convert_scheme_ScaleStatus_To_v1_ScaleStatus,
-		Convert_v1_ScaleStatus_To_scheme_ScaleStatus,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func Convert_scheme_ScaleStatus_To_v1_ScaleStatus(in *scheme.ScaleStatus, out *v1.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas

@@ -127,7 +127,7 @@ func TestRunAccessCheck(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -197,7 +197,7 @@ func TestRunAccessList(t *testing.T) {
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
 		defer tf.Cleanup()
 
-		ns := scheme.Codecs
+		ns := scheme.Codecs.WithoutConversion()
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 		tf.Client = &fake.RESTClient{

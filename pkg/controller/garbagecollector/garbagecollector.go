@@ -17,12 +17,13 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -43,6 +44,7 @@ import (
 	_ "k8s.io/client-go/kubernetes"
 )
 
+// ResourceResyncTime defines the resync period of the garbage collector's informers.
 const ResourceResyncTime time.Duration = 0
 
 // GarbageCollector runs reflectors to watch for changes of managed API
@@ -66,15 +68,14 @@ type GarbageCollector struct {
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
-	sharedInformers  controller.InformerFactory
 
 	workerLock sync.RWMutex
 }
 
+// NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
 	metadataClient metadata.Interface,
 	mapper resettableRESTMapper,
-	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers controller.InformerFactory,
 	informersStarted <-chan struct{},
@@ -89,7 +90,7 @@ func NewGarbageCollector(
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
-	gb := &GraphBuilder{
+	gc.dependencyGraphBuilder = &GraphBuilder{
 		metadataClient:   metadataClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,
@@ -103,10 +104,6 @@ func NewGarbageCollector(
 		sharedInformers:  sharedInformers,
 		ignoredResources: ignoredResources,
 	}
-	if err := gb.syncMonitors(deletableResources); err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to sync all monitors: %v", err))
-	}
-	gc.dependencyGraphBuilder = gb
 
 	return gc, nil
 }
@@ -121,6 +118,7 @@ func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.GroupVe
 	return nil
 }
 
+// Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
@@ -273,6 +271,7 @@ func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan 
 	return stopChWithTimeout
 }
 
+// IsSynced returns true if dependencyGraphBuilder is synced.
 func (gc *GarbageCollector) IsSynced() bool {
 	return gc.dependencyGraphBuilder.IsSynced()
 }
@@ -344,7 +343,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
+	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(context.TODO(), reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
@@ -402,7 +401,9 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 }
 
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
-	klog.V(2).Infof("processing item %s", item.identity)
+	klog.V(2).InfoS("Processing object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
+		"objectUID", item.identity.UID, "kind", item.identity.Kind)
+
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
 		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
@@ -515,7 +516,8 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 			// otherwise, default to background.
 			policy = metav1.DeletePropagationBackground
 		}
-		klog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		klog.V(2).InfoS("Deleting object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID, "kind", item.identity.Kind, "propagationPolicy", policy)
 		return gc.deleteObject(item.identity, &policy)
 	}
 }

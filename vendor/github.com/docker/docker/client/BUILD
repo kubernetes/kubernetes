@@ -100,7 +100,6 @@ go_library(
         "service_logs.go",
         "service_remove.go",
         "service_update.go",
-        "session.go",
         "swarm_get_unlock_key.go",
         "swarm_init.go",
         "swarm_inspect.go",

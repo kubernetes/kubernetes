@@ -41,7 +41,6 @@ go_test(
         "env_test.go",
         "tar_test.go",
     ],
-    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )

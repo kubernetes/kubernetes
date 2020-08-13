@@ -32,12 +32,12 @@ const administratorSID = "S-1-5-32-544"
 func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
 	currUser, err := user.Current()
 	if err != nil {
-		return nil, []error{errors.New("cannot get current user")}
+		return nil, []error{errors.Wrap(err, "cannot get current user")}
 	}
 
 	groupIds, err := currUser.GroupIds()
 	if err != nil {
-		return nil, []error{errors.New("cannot get group IDs for current user")}
+		return nil, []error{errors.Wrap(err, "cannot get group IDs for current user")}
 	}
 
 	for _, sid := range groupIds {

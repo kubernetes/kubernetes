@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +31,8 @@ const (
 	EndpointsResourceLock             = "endpoints"
 	ConfigMapsResourceLock            = "configmaps"
 	LeasesResourceLock                = "leases"
+	EndpointsLeasesResourceLock       = "endpointsleases"
+	ConfigMapsLeasesResourceLock      = "configmapsleases"
 )
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.
@@ -71,13 +74,13 @@ type ResourceLockConfig struct {
 // by the leaderelection code.
 type Interface interface {
 	// Get returns the LeaderElectionRecord
-	Get() (*LeaderElectionRecord, error)
+	Get(ctx context.Context) (*LeaderElectionRecord, []byte, error)
 
 	// Create attempts to create a LeaderElectionRecord
-	Create(ler LeaderElectionRecord) error
+	Create(ctx context.Context, ler LeaderElectionRecord) error
 
 	// Update will update and existing LeaderElectionRecord
-	Update(ler LeaderElectionRecord) error
+	Update(ctx context.Context, ler LeaderElectionRecord) error
 
 	// RecordEvent is used to record events
 	RecordEvent(string)
@@ -92,33 +95,46 @@ type Interface interface {
 
 // Manufacture will create a lock of a given type according to the input parameters
 func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
+	endpointsLock := &EndpointsLock{
+		EndpointsMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:     coreClient,
+		LockConfig: rlc,
+	}
+	configmapLock := &ConfigMapLock{
+		ConfigMapMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:     coreClient,
+		LockConfig: rlc,
+	}
+	leaseLock := &LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:     coordinationClient,
+		LockConfig: rlc,
+	}
 	switch lockType {
 	case EndpointsResourceLock:
-		return &EndpointsLock{
-			EndpointsMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
-			},
-			Client:     coreClient,
-			LockConfig: rlc,
-		}, nil
+		return endpointsLock, nil
 	case ConfigMapsResourceLock:
-		return &ConfigMapLock{
-			ConfigMapMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
-			},
-			Client:     coreClient,
-			LockConfig: rlc,
-		}, nil
+		return configmapLock, nil
 	case LeasesResourceLock:
-		return &LeaseLock{
-			LeaseMeta: metav1.ObjectMeta{
-				Namespace: ns,
-				Name:      name,
-			},
-			Client:     coordinationClient,
-			LockConfig: rlc,
+		return leaseLock, nil
+	case EndpointsLeasesResourceLock:
+		return &MultiLock{
+			Primary:   endpointsLock,
+			Secondary: leaseLock,
+		}, nil
+	case ConfigMapsLeasesResourceLock:
+		return &MultiLock{
+			Primary:   configmapLock,
+			Secondary: leaseLock,
 		}, nil
 	default:
 		return nil, fmt.Errorf("Invalid lock-type %s", lockType)

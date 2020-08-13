@@ -124,16 +124,3 @@ type Unknown struct {
 	// Unspecified means ContentTypeJSON.
 	ContentType string `protobuf:"bytes,4,opt,name=contentType"`
 }
-
-// VersionedObjects is used by Decoders to give callers a way to access all versions
-// of an object during the decoding process.
-//
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:deepcopy-gen=true
-type VersionedObjects struct {
-	// Objects is the set of objects retrieved during decoding, in order of conversion.
-	// The 0 index is the object as serialized on the wire. If conversion has occurred,
-	// other objects may be present. The right most object is the same as would be returned
-	// by a normal Decode call.
-	Objects []Object
-}

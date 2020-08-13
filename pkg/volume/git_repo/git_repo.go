@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -75,10 +75,6 @@ func (plugin *gitRepoPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 
 func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
-}
-
-func (plugin *gitRepoPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *gitRepoPlugin) RequiresRemount() bool {
@@ -240,7 +236,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 
 	volumeutil.SetReady(b.getMetaDir())
 	return nil

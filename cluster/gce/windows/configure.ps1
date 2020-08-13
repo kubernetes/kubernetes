@@ -131,34 +131,44 @@ try {
   Create-Directories
   Download-HelperScripts
 
+  DownloadAndInstall-Crictl
+  Configure-Crictl
+  Setup-ContainerRuntime
+  DownloadAndInstall-AuthPlugin
+  DownloadAndInstall-KubernetesBinaries
+  DownloadAndInstall-CSIProxyBinaries
+  Start-CSIProxy
+  Create-NodePki
+  Create-KubeletKubeconfig
+  Create-KubeproxyKubeconfig
+  Set-PodCidr
+  Configure-HostNetworkingService
+  Prepare-CniNetworking
+  Configure-HostDnsConf
+  Configure-GcePdTools
+  Configure-Kubelet
+
   # Even if Stackdriver is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {
     Install-LoggingAgent
     Configure-LoggingAgent
     Restart-LoggingAgent
   }
-
-  Create-DockerRegistryKey
-  Configure-Dockerd
-  Pull-InfraContainer
-  DownloadAndInstall-KubernetesBinaries
-  Create-NodePki
-  Create-KubeletKubeconfig
-  Create-KubeproxyKubeconfig
-  Set-PodCidr
-  Configure-HostNetworkingService
-  Configure-CniNetworking
-  Configure-HostDnsConf
-  Configure-GcePdTools
-  Configure-Kubelet
-
+  # Flush cache to disk before starting kubelet & kube-proxy services
+  # to make metadata server route and stackdriver service more persistent.
+  Write-Volumecache C -PassThru
   Start-WorkerServices
   Log-Output 'Waiting 15 seconds for node to join cluster.'
   Start-Sleep 15
   Verify-WorkerServices
 
   $config = New-FileRotationConfig
+  # TODO(random-liu): Generate containerd log into the log directory.
   Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
+
+  Pull-InfraContainer
+  # Flush cache to disk to persist the setup status
+  Write-Volumecache C -PassThru
 }
 catch {
   Write-Host 'Exception caught in script:'

@@ -30,6 +30,7 @@ import (
 	versioned "k8s.io/code-generator/_examples/apiserver/clientset/versioned"
 	example "k8s.io/code-generator/_examples/apiserver/informers/externalversions/example"
 	example2 "k8s.io/code-generator/_examples/apiserver/informers/externalversions/example2"
+	example3io "k8s.io/code-generator/_examples/apiserver/informers/externalversions/example3.io"
 	internalinterfaces "k8s.io/code-generator/_examples/apiserver/informers/externalversions/internalinterfaces"
 )
 
@@ -175,6 +176,7 @@ type SharedInformerFactory interface {
 
 	Example() example.Interface
 	SecondExample() example2.Interface
+	ThirdExample() example3io.Interface
 }
 
 func (f *sharedInformerFactory) Example() example.Interface {
@@ -183,4 +185,8 @@ func (f *sharedInformerFactory) Example() example.Interface {
 
 func (f *sharedInformerFactory) SecondExample() example2.Interface {
 	return example2.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) ThirdExample() example3io.Interface {
+	return example3io.New(f, f.namespace, f.tweakListOptions)
 }

@@ -25,7 +25,6 @@ go_test(
         "token_test.go",
         "version_test.go",
     ],
-    args = ["--kubeadm-path=$(location //cmd/kubeadm:kubeadm)"],
     data = ["//cmd/kubeadm"] + glob(["testdata/**"]),
     embed = [":go_default_library"],
     tags = [

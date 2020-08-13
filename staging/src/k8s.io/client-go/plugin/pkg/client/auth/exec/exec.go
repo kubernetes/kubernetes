@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,17 +39,26 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/connrotation"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
+const onRotateListWarningLength = 1000
+const installHintVerboseHelp = `
+
+It looks like you are trying to use a client-go credential plugin that is not installed.
+
+To learn more about this feature, consult the documentation available at:
+      https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins`
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
@@ -105,6 +116,44 @@ func (c *cache) put(s string, a *Authenticator) *Authenticator {
 	return a
 }
 
+// sometimes rate limits how often a function f() is called. Specifically, Do()
+// will run the provided function f() up to threshold times every interval
+// duration.
+type sometimes struct {
+	threshold int
+	interval  time.Duration
+
+	clock clock.Clock
+	mu    sync.Mutex
+
+	count  int       // times we have called f() in this window
+	window time.Time // beginning of current window of length interval
+}
+
+func (s *sometimes) Do(f func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := s.clock.Now()
+	if s.window.IsZero() {
+		s.window = now
+	}
+
+	// If we are no longer in our saved time window, then we get to reset our run
+	// count back to 0 and start increasing towards the threshold again.
+	if inWindow := now.Sub(s.window) < s.interval; !inWindow {
+		s.window = now
+		s.count = 0
+	}
+
+	// If we have not run the function more than threshold times in this current
+	// time window, we get to run it now!
+	if underThreshold := s.count < s.threshold; underThreshold {
+		s.count++
+		f()
+	}
+}
+
 // GetAuthenticator returns an exec-based plugin for providing client credentials.
 func GetAuthenticator(config *api.ExecConfig) (*Authenticator, error) {
 	return newAuthenticator(globalCache, config)
@@ -125,6 +174,13 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 		cmd:   config.Command,
 		args:  config.Args,
 		group: gv,
+
+		installHint: config.InstallHint,
+		sometimes: &sometimes{
+			threshold: 10,
+			interval:  time.Hour,
+			clock:     clock.RealClock{},
+		},
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
@@ -149,6 +205,12 @@ type Authenticator struct {
 	group schema.GroupVersion
 	env   []string
 
+	// Used to avoid log spew by rate limiting install hint printing. We didn't do
+	// this by interval based rate limiting alone since that way may have prevented
+	// the install hint from showing up for kubectl users.
+	sometimes   *sometimes
+	installHint string
+
 	// Stubbable for testing
 	stdin       io.Reader
 	stderr      io.Writer
@@ -164,7 +226,7 @@ type Authenticator struct {
 	cachedCreds *credentials
 	exp         time.Time
 
-	onRotate func()
+	onRotateList []func()
 }
 
 type credentials struct {
@@ -175,6 +237,15 @@ type credentials struct {
 // UpdateTransportConfig updates the transport.Config to use credentials
 // returned by the plugin.
 func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
+	// If a bearer token is present in the request - avoid the GetCert callback when
+	// setting up the transport, as that triggers the exec action if the server is
+	// also configured to allow client certificates for authentication. For requests
+	// like "kubectl get --token (token) pods" we should assume the intention is to
+	// use the provided token for authentication.
+	if c.HasTokenAuth() {
+		return nil
+	}
+
 	c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return &roundTripper{a, rt}
 	})
@@ -191,7 +262,15 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 	}
 	d := connrotation.NewDialer(dial)
-	a.onRotate = d.CloseAll
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onRotateList = append(a.onRotateList, d.CloseAll)
+	onRotateListLength := len(a.onRotateList)
+	if onRotateListLength > onRotateListWarningLength {
+		klog.Warningf("constructing many client instances from the same exec auth config can cause performance problems during cert rotation and can exhaust available network connections; %d clients constructed calling %q", onRotateListLength, a.cmd)
+	}
+
 	c.Dial = d.DialContext
 
 	return nil
@@ -251,6 +330,7 @@ func (a *Authenticator) cert() (*tls.Certificate, error) {
 func (a *Authenticator) getCreds() (*credentials, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
 	if a.cachedCreds != nil && !a.credsExpired() {
 		return a.cachedCreds, nil
 	}
@@ -258,6 +338,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 	if err := a.refreshCredsLocked(nil); err != nil {
 		return nil, err
 	}
+
 	return a.cachedCreds, nil
 }
 
@@ -310,7 +391,7 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 	}
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("exec: %v", err)
+		return a.wrapCmdRunErrorLocked(err)
 	}
 
 	_, gvk, err := codecs.UniversalDecoder(a.group).Decode(stdout.Bytes(), nil, cred)
@@ -346,6 +427,17 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		if err != nil {
 			return fmt.Errorf("failed parsing client key/certificate: %v", err)
 		}
+
+		// Leaf is initialized to be nil:
+		//  https://golang.org/pkg/crypto/tls/#X509KeyPair
+		// Leaf certificate is the first certificate:
+		//  https://golang.org/pkg/crypto/tls/#Certificate
+		// Populating leaf is useful for quickly accessing the underlying x509
+		// certificate values.
+		cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			return fmt.Errorf("failed parsing client leaf certificate: %v", err)
+		}
 		newCreds.cert = &cert
 	}
 
@@ -353,8 +445,52 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 	a.cachedCreds = newCreds
 	// Only close all connections when TLS cert rotates. Token rotation doesn't
 	// need the extra noise.
-	if a.onRotate != nil && oldCreds != nil && !reflect.DeepEqual(oldCreds.cert, a.cachedCreds.cert) {
-		a.onRotate()
+	if oldCreds != nil && !reflect.DeepEqual(oldCreds.cert, a.cachedCreds.cert) {
+		// Can be nil if the exec auth plugin only returned token auth.
+		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
+			metrics.ClientCertRotationAge.Observe(time.Now().Sub(oldCreds.cert.Leaf.NotBefore))
+		}
+		for _, onRotate := range a.onRotateList {
+			onRotate()
+		}
 	}
+
+	expiry := time.Time{}
+	if a.cachedCreds.cert != nil && a.cachedCreds.cert.Leaf != nil {
+		expiry = a.cachedCreds.cert.Leaf.NotAfter
+	}
+	expirationMetrics.set(a, expiry)
 	return nil
+}
+
+// wrapCmdRunErrorLocked pulls out the code to construct a helpful error message
+// for when the exec plugin's binary fails to Run().
+//
+// It must be called while holding the Authenticator's mutex.
+func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
+	switch err.(type) {
+	case *exec.Error: // Binary does not exist (see exec.Error).
+		builder := strings.Builder{}
+		fmt.Fprintf(&builder, "exec: executable %s not found", a.cmd)
+
+		a.sometimes.Do(func() {
+			fmt.Fprint(&builder, installHintVerboseHelp)
+			if a.installHint != "" {
+				fmt.Fprintf(&builder, "\n\n%s", a.installHint)
+			}
+		})
+
+		return errors.New(builder.String())
+
+	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
+		e := err.(*exec.ExitError)
+		return fmt.Errorf(
+			"exec: executable %s failed with exit code %d",
+			a.cmd,
+			e.ProcessState.ExitCode(),
+		)
+
+	default:
+		return fmt.Errorf("exec: %v", err)
+	}
 }

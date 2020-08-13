@@ -18,12 +18,12 @@ package aggregator
 
 import (
 	"crypto/sha512"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/go-openapi/spec"
+	jsoniter "github.com/json-iterator/go"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -80,7 +80,7 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 		return nil, "", http.StatusNotFound, nil
 	case http.StatusOK:
 		openAPISpec := &spec.Swagger{}
-		if err := json.Unmarshal(writer.data, openAPISpec); err != nil {
+		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(writer.data, openAPISpec); err != nil {
 			return nil, "", 0, err
 		}
 		newEtag = writer.Header().Get("Etag")

@@ -132,6 +132,10 @@ func TestBackup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open data dir: %v", err)
 	}
+	_, err = os.Create(filepath.Join(path, "data-dir", "empty.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = d.Backup()
 	if err != nil {
 		t.Fatalf("Failed to backup data directory %s: %v", d.path, err)
@@ -151,9 +155,12 @@ func TestBackup(t *testing.T) {
 
 func newTestPath(t *testing.T) string {
 	path, err := ioutil.TempDir("", "etcd-migrate-test-")
-	os.Chmod(path, 0777)
 	if err != nil {
 		t.Fatalf("Failed to create tmp dir for test: %v", err)
+	}
+	err = os.Chmod(path, 0777)
+	if err != nil {
+		t.Fatalf("Failed to granting permission to tmp dir for test: %v", err)
 	}
 	return path
 }

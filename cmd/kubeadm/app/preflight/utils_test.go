@@ -42,8 +42,8 @@ func TestGetKubeletVersion(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.output, func(t *testing.T) {
 			fcmd := fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-					func() ([]byte, error) { return []byte(tc.output), tc.err },
+				OutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) { return []byte(tc.output), nil, tc.err },
 				},
 			}
 			fexec := &fakeexec.FakeExec{

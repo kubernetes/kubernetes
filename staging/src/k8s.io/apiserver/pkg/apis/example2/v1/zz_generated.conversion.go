@@ -44,16 +44,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ReplicaSetSpec)(nil), (*example.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetSpec_To_example_ReplicaSetSpec(a.(*ReplicaSetSpec), b.(*example.ReplicaSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*example.ReplicaSetSpec)(nil), (*ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_example_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*example.ReplicaSetSpec), b.(*ReplicaSetSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*ReplicaSetStatus)(nil), (*example.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ReplicaSetStatus_To_example_ReplicaSetStatus(a.(*ReplicaSetStatus), b.(*example.ReplicaSetStatus), scope)
 	}); err != nil {

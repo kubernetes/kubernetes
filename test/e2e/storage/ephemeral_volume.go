@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -36,7 +37,6 @@ import (
 var (
 	volumePath = "/test-volume"
 	volumeName = "test-volume"
-	mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 )
 
 var _ = utils.SIGDescribe("Ephemeralstorage", func() {
@@ -54,7 +54,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 		for _, testSource := range invalidEphemeralSource("pod-ephm-test") {
 			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
-				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(pod)
+				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 
 				// Allow it to sleep for 30 seconds
@@ -84,7 +84,7 @@ func testEphemeralVolumePod(f *framework.Framework, volumeType string, source *v
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("test-container-subpath-%s", suffix),
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,

@@ -17,10 +17,13 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
-type singleNumaNodePolicy struct{}
+type singleNumaNodePolicy struct {
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+}
 
 var _ Policy = &singleNumaNodePolicy{}
 
@@ -28,23 +31,47 @@ var _ Policy = &singleNumaNodePolicy{}
 const PolicySingleNumaNode string = "single-numa-node"
 
 // NewSingleNumaNodePolicy returns single-numa-node policy.
-func NewSingleNumaNodePolicy() Policy {
-	return &singleNumaNodePolicy{}
+func NewSingleNumaNodePolicy(numaNodes []int) Policy {
+	return &singleNumaNodePolicy{numaNodes: numaNodes}
 }
 
 func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
-func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	if !hint.Preferred || hint.NUMANodeAffinity.Count() > 1 {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  "Topology Affinity Error",
-			Message: "Resources cannot be allocated with Topology Locality",
+func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {
+	return hint.Preferred
+}
+
+// Return hints that have valid bitmasks with exactly one bit set.
+func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
+	var filteredResourcesHints [][]TopologyHint
+	for _, oneResourceHints := range allResourcesHints {
+		var filtered []TopologyHint
+		for _, hint := range oneResourceHints {
+			if hint.NUMANodeAffinity == nil && hint.Preferred == true {
+				filtered = append(filtered, hint)
+			}
+			if hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() == 1 && hint.Preferred == true {
+				filtered = append(filtered, hint)
+			}
 		}
+		filteredResourcesHints = append(filteredResourcesHints, filtered)
 	}
-	return lifecycle.PodAdmitResult{
-		Admit: true,
+	return filteredResourcesHints
+}
+
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+	filteredHints := filterProvidersHints(providersHints)
+	// Filter to only include don't cares and hints with a single NUMA node.
+	singleNumaHints := filterSingleNumaHints(filteredHints)
+	bestHint := mergeFilteredHints(p.numaNodes, singleNumaHints)
+
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
+	if bestHint.NUMANodeAffinity.IsEqual(defaultAffinity) {
+		bestHint = TopologyHint{nil, bestHint.Preferred}
 	}
+
+	admit := p.canAdmitPodResult(&bestHint)
+	return bestHint, admit
 }

@@ -19,7 +19,7 @@ package utils
 import (
 	"io/ioutil"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func MakeTempDirOrDie(prefix string, baseDir string) string {

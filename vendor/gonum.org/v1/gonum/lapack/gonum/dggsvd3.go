@@ -13,13 +13,13 @@ import (
 
 // Dggsvd3 computes the generalized singular value decomposition (GSVD)
 // of an m×n matrix A and p×n matrix B:
-//  U^T*A*Q = D1*[ 0 R ]
+//  Uᵀ*A*Q = D1*[ 0 R ]
 //
-//  V^T*B*Q = D2*[ 0 R ]
+//  Vᵀ*B*Q = D2*[ 0 R ]
 // where U, V and Q are orthogonal matrices.
 //
 // Dggsvd3 returns k and l, the dimensions of the sub-blocks. k+l
-// is the effective numerical rank of the (m+p)×n matrix [ A^T B^T ]^T.
+// is the effective numerical rank of the (m+p)×n matrix [ Aᵀ Bᵀ ]ᵀ.
 // R is a (k+l)×(k+l) nonsingular upper triangular matrix, D1 and
 // D2 are m×(k+l) and p×(k+l) diagonal matrices and of the following
 // structures, respectively:

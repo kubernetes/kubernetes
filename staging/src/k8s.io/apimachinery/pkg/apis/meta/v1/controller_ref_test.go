@@ -97,6 +97,39 @@ func TestGetControllerOf(t *testing.T) {
 	}
 }
 
+func BenchmarkGetControllerOf(b *testing.B) {
+	gvk := schema.GroupVersionKind{
+		Group:   "group",
+		Version: "v1",
+		Kind:    "Kind",
+	}
+	obj1 := &metaObj{
+		ObjectMeta: ObjectMeta{
+			UID:  "9d0cdf8a-dedc-11e9-bf91-42010a800167",
+			Name: "my-object",
+		},
+	}
+	controllerRef := NewControllerRef(obj1, gvk)
+	controllerRef2 := *controllerRef
+	controllerRef2.Controller = nil
+	obj2 := &metaObj{
+		ObjectMeta: ObjectMeta{
+			UID:             "uid2",
+			Name:            "name1",
+			OwnerReferences: []OwnerReference{controllerRef2, controllerRef2, *controllerRef},
+		},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		c := GetControllerOf(obj2)
+		if c.Name != controllerRef.Name || c.UID != controllerRef.UID {
+			b.Errorf("Incorrect result of GetControllerOf: %v", c)
+		}
+	}
+}
+
 func TestIsControlledBy(t *testing.T) {
 	gvk := schema.GroupVersionKind{
 		Group:   "group",

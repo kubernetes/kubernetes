@@ -4,6 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "authorization.go",
+        "authorization_sas.go",
+        "authorization_storage.go",
         "autorest.go",
         "client.go",
         "error.go",
@@ -40,6 +42,7 @@ filegroup(
         "//vendor/github.com/Azure/go-autorest/autorest/adal:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/date:all-srcs",
+        "//vendor/github.com/Azure/go-autorest/autorest/mocks:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/to:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/validation:all-srcs",
     ],

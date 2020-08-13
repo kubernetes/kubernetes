@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/cmplx"
 
+	"gonum.org/v1/gonum/blas/cblas128"
 	"gonum.org/v1/gonum/floats"
 )
 
@@ -25,6 +26,12 @@ type CMatrix interface {
 	// This method may be implemented using the Conjugate type, which
 	// provides an implicit matrix conjugate transpose.
 	H() CMatrix
+}
+
+// A RawCMatrixer can return a cblas128.General representation of the receiver. Changes to the cblas128.General.Data
+// slice will be reflected in the original matrix, changes to the Rows, Cols and Stride fields will not.
+type RawCMatrixer interface {
+	RawCMatrix() cblas128.General
 }
 
 var (

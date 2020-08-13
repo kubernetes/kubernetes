@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// GoMock - a mock framework for Go.
+// Package gomock is a mock framework for Go.
 //
 // Standard usage:
 //   (1) Define an interface that you wish to mock.
@@ -63,8 +63,8 @@ import (
 	"sync"
 )
 
-// A TestReporter is something that can be used to report test failures.
-// It is satisfied by the standard library's *testing.T.
+// A TestReporter is something that can be used to report test failures.  It
+// is satisfied by the standard library's *testing.T.
 type TestReporter interface {
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
@@ -77,14 +77,35 @@ type TestHelper interface {
 	Helper()
 }
 
-// A Controller represents the top-level control of a mock ecosystem.
-// It defines the scope and lifetime of mock objects, as well as their expectations.
-// It is safe to call Controller's methods from multiple goroutines.
+// A Controller represents the top-level control of a mock ecosystem.  It
+// defines the scope and lifetime of mock objects, as well as their
+// expectations.  It is safe to call Controller's methods from multiple
+// goroutines. Each test should create a new Controller and invoke Finish via
+// defer.
+//
+//   func TestFoo(t *testing.T) {
+//     ctrl := gomock.NewController(st)
+//     defer ctrl.Finish()
+//     // ..
+//   }
+//
+//   func TestBar(t *testing.T) {
+//     t.Run("Sub-Test-1", st) {
+//       ctrl := gomock.NewController(st)
+//       defer ctrl.Finish()
+//       // ..
+//     })
+//     t.Run("Sub-Test-2", st) {
+//       ctrl := gomock.NewController(st)
+//       defer ctrl.Finish()
+//       // ..
+//     })
+//   })
 type Controller struct {
 	// T should only be called within a generated mock. It is not intended to
 	// be used in user code and may be changed in future versions. T is the
 	// TestReporter passed in when creating the Controller via NewController.
-	// If the TestReporter does not implment a TestHelper it will be wrapped
+	// If the TestReporter does not implement a TestHelper it will be wrapped
 	// with a nopTestHelper.
 	T             TestHelper
 	mu            sync.Mutex
@@ -92,6 +113,8 @@ type Controller struct {
 	finished      bool
 }
 
+// NewController returns a new Controller. It is the preferred way to create a
+// Controller.
 func NewController(t TestReporter) *Controller {
 	h, ok := t.(TestHelper)
 	if !ok {
@@ -135,6 +158,7 @@ type nopTestHelper struct {
 
 func (h nopTestHelper) Helper() {}
 
+// RecordCall is called by a mock. It should not be called by user code.
 func (ctrl *Controller) RecordCall(receiver interface{}, method string, args ...interface{}) *Call {
 	ctrl.T.Helper()
 
@@ -148,6 +172,7 @@ func (ctrl *Controller) RecordCall(receiver interface{}, method string, args ...
 	panic("unreachable")
 }
 
+// RecordCallWithMethodType is called by a mock. It should not be called by user code.
 func (ctrl *Controller) RecordCallWithMethodType(receiver interface{}, method string, methodType reflect.Type, args ...interface{}) *Call {
 	ctrl.T.Helper()
 
@@ -160,6 +185,7 @@ func (ctrl *Controller) RecordCallWithMethodType(receiver interface{}, method st
 	return call
 }
 
+// Call is called by a mock. It should not be called by user code.
 func (ctrl *Controller) Call(receiver interface{}, method string, args ...interface{}) []interface{} {
 	ctrl.T.Helper()
 
@@ -200,6 +226,9 @@ func (ctrl *Controller) Call(receiver interface{}, method string, args ...interf
 	return rets
 }
 
+// Finish checks to see if all the methods that were expected to be called
+// were called. It should be invoked for each Controller. It is not idempotent
+// and therefore can only be invoked once.
 func (ctrl *Controller) Finish() {
 	ctrl.T.Helper()
 

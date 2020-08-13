@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+
 	"github.com/spf13/pflag"
 
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
@@ -43,6 +44,7 @@ func (o *EndpointSliceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.Int32Var(&o.ConcurrentServiceEndpointSyncs, "concurrent-service-endpoint-syncs", o.ConcurrentServiceEndpointSyncs, "The number of service endpoint syncing operations that will be done concurrently. Larger number = faster endpoint slice updating, but more CPU (and network) load. Defaults to 5.")
 	fs.Int32Var(&o.MaxEndpointsPerSlice, "max-endpoints-per-slice", o.MaxEndpointsPerSlice, "The maximum number of endpoints that will be added to an EndpointSlice. More endpoints per slice will result in less endpoint slices, but larger resources. Defaults to 100.")
+	fs.DurationVar(&o.EndpointUpdatesBatchPeriod.Duration, "endpointslice-updates-batch-period", o.EndpointUpdatesBatchPeriod.Duration, "The length of endpoint slice updates batching period. Processing of pod changes will be delayed by this duration to join them with potential upcoming updates and reduce the overall number of endpoints updates. Larger number = higher endpoint programming latency, but lower number of endpoints revision generated")
 }
 
 // ApplyTo fills up EndpointSliceController config with options.
@@ -53,6 +55,7 @@ func (o *EndpointSliceControllerOptions) ApplyTo(cfg *endpointsliceconfig.Endpoi
 
 	cfg.ConcurrentServiceEndpointSyncs = o.ConcurrentServiceEndpointSyncs
 	cfg.MaxEndpointsPerSlice = o.MaxEndpointsPerSlice
+	cfg.EndpointUpdatesBatchPeriod = o.EndpointUpdatesBatchPeriod
 
 	return nil
 }

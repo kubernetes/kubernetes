@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
+	"context"
 	"net"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -35,7 +37,7 @@ var (
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the networking as expected.
 // in case you want to skip this test use SKIP=setup-networking
-var _ = KubeadmDescribe("networking [setup-networking]", func() {
+var _ = Describe("networking [setup-networking]", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("networking")
@@ -75,17 +77,17 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 		ginkgo.Context("podSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if dualStack {
-					framework.Skipf("Skipping because cluster is dual-stack")
+					e2eskipper.Skipf("Skipping because cluster is dual-stack")
 				}
 				if !podSubnetInKubeadmConfig {
-					framework.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
+					e2eskipper.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
 				}
 				cc := getClusterConfiguration(f.ClientSet)
 				if _, ok := cc["networking"]; ok {
 					netCC := cc["networking"].(map[interface{}]interface{})
 					if ps, ok := netCC["podSubnet"]; ok {
 						// Check that the pod CIDR allocated to the node(s) is within the kubeadm-config podCIDR.
-						nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+						nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 						framework.ExpectNoError(err, "error listing nodes")
 						for _, node := range nodes.Items {
 							if !subnetWithinSubnet(ps.(string), node.Spec.PodCIDR) {
@@ -99,10 +101,10 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 		ginkgo.Context("serviceSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if dualStack {
-					framework.Skipf("Skipping because cluster is dual-stack")
+					e2eskipper.Skipf("Skipping because cluster is dual-stack")
 				}
 				if !serviceSubnetInKubeadmConfig {
-					framework.Skipf("Skipping because serviceSubnet was not specified in kubeadm-config")
+					e2eskipper.Skipf("Skipping because serviceSubnet was not specified in kubeadm-config")
 				}
 				cc := getClusterConfiguration(f.ClientSet)
 				if _, ok := cc["networking"]; ok {
@@ -110,7 +112,7 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 					if ss, ok := netCC["serviceSubnet"]; ok {
 						// Get the kubernetes service in the default namespace.
 						// Check that service CIDR allocated is within the serviceSubnet range.
-						svc, err := f.ClientSet.CoreV1().Services("default").Get("kubernetes", metav1.GetOptions{})
+						svc, err := f.ClientSet.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 						framework.ExpectNoError(err, "error getting Service %q from namespace %q", "kubernetes", "default")
 						if !ipWithinSubnet(ss.(string), svc.Spec.ClusterIP) {
 							framework.Failf("failed due to service(%v) cluster-IP %v not inside configured service subnet: %s", svc.Name, svc.Spec.ClusterIP, ss)
@@ -124,16 +126,16 @@ var _ = KubeadmDescribe("networking [setup-networking]", func() {
 		ginkgo.Context("podSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if !dualStack {
-					framework.Skipf("Skipping because cluster is not dual-stack")
+					e2eskipper.Skipf("Skipping because cluster is not dual-stack")
 				}
 				if !podSubnetInKubeadmConfig {
-					framework.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
+					e2eskipper.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
 				}
 				cc := getClusterConfiguration(f.ClientSet)
 				if _, ok := cc["networking"]; ok {
 					netCC := cc["networking"].(map[interface{}]interface{})
 					if ps, ok := netCC["podSubnet"]; ok {
-						nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+						nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 						framework.ExpectNoError(err, "error listing nodes")
 						// Check that the pod CIDRs allocated to the node(s) are within the kubeadm-config podCIDR.
 						var found bool

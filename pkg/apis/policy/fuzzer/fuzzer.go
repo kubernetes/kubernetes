@@ -28,7 +28,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			s.PodDisruptionsAllowed = int32(c.Rand.Intn(2))
+			s.DisruptionsAllowed = int32(c.Rand.Intn(2))
 		},
 		func(psp *policy.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again

@@ -29,7 +29,7 @@ option java_multiple_files = true;
 option java_outer_classname = "OpenAPIExtensionV1";
 
 // The Java package name must be proto package name with proper prefix.
-option java_package = "org.openapic.v1";
+option java_package = "org.gnostic.v1";
 
 // A reasonable prefix for the Objective-C symbols generated from the package.
 // It should at a minimum be 3 characters long, all uppercase, and convention
@@ -53,7 +53,7 @@ message Version {
 message ExtensionHandlerRequest {
 
   // The OpenAPI descriptions that were explicitly listed on the command line.
-  // The specifications will appear in the order they are specified to openapic.
+  // The specifications will appear in the order they are specified to gnostic.
   Wrapper wrapper = 1;
 
   // The version number of openapi compiler.

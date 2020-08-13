@@ -17,13 +17,15 @@ limitations under the License.
 package autoscale
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -73,9 +75,11 @@ type AutoscaleOptions struct {
 	args             []string
 	enforceNamespace bool
 	namespace        string
-	dryRun           bool
+	dryRunStrategy   cmdutil.DryRunStrategy
+	dryRunVerifier   *resource.DryRunVerifier
 	builder          *resource.Builder
-	generatorFunc    func(string, *meta.RESTMapping) (generate.StructuredGenerator, error)
+	generatorFunc    func(name, refName string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error)
+	fieldManager     string
 
 	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
 	scaleKindResolver scale.ScaleKindResolver
@@ -128,19 +132,28 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-autoscale")
 	return cmd
 }
 
 // Complete verifies command line arguments and loads data from the command environment
 func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
-	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
-	o.builder = f.NewBuilder()
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+	o.builder = f.NewBuilder()
 	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)
 	o.args = args
 	o.RecordFlags.Complete(cmd)
@@ -157,7 +170,10 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.HPAClient = kubeClient.AutoscalingV1()
 
 	// get the generator
-	o.generatorFunc = func(name string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error) {
+	o.generatorFunc = func(name, refName string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error) {
+		if len(name) == 0 {
+			name = refName
+		}
 		switch o.Generator {
 		case generateversioned.HorizontalPodAutoscalerV1GeneratorName:
 			return &generateversioned.HorizontalPodAutoscalerGeneratorV1{
@@ -165,7 +181,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 				MinReplicas:        o.Min,
 				MaxReplicas:        o.Max,
 				CPUPercent:         o.CPUPercent,
-				ScaleRefName:       name,
+				ScaleRefName:       refName,
 				ScaleRefKind:       mapping.GroupVersionKind.Kind,
 				ScaleRefAPIVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}, nil
@@ -181,9 +197,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 
 		return o.PrintFlags.ToPrinter()
 	}
@@ -229,7 +243,7 @@ func (o *AutoscaleOptions) Run() error {
 			return fmt.Errorf("cannot autoscale a %v: %v", mapping.GroupVersionKind.Kind, err)
 		}
 
-		generator, err := o.generatorFunc(info.Name, mapping)
+		generator, err := o.generatorFunc(o.Name, info.Name, mapping)
 		if err != nil {
 			return err
 		}
@@ -248,7 +262,7 @@ func (o *AutoscaleOptions) Run() error {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		if o.dryRun {
+		if o.dryRunStrategy == cmdutil.DryRunClient {
 			count++
 
 			printer, err := o.ToPrinter("created")
@@ -262,7 +276,17 @@ func (o *AutoscaleOptions) Run() error {
 			return err
 		}
 
-		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(hpa)
+		createOptions := metav1.CreateOptions{}
+		if o.fieldManager != "" {
+			createOptions.FieldManager = o.fieldManager
+		}
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			if err := o.dryRunVerifier.HasSupport(hpa.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(context.TODO(), hpa, createOptions)
 		if err != nil {
 			return err
 		}

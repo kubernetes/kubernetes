@@ -43,8 +43,7 @@
   "eventTime": "2482-03-20T23:11:25.602224Z",
   "series": {
     "count": -1971381490,
-    "lastObservedTime": "2429-02-18T17:57:56.343118Z",
-    "state": "鯹)晿\u003c"
+    "lastObservedTime": "2429-02-18T17:57:56.343118Z"
   },
   "reportingController": "19",
   "reportingInstance": "20",
@@ -54,7 +53,7 @@
     "kind": "23",
     "namespace": "24",
     "name": "25",
-    "uid": "Ĩɘ.蘯6ċV夸eɑeʤ脽ěĂ",
+    "uid": "鯹)晿\u003c",
     "apiVersion": "26",
     "resourceVersion": "27",
     "fieldPath": "28"
@@ -63,7 +62,7 @@
     "kind": "29",
     "namespace": "30",
     "name": "31",
-    "uid": "蓏Ŋ",
+    "uid": ",c鮽ort昍řČ扷5ƗǸƢ6/ʕ",
     "apiVersion": "32",
     "resourceVersion": "33",
     "fieldPath": "34"
@@ -74,7 +73,7 @@
     "component": "37",
     "host": "38"
   },
-  "deprecatedFirstTimestamp": "2964-12-12T12:04:40Z",
-  "deprecatedLastTimestamp": "2452-08-27T22:01:15Z",
-  "deprecatedCount": 1804227960
+  "deprecatedFirstTimestamp": "2235-03-09T09:44:15Z",
+  "deprecatedLastTimestamp": "2964-12-12T12:04:40Z",
+  "deprecatedCount": -180456314
 }

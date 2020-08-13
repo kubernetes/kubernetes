@@ -2,10 +2,15 @@
 
 approvers:
 - Random-Liu
-- dchen1107
 - derekwaynecarr
 - tallclair
-- vishh
 - yujuhong
+- dashpole
+- sjenning
+emeritus_approvers:
+- vishh
+- dchen1107
 reviewers:
 - sig-node-reviewers
+labels:
+- sig/node

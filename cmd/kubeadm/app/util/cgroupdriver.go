@@ -48,7 +48,7 @@ func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
 func callDockerInfo(execer utilsexec.Interface) (string, error) {
 	out, err := execer.Command("docker", "info", "-f", "{{.CgroupDriver}}").Output()
 	if err != nil {
-		return "", errors.Wrap(err, "cannot execute 'docker info'")
+		return "", errors.Wrap(err, "cannot execute 'docker info -f {{.CgroupDriver}}'")
 	}
 	return string(out), nil
 }

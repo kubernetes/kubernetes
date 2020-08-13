@@ -28,7 +28,9 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -55,9 +57,17 @@ var (
 	defaultBackendPort  = intstr.FromInt(80)
 	defaultLoadBalancer = "127.0.0.1"
 	defaultPath         = "/foo"
+	defaultPathType     = networking.PathTypeImplementationSpecific
 	defaultPathMap      = map[string]string{defaultPath: defaultBackendName}
 	defaultTLS          = []networking.IngressTLS{
-		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
+		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "foosecret"},
+	}
+	serviceBackend = &networking.IngressServiceBackend{
+		Name: "defaultbackend",
+		Port: networking.ServiceBackendPort{
+			Name:   "",
+			Number: 80,
+		},
 	}
 )
 
@@ -67,10 +77,16 @@ func toHTTPIngressPaths(pathMap map[string]string) []networking.HTTPIngressPath 
 	httpPaths := []networking.HTTPIngressPath{}
 	for path, backend := range pathMap {
 		httpPaths = append(httpPaths, networking.HTTPIngressPath{
-			Path: path,
+			Path:     path,
+			PathType: &defaultPathType,
 			Backend: networking.IngressBackend{
-				ServiceName: backend,
-				ServicePort: defaultBackendPort,
+				Service: &networking.IngressServiceBackend{
+					Name: backend,
+					Port: networking.ServiceBackendPort{
+						Name:   defaultBackendPort.StrVal,
+						Number: defaultBackendPort.IntVal,
+					},
+				},
 			},
 		})
 	}
@@ -99,9 +115,8 @@ func newIngress(pathMap map[string]string) *networking.Ingress {
 			Namespace: namespace,
 		},
 		Spec: networking.IngressSpec{
-			Backend: &networking.IngressBackend{
-				ServiceName: defaultBackendName,
-				ServicePort: defaultBackendPort,
+			DefaultBackend: &networking.IngressBackend{
+				Service: serviceBackend.DeepCopy(),
 			},
 			Rules: toIngressRules(map[string]IngressRuleValues{
 				defaultHostname: pathMap,
@@ -129,11 +144,11 @@ func TestCreate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store)
 	ingress := validIngress()
 	noDefaultBackendAndRules := validIngress()
-	noDefaultBackendAndRules.Spec.Backend = &networking.IngressBackend{}
+	noDefaultBackendAndRules.Spec.DefaultBackend.Service = &networking.IngressServiceBackend{}
 	noDefaultBackendAndRules.Spec.Rules = []networking.IngressRule{}
 	badPath := validIngress()
 	badPath.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
-		"foo.bar.com": {"/invalid[": "svc"}})
+		"foo.bar.com": {"invalid-no-leading-slash": "svc"}})
 	test.TestCreate(
 		// valid
 		ingress,
@@ -158,11 +173,11 @@ func TestUpdate(t *testing.T) {
 			})
 			object.Spec.TLS = append(object.Spec.TLS, networking.IngressTLS{
 				Hosts:      []string{"*.google.com"},
-				SecretName: "googleSecret",
+				SecretName: "googlesecret",
 			})
 			return object
 		},
-		// invalid updateFunc: ObjeceMeta is not to be tampered with.
+		// invalid updateFunc: ObjectMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*networking.Ingress)
 			object.Name = ""
@@ -172,7 +187,7 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*networking.Ingress)
 			object.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
-				"foo.bar.com": {"/invalid[": "svc"}})
+				"foo.bar.com": {"invalid-no-leading-slash": "svc"}})
 			return object
 		},
 	)

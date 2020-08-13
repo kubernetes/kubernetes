@@ -199,6 +199,11 @@ type Benchmarker interface {
 //	ginkgo bootstrap
 func RunSpecs(t GinkgoTestingT, description string) bool {
 	specReporters := []Reporter{buildDefaultReporter()}
+	if config.DefaultReporterConfig.ReportFile != "" {
+		reportFile := config.DefaultReporterConfig.ReportFile
+		specReporters[0] = reporters.NewJUnitReporter(reportFile)
+		return RunSpecsWithDefaultAndCustomReporters(t, description, specReporters)
+	}
 	return RunSpecsWithCustomReporters(t, description, specReporters)
 }
 
@@ -283,7 +288,7 @@ func GinkgoRecover() {
 //BeforeEach, AfterEach, JustBeforeEach, It, and Measurement blocks.
 //
 //In addition you can nest Describe, Context and When blocks.  Describe, Context and When blocks are functionally
-//equivalent.  The difference is purely semantic -- you typical Describe the behavior of an object
+//equivalent.  The difference is purely semantic -- you typically Describe the behavior of an object
 //or method and, within that Describe, outline a number of Contexts and Whens.
 func Describe(text string, body func()) bool {
 	globalSuite.PushContainerNode(text, body, types.FlagTypeNone, codelocation.New(1))
@@ -499,7 +504,7 @@ func AfterSuite(body interface{}, timeout ...float64) bool {
 //until that node is done before running.
 //
 //SynchronizedBeforeSuite accomplishes this by taking *two* function arguments.  The first is only run on parallel node #1.  The second is
-//run on all nodes, but *only* after the first function completes succesfully.  Ginkgo also makes it possible to send data from the first function (on Node 1)
+//run on all nodes, but *only* after the first function completes successfully.  Ginkgo also makes it possible to send data from the first function (on Node 1)
 //to the second function (on all the other nodes).
 //
 //The functions have the following signatures.  The first function (which only runs on node 1) has the signature:

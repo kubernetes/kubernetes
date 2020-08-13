@@ -28,7 +28,6 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	admissionregistration "k8s.io/client-go/informers/admissionregistration"
 	apps "k8s.io/client-go/informers/apps"
-	auditregistration "k8s.io/client-go/informers/auditregistration"
 	autoscaling "k8s.io/client-go/informers/autoscaling"
 	batch "k8s.io/client-go/informers/batch"
 	certificates "k8s.io/client-go/informers/certificates"
@@ -37,6 +36,7 @@ import (
 	discovery "k8s.io/client-go/informers/discovery"
 	events "k8s.io/client-go/informers/events"
 	extensions "k8s.io/client-go/informers/extensions"
+	flowcontrol "k8s.io/client-go/informers/flowcontrol"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	networking "k8s.io/client-go/informers/networking"
 	node "k8s.io/client-go/informers/node"
@@ -191,7 +191,6 @@ type SharedInformerFactory interface {
 
 	Admissionregistration() admissionregistration.Interface
 	Apps() apps.Interface
-	Auditregistration() auditregistration.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
@@ -200,6 +199,7 @@ type SharedInformerFactory interface {
 	Discovery() discovery.Interface
 	Events() events.Interface
 	Extensions() extensions.Interface
+	Flowcontrol() flowcontrol.Interface
 	Networking() networking.Interface
 	Node() node.Interface
 	Policy() policy.Interface
@@ -215,10 +215,6 @@ func (f *sharedInformerFactory) Admissionregistration() admissionregistration.In
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
 	return apps.New(f, f.namespace, f.tweakListOptions)
-}
-
-func (f *sharedInformerFactory) Auditregistration() auditregistration.Interface {
-	return auditregistration.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Autoscaling() autoscaling.Interface {
@@ -251,6 +247,10 @@ func (f *sharedInformerFactory) Events() events.Interface {
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
 	return extensions.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Flowcontrol() flowcontrol.Interface {
+	return flowcontrol.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Networking() networking.Interface {

@@ -21,6 +21,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# start the cache mutation detector by default so that cache mutators will be found
+KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
+export KUBE_CACHE_MUTATION_DETECTOR
+
+# panic the server on watch decode errors since they are considered coder mistakes
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+export KUBE_PANIC_WATCH_DECODE_ERROR
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
@@ -61,6 +69,7 @@ function run_kube_apiserver() {
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
+    --client-ca-file=hack/testdata/ca.crt \
     --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
   export APISERVER_PID=$!
 
@@ -68,7 +77,7 @@ function run_kube_apiserver() {
 }
 
 # Runs run_kube_controller_manager
-# 
+#
 # Exports:
 #   CTLRMGR_PID
 function run_kube_controller_manager() {
@@ -88,7 +97,7 @@ function run_kube_controller_manager() {
 
 # Creates a node object with name 127.0.0.1. This is required because we do not
 # run kubelet.
-# 
+#
 # Exports:
 #   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
@@ -113,8 +122,17 @@ __EOF__
 # 2) $WHAT is not empty and kubeadm is part of $WHAT
 WHAT=${WHAT:-}
 if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
-  kube::log::status "Running kubeadm tests"  
-  run_kubeadm_tests
+  kube::log::status "Running kubeadm tests"
+
+  # build kubeadm
+  make all -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
+  # unless the user sets KUBEADM_PATH, assume that "make all..." just built it
+  export KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/_output/local/go/bin/kubeadm}"
+  # invoke the tests
+  make -C "${KUBE_ROOT}" test \
+    WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
+    KUBE_TIMEOUT=--timeout=240s
+
   # if we ONLY want to run kubeadm, then exit here.
   if [[ ${WHAT} == "kubeadm" ]]; then
     kube::log::status "TESTS PASSED"

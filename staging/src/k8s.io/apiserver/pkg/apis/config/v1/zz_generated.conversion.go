@@ -179,7 +179,7 @@ func Convert_config_IdentityConfiguration_To_v1_IdentityConfiguration(in *config
 
 func autoConvert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfiguration, out *config.KMSConfiguration, s conversion.Scope) error {
 	out.Name = in.Name
-	out.CacheSize = in.CacheSize
+	out.CacheSize = (*int32)(unsafe.Pointer(in.CacheSize))
 	out.Endpoint = in.Endpoint
 	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
@@ -192,7 +192,7 @@ func Convert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfiguration
 
 func autoConvert_config_KMSConfiguration_To_v1_KMSConfiguration(in *config.KMSConfiguration, out *KMSConfiguration, s conversion.Scope) error {
 	out.Name = in.Name
-	out.CacheSize = in.CacheSize
+	out.CacheSize = (*int32)(unsafe.Pointer(in.CacheSize))
 	out.Endpoint = in.Endpoint
 	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil

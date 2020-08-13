@@ -23,12 +23,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// Indexer is a storage interface that lets you list objects using multiple indexing functions.
-// There are three kinds of strings here.
-// One is a storage key, as defined in the Store interface.
-// Another kind is a name of an index.
-// The third kind of string is an "indexed value", which is produced by an
-// IndexFunc and can be a field value or any other string computed from the object.
+// Indexer extends Store with multiple indices and restricts each
+// accumulator to simply hold the current object (and be empty after
+// Delete).
+//
+// There are three kinds of strings here:
+// 1. a storage key, as defined in the Store interface,
+// 2. a name of an index, and
+// 3. an "indexed value", which is produced by an IndexFunc and
+//    can be a field value or any other string computed from the object.
 type Indexer interface {
 	Store
 	// Index returns the stored objects whose set of indexed values
@@ -56,7 +59,7 @@ type Indexer interface {
 type IndexFunc func(obj interface{}) ([]string, error)
 
 // IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc.  This is only useful if your index function returns
-// unique values for every object.  This is conversion can create errors when more than one key is found.  You
+// unique values for every object.  This conversion can create errors when more than one key is found.  You
 // should prefer to make proper key and index functions.
 func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 	return func(obj interface{}) (string, error) {

@@ -36,7 +36,9 @@ func (o *NodeIPAMControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 	fs.StringVar(&o.ServiceCIDR, "service-cluster-ip-range", o.ServiceCIDR, "CIDR Range for Services in cluster. Requires --allocate-node-cidrs to be true")
-	fs.Int32Var(&o.NodeCIDRMaskSize, "node-cidr-mask-size", o.NodeCIDRMaskSize, "Mask size for node cidr in cluster.")
+	fs.Int32Var(&o.NodeCIDRMaskSize, "node-cidr-mask-size", o.NodeCIDRMaskSize, "Mask size for node cidr in cluster. Default is 24 for IPv4 and 64 for IPv6.")
+	fs.Int32Var(&o.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", o.NodeCIDRMaskSizeIPv4, "Mask size for IPv4 node cidr in dual-stack cluster. Default is 24.")
+	fs.Int32Var(&o.NodeCIDRMaskSizeIPv6, "node-cidr-mask-size-ipv6", o.NodeCIDRMaskSizeIPv6, "Mask size for IPv6 node cidr in dual-stack cluster. Default is 64.")
 }
 
 // ApplyTo fills up NodeIpamController config with options.
@@ -55,6 +57,8 @@ func (o *NodeIPAMControllerOptions) ApplyTo(cfg *nodeipamconfig.NodeIPAMControll
 	}
 
 	cfg.NodeCIDRMaskSize = o.NodeCIDRMaskSize
+	cfg.NodeCIDRMaskSizeIPv4 = o.NodeCIDRMaskSizeIPv4
+	cfg.NodeCIDRMaskSizeIPv6 = o.NodeCIDRMaskSizeIPv6
 
 	return nil
 }

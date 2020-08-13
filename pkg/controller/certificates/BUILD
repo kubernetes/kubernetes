@@ -14,19 +14,20 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller:go_default_library",
-        "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/certificates/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/client-go/informers/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/certificates/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/certificates/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/golang.org/x/time/rate:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -42,6 +43,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/controller/certificates/approver:all-srcs",
+        "//pkg/controller/certificates/authority:all-srcs",
         "//pkg/controller/certificates/cleaner:all-srcs",
         "//pkg/controller/certificates/rootcacertpublisher:all-srcs",
         "//pkg/controller/certificates/signer:all-srcs",
@@ -61,7 +63,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/controller:go_default_library",
-        "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/certificates/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",

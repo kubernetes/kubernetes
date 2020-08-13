@@ -28,6 +28,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdpkg "k8s.io/kubectl/pkg/cmd"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/clusterinfo"
 	"k8s.io/kubectl/pkg/cmd/completion"
 	cmdconfig "k8s.io/kubectl/pkg/cmd/config"
+	"k8s.io/kubectl/pkg/cmd/cp"
 	"k8s.io/kubectl/pkg/cmd/create"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/describe"
@@ -49,6 +51,7 @@ import (
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
+	"k8s.io/kubectl/pkg/cmd/get"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
@@ -57,7 +60,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/portforward"
 	"k8s.io/kubectl/pkg/cmd/proxy"
 	"k8s.io/kubectl/pkg/cmd/replace"
-	"k8s.io/kubectl/pkg/cmd/rollingupdate"
 	"k8s.io/kubectl/pkg/cmd/rollout"
 	"k8s.io/kubectl/pkg/cmd/run"
 	"k8s.io/kubectl/pkg/cmd/scale"
@@ -69,10 +71,9 @@ import (
 	"k8s.io/kubectl/pkg/cmd/wait"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/cp"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/get"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/kustomize"
@@ -265,10 +266,6 @@ __kubectl_custom_func() {
             __kubectl_get_resource_pod
             return
             ;;
-        kubectl_rolling-update)
-            __kubectl_get_resource_rc
-            return
-            ;;
         kubectl_cordon | kubectl_uncordon | kubectl_drain | kubectl_top_node)
             __kubectl_get_resource_node
             return
@@ -433,6 +430,9 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
 func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
+	warningHandler := rest.NewWarningWriter(err, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(err)})
+	warningsAsErrors := false
+
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -446,10 +446,25 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
 		PersistentPreRunE: func(*cobra.Command, []string) error {
+			rest.SetDefaultWarningHandler(warningHandler)
 			return initProfiling()
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
-			return flushProfiling()
+			if err := flushProfiling(); err != nil {
+				return err
+			}
+			if warningsAsErrors {
+				count := warningHandler.WarningCount()
+				switch count {
+				case 0:
+					// no warnings
+				case 1:
+					return fmt.Errorf("%d warning received", count)
+				default:
+					return fmt.Errorf("%d warnings received", count)
+				}
+			}
+			return nil
 		},
 		BashCompletionFunction: bashCompletionFunc,
 	}
@@ -462,6 +477,8 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
+
+	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
@@ -507,7 +524,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, ioStreams),
-				rollingupdate.NewCmdRollingUpdate(f, ioStreams),
 				scale.NewCmdScale(f, ioStreams),
 				autoscale.NewCmdAutoscale(f, ioStreams),
 			},

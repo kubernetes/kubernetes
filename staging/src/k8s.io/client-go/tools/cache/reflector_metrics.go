@@ -47,19 +47,6 @@ func (noopMetric) Dec()            {}
 func (noopMetric) Observe(float64) {}
 func (noopMetric) Set(float64)     {}
 
-type reflectorMetrics struct {
-	numberOfLists       CounterMetric
-	listDuration        SummaryMetric
-	numberOfItemsInList SummaryMetric
-
-	numberOfWatches      CounterMetric
-	numberOfShortWatches CounterMetric
-	watchDuration        SummaryMetric
-	numberOfItemsInWatch SummaryMetric
-
-	lastResourceVersion GaugeMetric
-}
-
 // MetricsProvider generates various metrics used by the reflector.
 type MetricsProvider interface {
 	NewListsMetric(name string) CounterMetric

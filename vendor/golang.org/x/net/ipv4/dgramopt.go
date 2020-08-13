@@ -18,7 +18,7 @@ func (c *dgramOpt) MulticastTTL() (int, error) {
 	}
 	so, ok := sockOpts[ssoMulticastTTL]
 	if !ok {
-		return 0, errOpNoSupport
+		return 0, errNotImplemented
 	}
 	return so.GetInt(c.Conn)
 }
@@ -31,7 +31,7 @@ func (c *dgramOpt) SetMulticastTTL(ttl int) error {
 	}
 	so, ok := sockOpts[ssoMulticastTTL]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.SetInt(c.Conn, ttl)
 }
@@ -44,7 +44,7 @@ func (c *dgramOpt) MulticastInterface() (*net.Interface, error) {
 	}
 	so, ok := sockOpts[ssoMulticastInterface]
 	if !ok {
-		return nil, errOpNoSupport
+		return nil, errNotImplemented
 	}
 	return so.getMulticastInterface(c.Conn)
 }
@@ -57,7 +57,7 @@ func (c *dgramOpt) SetMulticastInterface(ifi *net.Interface) error {
 	}
 	so, ok := sockOpts[ssoMulticastInterface]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.setMulticastInterface(c.Conn, ifi)
 }
@@ -70,7 +70,7 @@ func (c *dgramOpt) MulticastLoopback() (bool, error) {
 	}
 	so, ok := sockOpts[ssoMulticastLoopback]
 	if !ok {
-		return false, errOpNoSupport
+		return false, errNotImplemented
 	}
 	on, err := so.GetInt(c.Conn)
 	if err != nil {
@@ -87,7 +87,7 @@ func (c *dgramOpt) SetMulticastLoopback(on bool) error {
 	}
 	so, ok := sockOpts[ssoMulticastLoopback]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.SetInt(c.Conn, boolint(on))
 }
@@ -107,7 +107,7 @@ func (c *dgramOpt) JoinGroup(ifi *net.Interface, group net.Addr) error {
 	}
 	so, ok := sockOpts[ssoJoinGroup]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	grp := netAddrToIP4(group)
 	if grp == nil {
@@ -125,7 +125,7 @@ func (c *dgramOpt) LeaveGroup(ifi *net.Interface, group net.Addr) error {
 	}
 	so, ok := sockOpts[ssoLeaveGroup]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	grp := netAddrToIP4(group)
 	if grp == nil {
@@ -146,7 +146,7 @@ func (c *dgramOpt) JoinSourceSpecificGroup(ifi *net.Interface, group, source net
 	}
 	so, ok := sockOpts[ssoJoinSourceGroup]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	grp := netAddrToIP4(group)
 	if grp == nil {
@@ -167,7 +167,7 @@ func (c *dgramOpt) LeaveSourceSpecificGroup(ifi *net.Interface, group, source ne
 	}
 	so, ok := sockOpts[ssoLeaveSourceGroup]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	grp := netAddrToIP4(group)
 	if grp == nil {
@@ -189,7 +189,7 @@ func (c *dgramOpt) ExcludeSourceSpecificGroup(ifi *net.Interface, group, source 
 	}
 	so, ok := sockOpts[ssoBlockSourceGroup]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	grp := netAddrToIP4(group)
 	if grp == nil {
@@ -210,7 +210,7 @@ func (c *dgramOpt) IncludeSourceSpecificGroup(ifi *net.Interface, group, source 
 	}
 	so, ok := sockOpts[ssoUnblockSourceGroup]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	grp := netAddrToIP4(group)
 	if grp == nil {
@@ -231,7 +231,7 @@ func (c *dgramOpt) ICMPFilter() (*ICMPFilter, error) {
 	}
 	so, ok := sockOpts[ssoICMPFilter]
 	if !ok {
-		return nil, errOpNoSupport
+		return nil, errNotImplemented
 	}
 	return so.getICMPFilter(c.Conn)
 }
@@ -244,7 +244,7 @@ func (c *dgramOpt) SetICMPFilter(f *ICMPFilter) error {
 	}
 	so, ok := sockOpts[ssoICMPFilter]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.setICMPFilter(c.Conn, f)
 }
@@ -258,7 +258,7 @@ func (c *dgramOpt) SetBPF(filter []bpf.RawInstruction) error {
 	}
 	so, ok := sockOpts[ssoAttachFilter]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.setBPF(c.Conn, filter)
 }

@@ -3,8 +3,10 @@
 reviewers:
   - gmarek
   - shyamjvs
+  - sig-scalability-reviewers
   - wojtek-t
 approvers:
   - gmarek
   - shyamjvs
+  - sig-scalability-approvers
   - wojtek-t

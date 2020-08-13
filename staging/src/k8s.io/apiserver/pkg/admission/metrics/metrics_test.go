@@ -37,8 +37,12 @@ var (
 func TestObserveAdmissionStep(t *testing.T) {
 	Metrics.reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
-	handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil)
-	handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil)
+	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in admit: %v", err)
+	}
+	if err := handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in validate: %v", err)
+	}
 	wantLabels := map[string]string{
 		"operation": string(admission.Create),
 		"type":      "admit",
@@ -55,8 +59,12 @@ func TestObserveAdmissionStep(t *testing.T) {
 func TestObserveAdmissionController(t *testing.T) {
 	Metrics.reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
-	handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil)
-	handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil)
+	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in admit: %v", err)
+	}
+	if err := handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in validate: %v", err)
+	}
 	wantLabels := map[string]string{
 		"name":      "a",
 		"operation": string(admission.Create),

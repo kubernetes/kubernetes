@@ -97,8 +97,10 @@ type controllerInitFunc func(ControllerContext) (http.Handler, bool, error)
 
 func TestController_DiscoveryError(t *testing.T) {
 	controllerInitFuncMap := map[string]controllerInitFunc{
-		"ResourceQuotaController":    startResourceQuotaController,
-		"GarbageCollectorController": startGarbageCollectorController,
+		"ResourceQuotaController":          startResourceQuotaController,
+		"GarbageCollectorController":       startGarbageCollectorController,
+		"EndpointSliceController":          startEndpointSliceController,
+		"EndpointSliceMirroringController": startEndpointSliceMirroringController,
 	}
 
 	tcs := map[string]struct {

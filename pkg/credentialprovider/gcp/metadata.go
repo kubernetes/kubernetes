@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gcp_credentials
+package gcp
 
 import (
 	"encoding/json"
@@ -26,19 +26,19 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
 const (
-	metadataUrl              = "http://metadata.google.internal./computeMetadata/v1/"
-	metadataAttributes       = metadataUrl + "instance/attributes/"
+	metadataURL              = "http://metadata.google.internal./computeMetadata/v1/"
+	metadataAttributes       = metadataURL + "instance/attributes/"
 	dockerConfigKey          = metadataAttributes + "google-dockercfg"
-	dockerConfigUrlKey       = metadataAttributes + "google-dockercfg-url"
-	serviceAccounts          = metadataUrl + "instance/service-accounts/"
-	metadataScopes           = metadataUrl + "instance/service-accounts/default/scopes"
-	metadataToken            = metadataUrl + "instance/service-accounts/default/token"
-	metadataEmail            = metadataUrl + "instance/service-accounts/default/email"
+	dockerConfigURLKey       = metadataAttributes + "google-dockercfg-url"
+	serviceAccounts          = metadataURL + "instance/service-accounts/"
+	metadataScopes           = metadataURL + "instance/service-accounts/default/scopes"
+	metadataToken            = metadataURL + "instance/service-accounts/default/token"
+	metadataEmail            = metadataURL + "instance/service-accounts/default/email"
 	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
 	defaultServiceAccount    = "default/"
@@ -50,7 +50,7 @@ var gceProductNameFile = "/sys/class/dmi/id/product_name"
 
 // For these urls, the parts of the host name can be glob, for example '*.gcr.io" will match
 // "foo.gcr.io" and "bar.gcr.io".
-var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io", "*.gcr.io"}
+var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io", "*.gcr.io", "*.pkg.dev"}
 
 var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
@@ -70,7 +70,7 @@ type dockerConfigKeyProvider struct {
 
 // A DockerConfigProvider that reads its configuration from a URL read from
 // a specific Google Compute Engine metadata key: 'google-dockercfg-url'.
-type dockerConfigUrlKeyProvider struct {
+type dockerConfigURLKeyProvider struct {
 	metadataProvider
 }
 
@@ -100,7 +100,7 @@ func init() {
 
 	credentialprovider.RegisterCredentialProvider("google-dockercfg-url",
 		&credentialprovider.CachingDockerConfigProvider{
-			Provider: &dockerConfigUrlKeyProvider{
+			Provider: &dockerConfigURLKeyProvider{
 				metadataProvider{Client: httpClient},
 			},
 			Lifetime: 60 * time.Second,
@@ -150,7 +150,7 @@ func (g *metadataProvider) Enabled() bool {
 func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg metadata key and
 	// parse them as an alternate .dockercfg
-	if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(dockerConfigKey, g.Client, metadataHeader); err != nil {
+	if cfg, err := credentialprovider.ReadDockerConfigFileFromURL(dockerConfigKey, g.Client, metadataHeader); err != nil {
 		klog.Errorf("while reading 'google-dockercfg' metadata: %v", err)
 	} else {
 		return cfg
@@ -160,13 +160,13 @@ func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.Docke
 }
 
 // Provide implements DockerConfigProvider
-func (g *dockerConfigUrlKeyProvider) Provide(image string) credentialprovider.DockerConfig {
+func (g *dockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg-url key and load a .dockercfg from there
-	if url, err := credentialprovider.ReadUrl(dockerConfigUrlKey, g.Client, metadataHeader); err != nil {
+	if url, err := credentialprovider.ReadURL(dockerConfigURLKey, g.Client, metadataHeader); err != nil {
 		klog.Errorf("while reading 'google-dockercfg-url' metadata: %v", err)
 	} else {
 		if strings.HasPrefix(string(url), "http") {
-			if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(string(url), g.Client, nil); err != nil {
+			if cfg, err := credentialprovider.ReadDockerConfigFileFromURL(string(url), g.Client, nil); err != nil {
 				klog.Errorf("while reading 'google-dockercfg-url'-specified url: %s, %v", string(url), err)
 			} else {
 				return cfg
@@ -214,7 +214,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 	// Given that we are on GCE, we should keep retrying until the metadata server responds.
 	value := runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadUrl(serviceAccounts, g.Client, metadataHeader)
+		value, err := credentialprovider.ReadURL(serviceAccounts, g.Client, metadataHeader)
 		if err != nil {
 			klog.V(2).Infof("Failed to Get service accounts from gce metadata server: %v", err)
 		}
@@ -237,7 +237,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 	url := metadataScopes + "?alt=json"
 	value = runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadUrl(url, g.Client, metadataHeader)
+		value, err := credentialprovider.ReadURL(url, g.Client, metadataHeader)
 		if err != nil {
 			klog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
 		}
@@ -268,21 +268,21 @@ type tokenBlob struct {
 func (g *containerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
 
-	tokenJsonBlob, err := credentialprovider.ReadUrl(metadataToken, g.Client, metadataHeader)
+	tokenJSONBlob, err := credentialprovider.ReadURL(metadataToken, g.Client, metadataHeader)
 	if err != nil {
 		klog.Errorf("while reading access token endpoint: %v", err)
 		return cfg
 	}
 
-	email, err := credentialprovider.ReadUrl(metadataEmail, g.Client, metadataHeader)
+	email, err := credentialprovider.ReadURL(metadataEmail, g.Client, metadataHeader)
 	if err != nil {
 		klog.Errorf("while reading email endpoint: %v", err)
 		return cfg
 	}
 
 	var parsedBlob tokenBlob
-	if err := json.Unmarshal([]byte(tokenJsonBlob), &parsedBlob); err != nil {
-		klog.Errorf("while parsing json blob %s: %v", tokenJsonBlob, err)
+	if err := json.Unmarshal([]byte(tokenJSONBlob), &parsedBlob); err != nil {
+		klog.Errorf("while parsing json blob %s: %v", tokenJSONBlob, err)
 		return cfg
 	}
 

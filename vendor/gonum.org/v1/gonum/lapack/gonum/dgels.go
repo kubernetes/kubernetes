@@ -20,7 +20,7 @@ import (
 //  2. If m < n and trans == blas.NoTrans, Dgels finds the minimum norm solution of
 //     A * X = B.
 //  3. If m >= n and trans == blas.Trans, Dgels finds the minimum norm solution of
-//     A^T * X = B.
+//     Aᵀ * X = B.
 //  4. If m < n and trans == blas.Trans, Dgels finds X such that || A*X - B||_2
 //     is minimized.
 // Note that the least-squares solutions (cases 1 and 3) perform the minimization

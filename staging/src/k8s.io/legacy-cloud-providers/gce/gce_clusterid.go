@@ -19,6 +19,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -199,7 +200,7 @@ func (ci *ClusterID) getOrInitialize() error {
 		UIDProvider: newID,
 	}
 
-	if _, err := ci.client.CoreV1().ConfigMaps(UIDNamespace).Create(cfg); err != nil {
+	if _, err := ci.client.CoreV1().ConfigMaps(UIDNamespace).Create(context.TODO(), cfg, metav1.CreateOptions{}); err != nil {
 		klog.Errorf("GCE cloud provider failed to create %v config map to store cluster id: %v", ci.cfgMapKey, err)
 		return err
 	}

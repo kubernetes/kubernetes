@@ -141,6 +141,7 @@ func TestFailParser(t *testing.T) {
 		{"invalid number", "{+12.3.0}", "cannot parse number +12.3.0"},
 		{"unterminated array", "{[1}", "unterminated array"},
 		{"unterminated filter", "{[?(.price]}", "unterminated filter"},
+		{"invalid multiple recursive descent", "{........}", "invalid multiple recursive descent"},
 	}
 	for _, test := range failParserTests {
 		_, err := Parse(test.name, test.text)

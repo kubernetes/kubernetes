@@ -20,9 +20,8 @@ import (
 
 type Context struct {
 	// docker root directory.
-	Docker  DockerContext
-	RktPath string
-	Crio    CrioContext
+	Docker DockerContext
+	Crio   CrioContext
 }
 
 type DockerContext struct {
@@ -65,6 +64,8 @@ type Fs struct {
 }
 
 type DiskStats struct {
+	MajorNum        uint64
+	MinorNum        uint64
 	ReadsCompleted  uint64
 	ReadsMerged     uint64
 	SectorsRead     uint64

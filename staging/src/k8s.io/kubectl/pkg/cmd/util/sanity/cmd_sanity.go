@@ -80,7 +80,7 @@ func RunCmdChecks(cmd *cobra.Command, cmdChecks []CmdCheck, skipCmd []string) []
 	fmt.Fprintf(os.Stdout, "---+ RUNNING COMMAND CHECKS on %q\n", cmdPath)
 
 	for _, check := range cmdChecks {
-		if err := check(cmd); err != nil && len(err) > 0 {
+		if err := check(cmd); len(err) > 0 {
 			errors = append(errors, err...)
 		}
 	}

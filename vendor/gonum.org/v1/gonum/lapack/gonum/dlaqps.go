@@ -122,7 +122,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Apply previous Householder reflectors to column K:
 		//
-		// A[rk:m, k] = A[rk:m, k] - A[rk:m, 0:k-1]*F[k, 0:k-1]^T.
+		// A[rk:m, k] = A[rk:m, k] - A[rk:m, 0:k-1]*F[k, 0:k-1]ᵀ.
 		if k > 0 {
 			bi.Dgemv(blas.NoTrans, m-rk, k, -1,
 				a[rk*lda:], lda,
@@ -143,7 +143,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Compute kth column of F:
 		//
-		// Compute F[k+1:n, k] = tau[k]*A[rk:m, k+1:n]^T*A[rk:m, k].
+		// Compute F[k+1:n, k] = tau[k]*A[rk:m, k+1:n]ᵀ*A[rk:m, k].
 		if k < n-1 {
 			bi.Dgemv(blas.Trans, m-rk, n-k-1, tau[k],
 				a[rk*lda+k+1:], lda,
@@ -159,7 +159,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Incremental updating of F:
 		//
-		// F[0:n, k] := F[0:n, k] - tau[k]*F[0:n, 0:k-1]*A[rk:m, 0:k-1]^T*A[rk:m,k].
+		// F[0:n, k] := F[0:n, k] - tau[k]*F[0:n, 0:k-1]*A[rk:m, 0:k-1]ᵀ*A[rk:m,k].
 		if k > 0 {
 			bi.Dgemv(blas.Trans, m-rk, k, -tau[k],
 				a[rk*lda:], lda,
@@ -175,7 +175,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Update the current row of A:
 		//
-		// A[rk, k+1:n] = A[rk, k+1:n] - A[rk, 0:k]*F[k+1:n, 0:k]^T.
+		// A[rk, k+1:n] = A[rk, k+1:n] - A[rk, 0:k]*F[k+1:n, 0:k]ᵀ.
 		if k < n-1 {
 			bi.Dgemv(blas.NoTrans, n-k-1, k+1, -1,
 				f[(k+1)*ldf:], ldf,
@@ -216,7 +216,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 	// Apply the block reflector to the rest of the matrix:
 	//
-	// A[offset+kb+1:m, kb+1:n] := A[offset+kb+1:m, kb+1:n] - A[offset+kb+1:m, 1:kb]*F[kb+1:n, 1:kb]^T.
+	// A[offset+kb+1:m, kb+1:n] := A[offset+kb+1:m, kb+1:n] - A[offset+kb+1:m, 1:kb]*F[kb+1:n, 1:kb]ᵀ.
 	if kb < min(n, m-offset) {
 		bi.Dgemm(blas.NoTrans, blas.Trans,
 			m-rk, n-kb, kb, -1,

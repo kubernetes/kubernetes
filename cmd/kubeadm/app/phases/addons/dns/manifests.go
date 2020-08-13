@@ -27,10 +27,7 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  # replicas: not specified here:
-  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
-  # 2. Default is 1.
-  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  replicas: {{ .Replicas }}
   strategy:
     rollingUpdate:
       maxSurge: 10%
@@ -223,7 +220,7 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  replicas: 2
+  replicas: {{ .Replicas }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -244,7 +241,7 @@ spec:
       - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
       containers:
       - name: coredns
         image: {{ .Image }}
@@ -313,15 +310,19 @@ data:
   Corefile: |
     .:53 {
         errors
-        health
+        health {
+           lameduck 5s
+        }
         ready
         kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
-        }{{ .Federation }}
+        }
         prometheus :9153
-        forward . {{ .UpstreamNameserver }}
+        forward . {{ .UpstreamNameserver }} {
+           max_concurrent 1000
+        }
         cache 30
         loop
         reload

@@ -17,7 +17,7 @@ const noSVDO = "dgesvd: not coded for overwrite"
 // Dgesvd computes the singular value decomposition of the input matrix A.
 //
 // The singular value decomposition is
-//  A = U * Sigma * V^T
+//  A = U * Sigma * Vᵀ
 // where Sigma is an m×n diagonal matrix containing the singular values of A,
 // U is an m×m orthogonal matrix and V is an n×n orthogonal matrix. The first
 // min(m,n) columns of U and V are the left and right singular vectors of A
@@ -29,7 +29,7 @@ const noSVDO = "dgesvd: not coded for overwrite"
 //  jobU == lapack.SVDStore     The first min(m,n) columns are returned in u
 //  jobU == lapack.SVDOverwrite The first min(m,n) columns of U are written into a
 //  jobU == lapack.SVDNone      The columns of U are not computed.
-// The behavior is the same for jobVT and the rows of V^T. At most one of jobU
+// The behavior is the same for jobVT and the rows of Vᵀ. At most one of jobU
 // and jobVT can equal lapack.SVDOverwrite, and Dgesvd will panic otherwise.
 //
 // On entry, a contains the data for the m×n matrix A. During the call to Dgesvd

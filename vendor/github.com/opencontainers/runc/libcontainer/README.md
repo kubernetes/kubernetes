@@ -155,8 +155,7 @@ config := &configs.Config{
 		Parent: "system",
 		Resources: &configs.Resources{
 			MemorySwappiness: nil,
-			AllowAllDevices:  nil,
-			AllowedDevices:   configs.DefaultAllowedDevices,
+			Devices:          specconv.AllowedDevices,
 		},
 	},
 	MaskPaths: []string{
@@ -166,7 +165,7 @@ config := &configs.Config{
 	ReadonlyPaths: []string{
 		"/proc/sys", "/proc/sysrq-trigger", "/proc/irq", "/proc/bus",
 	},
-	Devices:  configs.DefaultAutoCreatedDevices,
+	Devices:  specconv.AllowedDevices,
 	Hostname: "testing",
 	Mounts: []*configs.Mount{
 		{
@@ -261,6 +260,7 @@ process := &libcontainer.Process{
 	Stdin:  os.Stdin,
 	Stdout: os.Stdout,
 	Stderr: os.Stderr,
+	Init:   true,
 }
 
 err := container.Run(process)

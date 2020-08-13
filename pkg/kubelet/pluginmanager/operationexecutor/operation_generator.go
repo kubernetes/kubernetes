@@ -26,10 +26,12 @@ import (
 	"net"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/client-go/tools/record"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
@@ -59,21 +61,18 @@ type OperationGenerator interface {
 	// Generates the RegisterPlugin function needed to perform the registration of a plugin
 	GenerateRegisterPluginFunc(
 		socketPath string,
-		foundInDeprecatedDir bool,
 		timestamp time.Time,
 		pluginHandlers map[string]cache.PluginHandler,
 		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
 
 	// Generates the UnregisterPlugin function needed to perform the unregistration of a plugin
 	GenerateUnregisterPluginFunc(
-		socketPath string,
-		pluginHandlers map[string]cache.PluginHandler,
+		pluginInfo cache.PluginInfo,
 		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
 }
 
 func (og *operationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
-	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
@@ -104,7 +103,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if infoResp.Endpoint == "" {
 			infoResp.Endpoint = socketPath
 		}
-		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, foundInDeprecatedDir); err != nil {
+		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			if err = og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
@@ -112,11 +111,15 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		}
 		// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
 		// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
-		actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
-			SocketPath:           socketPath,
-			FoundInDeprecatedDir: foundInDeprecatedDir,
-			Timestamp:            timestamp,
+		err = actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
+			SocketPath: socketPath,
+			Timestamp:  timestamp,
+			Handler:    handler,
+			Name:       infoResp.Name,
 		})
+		if err != nil {
+			klog.Errorf("RegisterPlugin error -- failed to add plugin at socket %s, err: %v", socketPath, err)
+		}
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 		}
@@ -131,35 +134,20 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 }
 
 func (og *operationGenerator) GenerateUnregisterPluginFunc(
-	socketPath string,
-	pluginHandlers map[string]cache.PluginHandler,
+	pluginInfo cache.PluginInfo,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
 
 	unregisterPluginFunc := func() error {
-		client, conn, err := dial(socketPath, dialTimeoutDuration)
-		if err != nil {
-			return fmt.Errorf("UnregisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
+		if pluginInfo.Handler == nil {
+			return fmt.Errorf("UnregisterPlugin error -- failed to get plugin handler for %s", pluginInfo.SocketPath)
 		}
-		defer conn.Close()
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		infoResp, err := client.GetInfo(ctx, &registerapi.InfoRequest{})
-		if err != nil {
-			return fmt.Errorf("UnregisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
-		}
-
-		handler, ok := pluginHandlers[infoResp.Type]
-		if !ok {
-			return fmt.Errorf("UnregisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
-		}
-
 		// We remove the plugin to the actual state of world cache before calling a plugin consumer's Unregister handle
 		// so that if we receive a register event during Register Plugin, we can process it as a Register call.
-		actualStateOfWorldUpdater.RemovePlugin(socketPath)
+		actualStateOfWorldUpdater.RemovePlugin(pluginInfo.SocketPath)
 
-		handler.DeRegisterPlugin(infoResp.Name)
+		pluginInfo.Handler.DeRegisterPlugin(pluginInfo.Name)
+
+		klog.V(4).Infof("DeRegisterPlugin called for %s on %v", pluginInfo.Name, pluginInfo.Handler)
 		return nil
 	}
 	return unregisterPluginFunc
@@ -191,8 +179,8 @@ func dial(unixSocketPath string, timeout time.Duration) (registerapi.Registratio
 	defer cancel()
 
 	c, err := grpc.DialContext(ctx, unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
 

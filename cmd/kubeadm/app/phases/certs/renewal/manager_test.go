@@ -34,18 +34,22 @@ import (
 )
 
 var (
-	testCACertCfg = &certutil.Config{CommonName: "kubernetes"}
+	testCACertCfg = &pkiutil.CertConfig{
+		Config: certutil.Config{CommonName: "kubernetes"},
+	}
 
 	testCACert, testCAKey, _ = pkiutil.NewCertificateAuthority(testCACertCfg)
 
-	testCertCfg = &certutil.Config{
-		CommonName:   "test-common-name",
-		Organization: []string{"sig-cluster-lifecycle"},
-		AltNames: certutil.AltNames{
-			IPs:      []net.IP{net.ParseIP("10.100.0.1")},
-			DNSNames: []string{"test-domain.space"},
+	testCertCfg = &pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName:   "test-common-name",
+			Organization: []string{"sig-cluster-lifecycle"},
+			AltNames: certutil.AltNames{
+				IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+				DNSNames: []string{"test-domain.space"},
+			},
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
-		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 )
 

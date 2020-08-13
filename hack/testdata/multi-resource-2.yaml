@@ -1,0 +1,12 @@
+# Simple test that errors should not block apply of valid
+# resources. The ConfigMap should successfully apply, while
+# the custom resource fails because the CRD is missing.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foo
+---
+apiVersion: example.com/v1
+kind: Bogus
+metadata:
+  name: foo

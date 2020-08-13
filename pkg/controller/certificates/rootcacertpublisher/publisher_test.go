@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
@@ -83,7 +83,7 @@ func TestConfigMapCreation(t *testing.T) {
 		UpdatedConfigMap   *v1.ConfigMap
 		ExpectActions      []action
 	}{
-		"create new namesapce": {
+		"create new namespace": {
 			AddedNamespace: newNs,
 			ExpectActions:  []action{{verb: "create", name: RootCACertConfigMapName}},
 		},

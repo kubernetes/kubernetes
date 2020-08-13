@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
@@ -40,18 +40,25 @@ type cidrs struct {
 }
 
 var (
-	lbSrcRngsFlag cidrs
+	l4LbSrcRngsFlag cidrs
+	l7lbSrcRngsFlag cidrs
 )
 
 func init() {
 	var err error
-	// LB L7 proxies and all L3/4/7 health checkers have client addresses within these known CIDRs.
-	lbSrcRngsFlag.ipn, err = utilnet.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"}...)
+	// L3/4 health checkers have client addresses within these known CIDRs.
+	l4LbSrcRngsFlag.ipn, err = utilnet.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"}...)
+	if err != nil {
+		panic("Incorrect default GCE L3/4 source ranges")
+	}
+	// L7 health checkers have client addresses within these known CIDRs.
+	l7lbSrcRngsFlag.ipn, err = utilnet.ParseIPNets([]string{"130.211.0.0/22", "35.191.0.0/16"}...)
 	if err != nil {
 		panic("Incorrect default GCE L7 source ranges")
 	}
 
-	flag.Var(&lbSrcRngsFlag, "cloud-provider-gce-lb-src-cidrs", "CIDRs opened in GCE firewall for LB traffic proxy & health checks")
+	flag.Var(&l4LbSrcRngsFlag, "cloud-provider-gce-lb-src-cidrs", "CIDRs opened in GCE firewall for L4 LB traffic proxy & health checks")
+	flag.Var(&l7lbSrcRngsFlag, "cloud-provider-gce-l7lb-src-cidrs", "CIDRs opened in GCE firewall for L7 LB traffic proxy & health checks")
 }
 
 // String is the method to format the flag's value, part of the flag.Value interface.
@@ -82,10 +89,16 @@ func (c *cidrs) Set(value string) error {
 	return nil
 }
 
-// LoadBalancerSrcRanges contains the ranges of ips used by the GCE load balancers (l4 & L7)
+// L4LoadBalancerSrcRanges contains the ranges of ips used by the L3/L4 GCE load balancers
 // for proxying client requests and performing health checks.
-func LoadBalancerSrcRanges() []string {
-	return lbSrcRngsFlag.ipn.StringSlice()
+func L4LoadBalancerSrcRanges() []string {
+	return l4LbSrcRngsFlag.ipn.StringSlice()
+}
+
+// L7LoadBalancerSrcRanges contains the ranges of ips used by the GCE load balancers L7
+// for proxying client requests and performing health checks.
+func L7LoadBalancerSrcRanges() []string {
+	return l7lbSrcRngsFlag.ipn.StringSlice()
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
@@ -97,6 +110,11 @@ func (g *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, svc *v1
 		status.Ingress = []v1.LoadBalancerIngress{{IP: fwd.IPAddress}}
 
 		return status, true, nil
+	}
+	// Checking for finalizer is more accurate because controller restart could happen in the middle of resource
+	// deletion. So even though forwarding rule was deleted, cleanup might not have been complete.
+	if hasFinalizer(svc, ILBFinalizerV1) {
+		return &v1.LoadBalancerStatus{}, true, nil
 	}
 	return nil, false, ignoreNotFound(err)
 }

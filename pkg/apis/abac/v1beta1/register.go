@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/apis/abac"
 )
 
@@ -29,15 +30,10 @@ const GroupName = "abac.authorization.kubernetes.io"
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
 func init() {
-	// TODO: delete this, abac should not have its own scheme.
-	if err := addKnownTypes(abac.Scheme); err != nil {
-		// Programmer error.
-		panic(err)
-	}
-	if err := addConversionFuncs(abac.Scheme); err != nil {
-		// Programmer error.
-		panic(err)
-	}
+	// TODO: Delete this init function, abac should not have its own scheme.
+	utilruntime.Must(addKnownTypes(abac.Scheme))
+
+	utilruntime.Must(RegisterConversions(abac.Scheme))
 }
 
 var (
@@ -56,7 +52,7 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes, addConversionFuncs, RegisterDefaults)
+	localSchemeBuilder.Register(addKnownTypes, RegisterDefaults)
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {

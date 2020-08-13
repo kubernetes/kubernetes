@@ -3,8 +3,6 @@
 package cgroups
 
 import (
-	"fmt"
-
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
@@ -27,38 +25,27 @@ type Manager interface {
 	// Destroys the cgroup set
 	Destroy() error
 
-	// The option func SystemdCgroups() and Cgroupfs() require following attributes:
-	// 	Paths   map[string]string
-	// 	Cgroups *configs.Cgroup
-	// Paths maps cgroup subsystem to path at which it is mounted.
-	// Cgroups specifies specific cgroup settings for the various subsystems
-
-	// Returns cgroup paths to save in a state file and to be able to
-	// restore the object later.
-	GetPaths() map[string]string
+	// Path returns a cgroup path to the specified controller/subsystem.
+	// For cgroupv2, the argument is unused and can be empty.
+	Path(string) string
 
 	// Sets the cgroup as configured.
 	Set(container *configs.Config) error
-}
 
-type NotFoundError struct {
-	Subsystem string
-}
+	// GetPaths returns cgroup path(s) to save in a state file in order to restore later.
+	//
+	// For cgroup v1, a key is cgroup subsystem name, and the value is the path
+	// to the cgroup for this subsystem.
+	//
+	// For cgroup v2 unified hierarchy, a key is "", and the value is the unified path.
+	GetPaths() map[string]string
 
-func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("mountpoint for %s not found", e.Subsystem)
-}
+	// GetCgroups returns the cgroup data as configured.
+	GetCgroups() (*configs.Cgroup, error)
 
-func NewNotFoundError(sub string) error {
-	return &NotFoundError{
-		Subsystem: sub,
-	}
-}
+	// GetFreezerState retrieves the current FreezerState of the cgroup.
+	GetFreezerState() (configs.FreezerState, error)
 
-func IsNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*NotFoundError)
-	return ok
+	// Whether the cgroup path exists or not
+	Exists() bool
 }

@@ -45,6 +45,8 @@
     "podInfoOnMount": false,
     "volumeLifecycleModes": [
       "r鯹)晿\u003co,c鮽ort昍řČ扷5ƗǸ"
-    ]
+    ],
+    "storageCapacity": true,
+    "fsGroupPolicy": "/ʕVŚ(ĿȊ甞谐颋ǅSǡ"
   }
 }

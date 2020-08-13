@@ -391,6 +391,52 @@ func TestMemoryPressure(t *testing.T) {
 	}
 }
 
+func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
+	resource := newResourceList("100m", "1Gi", "")
+	switch class {
+	case v1.PodQOSGuaranteed:
+		return []v1.Container{newContainer("guaranteed-container", resource, resource)}
+	case v1.PodQOSBurstable:
+		return []v1.Container{newContainer("burtable-container", resource, nil)}
+	case v1.PodQOSBestEffort:
+		fallthrough
+	default:
+		return []v1.Container{newContainer("best-effort-container", nil, nil)}
+	}
+}
+
+func TestAdmitUnderNodeConditions(t *testing.T) {
+	manager := &managerImpl{}
+	pods := []*v1.Pod{
+		newPod("guaranteed-pod", scheduling.DefaultPriorityWhenNoDefaultClassExists, makeContainersByQOS(v1.PodQOSGuaranteed), nil),
+		newPod("burstable-pod", scheduling.DefaultPriorityWhenNoDefaultClassExists, makeContainersByQOS(v1.PodQOSBurstable), nil),
+		newPod("best-effort-pod", scheduling.DefaultPriorityWhenNoDefaultClassExists, makeContainersByQOS(v1.PodQOSBestEffort), nil),
+	}
+
+	expected := []bool{true, true, true}
+	for i, pod := range pods {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+
+	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure}
+	expected = []bool{true, true, false}
+	for i, pod := range pods {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+
+	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
+	expected = []bool{false, false, false}
+	for i, pod := range pods {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+}
+
 // parseQuantity parses the specified value (if provided) otherwise returns 0 value
 func parseQuantity(value string) resource.Quantity {
 	if len(value) == 0 {
@@ -881,7 +927,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// no image gc should have occurred
 	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
-		t.Errorf("Manager chose to perform image gc when it was not neeed")
+		t.Errorf("Manager chose to perform image gc when it was not needed")
 	}
 
 	// no pod should have been killed
@@ -904,7 +950,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// no image gc should have occurred
 	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
-		t.Errorf("Manager chose to perform image gc when it was not neeed")
+		t.Errorf("Manager chose to perform image gc when it was not needed")
 	}
 
 	// no pod should have been killed
@@ -1266,11 +1312,6 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
 		t.Errorf("Manager should report memory pressure")
-	}
-
-	// check the right pod was killed
-	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 }
 

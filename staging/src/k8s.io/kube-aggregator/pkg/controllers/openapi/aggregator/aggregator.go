@@ -26,7 +26,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/server"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -120,8 +120,11 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
-	s.openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(
-		specToServe, "/openapi/v2", pathHandler)
+	s.openAPIVersionedService, err = handler.NewOpenAPIService(specToServe)
+	if err != nil {
+		return nil, err
+	}
+	err = s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
 	if err != nil {
 		return nil, err
 	}

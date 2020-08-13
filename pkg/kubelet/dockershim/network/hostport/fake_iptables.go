@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -39,6 +42,7 @@ type fakeTable struct {
 type fakeIPTables struct {
 	tables        map[string]*fakeTable
 	builtinChains map[string]sets.String
+	protocol      utiliptables.Protocol
 }
 
 func NewFakeIPTables() *fakeIPTables {
@@ -49,6 +53,7 @@ func NewFakeIPTables() *fakeIPTables {
 			string(utiliptables.TableNAT):    sets.NewString("PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"),
 			string(utiliptables.TableMangle): sets.NewString("PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"),
 		},
+		protocol: utiliptables.ProtocolIPv4,
 	}
 }
 
@@ -220,8 +225,12 @@ func (f *fakeIPTables) DeleteRule(tableName utiliptables.Table, chainName utilip
 	return nil
 }
 
-func (f *fakeIPTables) IsIpv6() bool {
-	return false
+func (f *fakeIPTables) IsIPv6() bool {
+	return f.protocol == utiliptables.ProtocolIPv6
+}
+
+func (f *fakeIPTables) Protocol() utiliptables.Protocol {
+	return f.protocol
 }
 
 func saveChain(chain *fakeChain, data *bytes.Buffer) {
@@ -335,10 +344,7 @@ func (f *fakeIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, cou
 	return f.restore("", data, flush)
 }
 
-func (f *fakeIPTables) AddReloadFunc(reloadFunc func()) {
-}
-
-func (f *fakeIPTables) Destroy() {
+func (f *fakeIPTables) Monitor(canary utiliptables.Chain, tables []utiliptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 }
 
 func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName utiliptables.Chain) bool {

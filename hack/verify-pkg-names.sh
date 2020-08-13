@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Verify whether codes follow golang convention.
+# This script verifies whether codes follow golang convention.
+# Usage: `hack/verify-pkg-names.sh`.
 
 set -o errexit
 set -o nounset

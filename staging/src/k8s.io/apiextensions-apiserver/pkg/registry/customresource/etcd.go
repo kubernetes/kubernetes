@@ -237,48 +237,17 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 }
 
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, false, err
-	}
-	cr := obj.(*unstructured.Unstructured)
-
-	const invalidSpecReplicas = -2147483648 // smallest int32
-	oldScale, replicasFound, err := scaleFromCustomResource(cr, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
-	if err != nil {
-		return nil, false, err
-	}
-	if !replicasFound {
-		oldScale.Spec.Replicas = invalidSpecReplicas // signal that this was not set before
+	scaleObjInfo := &scaleUpdatedObjectInfo{
+		reqObjInfo:         objInfo,
+		specReplicasPath:   r.specReplicasPath,
+		labelSelectorPath:  r.labelSelectorPath,
+		statusReplicasPath: r.statusReplicasPath,
 	}
 
-	obj, err = objInfo.UpdatedObject(ctx, oldScale)
-	if err != nil {
-		return nil, false, err
-	}
-	if obj == nil {
-		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
-	}
-
-	scale, ok := obj.(*autoscalingv1.Scale)
-	if !ok {
-		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
-	}
-
-	if scale.Spec.Replicas == invalidSpecReplicas {
-		return nil, false, apierrors.NewBadRequest(fmt.Sprintf("the spec replicas field %q cannot be empty", r.specReplicasPath))
-	}
-
-	specReplicasPath := strings.TrimPrefix(r.specReplicasPath, ".") // ignore leading period
-	if err = unstructured.SetNestedField(cr.Object, int64(scale.Spec.Replicas), strings.Split(specReplicasPath, ".")...); err != nil {
-		return nil, false, err
-	}
-	cr.SetResourceVersion(scale.ResourceVersion)
-
-	obj, _, err = r.store.Update(
+	obj, _, err := r.store.Update(
 		ctx,
-		cr.GetName(),
-		rest.DefaultUpdatedObjectInfo(cr),
+		name,
+		scaleObjInfo,
 		toScaleCreateValidation(createValidation, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath),
 		toScaleUpdateValidation(updateValidation, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath),
 		false,
@@ -287,12 +256,13 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	if err != nil {
 		return nil, false, err
 	}
-	cr = obj.(*unstructured.Unstructured)
+	cr := obj.(*unstructured.Unstructured)
 
 	newScale, _, err := scaleFromCustomResource(cr, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
 	if err != nil {
 		return nil, false, apierrors.NewBadRequest(err.Error())
 	}
+
 	return newScale, false, err
 }
 
@@ -342,7 +312,7 @@ func scaleFromCustomResource(cr *unstructured.Unstructured, specReplicasPath, st
 	var labelSelector string
 	if len(labelSelectorPath) > 0 {
 		labelSelectorPath = strings.TrimPrefix(labelSelectorPath, ".") // ignore leading period
-		labelSelector, found, err = unstructured.NestedString(cr.UnstructuredContent(), strings.Split(labelSelectorPath, ".")...)
+		labelSelector, _, err = unstructured.NestedString(cr.UnstructuredContent(), strings.Split(labelSelectorPath, ".")...)
 		if err != nil {
 			return nil, false, err
 		}
@@ -371,4 +341,56 @@ func scaleFromCustomResource(cr *unstructured.Unstructured, specReplicasPath, st
 	}
 
 	return scale, foundSpecReplicas, nil
+}
+
+type scaleUpdatedObjectInfo struct {
+	reqObjInfo         rest.UpdatedObjectInfo
+	specReplicasPath   string
+	statusReplicasPath string
+	labelSelectorPath  string
+}
+
+func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
+	return i.reqObjInfo.Preconditions()
+}
+
+func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
+	cr := oldObj.DeepCopyObject().(*unstructured.Unstructured)
+	const invalidSpecReplicas = -2147483648 // smallest int32
+	oldScale, replicasFound, err := scaleFromCustomResource(cr, i.specReplicasPath, i.statusReplicasPath, i.labelSelectorPath)
+	if err != nil {
+		return nil, err
+	}
+	if !replicasFound {
+		oldScale.Spec.Replicas = invalidSpecReplicas // signal that this was not set before
+	}
+
+	obj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
+	if err != nil {
+		return nil, err
+	}
+	if obj == nil {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
+	}
+
+	scale, ok := obj.(*autoscalingv1.Scale)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
+	}
+
+	if scale.Spec.Replicas == invalidSpecReplicas {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("the spec replicas field %q cannot be empty", i.specReplicasPath))
+	}
+
+	specReplicasPath := strings.TrimPrefix(i.specReplicasPath, ".") // ignore leading period
+
+	if err := unstructured.SetNestedField(cr.Object, int64(scale.Spec.Replicas), strings.Split(specReplicasPath, ".")...); err != nil {
+		return nil, err
+	}
+	if len(scale.ResourceVersion) != 0 {
+		// The client provided a resourceVersion precondition.
+		// Set that precondition and return any conflict errors to the client.
+		cr.SetResourceVersion(scale.ResourceVersion)
+	}
+	return cr, nil
 }

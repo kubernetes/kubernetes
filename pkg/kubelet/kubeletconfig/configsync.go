@@ -17,11 +17,12 @@ limitations under the License.
 package kubeletconfig
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -198,7 +199,7 @@ func restartForNewConfig(eventClient v1core.EventsGetter, nodeName string, sourc
 	// because the event recorder won't flush its queue before we exit (we'd lose the event)
 	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
 	klog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(event); err != nil {
+	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(context.TODO(), event, metav1.CreateOptions{}); err != nil {
 		utillog.Errorf("failed to send event, error: %v", err)
 	}
 	utillog.Infof(message)

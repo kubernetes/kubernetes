@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pborman/uuid"
-	"k8s.io/klog"
+	"github.com/google/uuid"
+	"k8s.io/klog/v2"
 
 	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -58,7 +58,7 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 	if ids != "" {
 		ev.AuditID = types.UID(ids)
 	} else {
-		ev.AuditID = types.UID(uuid.NewRandom().String())
+		ev.AuditID = types.UID(uuid.New().String())
 	}
 
 	ips := utilnet.SourceIPs(req)
@@ -86,6 +86,10 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 			APIGroup:    attribs.GetAPIGroup(),
 			APIVersion:  attribs.GetAPIVersion(),
 		}
+	}
+
+	for _, kv := range auditAnnotationsFrom(req.Context()) {
+		LogAnnotation(ev, kv.key, kv.value)
 	}
 
 	return ev, nil

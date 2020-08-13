@@ -9,7 +9,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/go.opencensus.io/internal",
     importpath = "go.opencensus.io/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/go.opencensus.io:__subpackages__"],
     deps = ["//vendor/go.opencensus.io:go_default_library"],
 )
 

@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -615,5 +616,126 @@ func TestSafeSort(t *testing.T) {
 				t.Errorf("after safeSort(), input = %v, want %v", tt.in, tt.inCopy)
 			}
 		})
+	}
+}
+
+func BenchmarkSelectorFromValidatedSet(b *testing.B) {
+	set := map[string]string{
+		"foo": "foo",
+		"bar": "bar",
+	}
+
+	for i := 0; i < b.N; i++ {
+		if SelectorFromValidatedSet(set).Empty() {
+			b.Errorf("Unexpected selector")
+		}
+	}
+}
+
+func TestRequiresExactMatch(t *testing.T) {
+	testCases := []struct {
+		name          string
+		sel           Selector
+		label         string
+		expectedFound bool
+		expectedValue string
+	}{
+		{
+			name:          "keyInOperatorExactMatch",
+			sel:           internalSelector{Requirement{"key", selection.In, []string{"value"}}},
+			label:         "key",
+			expectedFound: true,
+			expectedValue: "value",
+		},
+		{
+			name:          "keyInOperatorNotExactMatch",
+			sel:           internalSelector{Requirement{"key", selection.In, []string{"value", "value2"}}},
+			label:         "key",
+			expectedFound: false,
+			expectedValue: "",
+		},
+		{
+			name: "keyInOperatorNotExactMatch",
+			sel: internalSelector{
+				Requirement{"key", selection.In, []string{"value", "value1"}},
+				Requirement{"key2", selection.In, []string{"value2"}},
+			},
+			label:         "key2",
+			expectedFound: true,
+			expectedValue: "value2",
+		},
+		{
+			name:          "keyEqualOperatorExactMatch",
+			sel:           internalSelector{Requirement{"key", selection.Equals, []string{"value"}}},
+			label:         "key",
+			expectedFound: true,
+			expectedValue: "value",
+		},
+		{
+			name:          "keyDoubleEqualOperatorExactMatch",
+			sel:           internalSelector{Requirement{"key", selection.DoubleEquals, []string{"value"}}},
+			label:         "key",
+			expectedFound: true,
+			expectedValue: "value",
+		},
+		{
+			name:          "keyNotEqualOperatorExactMatch",
+			sel:           internalSelector{Requirement{"key", selection.NotEquals, []string{"value"}}},
+			label:         "key",
+			expectedFound: false,
+			expectedValue: "",
+		},
+		{
+			name: "keyEqualOperatorExactMatchFirst",
+			sel: internalSelector{
+				Requirement{"key", selection.In, []string{"value"}},
+				Requirement{"key2", selection.In, []string{"value2"}},
+			},
+			label:         "key",
+			expectedFound: true,
+			expectedValue: "value",
+		},
+	}
+	for _, ts := range testCases {
+		t.Run(ts.name, func(t *testing.T) {
+			value, found := ts.sel.RequiresExactMatch(ts.label)
+			if found != ts.expectedFound {
+				t.Errorf("Expected match %v, found %v", ts.expectedFound, found)
+			}
+			if found && value != ts.expectedValue {
+				t.Errorf("Expected value %v, found %v", ts.expectedValue, value)
+			}
+
+		})
+	}
+}
+
+func TestValidatedSelectorFromSet(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            Set
+		expectedSelector internalSelector
+		expectedError    error
+	}{
+		{
+			name:             "Simple Set, no error",
+			input:            Set{"key": "val"},
+			expectedSelector: internalSelector([]Requirement{{key: "key", operator: selection.Equals, strValues: []string{"val"}}}),
+		},
+		{
+			name:          "Invalid Set, value too long",
+			input:         Set{"Key": "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui"},
+			expectedError: fmt.Errorf(`invalid label value: "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui": at key: "Key": must be no more than 63 characters`),
+		},
+	}
+
+	for _, tc := range tests {
+		selector, err := ValidatedSelectorFromSet(tc.input)
+		if !reflect.DeepEqual(err, tc.expectedError) {
+			t.Fatalf("expected error %v, got error %v", tc.expectedError, err)
+		}
+		if err == nil && !reflect.DeepEqual(selector, tc.expectedSelector) {
+			t.Errorf("expected selector %v, got selector %v", tc.expectedSelector, selector)
+		}
 	}
 }

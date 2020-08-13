@@ -34,7 +34,7 @@ elif sudo --non-interactive "$(which bash)" -c true 2> /dev/null; then
   echo 'No need to refresh sudo credentials'
 else
   echo 'Updating sudo credentials'
-  sudo --validate || exit 1
+  sudo -v || exit 1
 fi
 
 # FOCUS is ginkgo focus to select which tests to run. By default, FOCUS is
@@ -120,7 +120,7 @@ start_kubelet() {
   # we want to run this command as root but log the file to a normal user file
   # (so disable SC2024)
   # shellcheck disable=SC2024
-  if ! sudo -b "${KUBELET}" "$@" &>"${LOG_DIR}/${kubelet_log}"; then 
+  if ! sudo -b "${KUBELET}" "$@" &>"${LOG_DIR}/${kubelet_log}"; then
     echo "Failed to start kubelet"
     exit 1
   fi

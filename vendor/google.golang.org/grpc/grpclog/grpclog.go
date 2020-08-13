@@ -89,7 +89,7 @@ func Fatal(args ...interface{}) {
 }
 
 // Fatalf logs to the FATAL log. Arguments are handled in the manner of fmt.Printf.
-// It calles os.Exit() with exit code 1.
+// It calls os.Exit() with exit code 1.
 func Fatalf(format string, args ...interface{}) {
 	logger.Fatalf(format, args...)
 	// Make sure fatal logs will exit.

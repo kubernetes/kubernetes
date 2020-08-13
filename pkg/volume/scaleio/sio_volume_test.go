@@ -23,7 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/klog"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog/v2"
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,14 +53,13 @@ func newPluginMgr(t *testing.T, apiObject runtime.Object) (*volume.VolumePluginM
 	}
 
 	fakeClient := fakeclient.NewSimpleClientset(apiObject)
-	host := volumetest.NewFakeVolumeHostWithNodeLabels(
+	host := volumetest.NewFakeVolumeHostWithNodeLabels(t,
 		tmpDir,
 		fakeClient,
-		nil,
+		ProbeVolumePlugins(),
 		map[string]string{sdcGUIDLabelName: "abc-123"},
 	)
-	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	plugMgr := host.GetPluginMgr()
 
 	return plugMgr, tmpDir
 }
@@ -426,7 +426,7 @@ func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
 	}
 }
 
-func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
+func TestVolumeProvisionerWithMinimumCapacity(t *testing.T) {
 	plugMgr, tmpDir := newPluginMgr(t, makeScaleIOSecret(testSecret, testns))
 	defer os.RemoveAll(tmpDir)
 
@@ -442,7 +442,7 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	options := volume.VolumeOptions{
 		ClusterName:                   "testcluster",
 		PVName:                        "pvc-sio-dynamic-vol",
-		PVC:                           volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -467,11 +467,25 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 
-	_, err = provisioner.Provision(nil, nil)
-	if err == nil {
-		t.Fatalf("call to Provision() should fail with invalid capacity")
+	pv, err :=
+		provisioner.Provision(nil, nil)
+	if err != nil {
+		t.Fatalf("call to Provision() failed %v", err)
 	}
 
+	pvSize := pv.Spec.Capacity.Storage()
+	if pvSize == nil {
+		t.Fatalf("unexpected pv size: nil")
+	}
+
+	gibSize, err := volumehelpers.RoundUpToGiB(*pvSize)
+	if err != nil {
+		t.Fatalf("unexpected error while converting size to GiB: %v", err)
+	}
+
+	if gibSize != minimumVolumeSizeGiB {
+		t.Fatalf("expected GiB size to be %v got %v", minimumVolumeSizeGiB, gibSize)
+	}
 }
 
 func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {

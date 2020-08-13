@@ -238,10 +238,10 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 					} else {
 						goTyp, _ := p.GoType(message, field)
 						goTyp = strings.Replace(goTyp, "[]", "", 1)
-						p.P("vs := make([]*", goTyp, ", len(this.", fieldname, "))")
+						p.P("vs := make([]", goTyp, ", len(this.", fieldname, "))")
 						p.P("for i := range vs {")
 						p.In()
-						p.P("vs[i] = &this.", fieldname, "[i]")
+						p.P("vs[i] = this.", fieldname, "[i]")
 						p.Out()
 						p.P("}")
 						p.P(`s = append(s, "`, fieldname, `: " + `, fmtPkg.Use(), `.Sprintf("%#v", vs) + ",\n")`)

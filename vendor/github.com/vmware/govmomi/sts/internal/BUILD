@@ -5,7 +5,7 @@ go_library(
     srcs = ["types.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/sts/internal",
     importpath = "github.com/vmware/govmomi/sts/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/github.com/vmware/govmomi/sts:__subpackages__"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",

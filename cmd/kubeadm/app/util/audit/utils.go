@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/audit/install"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // CreateDefaultAuditLogPolicy writes the default audit log policy to disk.
@@ -60,7 +60,7 @@ func writePolicyToDisk(policyFile string, policy *auditv1.Policy) error {
 	codecs := serializer.NewCodecFactory(scheme)
 
 	// writes the policy to disk
-	serialized, err := util.MarshalToYamlForCodecs(policy, auditv1.SchemeGroupVersion, codecs)
+	serialized, err := kubeadmutil.MarshalToYamlForCodecs(policy, auditv1.SchemeGroupVersion, codecs)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal audit policy to YAML")

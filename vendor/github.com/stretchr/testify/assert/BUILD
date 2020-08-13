@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "assertion_format.go",
         "assertion_forward.go",
+        "assertion_order.go",
         "assertions.go",
         "doc.go",
         "errors.go",
@@ -17,6 +18,7 @@ go_library(
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 

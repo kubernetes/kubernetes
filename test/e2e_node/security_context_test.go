@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -26,10 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -77,11 +76,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			isEnabled, err := isSharedPIDNamespaceSupported()
 			framework.ExpectNoError(err)
 			if !isEnabled {
-				framework.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
-			}
-			// It's not enough to set this flag in the kubelet because the apiserver needs it too
-			if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) {
-				framework.Skipf("run test with --feature-gates=PodShareProcessNamespace=true to test PID namespace sharing")
+				e2eskipper.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
 			}
 
 			ginkgo.By("Create a pod with shared PID namespace.")
@@ -347,52 +342,6 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		ginkgo.AfterEach(func() {
 			if l != nil {
 				l.Close()
-			}
-		})
-	})
-
-	ginkgo.Context("When creating a pod with privileged", func() {
-		makeUserPod := func(podName, image string, command []string, privileged bool) *v1.Pod {
-			return &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: podName,
-				},
-				Spec: v1.PodSpec{
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Image:   image,
-							Name:    podName,
-							Command: command,
-							SecurityContext: &v1.SecurityContext{
-								Privileged: &privileged,
-							},
-						},
-					},
-				},
-			}
-		}
-		createAndWaitUserPod := func(privileged bool) string {
-			podName := fmt.Sprintf("busybox-privileged-%v-%s", privileged, uuid.NewUUID())
-			podClient.Create(makeUserPod(podName,
-				busyboxImage,
-				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
-				privileged,
-			))
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
-			return podName
-		}
-
-		ginkgo.It("should run the container as privileged when true [NodeFeature:HostAccess]", func() {
-			podName := createAndWaitUserPod(true)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
-			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
-			}
-
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
-			if strings.Contains(logs, "Operation not permitted") {
-				framework.Failf("privileged container should be able to create dummy device")
 			}
 		})
 	})

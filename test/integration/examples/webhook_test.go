@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -63,7 +64,7 @@ func TestWebhookLoopback(t *testing.T) {
 	})
 
 	fail := admissionv1beta1.Fail
-	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhooktest.example.com"},
 		Webhooks: []admissionv1beta1.MutatingWebhook{{
 			Name: "webhooktest.example.com",
@@ -76,16 +77,16 @@ func TestWebhookLoopback(t *testing.T) {
 			}},
 			FailurePolicy: &fail,
 		}},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (done bool, err error) {
-		_, err = client.CoreV1().ConfigMaps("default").Create(&v1.ConfigMap{
+		_, err = client.CoreV1().ConfigMaps("default").Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "webhook-test"},
 			Data:       map[string]string{"invalid key": "value"},
-		})
+		}, metav1.CreateOptions{})
 		if err == nil {
 			t.Fatal("Unexpected success")
 		}

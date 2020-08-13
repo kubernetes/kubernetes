@@ -17,8 +17,7 @@ limitations under the License.
 package prebind
 
 import (
-	"fmt"
-
+	"context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -28,7 +27,7 @@ import (
 // and implements only one hook for prebind.
 type StatelessPreBindExample struct{}
 
-var _ = framework.PreBindPlugin(StatelessPreBindExample{})
+var _ framework.PreBindPlugin = StatelessPreBindExample{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "stateless-prebind-plugin-example"
@@ -39,9 +38,9 @@ func (sr StatelessPreBindExample) Name() string {
 }
 
 // PreBind is the functions invoked by the framework at "prebind" extension point.
-func (sr StatelessPreBindExample) PreBind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (sr StatelessPreBindExample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("pod cannot be nil"))
+		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
 	if pod.Namespace != "foo" {
 		return framework.NewStatus(framework.Unschedulable, "only pods from 'foo' namespace are allowed")

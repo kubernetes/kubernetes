@@ -16,7 +16,6 @@ package validate
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/go-openapi/spec"
 )
@@ -39,34 +38,7 @@ func (ex *exampleValidator) beingVisited(path string) {
 
 // isVisited tells if a path has already been visited
 func (ex *exampleValidator) isVisited(path string) bool {
-	found := ex.visitedSchemas[path]
-	if !found {
-		// search for overlapping paths
-		frags := strings.Split(path, ".")
-		if len(frags) < 2 {
-			// shortcut exit on smaller paths
-			return found
-		}
-		last := len(frags) - 1
-		var currentFragStr, parent string
-		for i := range frags {
-			if i == 0 {
-				currentFragStr = frags[last]
-			} else {
-				currentFragStr = strings.Join([]string{frags[last-i], currentFragStr}, ".")
-			}
-			if i < last {
-				parent = strings.Join(frags[0:last-i], ".")
-			} else {
-				parent = ""
-			}
-			if strings.HasSuffix(parent, currentFragStr) {
-				found = true
-				break
-			}
-		}
-	}
-	return found
+	return isVisited(path, ex.visitedSchemas)
 }
 
 // Validate validates the example values declared in the swagger spec
@@ -97,64 +69,60 @@ func (ex *exampleValidator) validateExampleValueValidAgainstSchema() *Result {
 	s := ex.SpecValidator
 
 	for method, pathItem := range s.analyzer.Operations() {
-		if pathItem != nil { // Safeguard
-			for path, op := range pathItem {
-				// parameters
-				for _, param := range paramHelp.safeExpandedParamsFor(path, method, op.ID, res, s) {
+		for path, op := range pathItem {
+			// parameters
+			for _, param := range paramHelp.safeExpandedParamsFor(path, method, op.ID, res, s) {
 
-					// As of swagger 2.0, Examples are not supported in simple parameters
-					// However, it looks like it is supported by go-openapi
+				// As of swagger 2.0, Examples are not supported in simple parameters
+				// However, it looks like it is supported by go-openapi
 
-					// reset explored schemas to get depth-first recursive-proof exploration
-					ex.resetVisited()
+				// reset explored schemas to get depth-first recursive-proof exploration
+				ex.resetVisited()
 
-					// Check simple parameters first
-					// default values provided must validate against their inline definition (no explicit schema)
-					if param.Example != nil && param.Schema == nil {
-						// check param default value is valid
-						red := NewParamValidator(&param, s.KnownFormats).Validate(param.Example)
-						if red.HasErrorsOrWarnings() {
-							res.AddWarnings(exampleValueDoesNotValidateMsg(param.Name, param.In))
-							res.MergeAsWarnings(red)
-						}
-					}
-
-					// Recursively follows Items and Schemas
-					if param.Items != nil {
-						red := ex.validateExampleValueItemsAgainstSchema(param.Name, param.In, &param, param.Items)
-						if red.HasErrorsOrWarnings() {
-							res.AddWarnings(exampleValueItemsDoesNotValidateMsg(param.Name, param.In))
-							res.Merge(red)
-						}
-					}
-
-					if param.Schema != nil {
-						// Validate example value against schema
-						red := ex.validateExampleValueSchemaAgainstSchema(param.Name, param.In, param.Schema)
-						if red.HasErrorsOrWarnings() {
-							res.AddWarnings(exampleValueDoesNotValidateMsg(param.Name, param.In))
-							res.Merge(red)
-						}
+				// Check simple parameters first
+				// default values provided must validate against their inline definition (no explicit schema)
+				if param.Example != nil && param.Schema == nil {
+					// check param default value is valid
+					red := NewParamValidator(&param, s.KnownFormats).Validate(param.Example)
+					if red.HasErrorsOrWarnings() {
+						res.AddWarnings(exampleValueDoesNotValidateMsg(param.Name, param.In))
+						res.MergeAsWarnings(red)
 					}
 				}
 
-				if op.Responses != nil {
-					if op.Responses.Default != nil {
-						// Same constraint on default Response
-						res.Merge(ex.validateExampleInResponse(op.Responses.Default, "default", path, 0, op.ID))
-					}
-					// Same constraint on regular Responses
-					if op.Responses.StatusCodeResponses != nil { // Safeguard
-						for code, r := range op.Responses.StatusCodeResponses {
-							res.Merge(ex.validateExampleInResponse(&r, "response", path, code, op.ID))
-						}
-					}
-				} else {
-					// Empty op.ID means there is no meaningful operation: no need to report a specific message
-					if op.ID != "" {
-						res.AddErrors(noValidResponseMsg(op.ID))
+				// Recursively follows Items and Schemas
+				if param.Items != nil {
+					red := ex.validateExampleValueItemsAgainstSchema(param.Name, param.In, &param, param.Items)
+					if red.HasErrorsOrWarnings() {
+						res.AddWarnings(exampleValueItemsDoesNotValidateMsg(param.Name, param.In))
+						res.Merge(red)
 					}
 				}
+
+				if param.Schema != nil {
+					// Validate example value against schema
+					red := ex.validateExampleValueSchemaAgainstSchema(param.Name, param.In, param.Schema)
+					if red.HasErrorsOrWarnings() {
+						res.AddWarnings(exampleValueDoesNotValidateMsg(param.Name, param.In))
+						res.Merge(red)
+					}
+				}
+			}
+
+			if op.Responses != nil {
+				if op.Responses.Default != nil {
+					// Same constraint on default Response
+					res.Merge(ex.validateExampleInResponse(op.Responses.Default, jsonDefault, path, 0, op.ID))
+				}
+				// Same constraint on regular Responses
+				if op.Responses.StatusCodeResponses != nil { // Safeguard
+					for code, r := range op.Responses.StatusCodeResponses {
+						res.Merge(ex.validateExampleInResponse(&r, "response", path, code, op.ID))
+					}
+				}
+			} else if op.ID != "" {
+				// Empty op.ID means there is no meaningful operation: no need to report a specific message
+				res.AddErrors(noValidResponseMsg(op.ID))
 			}
 		}
 	}
@@ -178,6 +146,7 @@ func (ex *exampleValidator) validateExampleInResponse(resp *spec.Response, respo
 
 	responseName, responseCodeAsStr := responseHelp.responseMsgVariants(responseType, responseCode)
 
+	// nolint: dupl
 	if response.Headers != nil { // Safeguard
 		for nm, h := range response.Headers {
 			// reset explored schemas to get depth-first recursive-proof exploration
@@ -222,7 +191,7 @@ func (ex *exampleValidator) validateExampleInResponse(resp *spec.Response, respo
 	if response.Examples != nil {
 		if response.Schema != nil {
 			if example, ok := response.Examples["application/json"]; ok {
-				res.MergeAsWarnings(NewSchemaValidator(response.Schema, s.spec.Spec(), path, s.KnownFormats).Validate(example))
+				res.MergeAsWarnings(NewSchemaValidator(response.Schema, s.spec.Spec(), path+".examples", s.KnownFormats, SwaggerSchema(true)).Validate(example))
 			} else {
 				// TODO: validate other media types too
 				res.AddWarnings(examplesMimeNotSupportedMsg(operationID, responseName))
@@ -244,7 +213,7 @@ func (ex *exampleValidator) validateExampleValueSchemaAgainstSchema(path, in str
 	res := new(Result)
 
 	if schema.Example != nil {
-		res.MergeAsWarnings(NewSchemaValidator(schema, s.spec.Spec(), path+".example", s.KnownFormats).Validate(schema.Example))
+		res.MergeAsWarnings(NewSchemaValidator(schema, s.spec.Spec(), path+".example", s.KnownFormats, SwaggerSchema(true)).Validate(schema.Example))
 	}
 	if schema.Items != nil {
 		if schema.Items.Schema != nil {
@@ -281,6 +250,8 @@ func (ex *exampleValidator) validateExampleValueSchemaAgainstSchema(path, in str
 	return res
 }
 
+// TODO: Temporary duplicated code. Need to refactor with examples
+// nolint: dupl
 func (ex *exampleValidator) validateExampleValueItemsAgainstSchema(path, in string, root interface{}, items *spec.Items) *Result {
 	res := new(Result)
 	s := ex.SpecValidator

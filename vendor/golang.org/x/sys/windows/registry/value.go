@@ -68,7 +68,7 @@ func (k Key) GetValue(name string, buf []byte) (n int, valtype uint32, err error
 	return int(l), valtype, nil
 }
 
-func (k Key) getValue(name string, buf []byte) (date []byte, valtype uint32, err error) {
+func (k Key) getValue(name string, buf []byte) (data []byte, valtype uint32, err error) {
 	p, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
 		return nil, 0, err
@@ -108,7 +108,7 @@ func (k Key) GetStringValue(name string) (val string, valtype uint32, err error)
 	if len(data) == 0 {
 		return "", typ, nil
 	}
-	u := (*[1 << 29]uint16)(unsafe.Pointer(&data[0]))[:]
+	u := (*[1 << 29]uint16)(unsafe.Pointer(&data[0]))[: len(data)/2 : len(data)/2]
 	return syscall.UTF16ToString(u), typ, nil
 }
 
@@ -185,8 +185,7 @@ func ExpandString(value string) (string, error) {
 			return "", err
 		}
 		if n <= uint32(len(r)) {
-			u := (*[1 << 29]uint16)(unsafe.Pointer(&r[0]))[:]
-			return syscall.UTF16ToString(u), nil
+			return syscall.UTF16ToString(r[:n]), nil
 		}
 		r = make([]uint16, n)
 	}
@@ -208,7 +207,7 @@ func (k Key) GetStringsValue(name string) (val []string, valtype uint32, err err
 	if len(data) == 0 {
 		return nil, typ, nil
 	}
-	p := (*[1 << 29]uint16)(unsafe.Pointer(&data[0]))[:len(data)/2]
+	p := (*[1 << 29]uint16)(unsafe.Pointer(&data[0]))[: len(data)/2 : len(data)/2]
 	if len(p) == 0 {
 		return nil, typ, nil
 	}
@@ -241,12 +240,15 @@ func (k Key) GetIntegerValue(name string) (val uint64, valtype uint32, err error
 		if len(data) != 4 {
 			return 0, typ, errors.New("DWORD value is not 4 bytes long")
 		}
-		return uint64(*(*uint32)(unsafe.Pointer(&data[0]))), DWORD, nil
+		var val32 uint32
+		copy((*[4]byte)(unsafe.Pointer(&val32))[:], data)
+		return uint64(val32), DWORD, nil
 	case QWORD:
 		if len(data) != 8 {
 			return 0, typ, errors.New("QWORD value is not 8 bytes long")
 		}
-		return uint64(*(*uint64)(unsafe.Pointer(&data[0]))), QWORD, nil
+		copy((*[8]byte)(unsafe.Pointer(&val))[:], data)
+		return val, QWORD, nil
 	default:
 		return 0, typ, ErrUnexpectedType
 	}
@@ -296,7 +298,7 @@ func (k Key) setStringValue(name string, valtype uint32, value string) error {
 	if err != nil {
 		return err
 	}
-	buf := (*[1 << 29]byte)(unsafe.Pointer(&v[0]))[:len(v)*2]
+	buf := (*[1 << 29]byte)(unsafe.Pointer(&v[0]))[: len(v)*2 : len(v)*2]
 	return k.setValue(name, valtype, buf)
 }
 
@@ -326,7 +328,7 @@ func (k Key) SetStringsValue(name string, value []string) error {
 		ss += s + "\x00"
 	}
 	v := utf16.Encode([]rune(ss + "\x00"))
-	buf := (*[1 << 29]byte)(unsafe.Pointer(&v[0]))[:len(v)*2]
+	buf := (*[1 << 29]byte)(unsafe.Pointer(&v[0]))[: len(v)*2 : len(v)*2]
 	return k.setValue(name, MULTI_SZ, buf)
 }
 

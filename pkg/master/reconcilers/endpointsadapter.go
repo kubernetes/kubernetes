@@ -17,12 +17,15 @@ limitations under the License.
 package reconcilers
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	utilnet "k8s.io/utils/net"
 )
 
 // EndpointsAdapter provides a simple interface for reading and writing both
@@ -49,7 +52,7 @@ func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSl
 // Get takes the name and namespace of the Endpoints resource, and returns a
 // corresponding Endpoints object if it exists, and an error if there is any.
 func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetOptions) (*corev1.Endpoints, error) {
-	return adapter.endpointClient.Endpoints(namespace).Get(name, getOpts)
+	return adapter.endpointClient.Endpoints(namespace).Get(context.TODO(), name, getOpts)
 }
 
 // Create accepts a namespace and Endpoints object and creates the Endpoints
@@ -57,9 +60,9 @@ func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetO
 // be created or updated. The created Endpoints object or an error will be
 // returned.
 func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
-	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(endpoints)
-	if err == nil && adapter.endpointSliceClient != nil {
-		_, err = adapter.ensureEndpointSliceFromEndpoints(namespace, endpoints)
+	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+	if err == nil {
+		err = adapter.EnsureEndpointSliceFromEndpoints(namespace, endpoints)
 	}
 	return endpoints, err
 }
@@ -68,28 +71,50 @@ func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endp
 // endpointSliceClient exists, a matching EndpointSlice will also be created or
 // updated. The updated Endpoints object or an error will be returned.
 func (adapter *EndpointsAdapter) Update(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
-	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(endpoints)
-	if err == nil && adapter.endpointSliceClient != nil {
-		_, err = adapter.ensureEndpointSliceFromEndpoints(namespace, endpoints)
+	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
+	if err == nil {
+		err = adapter.EnsureEndpointSliceFromEndpoints(namespace, endpoints)
 	}
 	return endpoints, err
 }
 
-// ensureEndpointSliceFromEndpoints accepts a namespace and Endpoints resource
-// and creates or updates a corresponding EndpointSlice. The EndpointSlice
-// and/or an error will be returned.
-func (adapter *EndpointsAdapter) ensureEndpointSliceFromEndpoints(namespace string, endpoints *corev1.Endpoints) (*discovery.EndpointSlice, error) {
+// EnsureEndpointSliceFromEndpoints accepts a namespace and Endpoints resource
+// and creates or updates a corresponding EndpointSlice if an endpointSliceClient
+// exists. An error will be returned if it fails to sync the EndpointSlice.
+func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace string, endpoints *corev1.Endpoints) error {
+	if adapter.endpointSliceClient == nil {
+		return nil
+	}
 	endpointSlice := endpointSliceFromEndpoints(endpoints)
-	_, err := adapter.endpointSliceClient.EndpointSlices(namespace).Get(endpointSlice.Name, metav1.GetOptions{})
+	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(namespace).Get(context.TODO(), endpointSlice.Name, metav1.GetOptions{})
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return adapter.endpointSliceClient.EndpointSlices(namespace).Create(endpointSlice)
+			if _, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{}); errors.IsAlreadyExists(err) {
+				err = nil
+			}
 		}
-		return nil, err
+		return err
 	}
 
-	return adapter.endpointSliceClient.EndpointSlices(namespace).Update(endpointSlice)
+	// required for transition from IP to IPv4 address type.
+	if currentEndpointSlice.AddressType != endpointSlice.AddressType {
+		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+		return err
+	}
+
+	if apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) &&
+		apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) &&
+		apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
+		return nil
+	}
+
+	_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
+	return err
 }
 
 // endpointSliceFromEndpoints generates an EndpointSlice from an Endpoints
@@ -99,8 +124,9 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 	endpointSlice.Name = endpoints.Name
 	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
 
-	ipAddressType := discovery.AddressTypeIP
-	endpointSlice.AddressType = &ipAddressType
+	// TODO: Add support for dual stack here (and in the rest of
+	// EndpointsAdapter).
+	endpointSlice.AddressType = discovery.AddressTypeIPv4
 
 	if len(endpoints.Subsets) > 0 {
 		subset := endpoints.Subsets[0]
@@ -111,15 +137,31 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 				Protocol: &subset.Ports[i].Protocol,
 			})
 		}
-		for _, address := range subset.Addresses {
-			endpointSlice.Endpoints = append(endpointSlice.Endpoints, endpointFromAddress(address, true))
+
+		if allAddressesIPv6(append(subset.Addresses, subset.NotReadyAddresses...)) {
+			endpointSlice.AddressType = discovery.AddressTypeIPv6
 		}
-		for _, address := range subset.NotReadyAddresses {
-			endpointSlice.Endpoints = append(endpointSlice.Endpoints, endpointFromAddress(address, false))
-		}
+
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)...)
 	}
 
 	return endpointSlice
+}
+
+// getEndpointsFromAddresses returns a list of Endpoints from addresses that
+// match the provided address type.
+func getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType, ready bool) []discovery.Endpoint {
+	endpoints := []discovery.Endpoint{}
+	isIPv6AddressType := addressType == discovery.AddressTypeIPv6
+
+	for _, address := range addresses {
+		if utilnet.IsIPv6String(address.IP) == isIPv6AddressType {
+			endpoints = append(endpoints, endpointFromAddress(address, ready))
+		}
+	}
+
+	return endpoints
 }
 
 // endpointFromAddress generates an Endpoint from an EndpointAddress resource.
@@ -135,4 +177,33 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		TargetRef:  address.TargetRef,
 		Topology:   topology,
 	}
+}
+
+// allAddressesIPv6 returns true if all provided addresses are IPv6.
+func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
+	if len(addresses) == 0 {
+		return false
+	}
+
+	for _, address := range addresses {
+		if !utilnet.IsIPv6String(address.IP) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// setSkipMirrorTrue sets endpointslice.kubernetes.io/skip-mirror to true. It
+// returns true if this has resulted in a change to the Endpoints resource.
+func setSkipMirrorTrue(e *corev1.Endpoints) bool {
+	skipMirrorVal, ok := e.Labels[discovery.LabelSkipMirror]
+	if !ok || skipMirrorVal != "true" {
+		if e.Labels == nil {
+			e.Labels = map[string]string{}
+		}
+		e.Labels[discovery.LabelSkipMirror] = "true"
+		return true
+	}
+	return false
 }

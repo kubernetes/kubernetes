@@ -62,6 +62,9 @@ func (reporter *DefaultReporter) SpecDidComplete(specSummary *types.SpecSummary)
 			reporter.stenographer.AnnounceSuccesfulSlowSpec(specSummary, reporter.config.Succinct)
 		} else {
 			reporter.stenographer.AnnounceSuccesfulSpec(specSummary)
+			if reporter.config.ReportPassed {
+				reporter.stenographer.AnnounceCapturedOutput(specSummary.CapturedOutput)
+			}
 		}
 	case types.SpecStatePending:
 		reporter.stenographer.AnnouncePendingSpec(specSummary, reporter.config.NoisyPendings && !reporter.config.Succinct)

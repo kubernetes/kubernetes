@@ -26,32 +26,15 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
-	kubeletConfigDownloadLongDesc = cmdutil.LongDesc(`
-		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
-		where X is the minor version of the kubelet. Either kubeadm autodetects the kubelet version by exec-ing
-		"kubelet --version" or respects the --kubelet-version parameter.
-		` + cmdutil.AlphaDisclaimer)
-
-	kubeletConfigDownloadExample = cmdutil.Examples(fmt.Sprintf(`
-		# Download the kubelet configuration from the ConfigMap in the cluster. Autodetect the kubelet version.
-		kubeadm alpha phase kubelet config download
-
-		# Download the kubelet configuration from the ConfigMap in the cluster. Use a specific desired kubelet version.
-		kubeadm alpha phase kubelet config download --kubelet-version %s
-		`, constants.CurrentKubernetesVersion))
-
 	kubeletConfigEnableDynamicLongDesc = cmdutil.LongDesc(`
 		Enable or update dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
 		where X is the minor version of the desired kubelet version.
 
-		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
+		WARNING: This kubeadm feature is deprecated. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
 
 		` + cmdutil.AlphaDisclaimer)
@@ -60,7 +43,7 @@ var (
 		# Enable dynamic kubelet configuration for a Node.
 		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version %s
 
-		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
+		WARNING: This kubeadm feature is deprecated. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
 		`, constants.CurrentKubernetesVersion))
 )
@@ -85,44 +68,8 @@ func newCmdKubeletConfig() *cobra.Command {
 		Long:  cmdutil.MacroCommandLongDescription,
 	}
 
-	cmd.AddCommand(newCmdKubeletConfigDownload())
 	cmd.AddCommand(newCmdKubeletConfigEnableDynamic())
 	return cmd
-}
-
-// newCmdKubeletConfigDownload calls cobra.Command for downloading the kubelet configuration from the kubelet-config-1.X ConfigMap in the cluster
-func newCmdKubeletConfigDownload() *cobra.Command {
-	var kubeletVersionStr string
-	// TODO: Be smarter about this and be able to load multiple kubeconfig files in different orders of precedence
-	kubeConfigFile := constants.GetKubeletKubeConfigPath()
-
-	cmd := &cobra.Command{
-		Use:     "download",
-		Short:   "Download the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet",
-		Long:    kubeletConfigDownloadLongDesc,
-		Example: kubeletConfigDownloadExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			kubeletVersion, err := getKubeletVersion(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
-
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
-
-			err = kubeletphase.DownloadConfig(client, kubeletVersion, constants.KubeletRunDirectory)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
-	cmd.Flags().StringVar(&kubeletVersionStr, "kubelet-version", kubeletVersionStr, "The desired version for the kubelet. Defaults to being autodetected from 'kubelet --version'.")
-	return cmd
-}
-
-func getKubeletVersion(kubeletVersionStr string) (*version.Version, error) {
-	if len(kubeletVersionStr) > 0 {
-		return version.ParseSemantic(kubeletVersionStr)
-	}
-	return preflight.GetKubeletVersion(utilsexec.New())
 }
 
 // newCmdKubeletConfigEnableDynamic calls cobra.Command for enabling dynamic kubelet configuration on node
@@ -133,27 +80,33 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "enable-dynamic",
-		Short:   "EXPERIMENTAL: Enable or update dynamic kubelet configuration for a Node",
+		Short:   "DEPRECATED: Enable or update dynamic kubelet configuration for a Node",
 		Long:    kubeletConfigEnableDynamicLongDesc,
 		Example: kubeletConfigEnableDynamicExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		Deprecated: "This command is deprecated and will be removed in a future release. Please defer to the official \"Dynamic Kubelet Configuration\" " +
+			"guide at k8s.io if you wish to use this feature",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(nodeName) == 0 {
-				kubeadmutil.CheckErr(errors.New("the --node-name argument is required"))
+				return errors.New("the --node-name argument is required")
 			}
 			if len(kubeletVersionStr) == 0 {
-				kubeadmutil.CheckErr(errors.New("the --kubelet-version argument is required"))
+				return errors.New("the --kubelet-version argument is required")
 			}
 
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
-			kubeadmutil.CheckErr(err)
+			return kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)

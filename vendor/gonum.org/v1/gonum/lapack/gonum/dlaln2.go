@@ -7,8 +7,8 @@ package gonum
 import "math"
 
 // Dlaln2 solves a linear equation or a system of 2 linear equations of the form
-//  (ca A   - w D) X = scale B,  if trans == false,
-//  (ca A^T - w D) X = scale B,  if trans == true,
+//  (ca A   - w D) X = scale B  if trans == false,
+//  (ca Aᵀ - w D) X = scale B   if trans == true,
 // where A is a na×na real matrix, ca is a real scalar, D is a na×na diagonal
 // real matrix, w is a scalar, real if nw == 1, complex if nw == 2, and X and B
 // are na×1 matrices, real if w is real, complex if w is complex.
@@ -147,7 +147,7 @@ func (impl Implementation) Dlaln2(trans bool, na, nw int, smin, ca float64, a []
 	// Compute the real part of
 	//  C = ca A   - w D
 	// or
-	//  C = ca A^T - w D.
+	//  C = ca Aᵀ - w D.
 	crv := [4]float64{
 		ca*a[0] - wr*d1,
 		ca * a[1],

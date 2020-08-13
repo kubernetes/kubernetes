@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -69,8 +70,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			httpYaml := readFile(test, "http-liveness.yaml.in")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			framework.RunKubectlOrDieInput(execYaml, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(httpYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-", nsFlag)
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
@@ -79,7 +80,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				err := e2epod.WaitForPodNameRunningInNamespace(c, podName, ns)
 				framework.ExpectNoError(err)
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+					pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
@@ -120,8 +121,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			podName := "secret-test-pod"
 
 			ginkgo.By("creating secret and pod")
-			framework.RunKubectlOrDieInput(secretYaml, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
@@ -139,7 +140,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			podName := "dapi-test-pod"
 
 			ginkgo.By("creating the pod")
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
@@ -154,5 +155,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
-	return commonutils.SubstituteImageName(string(testfiles.ReadOrDie(from)))
+	data, err := testfiles.Read(from)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	return commonutils.SubstituteImageName(string(data))
 }

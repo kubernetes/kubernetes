@@ -1,3 +1,7 @@
+# 3.2
+
+* The pause container is built with the correct "Architecture" metadata. ([#87954](https://prs.k8s.io/87954), [@BenTheElder](https://github.com/BenTheElder))
+
 # 3.1
 
 * The pause container gains a signal handler to clean up orphaned zombie processes. ([#36853](https://prs.k8s.io/36853), [@verb](https://github.com/verb))

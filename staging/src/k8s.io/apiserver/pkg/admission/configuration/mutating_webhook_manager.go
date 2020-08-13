@@ -21,13 +21,13 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
-	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
+	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -41,7 +41,7 @@ type mutatingWebhookConfigurationManager struct {
 var _ generic.Source = &mutatingWebhookConfigurationManager{}
 
 func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
-	informer := f.Admissionregistration().V1beta1().MutatingWebhookConfigurations()
+	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
 	manager := &mutatingWebhookConfigurationManager{
 		configuration: &atomic.Value{},
 		lister:        informer.Lister(),
@@ -79,7 +79,7 @@ func (m *mutatingWebhookConfigurationManager) updateConfiguration() {
 	m.configuration.Store(mergeMutatingWebhookConfigurations(configurations))
 }
 
-func mergeMutatingWebhookConfigurations(configurations []*v1beta1.MutatingWebhookConfiguration) []webhook.WebhookAccessor {
+func mergeMutatingWebhookConfigurations(configurations []*v1.MutatingWebhookConfiguration) []webhook.WebhookAccessor {
 	// The internal order of webhooks for each configuration is provided by the user
 	// but configurations themselves can be in any order. As we are going to run these
 	// webhooks in serial, they are sorted here to have a deterministic order.
@@ -99,7 +99,7 @@ func mergeMutatingWebhookConfigurations(configurations []*v1beta1.MutatingWebhoo
 	return accessors
 }
 
-type MutatingWebhookConfigurationSorter []*v1beta1.MutatingWebhookConfiguration
+type MutatingWebhookConfigurationSorter []*v1.MutatingWebhookConfiguration
 
 func (a MutatingWebhookConfigurationSorter) ByName(i, j int) bool {
 	return a[i].Name < a[j].Name

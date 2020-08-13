@@ -58,6 +58,9 @@ func TestVirtualServer(t *testing.T) {
 	}
 	// Check the updated virtual server
 	got12, err := fake.GetVirtualServer(vs1)
+	if err != nil {
+		t.Errorf("Fail to get virtual server, error: %v", err)
+	}
 	if !got12.Equal(vs12) {
 		t.Errorf("Expect virtual server: %v, got: %v", vs12, got12)
 	}

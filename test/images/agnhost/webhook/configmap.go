@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -97,8 +97,10 @@ func mutateConfigmaps(ar v1.AdmissionReview) *v1.AdmissionResponse {
 		reviewResponse.Patch = []byte(configMapPatch2)
 	}
 
-	pt := v1.PatchTypeJSONPatch
-	reviewResponse.PatchType = &pt
+	if len(reviewResponse.Patch) != 0 {
+		pt := v1.PatchTypeJSONPatch
+		reviewResponse.PatchType = &pt
+	}
 
 	return &reviewResponse
 }

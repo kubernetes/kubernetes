@@ -12,7 +12,7 @@ func (c *genericOpt) TrafficClass() (int, error) {
 	}
 	so, ok := sockOpts[ssoTrafficClass]
 	if !ok {
-		return 0, errOpNoSupport
+		return 0, errNotImplemented
 	}
 	return so.GetInt(c.Conn)
 }
@@ -25,7 +25,7 @@ func (c *genericOpt) SetTrafficClass(tclass int) error {
 	}
 	so, ok := sockOpts[ssoTrafficClass]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.SetInt(c.Conn, tclass)
 }
@@ -37,7 +37,7 @@ func (c *genericOpt) HopLimit() (int, error) {
 	}
 	so, ok := sockOpts[ssoHopLimit]
 	if !ok {
-		return 0, errOpNoSupport
+		return 0, errNotImplemented
 	}
 	return so.GetInt(c.Conn)
 }
@@ -50,7 +50,7 @@ func (c *genericOpt) SetHopLimit(hoplim int) error {
 	}
 	so, ok := sockOpts[ssoHopLimit]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.SetInt(c.Conn, hoplim)
 }

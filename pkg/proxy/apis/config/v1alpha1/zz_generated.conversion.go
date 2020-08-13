@@ -96,6 +96,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
+	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
@@ -120,6 +121,8 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	if err := Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(&in.Winkernel, &out.Winkernel, s); err != nil {
 		return err
 	}
+	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.DetectLocalMode = config.LocalMode(in.DetectLocalMode)
 	return nil
 }
 
@@ -133,6 +136,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
+	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
@@ -157,6 +161,8 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	if err := Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(&in.Winkernel, &out.Winkernel, s); err != nil {
 		return err
 	}
+	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.DetectLocalMode = v1alpha1.LocalMode(in.DetectLocalMode)
 	return nil
 }
 
@@ -223,6 +229,9 @@ func autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConf
 	out.Scheduler = in.Scheduler
 	out.ExcludeCIDRs = *(*[]string)(unsafe.Pointer(&in.ExcludeCIDRs))
 	out.StrictARP = in.StrictARP
+	out.TCPTimeout = in.TCPTimeout
+	out.TCPFinTimeout = in.TCPFinTimeout
+	out.UDPTimeout = in.UDPTimeout
 	return nil
 }
 
@@ -237,6 +246,9 @@ func autoConvert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConf
 	out.Scheduler = in.Scheduler
 	out.ExcludeCIDRs = *(*[]string)(unsafe.Pointer(&in.ExcludeCIDRs))
 	out.StrictARP = in.StrictARP
+	out.TCPTimeout = in.TCPTimeout
+	out.TCPFinTimeout = in.TCPFinTimeout
+	out.UDPTimeout = in.UDPTimeout
 	return nil
 }
 

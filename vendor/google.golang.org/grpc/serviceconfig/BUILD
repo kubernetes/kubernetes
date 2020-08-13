@@ -6,7 +6,6 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/serviceconfig",
     importpath = "google.golang.org/grpc/serviceconfig",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/google.golang.org/grpc/internal:go_default_library"],
 )
 
 filegroup(

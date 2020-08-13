@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -64,7 +63,7 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
+	allErrs = append(allErrs, componentconfigs.Validate(c)...)
 	return allErrs
 }
 
@@ -290,7 +289,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		if (e.External.CertFile == "" && e.External.KeyFile != "") || (e.External.CertFile != "" && e.External.KeyFile == "") {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set"))
 		}
-		// If the cert and key are specified, require the VA as well
+		// If the cert and key are specified, require the CA as well
 		if e.External.CertFile != "" && e.External.KeyFile != "" && e.External.CAFile == "" {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile"))
 		}
@@ -373,33 +372,32 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 // ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if isDualStack {
-		subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
+		return allErrs
+	}
+	switch {
+	// if DualStack only 2 CIDRs allowed
+	case isDualStack && len(subnets) > 2:
+		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
+	// if DualStack and there are 2 CIDRs validate if there is at least one of each IP family
+	case isDualStack && len(subnets) == 2:
+		areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, err.Error()))
-		} else {
-			areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, subnets, err.Error()))
-			} else if !areDualStackCIDRs {
-				allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected at least one IP from each family (v4 or v6) for dual-stack networking"))
-			}
-			for _, s := range subnets {
-				numAddresses := ipallocator.RangeSize(s)
-				if numAddresses < minAddrs {
-					allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
-				}
-			}
+		} else if !areDualStackCIDRs {
+			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 		}
-	} else {
-		_, svcSubnet, err := net.ParseCIDR(subnetStr)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
-			return allErrs
-		}
-		numAddresses := ipallocator.RangeSize(svcSubnet)
+	// if not DualStack only one CIDR allowed
+	case !isDualStack && len(subnets) > 1:
+		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "only one CIDR allowed for single-stack networking"))
+	}
+	// validate the subnet/s
+	for _, s := range subnets {
+		numAddresses := utilnet.RangeSize(s)
 		if numAddresses < minAddrs {
-			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "subnet is too small"))
+			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), "subnet is too small"))
 		}
 	}
 	return allErrs
@@ -414,8 +412,10 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 	}
 	// check if dual-stack feature-gate is enabled
 	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
-	// TODO(Arvinderpal): use isDualStack flag once list of service CIDRs is supported (PR: #79386)
-	allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, false /*isDualStack*/, field.NewPath("serviceSubnet"))...)
+
+	if len(c.Networking.ServiceSubnet) != 0 {
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+	}
 	if len(c.Networking.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("podSubnet"))...)
 	}
@@ -463,6 +463,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
 		kubeadmcmdoptions.Kustomize,
+		kubeadmcmdoptions.Patches,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {
 		return true

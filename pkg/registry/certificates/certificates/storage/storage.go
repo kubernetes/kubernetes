@@ -31,12 +31,12 @@ import (
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 )
 
-// REST implements a RESTStorage for CertificateSigningRequest
+// REST implements a RESTStorage for CertificateSigningRequest.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a registry which will store CertificateSigningRequest in the given helper
+// NewREST returns a registry which will store CertificateSigningRequest in the given helper.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
@@ -50,7 +50,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: csrregistry.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}
@@ -80,6 +80,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CertificateSigningRequest object.
 func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
@@ -103,8 +104,14 @@ type ApprovalREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CertificateSigningRequest object.
 func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
+}
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *ApprovalREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the approval subset of an object.
@@ -113,3 +120,5 @@ func (r *ApprovalREST) Update(ctx context.Context, name string, objInfo rest.Upd
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
+
+var _ = rest.Patcher(&ApprovalREST{})

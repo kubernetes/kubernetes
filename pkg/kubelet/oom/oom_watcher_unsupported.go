@@ -28,8 +28,8 @@ type oomWatcherUnsupported struct{}
 var _ Watcher = new(oomWatcherUnsupported)
 
 // NewWatcher creates a fake one here
-func NewWatcher(_ record.EventRecorder) Watcher {
-	return &oomWatcherUnsupported{}
+func NewWatcher(_ record.EventRecorder) (Watcher, error) {
+	return &oomWatcherUnsupported{}, nil
 }
 
 func (ow *oomWatcherUnsupported) Start(_ *v1.ObjectReference) error {

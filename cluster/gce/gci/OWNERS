@@ -1,5 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+reviewers:
+  - mml
+  - roycaihw
+  - karan
 approvers:
-- dchen1107
-- yguo0905
+  - dchen1107
+  - yguo0905
+  - cheftako

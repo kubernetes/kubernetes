@@ -131,16 +131,14 @@ func (m *defaultQueueMetrics) updateUnfinishedWork() {
 	var total float64
 	var oldest float64
 	for _, t := range m.processingStartTimes {
-		age := m.sinceInMicroseconds(t)
+		age := m.sinceInSeconds(t)
 		total += age
 		if age > oldest {
 			oldest = age
 		}
 	}
-	// Convert to seconds; microseconds is unhelpfully granular for this.
-	total /= 1000000
 	m.unfinishedWorkSeconds.Set(total)
-	m.longestRunningProcessor.Set(oldest / 1000000)
+	m.longestRunningProcessor.Set(oldest)
 }
 
 type noMetrics struct{}
@@ -149,11 +147,6 @@ func (noMetrics) add(item t)            {}
 func (noMetrics) get(item t)            {}
 func (noMetrics) done(item t)           {}
 func (noMetrics) updateUnfinishedWork() {}
-
-// Gets the time since the specified start in microseconds.
-func (m *defaultQueueMetrics) sinceInMicroseconds(start time.Time) float64 {
-	return float64(m.clock.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
-}
 
 // Gets the time since the specified start in seconds.
 func (m *defaultQueueMetrics) sinceInSeconds(start time.Time) float64 {

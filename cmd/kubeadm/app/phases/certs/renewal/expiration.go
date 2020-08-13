@@ -48,5 +48,5 @@ func newExpirationInfo(name string, cert *x509.Certificate, externallyManaged bo
 
 // ResidualTime returns the time missing to expiration
 func (e *ExpirationInfo) ResidualTime() time.Duration {
-	return e.ExpirationDate.Sub(time.Now())
+	return time.Until(e.ExpirationDate)
 }

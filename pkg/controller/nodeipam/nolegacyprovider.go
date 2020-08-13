@@ -24,7 +24,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func startLegacyIPAM(
@@ -34,7 +34,7 @@ func startLegacyIPAM(
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
-	nodeCIDRMaskSize int,
+	nodeCIDRMaskSizes []int,
 ) {
 	klog.Fatal("Error trying to Init(): legacy cloud provider support disabled at build time")
 }

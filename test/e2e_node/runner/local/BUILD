@@ -19,7 +19,7 @@ go_library(
         "//test/e2e_node/builder:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//test/utils:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

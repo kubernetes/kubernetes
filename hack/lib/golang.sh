@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
+
 # The golang package that we are building.
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
@@ -47,7 +49,6 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
-  darwin/386
   windows/amd64
   windows/386
 )
@@ -73,8 +74,8 @@ kube::golang::server_targets() {
     cmd/kube-controller-manager
     cmd/kubelet
     cmd/kubeadm
-    cmd/hyperkube
     cmd/kube-scheduler
+    vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
   )
@@ -275,7 +276,6 @@ readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
   test/kubemark
-  hack/e2e.go
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
@@ -467,7 +467,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(go version)"
   local minimum_go_version
-  minimum_go_version=go1.12.1
+  minimum_go_version=go1.14.4
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -674,6 +674,9 @@ kube::golang::build_some_binaries() {
 }
 
 kube::golang::build_binaries_for_platform() {
+  # This is for sanity.  Without it, user umasks can leak through.
+  umask 0022
+
   local platform=$1
 
   local -a statics=()
@@ -700,6 +703,7 @@ kube::golang::build_binaries_for_platform() {
       -gcflags "${gogcflags:-}"
       -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
+      -tags "${gotags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
@@ -710,6 +714,7 @@ kube::golang::build_binaries_for_platform() {
       -gcflags "${gogcflags:-}"
       -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
+      -tags "${gotags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
@@ -725,6 +730,7 @@ kube::golang::build_binaries_for_platform() {
       -gcflags "${gogcflags:-}" \
       -asmflags "${goasmflags:-}" \
       -ldflags "${goldflags:-}" \
+      -tags "${gotags:-}" \
       -o "${outfile}" \
       "${testpkg}"
   done
@@ -776,14 +782,18 @@ kube::golang::build_binaries() {
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
-    local goflags goldflags goasmflags gogcflags
+    local goflags goldflags goasmflags gogcflags gotags
     # If GOLDFLAGS is unset, then set it to the a default of "-s -w".
     # Disable SC2153 for this, as it will throw a warning that the local
     # variable goldflags will exist, and it suggest changing it to this.
     # shellcheck disable=SC2153
-    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
+    goldflags="${GOLDFLAGS=-s -w -buildid=} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
+
+    # extract tags if any specified in GOFLAGS
+    # shellcheck disable=SC2001
+    gotags="selinux,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
 
     local -a targets=()
     local arg

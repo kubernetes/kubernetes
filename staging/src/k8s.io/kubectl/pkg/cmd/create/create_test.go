@@ -67,7 +67,7 @@ func TestCreateObject(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -104,8 +104,8 @@ func TestCreateMultipleObject(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../test/data/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -141,7 +141,7 @@ func TestCreateDirectory(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
-	cmd.Flags().Set("filename", "../../../test/data/replace/legacy")
+	cmd.Flags().Set("filename", "../../../testdata/replace/legacy")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 

@@ -17,18 +17,18 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/node/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/scheduling"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -38,27 +38,27 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
-		scheduling := &v1beta1.Scheduling{
+		scheduling := &nodev1beta1.Scheduling{
 			NodeSelector: map[string]string{
 				"foo": "conflict",
 			},
 		}
 
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass", framework.TestContext.ContainerRuntime)
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(runtimeClass)
+		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := newRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			"foo": "bar",
 		}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectError(err, "should be forbidden")
-		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] [Disruptive] ", func() {
 		nodeName := scheduling.GetNodeThatCanRunPod(f)
 		nodeSelector := map[string]string{
 			"foo":  "bar",
@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 				Effect:   v1.TaintEffectNoSchedule,
 			},
 		}
-		scheduling := &v1beta1.Scheduling{
+		scheduling := &nodev1beta1.Scheduling{
 			NodeSelector: nodeSelector,
 			Tolerations:  tolerations,
 		}
@@ -90,17 +90,17 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			Value:  "bar",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		framework.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
+		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
 		framework.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
-		defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
+		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(runtimeClass)
+		rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := newRuntimeClassPod(rc.GetName())
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			"foo": "bar",
 		}
@@ -109,7 +109,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
 
 		// check that pod got scheduled on specified node.
-		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
 		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
@@ -118,26 +118,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 })
 
 // newRuntimeClass returns a test runtime class.
-func newRuntimeClass(namespace, name string) *v1beta1.RuntimeClass {
+func newRuntimeClass(namespace, name, handler string) *nodev1beta1.RuntimeClass {
 	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
-	return runtimeclasstest.NewRuntimeClass(uniqueName, framework.PreconfiguredRuntimeClassHandler())
-}
-
-// newRuntimeClassPod returns a test pod with the given runtimeClassName.
-func newRuntimeClassPod(runtimeClassName string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("test-runtimeclass-%s-", runtimeClassName),
-		},
-		Spec: v1.PodSpec{
-			RuntimeClassName: &runtimeClassName,
-			Containers: []v1.Container{{
-				Name:    "test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-				Command: []string{"true"},
-			}},
-			RestartPolicy:                v1.RestartPolicyNever,
-			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
-		},
-	}
+	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler(handler))
 }

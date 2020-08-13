@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -60,13 +61,13 @@ func NewFilteredValidatingWebhookConfigurationInformer(client kubernetes.Interfa
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(options)
+				return client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Watch(options)
+				return client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Watch(context.TODO(), options)
 			},
 		},
 		&admissionregistrationv1.ValidatingWebhookConfiguration{},

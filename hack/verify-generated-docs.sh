@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks that various type of documents(* .md, * .yaml and man
+# files) are generated correctly(just verifies the generation process).
+# Usage: `hack/verify-generated-docs.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

@@ -28,12 +28,23 @@ import (
 )
 
 var (
-	supportedAddressTypes  = sets.NewString(string(discovery.AddressTypeIP))
-	supportedPortProtocols = sets.NewString(string(api.ProtocolTCP), string(api.ProtocolUDP), string(api.ProtocolSCTP))
-	maxTopologyLabels      = 16
-	maxAddresses           = 100
-	maxPorts               = 100
-	maxEndpoints           = 1000
+	supportedAddressTypes = sets.NewString(
+		string(discovery.AddressTypeIPv4),
+		string(discovery.AddressTypeIPv6),
+		string(discovery.AddressTypeFQDN),
+	)
+	deprecatedAddressTypes = sets.NewString(
+		string(discovery.AddressTypeIP),
+	)
+	supportedPortProtocols = sets.NewString(
+		string(api.ProtocolTCP),
+		string(api.ProtocolUDP),
+		string(api.ProtocolSCTP),
+	)
+	maxTopologyLabels = 16
+	maxAddresses      = 100
+	maxPorts          = 100
+	maxEndpoints      = 1000
 )
 
 // ValidateEndpointSliceName can be used to check whether the given endpoint
@@ -42,31 +53,24 @@ var (
 var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateEndpointSlice validates an EndpointSlice.
-func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice) field.ErrorList {
+func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice, validAddressTypes sets.String) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
-
-	addrType := discovery.AddressType("")
-	if endpointSlice.AddressType == nil {
-		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
-	} else {
-		addrType = *endpointSlice.AddressType
-	}
-
-	if endpointSlice.AddressType != nil && !supportedAddressTypes.Has(string(*endpointSlice.AddressType)) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), *endpointSlice.AddressType, supportedAddressTypes.List()))
-	}
-
-	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, addrType, field.NewPath("endpoints"))...)
+	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType, validAddressTypes)...)
+	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))...)
 	allErrs = append(allErrs, validatePorts(endpointSlice.Ports, field.NewPath("ports"))...)
 
 	return allErrs
 }
 
+// ValidateEndpointSliceCreate validates an EndpointSlice when it is created.
+func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.ErrorList {
+	return ValidateEndpointSlice(endpointSlice, supportedAddressTypes)
+}
+
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	allErrs := ValidateEndpointSlice(newEndpointSlice)
-
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(*newEndpointSlice.AddressType, *oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
+	allErrs := ValidateEndpointSlice(newEndpointSlice, supportedAddressTypes.Union(deprecatedAddressTypes))
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
 
 	return allErrs
 }
@@ -83,17 +87,26 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		idxPath := fldPath.Index(i)
 		addressPath := idxPath.Child("addresses")
 
-		if addrType == discovery.AddressTypeIP {
-			if len(endpoint.Addresses) == 0 {
-				allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address"))
-			} else if len(endpoint.Addresses) > maxAddresses {
-				allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses))
-			}
+		if len(endpoint.Addresses) == 0 {
+			allErrs = append(allErrs, field.Required(addressPath, "must contain at least 1 address"))
+		} else if len(endpoint.Addresses) > maxAddresses {
+			allErrs = append(allErrs, field.TooMany(addressPath, len(endpoint.Addresses), maxAddresses))
+		}
 
-			for i, address := range endpoint.Addresses {
+		for i, address := range endpoint.Addresses {
+			// This validates known address types, unknown types fall through
+			// and do not get validated.
+			switch addrType {
+			case discovery.AddressTypeIP:
 				for _, msg := range validation.IsValidIP(address) {
 					allErrs = append(allErrs, field.Invalid(addressPath.Index(i), address, msg))
 				}
+			case discovery.AddressTypeIPv4:
+				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
+			case discovery.AddressTypeIPv6:
+				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
+			case discovery.AddressTypeFQDN:
+				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
 			}
 		}
 
@@ -104,9 +117,7 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		allErrs = append(allErrs, metavalidation.ValidateLabels(endpoint.Topology, topologyPath)...)
 
 		if endpoint.Hostname != nil {
-			for _, msg := range validation.IsDNS1123Label(*endpoint.Hostname) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), *endpoint.Hostname, msg))
-			}
+			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpoint.Hostname, idxPath.Child("hostname"))...)
 		}
 	}
 
@@ -126,9 +137,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		idxPath := fldPath.Index(i)
 
 		if len(*endpointPort.Name) > 0 {
-			for _, msg := range validation.IsValidPortName(*endpointPort.Name) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), endpointPort.Name, msg))
-			}
+			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpointPort.Name, idxPath.Child("name"))...)
 		}
 
 		if portNames.Has(*endpointPort.Name) {
@@ -142,6 +151,24 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		} else if !supportedPortProtocols.Has(string(*endpointPort.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, supportedPortProtocols.List()))
 		}
+
+		if endpointPort.AppProtocol != nil {
+			for _, msg := range validation.IsQualifiedName(*endpointPort.AppProtocol) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("appProtocol"), endpointPort.AppProtocol, msg))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func validateAddressType(addressType discovery.AddressType, validAddressTypes sets.String) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if addressType == "" {
+		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
+	} else if !validAddressTypes.Has(string(addressType)) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, validAddressTypes.List()))
 	}
 
 	return allErrs

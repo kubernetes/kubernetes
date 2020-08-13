@@ -24,7 +24,7 @@ import (
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestDeploymentStatusViewerStatus(t *testing.T) {
@@ -128,7 +128,8 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				Status: test.status,
 			}
 			unstructuredD := &unstructured.Unstructured{}
-			err := scheme.Scheme.Convert(d, unstructuredD, nil)
+			var err error
+			unstructuredD.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(d)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -233,7 +234,8 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 			}
 
 			unstructuredD := &unstructured.Unstructured{}
-			err := scheme.Scheme.Convert(d, unstructuredD, nil)
+			var err error
+			unstructuredD.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(d)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -384,7 +386,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			s.Generation = test.generation
 
 			unstructuredS := &unstructured.Unstructured{}
-			err := scheme.Scheme.Convert(s, unstructuredS, nil)
+			var err error
+			unstructuredS.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(s)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -422,7 +425,8 @@ func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 	}
 
 	unstructuredD := &unstructured.Unstructured{}
-	err := scheme.Scheme.Convert(d, unstructuredD, nil)
+	var err error
+	unstructuredD.Object, err = runtime.DefaultUnstructuredConverter.ToUnstructured(d)
 	if err != nil {
 		t.Fatal(err)
 	}

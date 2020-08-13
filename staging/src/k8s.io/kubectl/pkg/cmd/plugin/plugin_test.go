@@ -17,7 +17,6 @@ limitations under the License.
 package plugin
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -98,6 +97,8 @@ func TestPluginPathsAreValid(t *testing.T) {
 		verifier           *fakePluginPathVerifier
 		expectVerifyErrors []error
 		expectErr          string
+		expectErrOut       string
+		expectOut          string
 	}{
 		{
 			name:        "ensure no plugins found if no files begin with kubectl- prefix",
@@ -106,7 +107,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginFile: func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "notkubectl-")
 			},
-			expectErr: "unable to find any kubectl plugins in your PATH",
+			expectErr: "error: unable to find any kubectl plugins in your PATH\n",
 		},
 		{
 			name:        "ensure de-duplicated plugin-paths slice",
@@ -115,12 +116,22 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginFile: func() (*os.File, error) {
 				return ioutil.TempFile(tempDir, "kubectl-")
 			},
+			expectOut: "The following compatible plugins are available:",
+		},
+		{
+			name:        "ensure no errors when empty string or blank path are specified",
+			pluginPaths: []string{tempDir, "", " "},
+			verifier:    newFakePluginPathVerifier(),
+			pluginFile: func() (*os.File, error) {
+				return ioutil.TempFile(tempDir, "kubectl-")
+			},
+			expectOut: "The following compatible plugins are available:",
 		},
 	}
 
 	for _, test := range tc {
 		t.Run(test.name, func(t *testing.T) {
-			ioStreams, _, _, errOut := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, errOut := genericclioptions.NewTestIOStreams()
 			o := &PluginListOptions{
 				Verifier:  test.verifier,
 				IOStreams: ioStreams,
@@ -145,23 +156,23 @@ func TestPluginPathsAreValid(t *testing.T) {
 
 			err := o.Run()
 			if err == nil && len(test.expectErr) > 0 {
-				t.Fatalf("unexpected non-error: expecting %v", test.expectErr)
-			}
-			if err != nil && len(test.expectErr) == 0 {
-				t.Fatalf("unexpected error: %v - %v", err, errOut.String())
-			}
-			if err == nil {
-				return
+				t.Fatalf("unexpected non-error: expected %v, but got nothing", test.expectErr)
+			} else if err != nil && len(test.expectErr) == 0 {
+				t.Fatalf("unexpected error: expected nothing, but got %v", err.Error())
+			} else if err != nil && err.Error() != test.expectErr {
+				t.Fatalf("unexpected error: expected %v, but got %v", test.expectErr, err.Error())
 			}
 
-			allErrs := bytes.NewBuffer(errOut.Bytes())
-			if _, err := allErrs.WriteString(err.Error()); err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if len(test.expectErrOut) == 0 && errOut.Len() > 0 {
+				t.Fatalf("unexpected error output: expected nothing, but got %v", errOut.String())
+			} else if len(test.expectErrOut) > 0 && !strings.Contains(errOut.String(), test.expectErrOut) {
+				t.Fatalf("unexpected error output: expected to contain %v, but got %v", test.expectErrOut, errOut.String())
 			}
-			if len(test.expectErr) > 0 {
-				if !strings.Contains(allErrs.String(), test.expectErr) {
-					t.Fatalf("unexpected error: expected %v, but got %v", test.expectErr, allErrs.String())
-				}
+
+			if len(test.expectOut) == 0 && out.Len() > 0 {
+				t.Fatalf("unexpected output: expected nothing, but got %v", out.String())
+			} else if len(test.expectOut) > 0 && !strings.Contains(out.String(), test.expectOut) {
+				t.Fatalf("unexpected output: expected to contain %v, but got %v", test.expectOut, out.String())
 			}
 		})
 	}

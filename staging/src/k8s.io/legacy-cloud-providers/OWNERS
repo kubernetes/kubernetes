@@ -5,12 +5,12 @@ approvers:
 - dims
 - andrewsykim
 - cheftako
-- mcrute
 reviewers:
 - mikedanese
 - dims
 - andrewsykim
 - cheftako
+emeritus_approvers:
 - mcrute
 labels:
 - sig/cloud-provider

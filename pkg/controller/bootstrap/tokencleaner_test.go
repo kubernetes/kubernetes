@@ -110,10 +110,11 @@ func TestCleanerExpiredAt(t *testing.T) {
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	addSecretExpiration(secret, timeString(2*time.Second))
+	secrets.Informer().GetIndexer().Add(secret)
+	cleaner.enqueueSecrets(secret)
 	expected := []core.Action{}
 	verifyFunc := func() {
-		secrets.Informer().GetIndexer().Add(secret)
-		cleaner.evalSecret(secret)
+		cleaner.processNextWorkItem()
 		verifyActions(t, expected, cl.Actions())
 	}
 	// token has not expired currently

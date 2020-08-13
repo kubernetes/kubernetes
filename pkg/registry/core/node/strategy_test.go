@@ -17,21 +17,23 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 
-	// install all api groups for testing
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestMatchNode(t *testing.T) {
@@ -233,5 +235,109 @@ func TestDropFields(t *testing.T) {
 				t.Errorf("%v: unexpected node spec: %v", tc.name, diff.ObjectReflectDiff(tc.node, tc.compareNode))
 			}
 		}()
+	}
+}
+func TestValidateUpdate(t *testing.T) {
+	tests := []struct {
+		oldNode api.Node
+		node    api.Node
+		valid   bool
+	}{
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hugepage-change-values-from-0",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("0"),
+					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hugepage-change-values-from-0",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, true},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hugepage-change-values",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hugepage-change-values",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, true},
+	}
+	for i, test := range tests {
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := (nodeStrategy{}).ValidateUpdate(context.Background(), &test.node, &test.oldNode)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		node  api.Node
+		valid bool
+	}{
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "one-hugepage-size",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceCPU:                   resource.MustParse("100"),
+					api.ResourceMemory:                resource.MustParse("10000"),
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("0"),
+					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, true},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "multiple-hugepage-sizes",
+			},
+			Status: api.NodeStatus{
+				Capacity: api.ResourceList{
+					api.ResourceCPU:                   resource.MustParse("100"),
+					api.ResourceMemory:                resource.MustParse("10000"),
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, true},
+	}
+	for i, test := range tests {
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := (nodeStrategy{}).Validate(context.Background(), &test.node)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+		}
 	}
 }

@@ -1,7 +1,7 @@
 sudo: false
 language: go
 go:
-  - 1.11.x
+  - 1.8.x
 env:
   - DEP_VERSION="0.3.2"
 

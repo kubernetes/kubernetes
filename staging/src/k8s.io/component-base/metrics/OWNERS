@@ -1,12 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- piosz
-- brancz
+- sig-instrumentation-approvers
 - logicalhan
+- RainbowMango
 reviewers:
-- piosz
-- brancz
-- logicalhan
+- sig-instrumentation-reviewers
 labels:
 - sig/instrumentation

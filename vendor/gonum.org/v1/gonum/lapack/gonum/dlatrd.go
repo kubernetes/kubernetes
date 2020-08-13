@@ -11,7 +11,7 @@ import (
 
 // Dlatrd reduces nb rows and columns of a real n×n symmetric matrix A to symmetric
 // tridiagonal form. It computes the orthonormal similarity transformation
-//  Q^T * A * Q
+//  Qᵀ * A * Q
 // and returns the matrices V and W to apply to the unreduced part of A. If
 // uplo == blas.Upper, the upper triangle is supplied and the last nb rows are
 // reduced. If uplo == blas.Lower, the lower triangle is supplied and the first
@@ -51,7 +51,7 @@ import (
 //
 // The matrix Q is represented as a product of elementary reflectors. Each reflector
 // H has the form
-//  I - tau * v * v^T
+//  I - tau * v * vᵀ
 // If uplo == blas.Upper,
 //  Q = H_{n-1} * H_{n-2} * ... * H_{n-nb}
 // where v[:i-1] is stored in A[:i-1,i], v[i-1] = 1, and v[i:n] = 0.
@@ -62,7 +62,7 @@ import (
 //
 // The vectors v form the n×nb matrix V which is used with W to apply a
 // symmetric rank-2 update to the unreduced part of A
-//  A = A - V * W^T - W * V^T
+//  A = A - V * Wᵀ - W * Vᵀ
 //
 // Dlatrd is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlatrd(uplo blas.Uplo, n, nb int, a []float64, lda int, e, tau, w []float64, ldw int) {

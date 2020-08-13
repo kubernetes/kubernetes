@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -58,27 +59,33 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	volumePluginMgr *volume.VolumePluginMgr,
 	pvcLister corelisters.PersistentVolumeClaimLister,
-	pvLister corelisters.PersistentVolumeLister) DesiredStateOfWorldPopulator {
+	pvLister corelisters.PersistentVolumeLister,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		loopSleepDuration:     loopSleepDuration,
-		listPodsRetryDuration: listPodsRetryDuration,
-		podLister:             podLister,
-		desiredStateOfWorld:   desiredStateOfWorld,
-		volumePluginMgr:       volumePluginMgr,
-		pvcLister:             pvcLister,
-		pvLister:              pvLister,
+		loopSleepDuration:        loopSleepDuration,
+		listPodsRetryDuration:    listPodsRetryDuration,
+		podLister:                podLister,
+		desiredStateOfWorld:      desiredStateOfWorld,
+		volumePluginMgr:          volumePluginMgr,
+		pvcLister:                pvcLister,
+		pvLister:                 pvLister,
+		csiMigratedPluginManager: csiMigratedPluginManager,
+		intreeToCSITranslator:    intreeToCSITranslator,
 	}
 }
 
 type desiredStateOfWorldPopulator struct {
-	loopSleepDuration     time.Duration
-	podLister             corelisters.PodLister
-	desiredStateOfWorld   cache.DesiredStateOfWorld
-	volumePluginMgr       *volume.VolumePluginMgr
-	pvcLister             corelisters.PersistentVolumeClaimLister
-	pvLister              corelisters.PersistentVolumeLister
-	listPodsRetryDuration time.Duration
-	timeOfLastListPods    time.Time
+	loopSleepDuration        time.Duration
+	podLister                corelisters.PodLister
+	desiredStateOfWorld      cache.DesiredStateOfWorld
+	volumePluginMgr          *volume.VolumePluginMgr
+	pvcLister                corelisters.PersistentVolumeClaimLister
+	pvLister                 corelisters.PersistentVolumeLister
+	listPodsRetryDuration    time.Duration
+	timeOfLastListPods       time.Time
+	csiMigratedPluginManager csimigration.PluginManager
+	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
@@ -163,7 +170,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 			continue
 		}
 		util.ProcessPodVolumes(pod, true,
-			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister)
+			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator)
 
 	}
 

@@ -103,12 +103,25 @@ type JSONSchemaProps struct {
 	//      may be used on any type of list (struct, scalar, ...).
 	// 2) `set`:
 	//      Sets are lists that must not have multiple items with the same value. Each
-	//      value must be a scalar (or another atomic type).
+	//      value must be a scalar, an object with x-kubernetes-map-type `atomic` or an
+	//      array with x-kubernetes-list-type `atomic`.
 	// 3) `map`:
 	//      These lists are like maps in that their elements have a non-index key
 	//      used to identify them. Order is preserved upon merge. The map tag
 	//      must only be used on a list with elements of type object.
 	XListType *string
+
+	// x-kubernetes-map-type annotates an object to further describe its topology.
+	// This extension must only be used when type is object and may have 2 possible values:
+	//
+	// 1) `granular`:
+	//      These maps are actual maps (key-value pairs) and each fields are independent
+	//      from each other (they can each be manipulated by separate actors). This is
+	//      the default behaviour for all maps.
+	// 2) `atomic`: the list is treated as a single entity, like a scalar.
+	//      Atomic maps will be entirely replaced when updated.
+	// +optional
+	XMapType *string
 }
 
 // JSON represents any valid JSON value.

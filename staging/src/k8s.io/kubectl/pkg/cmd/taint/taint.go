@@ -22,10 +22,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/explain"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -44,6 +46,9 @@ type TaintOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
+
 	resources      []string
 	taintsToAdd    []v1.Taint
 	taintsToRemove []v1.Taint
@@ -51,10 +56,13 @@ type TaintOptions struct {
 	selector       string
 	overwrite      bool
 	all            bool
+	fieldManager   string
 
 	ClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 
 	genericclioptions.IOStreams
+
+	Mapper meta.RESTMapper
 }
 
 var (
@@ -109,11 +117,13 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	}
 
 	options.PrintFlags.AddFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
 	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all nodes in the cluster")
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.fieldManager, "kubectl-taint")
 	return cmd
 }
 
@@ -124,12 +134,32 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return err
 	}
 
+	o.Mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+
 	// retrieves resource and taint args from args
 	// also checks args to verify that all resources are specified before taints
 	taintArgs := []string{}
 	metTaintArg := false
 	for _, s := range args {
-		isTaint := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		isTaint := strings.Contains(s, "=") || strings.Contains(s, ":") || strings.HasSuffix(s, "-")
 		switch {
 		case !metTaintArg && isTaint:
 			metTaintArg = true
@@ -183,7 +213,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 func (o TaintOptions) validateFlags() error {
 	// Cannot have a non-empty selector and all flag set. They are mutually exclusive.
 	if o.all && o.selector != "" {
-		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited.")
+		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited")
 	}
 	// If both selector and all are not set.
 	if !o.all && o.selector == "" {
@@ -199,15 +229,18 @@ func (o TaintOptions) validateFlags() error {
 // Validate checks to the TaintOptions to see if there is sufficient information run the command.
 func (o TaintOptions) Validate() error {
 	resourceType := strings.ToLower(o.resources[0])
-	validResources, isValidResource := []string{"node", "nodes"}, false
-	for _, validResource := range validResources {
-		if resourceType == validResource {
-			isValidResource = true
-			break
-		}
+	fullySpecifiedGVR, _, err := explain.SplitAndParseResourceRequest(resourceType, o.Mapper)
+	if err != nil {
+		return err
 	}
-	if !isValidResource {
-		return fmt.Errorf("invalid resource type %s, only %q are supported", o.resources[0], validResources)
+
+	gvk, err := o.Mapper.KindFor(fullySpecifiedGVR)
+	if err != nil {
+		return err
+	}
+
+	if gvk.Kind != "Node" {
+		return fmt.Errorf("invalid resource type %s, only node types are supported", resourceType)
 	}
 
 	// check the format of taint args and checks removed taints aren't in the new taints list
@@ -261,12 +294,55 @@ func (o TaintOptions) RunTaint() error {
 			klog.V(2).Infof("couldn't compute patch: %v", err)
 		}
 
+		printer, err := o.ToPrinter(operation)
+		if err != nil {
+			return err
+		}
+		if o.DryRunStrategy == cmdutil.DryRunClient {
+			if createdPatch {
+				typedObj, err := scheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+				if err != nil {
+					return err
+				}
+
+				nodeObj, ok := typedObj.(*v1.Node)
+				if !ok {
+					return fmt.Errorf("unexpected type %T", typedObj)
+				}
+
+				originalObjJS, err := json.Marshal(nodeObj)
+				if err != nil {
+					return err
+				}
+
+				originalPatchedObjJS, err := strategicpatch.StrategicMergePatch(originalObjJS, patchBytes, nodeObj)
+				if err != nil {
+					return err
+				}
+
+				targetObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalPatchedObjJS)
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(targetObj, o.Out)
+			}
+			return printer.PrintObj(obj, o.Out)
+		}
+
 		mapping := info.ResourceMapping()
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
 		client, err := o.ClientForMapping(mapping)
 		if err != nil {
 			return err
 		}
-		helper := resource.NewHelper(client, mapping)
+		helper := resource.
+			NewHelper(client, mapping).
+			WithFieldManager(o.fieldManager).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer)
 
 		var outputObj runtime.Object
 		if createdPatch {
@@ -278,10 +354,6 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		printer, err := o.ToPrinter(operation)
-		if err != nil {
-			return err
-		}
 		return printer.PrintObj(outputObj, o.Out)
 	})
 }
@@ -294,7 +366,7 @@ func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 	}
 	if !o.overwrite {
 		if exists := checkIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
-			return "", fmt.Errorf("Node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
+			return "", fmt.Errorf("node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
 		}
 	}
 	operation, newTaints, err := reorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)

@@ -17,21 +17,23 @@ limitations under the License.
 package quobyte
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	gostrings "strings"
 
-	"github.com/pborman/uuid"
-	"k8s.io/api/core/v1"
+	"github.com/google/uuid"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -102,15 +104,11 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	exec := plugin.host.GetExec(plugin.GetPluginName())
-	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
+	if out, err := exec.Command("ls", "/sbin/mount.quobyte").CombinedOutput(); err == nil {
 		klog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}
 
-	return false
-}
-
-func (plugin *quobytePlugin) IsMigratedToCSI() bool {
 	return false
 }
 
@@ -408,7 +406,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 	}
 
 	// create random image name
-	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.New().String())
 
 	manager := &quobyteVolumeManager{
 		config: cfg,
@@ -416,7 +414,9 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 
 	vol, sizeGB, err := manager.createVolume(provisioner, createQuota)
 	if err != nil {
-		return nil, err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("CreateVolume failed: %v", err)
+		return nil, errors.New("CreateVolume failed: see kube-controller-manager.log for details")
 	}
 	pv := new(v1.PersistentVolume)
 	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, util.VolumeDynamicallyCreatedByKey, "quobyte-dynamic-provisioner")
@@ -451,7 +451,13 @@ func (deleter *quobyteVolumeDeleter) Delete() error {
 	manager := &quobyteVolumeManager{
 		config: cfg,
 	}
-	return manager.deleteVolume(deleter)
+	err = manager.deleteVolume(deleter)
+	if err != nil {
+		// don't log error details from client calls in events
+		klog.V(4).Infof("DeleteVolume failed: %v", err)
+		return errors.New("DeleteVolume failed: see kube-controller-manager.log for details")
+	}
+	return nil
 }
 
 // Parse API configuration (url, username and password) out of class.Parameters.
@@ -459,19 +465,14 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	var apiServer, secretName string
 	secretNamespace := "default"
 
-	deleteKeys := []string{}
-
 	for k, v := range params {
 		switch gostrings.ToLower(k) {
 		case "adminsecretname":
 			secretName = v
-			deleteKeys = append(deleteKeys, k)
 		case "adminsecretnamespace":
 			secretNamespace = v
-			deleteKeys = append(deleteKeys, k)
 		case "quobyteapiserver":
 			apiServer = v
-			deleteKeys = append(deleteKeys, k)
 		}
 	}
 

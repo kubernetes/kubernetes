@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget"
 )
 
-// rest implements a RESTStorage for pod disruption budgets against etcd
+// REST implements a RESTStorage for pod disruption budgets against etcd.
 type REST struct {
 	*genericregistry.Store
 }
@@ -64,11 +64,12 @@ func (r *REST) ShortNames() []string {
 	return []string{"pdb"}
 }
 
-// StatusREST implements the REST endpoint for changing the status of an podDisruptionBudget
+// StatusREST implements the REST endpoint for changing the status of an podDisruptionBudget.
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new PodDisruptionBudget object.
 func (r *StatusREST) New() runtime.Object {
 	return &policyapi.PodDisruptionBudget{}
 }

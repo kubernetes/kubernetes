@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -72,9 +72,13 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 		PVCName:            pdName,
 		SizeGB:             1,
 		Tags:               nil,
-		AvailabilityZone:   zone,
 		DiskIOPSReadWrite:  "",
 		DiskMBpsReadWrite:  "",
+	}
+
+	// do not use blank zone definition
+	if len(zone) > 0 {
+		volumeOptions.AvailabilityZone = zone
 	}
 	return p.azureCloud.CreateManagedDisk(volumeOptions)
 }

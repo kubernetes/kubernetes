@@ -17,10 +17,13 @@ limitations under the License.
 package kubeadm
 
 import (
+	"crypto/x509"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -62,9 +65,9 @@ type InitConfiguration struct {
 type ClusterConfiguration struct {
 	metav1.TypeMeta
 
-	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
+	// ComponentConfigs holds component configs known to kubeadm, should long-term only exist in the internal kubeadm API
 	// +k8s:conversion-gen=false
-	ComponentConfigs ComponentConfigs
+	ComponentConfigs ComponentConfigMap
 
 	// Etcd holds configuration for etcd.
 	Etcd Etcd
@@ -114,6 +117,8 @@ type ClusterConfiguration struct {
 	CIImageRepository string
 
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
+	// DEPRECATED: As hyperkube is itself deprecated, this fields is too. It will be removed in future kubeadm config versions, kubeadm
+	// will print multiple warnings when set to true, and at some point it may become ignored.
 	UseHyperKubeImage bool
 
 	// FeatureGates enabled by the user.
@@ -177,14 +182,6 @@ type ImageMeta struct {
 	ImageTag string
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
-}
-
-// ComponentConfigs holds known internal ComponentConfig types for other components
-type ComponentConfigs struct {
-	// Kubelet holds the ComponentConfiguration for the kubelet
-	Kubelet *kubeletconfig.KubeletConfiguration
-	// KubeProxy holds the ComponentConfiguration for the kube-proxy
-	KubeProxy *kubeproxyconfig.KubeProxyConfiguration
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -379,8 +376,7 @@ type BootstrapTokenDiscovery struct {
 	// pinning, which can be unsafe. Each hash is specified as "<type>:<value>",
 	// where the only currently supported type is "sha256". This is a hex-encoded
 	// SHA-256 hash of the Subject Public Key Info (SPKI) object in DER-encoded
-	// ASN.1. These hashes can be calculated using, for example, OpenSSL:
-	// openssl x509 -pubkey -in ca.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+	// ASN.1. These hashes can be calculated using, for example, OpenSSL.
 	CACertHashes []string
 
 	// UnsafeSkipCAVerification allows token-based discovery
@@ -407,6 +403,15 @@ func (cfg *ClusterConfiguration) GetControlPlaneImageRepository() string {
 	return cfg.ImageRepository
 }
 
+// PublicKeyAlgorithm returns the type of encryption keys used in the cluster.
+func (cfg *ClusterConfiguration) PublicKeyAlgorithm() x509.PublicKeyAlgorithm {
+	if features.Enabled(cfg.FeatureGates, features.PublicKeysECDSA) {
+		return x509.ECDSA
+	}
+
+	return x509.RSA
+}
+
 // HostPathMount contains elements describing volumes that are mounted from the
 // host.
 type HostPathMount struct {
@@ -422,3 +427,31 @@ type HostPathMount struct {
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
 }
+
+// DocumentMap is a convenient way to describe a map between a YAML document and its GVK type
+// +k8s:deepcopy-gen=false
+type DocumentMap map[schema.GroupVersionKind][]byte
+
+// ComponentConfig holds a known component config
+type ComponentConfig interface {
+	// DeepCopy should create a new deep copy of the component config in place
+	DeepCopy() ComponentConfig
+
+	// Marshal is marshalling the config into a YAML document returned as a byte slice
+	Marshal() ([]byte, error)
+
+	// Unmarshal loads the config from a document map. No config in the document map is no error.
+	Unmarshal(docmap DocumentMap) error
+
+	// Default patches the component config with kubeadm preferred defaults
+	Default(cfg *ClusterConfiguration, localAPIEndpoint *APIEndpoint, nodeRegOpts *NodeRegistrationOptions)
+
+	// IsUserSupplied indicates if the component config was supplied or modified by a user or was kubeadm generated
+	IsUserSupplied() bool
+
+	// SetUserSupplied sets the state of the component config "user supplied" flag to, either true, or false.
+	SetUserSupplied(userSupplied bool)
+}
+
+// ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
+type ComponentConfigMap map[string]ComponentConfig

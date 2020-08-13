@@ -143,6 +143,9 @@ func (in *KubeProxyIPVSConfiguration) DeepCopyInto(out *KubeProxyIPVSConfigurati
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	out.TCPTimeout = in.TCPTimeout
+	out.TCPFinTimeout = in.TCPFinTimeout
+	out.UDPTimeout = in.UDPTimeout
 	return
 }
 

@@ -10,8 +10,8 @@ import (
 )
 
 // Dgebak updates an n×m matrix V as
-//  V = P D V,        if side == lapack.EVRight,
-//  V = P D^{-1} V,   if side == lapack.EVLeft,
+//  V = P D V       if side == lapack.EVRight,
+//  V = P D^{-1} V  if side == lapack.EVLeft,
 // where P and D are n×n permutation and scaling matrices, respectively,
 // implicitly represented by job, scale, ilo and ihi as returned by Dgebal.
 //

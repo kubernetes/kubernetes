@@ -14,6 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script runs `curl` command to get the kubernetes build file.
+# Version number or publication is either a proper version number'
+# (e.g. "v1.0.6", "v1.2.0-alpha.1.881+376438b69c7612") or a version'
+#  publication of the form <bucket>/<version> (e.g. "release/stable",'
+# "ci/latest-1").'
+
+# Usage `hack/get-build.sh [Version]`.
+# Example `hack/get-build.sh v1.16.4`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

@@ -26,7 +26,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // Manager manages all the Device Plugins running on a node.
@@ -34,15 +34,17 @@ type Manager interface {
 	// Start starts device plugin registration service.
 	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
 
-	// Allocate configures and assigns devices to pods. The pods are provided
-	// through the pod admission attributes in the attrs argument. From the
-	// requested device resources, Allocate will communicate with the owning
-	// device plugin to allow setup procedures to take place, and for the
-	// device plugin to provide runtime settings to use the device (environment
-	// variables, mount points and device files). The node object is provided
-	// for the device manager to update the node capacity to reflect the
-	// currently available devices.
-	Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
+	// Allocate configures and assigns devices to a container in a pod. From
+	// the requested device resources, Allocate will communicate with the
+	// owning device plugin to allow setup procedures to take place, and for
+	// the device plugin to provide runtime settings to use the device
+	// (environment variables, mount points and device files).
+	Allocate(pod *v1.Pod, container *v1.Container) error
+
+	// UpdatePluginResources updates node resources based on devices already
+	// allocated to pods. The node object is provided for the device manager to
+	// update the node capacity to reflect the currently available devices.
+	UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
 
 	// Stop stops the manager.
 	Stop() error
@@ -67,7 +69,10 @@ type Manager interface {
 
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments
-	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+
+	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
+	UpdateAllocatedDevices()
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

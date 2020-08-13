@@ -19,7 +19,7 @@ package object
 import (
 	"testing"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,7 +52,7 @@ func TestObjectSelector(t *testing.T) {
 		},
 	}
 	matcher := &Matcher{}
-	allScopes := v1beta1.AllScopes
+	allScopes := v1.AllScopes
 	testcases := []struct {
 		name string
 
@@ -106,12 +106,12 @@ func TestObjectSelector(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		hook := &v1beta1.ValidatingWebhook{
+		hook := &v1.ValidatingWebhook{
 			NamespaceSelector: &metav1.LabelSelector{},
 			ObjectSelector:    testcase.objectSelector,
-			Rules: []v1beta1.RuleWithOperations{{
-				Operations: []v1beta1.OperationType{"*"},
-				Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+			Rules: []v1.RuleWithOperations{{
+				Operations: []v1.OperationType{"*"},
+				Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 			}}}
 
 		t.Run(testcase.name, func(t *testing.T) {

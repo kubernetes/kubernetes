@@ -22,10 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 )
 
 func TestValidatePriorityClass(t *testing.T) {
-	spcs := scheduling.SystemPriorityClasses()
+	spcs := schedulingapiv1.SystemPriorityClasses()
 	successCases := map[string]scheduling.PriorityClass{
 		"no description": {
 			ObjectMeta: metav1.ObjectMeta{Name: "tier1", Namespace: ""},

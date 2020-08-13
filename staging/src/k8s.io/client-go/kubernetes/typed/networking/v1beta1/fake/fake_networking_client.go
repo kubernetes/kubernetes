@@ -32,6 +32,10 @@ func (c *FakeNetworkingV1beta1) Ingresses(namespace string) v1beta1.IngressInter
 	return &FakeIngresses{c, namespace}
 }
 
+func (c *FakeNetworkingV1beta1) IngressClasses() v1beta1.IngressClassInterface {
+	return &FakeIngressClasses{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeNetworkingV1beta1) RESTClient() rest.Interface {

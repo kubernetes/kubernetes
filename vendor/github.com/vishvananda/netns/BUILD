@@ -10,6 +10,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/vishvananda/netns",
     importpath = "github.com/vishvananda/netns",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
 )
 
 filegroup(

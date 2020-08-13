@@ -26,9 +26,6 @@ source "${KUBE_ROOT}/build/common.sh"
 source "${KUBE_ROOT}/build/lib/release.sh"
 
 CMD_TARGETS="${KUBE_SERVER_IMAGE_TARGETS[*]}"
-if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
-    CMD_TARGETS="${CMD_TARGETS} cmd/hyperkube"
-fi
 if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
     CMD_TARGETS="${CMD_TARGETS} ${KUBE_CONFORMANCE_IMAGE_TARGETS[*]}"
 fi

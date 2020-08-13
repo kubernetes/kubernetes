@@ -17,18 +17,21 @@ limitations under the License.
 package servicecatalog
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -41,7 +44,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	ginkgo.BeforeEach(func() {
 		// only run on gce for the time being til we find an easier way to update
 		// the admission controllers used on the others
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		podClient = f.PodClient()
 	})
 
@@ -73,8 +76,8 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		}
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
-		if errors.IsNotFound(err) {
-			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+		if apierrors.IsNotFound(err) {
+			e2eskipper.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
 		framework.ExpectNoError(err)
 
@@ -111,14 +114,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pod")
 		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := podClient.Watch(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to set up watch")
 
 		ginkgo.By("submitting the pod to kubernetes")
@@ -127,7 +130,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		ginkgo.By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err = podClient.List(options)
+		pods, err = podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pod")
 		framework.ExpectEqual(len(pods.Items), 1)
 
@@ -143,11 +146,11 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("ensuring pod is modified")
 		// save the running pod
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		// check the annotation is there
@@ -191,8 +194,8 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		}
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
-		if errors.IsNotFound(err) {
-			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+		if apierrors.IsNotFound(err) {
+			e2eskipper.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
 		framework.ExpectNoError(err)
 
@@ -231,14 +234,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pod")
 		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := podClient.Watch(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to set up watch")
 
 		ginkgo.By("submitting the pod to kubernetes")
@@ -247,7 +250,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		ginkgo.By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err = podClient.List(options)
+		pods, err = podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pod")
 		framework.ExpectEqual(len(pods.Items), 1)
 
@@ -263,11 +266,11 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(originalPod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, originalPod.Name, f.Namespace.Name))
 
 		ginkgo.By("ensuring pod is modified")
 		// save the running pod
-		pod, err := podClient.Get(originalPod.Name, metav1.GetOptions{})
+		pod, err := podClient.Get(context.TODO(), originalPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		// check the annotation is not there
@@ -287,5 +290,5 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 })
 
 func createPodPreset(c clientset.Interface, ns string, job *settingsv1alpha1.PodPreset) (*settingsv1alpha1.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
+	return c.SettingsV1alpha1().PodPresets(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 }

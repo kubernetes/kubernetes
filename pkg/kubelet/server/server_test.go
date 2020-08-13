@@ -36,6 +36,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
@@ -57,10 +58,10 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
+	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -101,6 +102,10 @@ func (fk *fakeKubelet) LatestLoopEntryTime() time.Time {
 
 func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
+}
+
+func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
 func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
@@ -284,7 +289,7 @@ func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
 	return f.attributesFunc(u, req)
 }
-func (f *fakeAuth) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
 }
 
@@ -301,6 +306,11 @@ func newServerTest() *serverTestFramework {
 }
 
 func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
+	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, redirectContainerStreaming, streamingServer)
+}
+
+func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler, redirectContainerStreaming bool,
+	streamingServer streaming.Server) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -340,6 +350,7 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 		enableDebugging,
 		false,
 		redirectContainerStreaming,
+		enableSystemLogHandler,
 		fw.criHandler)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
@@ -1011,6 +1022,16 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 	}
 }
 
+func makeReq(t *testing.T, method, url, clientProtocol string) *http.Request {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		t.Fatalf("error creating request: %v", err)
+	}
+	req.Header.Set("Content-Type", "")
+	req.Header.Add("X-Stream-Protocol-Version", clientProtocol)
+	return req
+}
+
 func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
@@ -1024,10 +1045,10 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Post(url, "", nil)
+	resp, err := c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -1063,14 +1084,13 @@ func testExecAttach(t *testing.T, verb string) {
 		"stdout":                       {stdout: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stderr":                       {stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdout and stderr":            {stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stdout stderr and tty":        {stdout: true, stderr: true, tty: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdin stdout and stderr":      {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdin stdout stderr with uid": {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols, uid: true},
 		"stdout with redirect":         {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
 	}
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
@@ -1194,7 +1214,7 @@ func testExecAttach(t *testing.T, verb string) {
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 
-			resp, err = c.Post(url, "", nil)
+			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
@@ -1290,7 +1310,8 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Post(url, "", nil)
+	req := makeReq(t, "POST", url, "portforward.k8s.io")
+	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -1333,8 +1354,8 @@ func TestServePortForward(t *testing.T) {
 	podNamespace := "other"
 	podName := "foo"
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
@@ -1398,7 +1419,8 @@ func TestServePortForward(t *testing.T) {
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 
-			resp, err := c.Post(url, "", nil)
+			req := makeReq(t, "POST", url, "portforward.k8s.io")
+			resp, err := c.Do(req)
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
@@ -1460,8 +1482,82 @@ func TestCRIHandler(t *testing.T) {
 	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
 }
 
+func TestMetricBuckets(t *testing.T) {
+	tests := map[string]struct {
+		url    string
+		bucket string
+	}{
+		"healthz endpoint":                {url: "/healthz", bucket: "healthz"},
+		"attach":                          {url: "/attach/podNamespace/podID/containerName", bucket: "attach"},
+		"attach with uid":                 {url: "/attach/podNamespace/podID/uid/containerName", bucket: "attach"},
+		"configz":                         {url: "/configz", bucket: "configz"},
+		"containerLogs":                   {url: "/containerLogs/podNamespace/podID/containerName", bucket: "containerLogs"},
+		"cri":                             {url: "/cri/", bucket: "cri"},
+		"cri with sub":                    {url: "/cri/foo", bucket: "cri"},
+		"debug v flags":                   {url: "/debug/flags/v", bucket: "debug"},
+		"pprof with sub":                  {url: "/debug/pprof/subpath", bucket: "debug"},
+		"exec":                            {url: "/exec/podNamespace/podID/containerName", bucket: "exec"},
+		"exec with uid":                   {url: "/exec/podNamespace/podID/uid/containerName", bucket: "exec"},
+		"healthz":                         {url: "/healthz/", bucket: "healthz"},
+		"healthz log sub":                 {url: "/healthz/log", bucket: "healthz"},
+		"healthz ping":                    {url: "/healthz/ping", bucket: "healthz"},
+		"healthz sync loop":               {url: "/healthz/syncloop", bucket: "healthz"},
+		"logs":                            {url: "/logs/", bucket: "logs"},
+		"logs with path":                  {url: "/logs/logpath", bucket: "logs"},
+		"metrics":                         {url: "/metrics", bucket: "metrics"},
+		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
+		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
+		"metrics resource v1alpha1":       {url: "/metrics/resource/v1alpha1", bucket: "metrics/resource"},
+		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
+		"pods":                            {url: "/pods/", bucket: "pods"},
+		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},
+		"portForward with uid":            {url: "/portForward/podNamespace/podID/uid", bucket: "portForward"},
+		"run":                             {url: "/run/podNamespace/podID/containerName", bucket: "run"},
+		"run with uid":                    {url: "/run/podNamespace/podID/uid/containerName", bucket: "run"},
+		"runningpods":                     {url: "/runningpods/", bucket: "runningpods"},
+		"spec":                            {url: "/spec/", bucket: "spec"},
+		"stats":                           {url: "/stats/", bucket: "stats"},
+		"stats container sub":             {url: "/stats/container", bucket: "stats"},
+		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
+		"stats containerName with uid":    {url: "/stats/namespace/podName/uid/containerName", bucket: "stats"},
+		"stats containerName":             {url: "/stats/podName/containerName", bucket: "stats"},
+		"invalid path":                    {url: "/junk", bucket: "other"},
+		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
+	}
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	for _, test := range tests {
+		path := test.url
+		bucket := test.bucket
+		require.Equal(t, fw.serverUnderTest.getMetricBucket(path), bucket)
+	}
+}
+
+func TestMetricMethodBuckets(t *testing.T) {
+	tests := map[string]struct {
+		method string
+		bucket string
+	}{
+		"normal GET":     {method: "GET", bucket: "GET"},
+		"normal POST":    {method: "POST", bucket: "POST"},
+		"invalid method": {method: "WEIRD", bucket: "other"},
+	}
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	for _, test := range tests {
+		method := test.method
+		bucket := test.bucket
+		require.Equal(t, fw.serverUnderTest.getMetricMethodBucket(method), bucket)
+	}
+}
+
 func TestDebuggingDisabledHandlers(t *testing.T) {
-	fw := newServerTestWithDebug(false, false, nil)
+	// for backward compatibility even if enablesystemLogHandler is set but not enableDebuggingHandler then /logs
+	//shouldn't be served.
+	fw := newServerTestWithDebuggingHandlers(false, true, false, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1471,19 +1567,7 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	}
 
 	for _, p := range paths {
-		resp, err := http.Get(fw.testHTTPServer.URL + p)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err := ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
-
-		resp, err = http.Post(fw.testHTTPServer.URL+p, "", nil)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err = ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
+		verifyEndpointResponse(t, fw, p, "Debug endpoints are disabled.\n")
 	}
 
 	// test some other paths, make sure they're working
@@ -1516,6 +1600,43 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 
 }
 
+func TestDisablingSystemLogHandler(t *testing.T) {
+	fw := newServerTestWithDebuggingHandlers(true, false, false, nil)
+	defer fw.testHTTPServer.Close()
+
+	// verify logs endpoint is disabled
+	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+}
+
+func TestFailedParseParamsSummaryHandler(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/summary", "invalid/content/type", nil)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+	v, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Contains(t, string(v), "parse form failed")
+}
+
+func verifyEndpointResponse(t *testing.T, fw *serverTestFramework, path string, expectedResponse string) {
+	resp, err := http.Get(fw.testHTTPServer.URL + path)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
+
+	resp, err = http.Post(fw.testHTTPServer.URL+path, "", nil)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err = ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
+}
+
 func TestTrimURLPath(t *testing.T) {
 	tests := []struct {
 		path, expected string
@@ -1533,6 +1654,6 @@ func TestTrimURLPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		assert.Equal(t, test.expected, trimURLPath(test.path), fmt.Sprintf("path is: %s", test.path))
+		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
 	}
 }

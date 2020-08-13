@@ -28,41 +28,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/stretchr/testify/assert"
 
+	utilpointer "k8s.io/utils/pointer"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/util/configz"
-	utilpointer "k8s.io/utils/pointer"
 )
-
-// This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
-func TestProxyServerWithCleanupAndExit(t *testing.T) {
-	// Each bind address below is a separate test case
-	bindAddresses := []string{
-		"0.0.0.0",
-		"::",
-	}
-	for _, addr := range bindAddresses {
-		options := NewOptions()
-
-		options.config = &kubeproxyconfig.KubeProxyConfiguration{
-			BindAddress: addr,
-		}
-		options.CleanupAndExit = true
-
-		proxyserver, err := NewProxyServer(options)
-
-		assert.Nil(t, err, "unexpected error in NewProxyServer, addr: %s", addr)
-		assert.NotNil(t, proxyserver, "nil proxy server obj, addr: %s", addr)
-		assert.NotNil(t, proxyserver.IptInterface, "nil iptables intf, addr: %s", addr)
-
-		// Clean up config for next test case
-		configz.Delete(kubeproxyconfig.GroupName)
-	}
-}
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
@@ -147,6 +122,7 @@ mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
 udpIdleTimeout: 123ms
+detectLocalMode: "ClusterCIDR"
 nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
@@ -159,6 +135,7 @@ nodePortAddresses:
 		clusterCIDR        string
 		healthzBindAddress string
 		metricsBindAddress string
+		extraConfig        string
 	}{
 		{
 			name:               "iptables mode, IPv4 all-zeros bind address",
@@ -217,6 +194,30 @@ nodePortAddresses:
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
+		{
+			// Test for unknown field within config.
+			// For v1alpha1 a lenient path is implemented and will throw a
+			// strict decoding warning instead of failing to load
+			name:               "unknown field",
+			mode:               "iptables",
+			bindAddress:        "9.8.7.6",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+			extraConfig:        "foo: bar",
+		},
+		{
+			// Test for duplicate field within config.
+			// For v1alpha1 a lenient path is implemented and will throw a
+			// strict decoding warning instead of failing to load
+			name:               "duplicate field",
+			mode:               "iptables",
+			bindAddress:        "9.8.7.6",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+			extraConfig:        "bindAddress: 9.8.7.6",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -262,27 +263,45 @@ nodePortAddresses:
 			PortRange:          "2-7",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
 		}
 
 		options := NewOptions()
 
-		yaml := fmt.Sprintf(
+		baseYAML := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
 			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
+
+		// Append additional configuration to the base yaml template
+		yaml := fmt.Sprintf("%s\n%s", baseYAML, tc.extraConfig)
+
 		config, err := options.loadConfig([]byte(yaml))
+
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+
 		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
 		}
 	}
 }
 
 // TestLoadConfigFailures tests failure modes for loadConfig()
 func TestLoadConfigFailures(t *testing.T) {
+	// TODO(phenixblue): Uncomment below template when v1alpha2+ of kube-proxy config is
+	// released with strict decoding. These associated tests will fail with
+	// the lenient codec and only one config API version.
+	/*
+			yamlTemplate := `bindAddress: 0.0.0.0
+		clusterCIDR: "1.2.3.0/24"
+		configSyncPeriod: 15s
+		kind: KubeProxyConfiguration`
+	*/
+
 	testCases := []struct {
-		name   string
-		config string
-		expErr string
+		name    string
+		config  string
+		expErr  string
+		checkFn func(err error) bool
 	}{
 		{
 			name:   "Decode error test",
@@ -299,15 +318,39 @@ func TestLoadConfigFailures(t *testing.T) {
 			config: "bindAddress: ::",
 			expErr: "mapping values are not allowed in this context",
 		},
+		// TODO(phenixblue): Uncomment below tests when v1alpha2+ of kube-proxy config is
+		// released with strict decoding. These tests will fail with the
+		// lenient codec and only one config API version.
+		/*
+			{
+				name:    "Duplicate fields",
+				config:  fmt.Sprintf("%s\nbindAddress: 1.2.3.4", yamlTemplate),
+				checkFn: kuberuntime.IsStrictDecodingError,
+			},
+			{
+				name:    "Unknown field",
+				config:  fmt.Sprintf("%s\nfoo: bar", yamlTemplate),
+				checkFn: kuberuntime.IsStrictDecodingError,
+			},
+		*/
 	}
+
 	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"
 	for _, tc := range testCases {
-		options := NewOptions()
-		config := fmt.Sprintf("%s\n%s", version, tc.config)
-		_, err := options.loadConfig([]byte(config))
-		if assert.Error(t, err, tc.name) {
-			assert.Contains(t, err.Error(), tc.expErr, tc.name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewOptions()
+			config := fmt.Sprintf("%s\n%s", version, tc.config)
+			_, err := options.loadConfig([]byte(config))
+
+			if assert.Error(t, err, tc.name) {
+				if tc.expErr != "" {
+					assert.Contains(t, err.Error(), tc.expErr)
+				}
+				if tc.checkFn != nil {
+					assert.True(t, tc.checkFn(err), tc.name)
+				}
+			}
+		})
 	}
 }
 
@@ -375,6 +418,7 @@ func TestConfigChange(t *testing.T) {
 
 		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 10
@@ -407,6 +451,7 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
+detectLocalMode: "ClusterCIDR"
 udpIdleTimeout: 250ms`)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)

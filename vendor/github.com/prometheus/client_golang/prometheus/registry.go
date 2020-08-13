@@ -25,6 +25,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/cespare/xxhash/v2"
+	//lint:ignore SA1019 Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/expfmt"
 
@@ -74,7 +76,7 @@ func NewRegistry() *Registry {
 // NewPedanticRegistry returns a registry that checks during collection if each
 // collected Metric is consistent with its reported Desc, and if the Desc has
 // actually been registered with the registry. Unchecked Collectors (those whose
-// Describe methed does not yield any descriptors) are excluded from the check.
+// Describe method does not yield any descriptors) are excluded from the check.
 //
 // Usually, a Registry will be happy as long as the union of all collected
 // Metrics is consistent and valid even if some metrics are not consistent with
@@ -266,7 +268,7 @@ func (r *Registry) Register(c Collector) error {
 		descChan           = make(chan *Desc, capDescChan)
 		newDescIDs         = map[uint64]struct{}{}
 		newDimHashesByName = map[string]uint64{}
-		collectorID        uint64 // Just a sum of all desc IDs.
+		collectorID        uint64 // All desc IDs XOR'd together.
 		duplicateDescErr   error
 	)
 	go func() {
@@ -293,12 +295,12 @@ func (r *Registry) Register(c Collector) error {
 		if _, exists := r.descIDs[desc.id]; exists {
 			duplicateDescErr = fmt.Errorf("descriptor %s already exists with the same fully-qualified name and const label values", desc)
 		}
-		// If it is not a duplicate desc in this collector, add it to
+		// If it is not a duplicate desc in this collector, XOR it to
 		// the collectorID.  (We allow duplicate descs within the same
 		// collector, but their existence must be a no-op.)
 		if _, exists := newDescIDs[desc.id]; !exists {
 			newDescIDs[desc.id] = struct{}{}
-			collectorID += desc.id
+			collectorID ^= desc.id
 		}
 
 		// Are all the label names and the help string consistent with
@@ -325,9 +327,17 @@ func (r *Registry) Register(c Collector) error {
 		return nil
 	}
 	if existing, exists := r.collectorsByID[collectorID]; exists {
-		return AlreadyRegisteredError{
-			ExistingCollector: existing,
-			NewCollector:      c,
+		switch e := existing.(type) {
+		case *wrappingCollector:
+			return AlreadyRegisteredError{
+				ExistingCollector: e.unwrapRecursively(),
+				NewCollector:      c,
+			}
+		default:
+			return AlreadyRegisteredError{
+				ExistingCollector: e,
+				NewCollector:      c,
+			}
 		}
 	}
 	// If the collectorID is new, but at least one of the descs existed
@@ -352,7 +362,7 @@ func (r *Registry) Unregister(c Collector) bool {
 	var (
 		descChan    = make(chan *Desc, capDescChan)
 		descIDs     = map[uint64]struct{}{}
-		collectorID uint64 // Just a sum of the desc IDs.
+		collectorID uint64 // All desc IDs XOR'd together.
 	)
 	go func() {
 		c.Describe(descChan)
@@ -360,7 +370,7 @@ func (r *Registry) Unregister(c Collector) bool {
 	}()
 	for desc := range descChan {
 		if _, exists := descIDs[desc.id]; !exists {
-			collectorID += desc.id
+			collectorID ^= desc.id
 			descIDs[desc.id] = struct{}{}
 		}
 	}
@@ -680,7 +690,7 @@ func processMetric(
 // Gatherers is a slice of Gatherer instances that implements the Gatherer
 // interface itself. Its Gather method calls Gather on all Gatherers in the
 // slice in order and returns the merged results. Errors returned from the
-// Gather calles are all returned in a flattened MultiError. Duplicate and
+// Gather calls are all returned in a flattened MultiError. Duplicate and
 // inconsistent Metrics are skipped (first occurrence in slice order wins) and
 // reported in the returned error.
 //
@@ -867,9 +877,9 @@ func checkMetricConsistency(
 	}
 
 	// Is the metric unique (i.e. no other metric with the same name and the same labels)?
-	h := hashNew()
-	h = hashAdd(h, name)
-	h = hashAddByte(h, separatorByte)
+	h := xxhash.New()
+	h.WriteString(name)
+	h.Write(separatorByteSlice)
 	// Make sure label pairs are sorted. We depend on it for the consistency
 	// check.
 	if !sort.IsSorted(labelPairSorter(dtoMetric.Label)) {
@@ -880,18 +890,19 @@ func checkMetricConsistency(
 		dtoMetric.Label = copiedLabels
 	}
 	for _, lp := range dtoMetric.Label {
-		h = hashAdd(h, lp.GetName())
-		h = hashAddByte(h, separatorByte)
-		h = hashAdd(h, lp.GetValue())
-		h = hashAddByte(h, separatorByte)
+		h.WriteString(lp.GetName())
+		h.Write(separatorByteSlice)
+		h.WriteString(lp.GetValue())
+		h.Write(separatorByteSlice)
 	}
-	if _, exists := metricHashes[h]; exists {
+	hSum := h.Sum64()
+	if _, exists := metricHashes[hSum]; exists {
 		return fmt.Errorf(
 			"collected metric %q { %s} was collected before with the same name and label values",
 			name, dtoMetric,
 		)
 	}
-	metricHashes[h] = struct{}{}
+	metricHashes[hSum] = struct{}{}
 	return nil
 }
 

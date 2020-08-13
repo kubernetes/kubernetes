@@ -17,6 +17,7 @@ limitations under the License.
 package path
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -65,7 +66,7 @@ func TestNewAuthorizer(t *testing.T) {
 					info := authorizer.AttributesRecord{
 						Path: pth,
 					}
-					if got, _, err := a.Authorize(info); err != nil {
+					if got, _, err := a.Authorize(context.Background(), info); err != nil {
 						t.Errorf("NewAuthorizer(%v).Authorize(%q) return unexpected error: %v", tt.excludedPaths, pth, err)
 					} else if got != cases.want {
 						t.Errorf("NewAuthorizer(%v).Authorize(%q) = %v, want %v", tt.excludedPaths, pth, got, cases.want)

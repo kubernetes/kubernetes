@@ -9,6 +9,7 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = [
+        "cert_rotation_test.go",
         "client_test.go",
         "dynamic_client_test.go",
         "main_test.go",
@@ -18,8 +19,6 @@ go_test(
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -33,8 +32,14 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/client-go/transport:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

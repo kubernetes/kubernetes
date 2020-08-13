@@ -87,7 +87,7 @@ func RoleEscalationAuthorized(ctx context.Context, a authorizer.Authorizer) bool
 		ResourceRequest: true,
 	}
 
-	decision, _, err := a.Authorize(attrs)
+	decision, _, err := a.Authorize(ctx, attrs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf(
 			"error authorizing user %#v to escalate %#v named %q in namespace %q: %v",
@@ -135,7 +135,7 @@ func BindingAuthorized(ctx context.Context, roleRef rbac.RoleRef, bindingNamespa
 		return false
 	}
 
-	decision, _, err := a.Authorize(attrs)
+	decision, _, err := a.Authorize(ctx, attrs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf(
 			"error authorizing user %#v to bind %#v in namespace %s: %v",

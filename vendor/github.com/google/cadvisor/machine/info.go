@@ -17,28 +17,28 @@ package machine
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"time"
 
-	"github.com/docker/docker/pkg/parsers/operatingsystem"
+	"golang.org/x/sys/unix"
+
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/nvm"
 	"github.com/google/cadvisor/utils/cloudinfo"
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 
-	"k8s.io/klog"
-
-	"golang.org/x/sys/unix"
+	"k8s.io/klog/v2"
 )
 
 const hugepagesDirectory = "/sys/kernel/mm/hugepages/"
+const memoryControllerPath = "/sys/devices/system/edac/mc/"
 
-var machineIdFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
-var bootIdFilePath = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
+var machineIDFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
+var bootIDFilePath = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
 
 func getInfoFromFiles(filePaths string) string {
 	if len(filePaths) == 0 {
@@ -54,45 +54,6 @@ func getInfoFromFiles(filePaths string) string {
 	return ""
 }
 
-// GetHugePagesInfo returns information about pre-allocated huge pages
-func GetHugePagesInfo() ([]info.HugePagesInfo, error) {
-	var hugePagesInfo []info.HugePagesInfo
-	files, err := ioutil.ReadDir(hugepagesDirectory)
-	if err != nil {
-		// treat as non-fatal since kernels and machine can be
-		// configured to disable hugepage support
-		return hugePagesInfo, nil
-	}
-	for _, st := range files {
-		nameArray := strings.Split(st.Name(), "-")
-		pageSizeArray := strings.Split(nameArray[1], "kB")
-		pageSize, err := strconv.ParseUint(string(pageSizeArray[0]), 10, 64)
-		if err != nil {
-			return hugePagesInfo, err
-		}
-
-		numFile := hugepagesDirectory + st.Name() + "/nr_hugepages"
-		val, err := ioutil.ReadFile(numFile)
-		if err != nil {
-			return hugePagesInfo, err
-		}
-		var numPages uint64
-		// we use sscanf as the file as a new-line that trips up ParseUint
-		// it returns the number of tokens successfully parsed, so if
-		// n != 1, it means we were unable to parse a number from the file
-		n, err := fmt.Sscanf(string(val), "%d", &numPages)
-		if err != nil || n != 1 {
-			return hugePagesInfo, fmt.Errorf("could not parse file %v contents %q", numFile, string(val))
-		}
-
-		hugePagesInfo = append(hugePagesInfo, info.HugePagesInfo{
-			NumPages: numPages,
-			PageSize: pageSize,
-		})
-	}
-	return hugePagesInfo, nil
-}
-
 func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.MachineInfo, error) {
 	rootFs := "/"
 	if !inHostNamespace {
@@ -100,6 +61,9 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 	}
 
 	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "/proc/cpuinfo"))
+	if err != nil {
+		return nil, err
+	}
 	clockSpeed, err := GetClockSpeed(cpuinfo)
 	if err != nil {
 		return nil, err
@@ -110,7 +74,17 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		return nil, err
 	}
 
-	hugePagesInfo, err := GetHugePagesInfo()
+	memoryByType, err := GetMachineMemoryByType(memoryControllerPath)
+	if err != nil {
+		return nil, err
+	}
+
+	nvmInfo, err := nvm.GetInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	hugePagesInfo, err := sysinfo.GetHugePagesInfo(sysFs, hugepagesDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +104,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		klog.Errorf("Failed to get network devices: %v", err)
 	}
 
-	topology, numCores, err := GetTopology(sysFs, string(cpuinfo))
+	topology, numCores, err := GetTopology(sysFs)
 	if err != nil {
 		klog.Errorf("Failed to get topology information: %v", err)
 	}
@@ -146,19 +120,24 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 	instanceID := realCloudInfo.GetInstanceID()
 
 	machineInfo := &info.MachineInfo{
-		NumCores:       numCores,
-		CpuFrequency:   clockSpeed,
-		MemoryCapacity: memoryCapacity,
-		HugePages:      hugePagesInfo,
-		DiskMap:        diskMap,
-		NetworkDevices: netDevices,
-		Topology:       topology,
-		MachineID:      getInfoFromFiles(filepath.Join(rootFs, *machineIdFilePath)),
-		SystemUUID:     systemUUID,
-		BootID:         getInfoFromFiles(filepath.Join(rootFs, *bootIdFilePath)),
-		CloudProvider:  cloudProvider,
-		InstanceType:   instanceType,
-		InstanceID:     instanceID,
+		Timestamp:        time.Now(),
+		NumCores:         numCores,
+		NumPhysicalCores: GetPhysicalCores(cpuinfo),
+		NumSockets:       GetSockets(cpuinfo),
+		CpuFrequency:     clockSpeed,
+		MemoryCapacity:   memoryCapacity,
+		MemoryByType:     memoryByType,
+		NVMInfo:          nvmInfo,
+		HugePages:        hugePagesInfo,
+		DiskMap:          diskMap,
+		NetworkDevices:   netDevices,
+		Topology:         topology,
+		MachineID:        getInfoFromFiles(filepath.Join(rootFs, *machineIDFilePath)),
+		SystemUUID:       systemUUID,
+		BootID:           getInfoFromFiles(filepath.Join(rootFs, *bootIDFilePath)),
+		CloudProvider:    cloudProvider,
+		InstanceType:     instanceType,
+		InstanceID:       instanceID,
 	}
 
 	for i := range filesystems {
@@ -174,7 +153,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 }
 
 func ContainerOsVersion() string {
-	os, err := operatingsystem.GetOperatingSystem()
+	os, err := getOperatingSystem()
 	if err != nil {
 		os = "Unknown"
 	}

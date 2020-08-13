@@ -17,7 +17,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/appengine/internal",
     importpath = "google.golang.org/appengine/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/google.golang.org/appengine:__subpackages__"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

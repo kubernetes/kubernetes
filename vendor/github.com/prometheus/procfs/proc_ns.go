@@ -29,9 +29,9 @@ type Namespace struct {
 // Namespaces contains all of the namespaces that the process is contained in.
 type Namespaces map[string]Namespace
 
-// NewNamespaces reads from /proc/[pid/ns/* to get the namespaces of which the
+// Namespaces reads from /proc/<pid>/ns/* to get the namespaces of which the
 // process is a member.
-func (p Proc) NewNamespaces() (Namespaces, error) {
+func (p Proc) Namespaces() (Namespaces, error) {
 	d, err := os.Open(p.path("ns"))
 	if err != nil {
 		return nil, err

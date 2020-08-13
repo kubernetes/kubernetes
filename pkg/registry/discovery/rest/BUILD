@@ -10,6 +10,7 @@ go_library(
         "//pkg/apis/discovery:go_default_library",
         "//pkg/registry/discovery/endpointslice/storage:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",

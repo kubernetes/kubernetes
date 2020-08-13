@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -27,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -48,7 +49,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Service endpoint latency, thresholds
 		Description: Run 100 iterations of create service with the Pod running the pause image, measure the time it takes for creating the service and the endpoint with the service name is available. These durations are captured for 100 iterations, then the durations are sorted to compute 50th, 90th and 99th percentile. The single server latency MUST not exceed liberally set thresholds of 20s for 50th percentile and 50s for the 90th percentile.
 	*/
@@ -78,9 +79,12 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
-		oldThrottle := f.ClientSet.CoreV1().RESTClient().GetRateLimiter()
-		f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
-		defer func() { f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
+		cfg, err := framework.LoadConfig()
+		if err != nil {
+			framework.Failf("Unable to load config: %v", err)
+		}
+		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+		f.ClientSet = kubernetes.NewForConfigOrDie(cfg)
 
 		failing := sets.NewString()
 		d, err := runServiceLatencies(f, parallelTrials, totalTrials, acceptableFailureRatio)
@@ -95,7 +99,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		}
 		if n < 2 {
 			failing.Insert("Less than two runs succeeded; aborting.")
-			e2elog.Failf(strings.Join(failing.List(), "\n"))
+			framework.Failf(strings.Join(failing.List(), "\n"))
 		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
@@ -104,14 +108,14 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			}
 			return dSorted[est]
 		}
-		e2elog.Logf("Latencies: %v", dSorted)
+		framework.Logf("Latencies: %v", dSorted)
 		p50 := percentile(50)
 		p90 := percentile(90)
 		p99 := percentile(99)
-		e2elog.Logf("50 %%ile: %v", p50)
-		e2elog.Logf("90 %%ile: %v", p90)
-		e2elog.Logf("99 %%ile: %v", p99)
-		e2elog.Logf("Total sample count: %v", len(dSorted))
+		framework.Logf("50 %%ile: %v", p50)
+		framework.Logf("90 %%ile: %v", p90)
+		framework.Logf("99 %%ile: %v", p99)
+		framework.Logf("Total sample count: %v", len(dSorted))
 
 		if p50 > limitMedian {
 			failing.Insert("Median latency should be less than " + limitMedian.String())
@@ -122,7 +126,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		if failing.Len() > 0 {
 			errList := strings.Join(failing.List(), "\n")
 			helpfulInfo := fmt.Sprintf("\n50, 90, 99 percentiles: %v %v %v", p50, p90, p99)
-			e2elog.Failf(errList + helpfulInfo)
+			framework.Failf(errList + helpfulInfo)
 		}
 	})
 })
@@ -136,7 +140,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 		Replicas:     1,
 		PollInterval: time.Second,
 	}
-	if err := framework.RunRC(cfg); err != nil {
+	if err := e2erc.RunRC(cfg); err != nil {
 		return nil, err
 	}
 
@@ -176,14 +180,14 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
-			e2elog.Logf("Got error: %v", e)
+			framework.Logf("Got error: %v", e)
 			errCount++
 		case d := <-durations:
 			output = append(output, d)
 		}
 	}
 	if errCount != 0 {
-		e2elog.Logf("Got %d errors out of %d tries", errCount, total)
+		framework.Logf("Got %d errors out of %d tries", errCount, total)
 		errRatio := float32(errCount) / float32(total)
 		if errRatio > acceptableFailureRatio {
 			return output, fmt.Errorf("error ratio %g is higher than the acceptable ratio %g", errRatio, acceptableFailureRatio)
@@ -255,11 +259,10 @@ func (eq *endpointQueries) join() {
 					delete(eq.requests, got.Name)
 					req.endpoints = got
 					close(req.result)
-				} else {
-					// We've already recorded a result, but
-					// haven't gotten the request yet. Only
-					// keep the first result.
 				}
+				// We've already recorded a result, but
+				// haven't gotten the request yet. Only
+				// keep the first result.
 			} else {
 				// We haven't gotten the corresponding request
 				// yet, save this result.
@@ -293,11 +296,11 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(options)
+				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(context.TODO(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(options)
+				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Endpoints{},
@@ -342,17 +345,17 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
+	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return 0, err
 	}
-	e2elog.Logf("Created: %v", gotSvc.Name)
+	framework.Logf("Created: %v", gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
-		return 0, fmt.Errorf("Never got a result for endpoint %v", gotSvc.Name)
+		return 0, fmt.Errorf("never got a result for endpoint %v", gotSvc.Name)
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
-	e2elog.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
+	framework.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
 	return d, nil
 }

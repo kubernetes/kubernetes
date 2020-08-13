@@ -26,7 +26,6 @@ func TestValidateDeprecatedKubeSchedulerConfiguration(t *testing.T) {
 		config         *DeprecatedOptions
 	}{
 		"good": {
-			expectedToFail: false,
 			config: &DeprecatedOptions{
 				PolicyConfigFile:      "/some/file",
 				UseLegacyPolicyConfig: true,
@@ -39,6 +38,17 @@ func TestValidateDeprecatedKubeSchedulerConfiguration(t *testing.T) {
 				PolicyConfigFile:      "",
 				UseLegacyPolicyConfig: true,
 				AlgorithmProvider:     "",
+			},
+		},
+		"good affinity weight": {
+			config: &DeprecatedOptions{
+				HardPodAffinitySymmetricWeight: 50,
+			},
+		},
+		"bad affinity weight": {
+			expectedToFail: true,
+			config: &DeprecatedOptions{
+				HardPodAffinitySymmetricWeight: -1,
 			},
 		},
 	}

@@ -33,8 +33,8 @@ import (
 
 func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	testNameSpace := "test"
+	tf := cmdtesting.NewTestFactory().WithNamespace(testNameSpace)
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{}
@@ -52,7 +52,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: testNameSpace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -70,7 +71,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: testNameSpace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -88,7 +90,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: testNameSpace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -106,7 +109,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: testNameSpace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -140,7 +144,7 @@ func TestCreateRole(t *testing.T) {
 			cmd.Run(cmd, []string{roleName})
 			actual := &rbac.Role{}
 			if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), buf.Bytes(), actual); err != nil {
-				t.Log(string(buf.Bytes()))
+				t.Log(buf.String())
 				t.Fatal(err)
 			}
 			if !equality.Semantic.DeepEqual(test.expectedRole, actual) {

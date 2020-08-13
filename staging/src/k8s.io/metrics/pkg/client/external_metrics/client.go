@@ -17,6 +17,7 @@ limitations under the License.
 package external_metrics
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,7 @@ func NewForConfig(c *rest.Config) (ExternalMetricsClient, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		if configShallowCopy.Burst <= 0 {
-			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
@@ -88,7 +89,7 @@ func (m *namespacedMetrics) List(metricName string, metricSelector labels.Select
 		VersionedParams(&metav1.ListOptions{
 			LabelSelector: metricSelector.String(),
 		}, metav1.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(res)
 
 	if err != nil {

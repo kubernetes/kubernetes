@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
 )
@@ -127,14 +127,18 @@ func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 	return c.indexFunc(objInfo.latestObj)
 }
 
-// NewAssumeCache creates an assume cache for genernal objects.
+// NewAssumeCache creates an assume cache for general objects.
 func NewAssumeCache(informer cache.SharedIndexInformer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
 	c := &assumeCache{
 		description: description,
 		indexFunc:   indexFunc,
 		indexName:   indexName,
 	}
-	c.store = cache.NewIndexer(objInfoKeyFunc, cache.Indexers{indexName: c.objInfoIndexFunc})
+	indexers := cache.Indexers{}
+	if indexName != "" && indexFunc != nil {
+		indexers[indexName] = c.objInfoIndexFunc
+	}
+	c.store = cache.NewIndexer(objInfoKeyFunc, indexers)
 
 	// Unit tests don't use informers
 	if informer != nil {
@@ -185,8 +189,11 @@ func (c *assumeCache) add(obj interface{}) {
 	}
 
 	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
-	c.store.Update(objInfo)
-	klog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
+	if err = c.store.Update(objInfo); err != nil {
+		klog.Warningf("got error when updating stored object : %v", err)
+	} else {
+		klog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
+	}
 }
 
 func (c *assumeCache) update(oldObj interface{}, newObj interface{}) {
@@ -419,7 +426,7 @@ type pvcAssumeCache struct {
 
 // NewPVCAssumeCache creates a PVC assume cache.
 func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
-	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "", nil)}
 }
 
 func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {

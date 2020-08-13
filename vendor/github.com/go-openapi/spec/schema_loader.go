@@ -160,6 +160,7 @@ func (r *schemaLoader) load(refURL *url.URL) (interface{}, url.URL, bool, error)
 	if !fromCache {
 		b, err := r.loadDoc(normalized)
 		if err != nil {
+			debugLog("unable to load the document: %v", err)
 			return nil, url.URL{}, false, err
 		}
 

@@ -55,8 +55,8 @@ func (c *Cholesky) updateCond(norm float64) {
 	if norm < 0 {
 		// This is an approximation. By the definition of a norm,
 		//  |AB| <= |A| |B|.
-		// Since A = U^T*U, we get for the condition number κ that
-		//  κ(A) := |A| |A^-1| = |U^T*U| |A^-1| <= |U^T| |U| |A^-1|,
+		// Since A = Uᵀ*U, we get for the condition number κ that
+		//  κ(A) := |A| |A^-1| = |Uᵀ*U| |A^-1| <= |Uᵀ| |U| |A^-1|,
 		// so this will overestimate the condition number somewhat.
 		// The norm of the original factorized matrix cannot be stored
 		// because of update possibilities.
@@ -154,10 +154,19 @@ func (c *Cholesky) Reset() {
 	c.cond = math.Inf(1)
 }
 
+// IsEmpty returns whether the receiver is empty. Empty matrices can be the
+// receiver for size-restricted operations. The receiver can be emptied using
+// Reset.
+func (c *Cholesky) IsEmpty() bool {
+	return c.chol == nil || c.chol.IsEmpty()
+}
+
 // SetFromU sets the Cholesky decomposition from the given triangular matrix.
-// SetFromU panics if t is not upper triangular. Note that t is copied into,
-// not stored inside, the receiver.
-func (c *Cholesky) SetFromU(t *TriDense) {
+// SetFromU panics if t is not upper triangular. If the receiver is empty it
+// is resized to be n×n, the size of t. If dst is non-empty, SetFromU panics
+// if c is not of size n×n. Note that t is copied into, not stored inside, the
+// receiver.
+func (c *Cholesky) SetFromU(t Triangular) {
 	n, kind := t.Triangle()
 	if kind != Upper {
 		panic("cholesky: matrix must be upper triangular")
@@ -165,7 +174,7 @@ func (c *Cholesky) SetFromU(t *TriDense) {
 	if c.chol == nil {
 		c.chol = NewTriDense(n, Upper, nil)
 	} else {
-		c.chol = NewTriDense(n, Upper, use(c.chol.mat.Data, n*n))
+		c.chol.reuseAsNonZeroed(n, Upper)
 	}
 	c.chol.Copy(t)
 	c.updateCond(-1)
@@ -220,7 +229,7 @@ func (c *Cholesky) SolveTo(dst *Dense, b Matrix) error {
 		panic(ErrShape)
 	}
 
-	dst.reuseAs(bm, bn)
+	dst.reuseAsNonZeroed(bm, bn)
 	if b != dst {
 		dst.Copy(b)
 	}
@@ -267,14 +276,14 @@ func (c *Cholesky) SolveVecTo(dst *VecDense, b Vector) error {
 	}
 	switch rv := b.(type) {
 	default:
-		dst.reuseAs(n)
+		dst.reuseAsNonZeroed(n)
 		return c.SolveTo(dst.asDense(), b)
 	case RawVectorer:
 		bmat := rv.RawVector()
 		if dst != b {
 			dst.checkOverlap(bmat)
 		}
-		dst.reuseAs(n)
+		dst.reuseAsNonZeroed(n)
 		if dst != b {
 			dst.CopyVec(b)
 		}
@@ -293,54 +302,73 @@ func (c *Cholesky) RawU() Triangular {
 	return c.chol
 }
 
-// UTo extracts the n×n upper triangular matrix U from a Cholesky
-// decomposition into dst and returns the result. If dst is nil a new
-// TriDense is allocated.
-//  A = U^T * U.
-func (c *Cholesky) UTo(dst *TriDense) *TriDense {
+// UTo stores into dst the n×n upper triangular matrix U from a Cholesky
+// decomposition
+//  A = Uᵀ * U.
+// If dst is empty, it is resized to be an n×n upper triangular matrix. When dst
+// is non-empty, UTo panics if dst is not n×n or not Upper. UTo will also panic
+// if the receiver does not contain a successful factorization.
+func (c *Cholesky) UTo(dst *TriDense) {
 	if !c.valid() {
 		panic(badCholesky)
 	}
 	n := c.chol.mat.N
-	if dst == nil {
-		dst = NewTriDense(n, Upper, make([]float64, n*n))
+	if dst.IsEmpty() {
+		dst.ReuseAsTri(n, Upper)
 	} else {
-		dst.reuseAs(n, Upper)
+		n2, kind := dst.Triangle()
+		if n != n2 {
+			panic(ErrShape)
+		}
+		if kind != Upper {
+			panic(ErrTriangle)
+		}
 	}
 	dst.Copy(c.chol)
-	return dst
 }
 
-// LTo extracts the n×n lower triangular matrix L from a Cholesky
-// decomposition into dst and returns the result. If dst is nil a new
-// TriDense is allocated.
-//  A = L * L^T.
-func (c *Cholesky) LTo(dst *TriDense) *TriDense {
+// LTo stores into dst the n×n lower triangular matrix L from a Cholesky
+// decomposition
+//  A = L * Lᵀ.
+// If dst is empty, it is resized to be an n×n lower triangular matrix. When dst
+// is non-empty, LTo panics if dst is not n×n or not Lower. LTo will also panic
+// if the receiver does not contain a successful factorization.
+func (c *Cholesky) LTo(dst *TriDense) {
 	if !c.valid() {
 		panic(badCholesky)
 	}
 	n := c.chol.mat.N
-	if dst == nil {
-		dst = NewTriDense(n, Lower, make([]float64, n*n))
+	if dst.IsEmpty() {
+		dst.ReuseAsTri(n, Lower)
 	} else {
-		dst.reuseAs(n, Lower)
+		n2, kind := dst.Triangle()
+		if n != n2 {
+			panic(ErrShape)
+		}
+		if kind != Lower {
+			panic(ErrTriangle)
+		}
 	}
 	dst.Copy(c.chol.TTri())
-	return dst
 }
 
-// ToSym reconstructs the original positive definite matrix given its
-// Cholesky decomposition into dst and returns the result. If dst is nil
-// a new SymDense is allocated.
-func (c *Cholesky) ToSym(dst *SymDense) *SymDense {
+// ToSym reconstructs the original positive definite matrix from its
+// Cholesky decomposition, storing the result into dst. If dst is
+// empty it is resized to be n×n. If dst is non-empty, ToSym panics
+// if dst is not of size n×n. ToSym will also panic if the receiver
+// does not contain a successful factorization.
+func (c *Cholesky) ToSym(dst *SymDense) {
 	if !c.valid() {
 		panic(badCholesky)
 	}
 	n := c.chol.mat.N
-	if dst == nil {
-		dst = NewSymDense(n, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAsSym(n)
 	} else {
-		dst.reuseAs(n)
+		n2 := dst.Symmetric()
+		if n != n2 {
+			panic(ErrShape)
+		}
 	}
 	// Create a TriDense representing the Cholesky factor U with dst's
 	// backing slice.
@@ -356,7 +384,7 @@ func (c *Cholesky) ToSym(dst *SymDense) *SymDense {
 		cap: n,
 	}
 	u.Copy(c.chol)
-	// Compute the product U^T*U using the algorithm from LAPACK/TESTING/LIN/dpot01.f
+	// Compute the product Uᵀ*U using the algorithm from LAPACK/TESTING/LIN/dpot01.f
 	a := u.mat.Data
 	lda := u.mat.Stride
 	bi := blas64.Implementation()
@@ -366,7 +394,6 @@ func (c *Cholesky) ToSym(dst *SymDense) *SymDense {
 			bi.Dtrmv(blas.Upper, blas.Trans, blas.NonUnit, k, a, lda, a[k:], lda)
 		}
 	}
-	return dst
 }
 
 // InverseTo computes the inverse of the matrix represented by its Cholesky
@@ -378,7 +405,7 @@ func (c *Cholesky) InverseTo(s *SymDense) error {
 	if !c.valid() {
 		panic(badCholesky)
 	}
-	s.reuseAs(c.chol.mat.N)
+	s.reuseAsNonZeroed(c.chol.mat.N)
 	// Create a TriDense representing the Cholesky factor U with the backing
 	// slice from s.
 	// Operations on u are reflected in s.
@@ -407,10 +434,10 @@ func (c *Cholesky) InverseTo(s *SymDense) error {
 // Scale multiplies the original matrix A by a positive constant using
 // its Cholesky decomposition, storing the result in-place into the receiver.
 // That is, if the original Cholesky factorization is
-//  U^T * U = A
+//  Uᵀ * U = A
 // the updated factorization is
-//  U'^T * U' = f A = A'
-// Scale panics if the constant is non-positive, or if the receiver is non-zero
+//  U'ᵀ * U' = f A = A'
+// Scale panics if the constant is non-positive, or if the receiver is non-empty
 // and is of a different size from the input.
 func (c *Cholesky) Scale(f float64, orig *Cholesky) {
 	if !orig.valid() {
@@ -497,9 +524,9 @@ func (c *Cholesky) ExtendVecSym(a *Cholesky, v Vector) (ok bool) {
 // SymRankOne performs a rank-1 update of the original matrix A and refactorizes
 // its Cholesky factorization, storing the result into the receiver. That is, if
 // in the original Cholesky factorization
-//  U^T * U = A,
+//  Uᵀ * U = A,
 // in the updated factorization
-//  U'^T * U' = A + alpha * x * x^T = A'.
+//  U'ᵀ * U' = A + alpha * x * xᵀ = A'.
 //
 // Note that when alpha is negative, the updating problem may be ill-conditioned
 // and the results may be inaccurate, or the updated matrix A' may not be
@@ -605,7 +632,7 @@ func (c *Cholesky) SymRankOne(orig *Cholesky, alpha float64, x Vector) (ok bool)
 	if alpha != 1 {
 		blas64.Scal(alpha, blas64.Vector{N: n, Data: work, Inc: 1})
 	}
-	// Solve U^T * p = x storing the result into work.
+	// Solve Uᵀ * p = x storing the result into work.
 	ok = lapack64.Trtrs(blas.Trans, c.chol.RawTriangular(), blas64.General{
 		Rows:   n,
 		Cols:   1,
@@ -669,5 +696,5 @@ func (c *Cholesky) SymRankOne(orig *Cholesky, alpha float64, x Vector) (ok bool)
 }
 
 func (c *Cholesky) valid() bool {
-	return c.chol != nil && !c.chol.IsZero()
+	return c.chol != nil && !c.chol.IsEmpty()
 }

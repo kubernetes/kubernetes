@@ -18,11 +18,12 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,7 +42,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, log output, default
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
@@ -64,7 +65,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 			gomega.Eventually(func() string {
 				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream(context.TODO())
 				if err != nil {
 					return ""
 				}
@@ -99,13 +100,13 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, failed pod, terminated reason
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
 		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
 			gomega.Eventually(func() error {
-				podData, err := podClient.Get(podName, metav1.GetOptions{})
+				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -120,16 +121,16 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					return fmt.Errorf("expected non-zero exitCode and non-empty terminated state reason. Got exitCode: %+v and terminated state reason: %+v", contTerminatedState.ExitCode, contTerminatedState.Reason)
 				}
 				return nil
-			}, time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, framework.PodStartTimeout, time.Second*4).Should(gomega.BeNil())
 		})
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, failed pod, delete
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
 		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
-			err := podClient.Delete(podName, &metav1.DeleteOptions{})
+			err := podClient.Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
@@ -137,7 +138,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-host-aliases" + string(uuid.NewUUID())
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, hostAliases
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
 			Kubernetes mounts the /etc/hosts file into its containers, however, mounting individual files is not supported on Windows Containers. For this reason, this test is marked LinuxOnly.
@@ -167,7 +168,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 
 			gomega.Eventually(func() error {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
 				if err != nil {
 					return err
 				}
@@ -188,7 +189,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 
 		/*
-			Release : v1.13
+			Release: v1.13
 			Testname: Kubelet, pod with read only root file system
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 			This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
@@ -215,7 +216,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			gomega.Eventually(func() string {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
 				if err != nil {
 					return ""
 				}

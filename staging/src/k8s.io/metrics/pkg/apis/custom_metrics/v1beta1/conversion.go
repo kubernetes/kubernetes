@@ -19,22 +19,8 @@ package v1beta1
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/metrics/pkg/apis/custom_metrics"
 )
-
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_v1beta1_MetricValue_To_custom_metrics_MetricValue,
-		Convert_custom_metrics_MetricValue_To_v1beta1_MetricValue,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func Convert_v1beta1_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *custom_metrics.MetricValue, s conversion.Scope) error {
 	out.TypeMeta = in.TypeMeta

@@ -18,6 +18,7 @@ package polymorphichelpers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/apps"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 )
@@ -44,7 +46,7 @@ const (
 
 // Rollbacker provides an interface for resources that can be rolled back.
 type Rollbacker interface {
-	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error)
+	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error)
 }
 
 type RollbackVisitor struct {
@@ -94,7 +96,7 @@ type DeploymentRollbacker struct {
 	c kubernetes.Interface
 }
 
-func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -109,7 +111,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	// to the external appsv1 Deployment without round-tripping through an internal version of Deployment. We're
 	// currently getting rid of all internal versions of resources. So we specifically request the appsv1 version
 	// here. This follows the same pattern as for DaemonSet and StatefulSet.
-	deployment, err := r.c.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	deployment, err := r.c.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve Deployment %s: %v", name, err)
 	}
@@ -118,7 +120,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	if err != nil {
 		return "", err
 	}
-	if dryRun {
+	if dryRunStrategy == cmdutil.DryRunClient {
 		return printTemplate(&rsForRevision.Spec.Template)
 	}
 	if deployment.Spec.Paused {
@@ -152,8 +154,12 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
+	patchOptions := metav1.PatchOptions{}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	// Restore revision
-	if _, err = r.c.AppsV1().Deployments(namespace).Patch(name, patchType, patch); err != nil {
+	if _, err = r.c.AppsV1().Deployments(namespace).Patch(context.TODO(), name, patchType, patch, patchOptions); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 	return rollbackSuccess, nil
@@ -254,7 +260,7 @@ type DaemonSetRollbacker struct {
 	c kubernetes.Interface
 }
 
-func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -275,7 +281,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		return "", revisionNotFoundErr(toRevision)
 	}
 
-	if dryRun {
+	if dryRunStrategy == cmdutil.DryRunClient {
 		appliedDS, err := applyDaemonSetHistory(ds, toHistory)
 		if err != nil {
 			return "", err
@@ -292,8 +298,12 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
 	}
 
+	patchOptions := metav1.PatchOptions{}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	// Restore revision
-	if _, err = r.c.AppsV1().DaemonSets(accessor.GetNamespace()).Patch(accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
+	if _, err = r.c.AppsV1().DaemonSets(accessor.GetNamespace()).Patch(context.TODO(), accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw, patchOptions); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
@@ -341,7 +351,7 @@ type StatefulSetRollbacker struct {
 }
 
 // toRevision is a non-negative integer, with 0 being reserved to indicate rolling back to previous configuration
-func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRunStrategy cmdutil.DryRunStrategy) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -362,7 +372,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		return "", revisionNotFoundErr(toRevision)
 	}
 
-	if dryRun {
+	if dryRunStrategy == cmdutil.DryRunClient {
 		appliedSS, err := applyRevision(sts, toHistory)
 		if err != nil {
 			return "", err
@@ -379,8 +389,12 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
 	}
 
+	patchOptions := metav1.PatchOptions{}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
 	// Restore revision
-	if _, err = r.c.AppsV1().StatefulSets(sts.Namespace).Patch(sts.Name, types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
+	if _, err = r.c.AppsV1().StatefulSets(sts.Namespace).Patch(context.TODO(), sts.Name, types.StrategicMergePatchType, toHistory.Data.Raw, patchOptions); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
@@ -392,16 +406,16 @@ var appsCodec = scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
 // is nil, the returned StatefulSet is valid.
 func applyRevision(set *appsv1.StatefulSet, revision *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
-	clone := set.DeepCopy()
-	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(appsCodec, clone)), revision.Data.Raw, clone)
+	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(appsCodec, set)), revision.Data.Raw, set)
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(patched, clone)
+	result := &appsv1.StatefulSet{}
+	err = json.Unmarshal(patched, result)
 	if err != nil {
 		return nil, err
 	}
-	return clone, nil
+	return result, nil
 }
 
 // statefulsetMatch check if the given StatefulSet's template matches the template stored in the given history.

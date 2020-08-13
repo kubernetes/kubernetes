@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ExpirationCache implements the store interface
@@ -194,9 +194,9 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 	return nil
 }
 
-// Resync will touch all objects to put them into the processing queue
+// Resync is a no-op for one of these
 func (c *ExpirationCache) Resync() error {
-	return c.cacheStorage.Resync()
+	return nil
 }
 
 // NewTTLStore creates and returns a ExpirationCache with a TTLPolicy

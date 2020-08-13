@@ -13,14 +13,14 @@ import (
 
 // Dhseqr computes the eigenvalues of an n×n Hessenberg matrix H and,
 // optionally, the matrices T and Z from the Schur decomposition
-//  H = Z T Z^T,
+//  H = Z T Zᵀ,
 // where T is an n×n upper quasi-triangular matrix (the Schur form), and Z is
 // the n×n orthogonal matrix of Schur vectors.
 //
 // Optionally Z may be postmultiplied into an input orthogonal matrix Q so that
 // this routine can give the Schur factorization of a matrix A which has been
 // reduced to the Hessenberg form H by the orthogonal matrix Q:
-//  A = Q H Q^T = (QZ) T (QZ)^T.
+//  A = Q H Qᵀ = (QZ) T (QZ)ᵀ.
 //
 // If job == lapack.EigenvaluesOnly, only the eigenvalues will be computed.
 // If job == lapack.EigenvaluesAndSchur, the eigenvalues and the Schur form T will
@@ -43,8 +43,8 @@ import (
 // and Dhseqr will panic otherwise. ilo and ihi are typically set by a previous
 // call to Dgebal, otherwise they should be set to 0 and n-1, respectively. It
 // must hold that
-//  0 <= ilo <= ihi < n,     if n > 0,
-//  ilo == 0 and ihi == -1,  if n == 0.
+//  0 <= ilo <= ihi < n     if n > 0,
+//  ilo == 0 and ihi == -1  if n == 0.
 //
 // wr and wi must have length n.
 //

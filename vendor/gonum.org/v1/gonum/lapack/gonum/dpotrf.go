@@ -11,7 +11,7 @@ import (
 
 // Dpotrf computes the Cholesky decomposition of the symmetric positive definite
 // matrix a. If ul == blas.Upper, then a is stored as an upper-triangular matrix,
-// and a = U^T U is stored in place into a. If ul == blas.Lower, then a = L L^T
+// and a = Uᵀ U is stored in place into a. If ul == blas.Lower, then a = L Lᵀ
 // is computed and stored in-place into a. If a is not positive definite, false
 // is returned. This is the blocked version of the algorithm.
 func (impl Implementation) Dpotrf(ul blas.Uplo, n int, a []float64, lda int) (ok bool) {

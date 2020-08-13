@@ -112,7 +112,7 @@ func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	b = bytes.Replace(b, []byte("YEAR"), []byte(strconv.Itoa(time.Now().Year())), -1)
+	b = bytes.Replace(b, []byte("YEAR"), []byte(strconv.Itoa(time.Now().UTC().Year())), -1)
 
 	if g.GeneratedByCommentTemplate != "" {
 		if len(b) != 0 {
@@ -158,6 +158,9 @@ func (g *GeneratorArgs) InputIncludes(p *types.Package) bool {
 		d := dir
 		if strings.HasSuffix(d, "...") {
 			d = strings.TrimSuffix(d, "...")
+		}
+		if strings.HasPrefix(d, "./vendor/") {
+			d = strings.TrimPrefix(d, "./vendor/")
 		}
 		if strings.HasPrefix(p.Path, d) {
 			return true

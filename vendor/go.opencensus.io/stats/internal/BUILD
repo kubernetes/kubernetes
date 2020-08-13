@@ -5,7 +5,7 @@ go_library(
     srcs = ["record.go"],
     importmap = "k8s.io/kubernetes/vendor/go.opencensus.io/stats/internal",
     importpath = "go.opencensus.io/stats/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/go.opencensus.io/stats:__subpackages__"],
     deps = ["//vendor/go.opencensus.io/tag:go_default_library"],
 )
 

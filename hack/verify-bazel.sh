@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of the bazel compilation files is needed
+# or not. We should run `hack/update-bazel.sh` if actually updates them.
+# Usage: `hack/verify-bazel.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -33,7 +37,7 @@ fi
 rm -f "${KUBE_ROOT}/{pkg/generated,staging/src/k8s.io/apiextensions-apiserver/pkg/client,staging/src/k8s.io/kube-aggregator/pkg/client}/openapi/zz_generated.openapi.go"
 
 _tmpdir="$(kube::realpath "$(mktemp -d -t verify-bazel.XXXXXX)")"
-kube::util::trap_add "rm -rf ${_tmpdir}" EXIT
+kube::util::trap_add "chmod -R u+rw ${_tmpdir} && rm -rf ${_tmpdir}" EXIT
 
 _tmp_gopath="${_tmpdir}/go"
 _tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"

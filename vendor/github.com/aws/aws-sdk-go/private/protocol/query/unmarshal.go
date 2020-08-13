@@ -24,7 +24,7 @@ func Unmarshal(r *request.Request) {
 		err := xmlutil.UnmarshalXML(r.Data, decoder, r.Operation.Name+"Result")
 		if err != nil {
 			r.Error = awserr.NewRequestFailure(
-				awserr.New("SerializationError", "failed decoding Query response", err),
+				awserr.New(request.ErrCodeSerialization, "failed decoding Query response", err),
 				r.HTTPResponse.StatusCode,
 				r.RequestID,
 			)

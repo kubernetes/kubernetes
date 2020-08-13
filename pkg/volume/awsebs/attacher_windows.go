@@ -1,3 +1,4 @@
+// +build !providerless
 // +build windows
 
 /*
@@ -41,7 +42,7 @@ func (attacher *awsElasticBlockStoreAttacher) getDiskNumber(volumeID string) (st
 	volumeID = split[len(split)-1]
 
 	exec := attacher.host.GetExec(awsElasticBlockStorePluginName)
-	output, err := exec.Run(ebsnvmeID)
+	output, err := exec.Command(ebsnvmeID).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("error calling ebsnvme-id.exe: %v", err)
 	}

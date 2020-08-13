@@ -32,7 +32,7 @@ type NodeLifecycleControllerConfiguration struct {
 	// nodeStartupGracePeriod is the amount of time which we allow starting a node to
 	// be unresponsive before marking it unhealthy.
 	NodeStartupGracePeriod metav1.Duration
-	// nodeMontiorGracePeriod is the amount of time which we allow a running node to be
+	// NodeMonitorGracePeriod is the amount of time which we allow a running node to be
 	// unresponsive before marking it unhealthy. Must be N times more than kubelet's
 	// nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
 	// to post node status.

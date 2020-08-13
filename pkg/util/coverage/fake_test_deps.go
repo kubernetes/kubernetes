@@ -23,6 +23,7 @@ import (
 // This is an implementation of testing.testDeps. It doesn't need to do anything, because
 // no tests are actually run. It does need a concrete implementation of at least ImportPath,
 // which is called unconditionally when running tests.
+//lint:ignore U1000 see comment above, we know it's unused normally.
 type fakeTestDeps struct{}
 
 func (fakeTestDeps) ImportPath() string {

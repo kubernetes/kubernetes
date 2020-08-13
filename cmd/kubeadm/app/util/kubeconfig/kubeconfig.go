@@ -80,7 +80,8 @@ func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 
 // ToClientSet converts a KubeConfig object to a client
 func ToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
-	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
+	overrides := clientcmd.ConfigOverrides{Timeout: "10s"}
+	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &overrides).ClientConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
 	}

@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/component-base/metrics"
@@ -31,7 +29,7 @@ import (
 )
 
 var (
-	latencyBuckets = prometheus.ExponentialBuckets(0.001, 2, 15)
+	latencyBuckets = metrics.ExponentialBuckets(0.001, 2, 15)
 )
 
 // converterMetricFactory holds metrics for all CRD converters

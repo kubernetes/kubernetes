@@ -17,11 +17,12 @@ limitations under the License.
 package dns
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,6 +92,7 @@ func TestCreateServiceAccount(t *testing.T) {
 }
 
 func TestCompileManifests(t *testing.T) {
+	replicas := int32(coreDNSReplicas)
 	var tests = []struct {
 		name     string
 		manifest string
@@ -99,7 +101,10 @@ func TestCompileManifests(t *testing.T) {
 		{
 			name:     "KubeDNSDeployment manifest",
 			manifest: KubeDNSDeployment,
-			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+			data: struct {
+				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
+				Replicas                                                                                                             *int32
+			}{
 				DeploymentName:       "foo",
 				KubeDNSImage:         "foo",
 				DNSMasqImage:         "foo",
@@ -108,6 +113,7 @@ func TestCompileManifests(t *testing.T) {
 				DNSProbeAddr:         "foo",
 				DNSDomain:            "foo",
 				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
@@ -120,18 +126,21 @@ func TestCompileManifests(t *testing.T) {
 		{
 			name:     "CoreDNSDeployment manifest",
 			manifest: CoreDNSDeployment,
-			data: struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
+			data: struct {
+				DeploymentName, Image, ControlPlaneTaintKey string
+				Replicas                                    *int32
+			}{
 				DeploymentName:       "foo",
 				Image:                "foo",
 				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
 			name:     "CoreDNSConfigMap manifest",
 			manifest: CoreDNSConfigMap,
-			data: struct{ DNSDomain, Federation, UpstreamNameserver, StubDomain string }{
+			data: struct{ DNSDomain, UpstreamNameserver, StubDomain string }{
 				DNSDomain:          "foo",
-				Federation:         "foo",
 				UpstreamNameserver: "foo",
 				StubDomain:         "foo",
 			},
@@ -150,21 +159,36 @@ func TestCompileManifests(t *testing.T) {
 func TestGetDNSIP(t *testing.T) {
 	var tests = []struct {
 		name, svcSubnet, expectedDNSIP string
+		isDualStack                    bool
 	}{
 		{
 			name:          "subnet mask 12",
 			svcSubnet:     "10.96.0.0/12",
 			expectedDNSIP: "10.96.0.10",
+			isDualStack:   false,
 		},
 		{
 			name:          "subnet mask 26",
 			svcSubnet:     "10.87.116.64/26",
 			expectedDNSIP: "10.87.116.74",
+			isDualStack:   false,
+		},
+		{
+			name:          "dual-stack ipv4 primary, subnet mask 26",
+			svcSubnet:     "10.87.116.64/26,fd03::/112",
+			expectedDNSIP: "10.87.116.74",
+			isDualStack:   true,
+		},
+		{
+			name:          "dual-stack ipv6 primary, subnet mask 112",
+			svcSubnet:     "fd03::/112,10.87.116.64/26",
+			expectedDNSIP: "fd03::a",
+			isDualStack:   true,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			dnsIP, err := kubeadmconstants.GetDNSIP(rt.svcSubnet)
+			dnsIP, err := kubeadmconstants.GetDNSIP(rt.svcSubnet, rt.isDualStack)
 			if err != nil {
 				t.Fatalf("couldn't get dnsIP : %v", err)
 			}
@@ -471,81 +495,8 @@ func TestTranslateUpstreamKubeDNSToCoreDNS(t *testing.T) {
 	}
 }
 
-func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
-	testCases := []struct {
-		name      string
-		configMap *v1.ConfigMap
-		expectOne string
-		expectTwo string
-	}{
-		{
-			name: "valid call",
-			configMap: &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kube-dns",
-					Namespace: "kube-system",
-				},
-				Data: map[string]string{
-					"federations":         `{"foo" : "foo.feddomain.com", "bar" : "bar.feddomain.com"}`,
-					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300","3.3.3.3"], "my.cluster.local" : ["2.3.4.5"]}`,
-					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
-				},
-			},
-
-			expectOne: `
-        federation cluster.local {
-           foo foo.feddomain.com
-           bar bar.feddomain.com
-        }`,
-			expectTwo: `
-        federation cluster.local {
-           bar bar.feddomain.com
-           foo foo.feddomain.com
-        }`,
-		},
-		{
-			name: "empty data",
-			configMap: &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kubedns",
-					Namespace: "kube-system",
-				},
-			},
-
-			expectOne: "",
-			expectTwo: "",
-		},
-		{
-			name: "missing federations data",
-			configMap: &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "kube-dns",
-					Namespace: "kube-system",
-				},
-				Data: map[string]string{
-					"stubDomains":         `{"foo.com" : ["1.2.3.4:5300"], "my.cluster.local" : ["2.3.4.5"]}`,
-					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
-				},
-			},
-
-			expectOne: "",
-			expectTwo: "",
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			out, err := translateFederationsofKubeDNSToCoreDNS(kubeDNSFederation, "cluster.local", testCase.configMap)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !strings.EqualFold(out, testCase.expectOne) && !strings.EqualFold(out, testCase.expectTwo) {
-				t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
-			}
-		})
-	}
-}
-
 func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
+	replicas := int32(coreDNSReplicas)
 	testCases := []struct {
 		name     string
 		manifest string
@@ -554,7 +505,10 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 		{
 			name:     "KubeDNSDeployment",
 			manifest: KubeDNSDeployment,
-			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+			data: struct {
+				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
+				Replicas                                                                                                             *int32
+			}{
 				DeploymentName:       "foo",
 				KubeDNSImage:         "foo",
 				DNSMasqImage:         "foo",
@@ -563,16 +517,21 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 				DNSProbeAddr:         "foo",
 				DNSDomain:            "foo",
 				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
 			name:     "CoreDNSDeployment",
 			manifest: CoreDNSDeployment,
-			data: struct{ DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string }{
+			data: struct {
+				DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string
+				Replicas                                                          *int32
+			}{
 				DeploymentName:       "foo",
 				Image:                "foo",
 				ControlPlaneTaintKey: "foo",
 				CoreDNSConfigMapName: "foo",
+				Replicas:             &replicas,
 			},
 		},
 	}
@@ -617,14 +576,18 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
-    health
+    health {
+        lameduck 5s
+    }
     kubernetes cluster.local in-addr.arpa ip6.arpa {
         pods insecure
         fallthrough in-addr.arpa ip6.arpa
         ttl 30
     }
     prometheus :9153
-    forward . /etc/resolv.conf
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
     cache 30
     loop
     reload
@@ -654,13 +617,17 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
-    health
+    health {
+        lameduck 5s
+    }
     kubernetes cluster.local in-addr.arpa ip6.arpa {
         pods insecure
         fallthrough in-addr.arpa ip6.arpa
     }
     prometheus :9153
-    forward . /etc/resolv.conf
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
     k8s_external example.com
     cache 30
     loop
@@ -685,7 +652,7 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating the CoreDNS ConfigMap: %v", err)
 			}
-			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
+			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
 			if !strings.EqualFold(migratedConfigMap.Data["Corefile"], tc.expectedCorefileData) {
 				t.Fatalf("expected to get %v, but got %v", tc.expectedCorefileData, migratedConfigMap.Data["Corefile"])
 			}
@@ -695,7 +662,7 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 
 func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion string) *clientsetfake.Clientset {
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&v1.ConfigMap{
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.CoreDNSConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -703,11 +670,11 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 		Data: map[string]string{
 			"Corefile": corefile,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ConfigMap: %v", err)
 	}
-	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(&apps.Deployment{
+	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
@@ -730,7 +697,7 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating deployment: %v", err)
 	}

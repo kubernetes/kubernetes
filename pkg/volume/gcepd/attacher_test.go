@@ -30,15 +30,16 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/gce"
 
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := "my-pd-volume"
 	spec := createVolSpec(name, false)
 
@@ -52,7 +53,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 }
 
 func TestGetDeviceName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := "my-pd-pv"
 	spec := createPVSpec(name, true, nil)
 
@@ -402,8 +403,8 @@ func TestVerifyVolumesAttached(t *testing.T) {
 
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *gcePersistentDiskPlugin {
-	host := volumetest.NewFakeVolumeHost(
+func newPlugin(t *testing.T) *gcePersistentDiskPlugin {
+	host := volumetest.NewFakeVolumeHost(t,
 		"/tmp", /* rootDir */
 		nil,    /* kubeClient */
 		nil,    /* plugins */
@@ -596,19 +597,19 @@ func (testcase *testcase) BulkDisksAreAttached(diskByNodes map[types.NodeName][]
 	return verifiedDisksByNodes, nil
 }
 
-func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
-	return errors.New("Not implemented")
+func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
+	return nil, errors.New("Not implemented")
 }
 
-func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
-	return errors.New("Not implemented")
+func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
+	return nil, errors.New("Not implemented")
 }
 
 func (testcase *testcase) DeleteDisk(diskToDelete string) error {
 	return errors.New("Not implemented")
 }
 
-func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
+func (testcase *testcase) GetAutoLabelsForPD(*gce.Disk) (map[string]string, error) {
 	return map[string]string{}, errors.New("Not implemented")
 }
 

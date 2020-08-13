@@ -26,8 +26,10 @@ import (
 )
 
 // SecretLister helps list Secrets.
+// All objects returned here must be treated as read-only.
 type SecretLister interface {
 	// List lists all Secrets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Secret, err error)
 	// Secrets returns an object that can list and get Secrets.
 	Secrets(namespace string) SecretNamespaceLister
@@ -58,10 +60,13 @@ func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
 }
 
 // SecretNamespaceLister helps list and get Secrets.
+// All objects returned here must be treated as read-only.
 type SecretNamespaceLister interface {
 	// List lists all Secrets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Secret, err error)
 	// Get retrieves the Secret from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Secret, error)
 	SecretNamespaceListerExpansion
 }

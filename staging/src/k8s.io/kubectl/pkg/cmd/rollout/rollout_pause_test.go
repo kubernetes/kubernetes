@@ -20,10 +20,9 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"testing"
 
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,23 +33,24 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
-var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
-var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
+var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "apps", Version: "v1"}
+var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "apps", Version: "v1"}
 
 func TestRolloutPause(t *testing.T) {
 	deploymentName := "deployment/nginx-deployment"
-	ns := scheme.Codecs
+	ns := scheme.Codecs.WithoutConversion()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := ns.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder)
 	tf.Client = &RolloutPauseRESTClient{
 		RESTClient: &fake.RESTClient{
+			GroupVersion:         rolloutPauseGroupVersionEncoder,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == "/namespaces/test/deployments/nginx-deployment" && (m == "GET" || m == "PATCH"):
-					responseDeployment := &extensionsv1beta1.Deployment{}
+					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = deploymentName
 					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
@@ -66,7 +66,7 @@ func TestRolloutPause(t *testing.T) {
 	cmd := NewCmdRolloutPause(tf, streams)
 
 	cmd.Run(cmd, []string{deploymentName})
-	expectedOutput := "deployment.extensions/" + deploymentName + " paused\n"
+	expectedOutput := "deployment.apps/" + deploymentName + " paused\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
@@ -77,39 +77,9 @@ type RolloutPauseRESTClient struct {
 }
 
 func (c *RolloutPauseRESTClient) Get() *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &rolloutPauseGroupVersionEncoder,
-		NegotiatedSerializer: c.NegotiatedSerializer,
-	}
-
-	info, _ := runtime.SerializerInfoForMediaType(c.NegotiatedSerializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		Encoder: c.NegotiatedSerializer.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder),
-		Decoder: c.NegotiatedSerializer.DecoderToVersion(info.Serializer, rolloutPauseGroupVersionDecoder),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, "GET", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return c.RESTClient.Verb("GET")
 }
 
 func (c *RolloutPauseRESTClient) Patch(pt types.PatchType) *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &rolloutPauseGroupVersionEncoder,
-		NegotiatedSerializer: c.NegotiatedSerializer,
-	}
-
-	info, _ := runtime.SerializerInfoForMediaType(c.NegotiatedSerializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		Encoder: c.NegotiatedSerializer.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder),
-		Decoder: c.NegotiatedSerializer.DecoderToVersion(info.Serializer, rolloutPauseGroupVersionDecoder),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return c.RESTClient.Verb("PATCH")
 }

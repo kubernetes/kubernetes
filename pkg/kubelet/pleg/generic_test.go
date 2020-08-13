@@ -21,14 +21,16 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/component-base/metrics/testutil"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -74,7 +76,7 @@ func getEventsFromChannel(ch <-chan *PodLifecycleEvent) []*PodLifecycleEvent {
 	return events
 }
 
-func createTestContainer(ID string, state kubecontainer.ContainerState) *kubecontainer.Container {
+func createTestContainer(ID string, state kubecontainer.State) *kubecontainer.Container {
 	return &kubecontainer.Container{
 		ID:    kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: ID},
 		State: state,
@@ -134,7 +136,8 @@ func TestRelisting(t *testing.T) {
 	// The second relist should not send out any event because no container has
 	// changed.
 	pleg.relist()
-	verifyEvents(t, expected, actual)
+	actual = getEventsFromChannel(ch)
+	assert.True(t, len(actual) == 0, "no container has changed, event length should be 0")
 
 	runtime.AllPodList = []*containertest.FakePod{
 		{Pod: &kubecontainer.Pod{
@@ -334,7 +337,7 @@ func createTestPodsStatusesAndEvents(num int) ([]*kubecontainer.Pod, []*kubecont
 		}
 		status := &kubecontainer.PodStatus{
 			ID:                id,
-			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+			ContainerStatuses: []*kubecontainer.Status{{ID: container.ID, State: cState}},
 		}
 		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
 		pods = append(pods, pod)
@@ -455,7 +458,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 	goodStatus := &kubecontainer.PodStatus{
 		ID:                podID,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: infraContainer.ID, State: infraContainer.State}},
+		ContainerStatuses: []*kubecontainer.Status{{ID: infraContainer.ID, State: infraContainer.State}},
 	}
 	runtimeMock.On("GetPodStatus", podID, "", "").Return(goodStatus, nil).Once()
 
@@ -480,7 +483,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 	badStatus := &kubecontainer.PodStatus{
 		ID:                podID,
-		ContainerStatuses: []*kubecontainer.ContainerStatus{},
+		ContainerStatuses: []*kubecontainer.Status{},
 	}
 	runtimeMock.On("GetPodStatus", podID, "", "").Return(badStatus, errors.New("inspection error")).Once()
 
@@ -605,7 +608,7 @@ func TestRelistIPChange(t *testing.T) {
 		status := &kubecontainer.PodStatus{
 			ID:                id,
 			IPs:               tc.podIPs,
-			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
+			ContainerStatuses: []*kubecontainer.Status{{ID: container.ID, State: cState}},
 		}
 		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
 
@@ -627,7 +630,7 @@ func TestRelistIPChange(t *testing.T) {
 		}
 		status = &kubecontainer.PodStatus{
 			ID:                id,
-			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
+			ContainerStatuses: []*kubecontainer.Status{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
 		}
 		event = &PodLifecycleEvent{ID: pod.ID, Type: ContainerDied, Data: container.ID.ID}
 		runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
@@ -661,33 +664,59 @@ func TestRunningPodAndContainerCount(t *testing.T) {
 				createTestContainer("c2", kubecontainer.ContainerStateUnknown),
 				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
 			},
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s1", kubecontainer.ContainerStateRunning),
+				createTestContainer("s2", kubecontainer.ContainerStateRunning),
+				createTestContainer("s3", kubecontainer.ContainerStateUnknown),
+			},
 		}},
 		{Pod: &kubecontainer.Pod{
 			ID: "4567",
 			Containers: []*kubecontainer.Container{
 				createTestContainer("c1", kubecontainer.ContainerStateExited),
 			},
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s1", kubecontainer.ContainerStateRunning),
+				createTestContainer("s2", kubecontainer.ContainerStateExited),
+			},
 		}},
 	}
 
 	pleg.relist()
 
-	// assert for container count with label "running"
-	actualMetricRunningContainerCount := &dto.Metric{}
-	expectedMetricRunningContainerCount := float64(1)
-	metrics.RunningContainerCount.WithLabelValues(string(kubecontainer.ContainerStateRunning)).Write(actualMetricRunningContainerCount)
-	assert.Equal(t, expectedMetricRunningContainerCount, actualMetricRunningContainerCount.GetGauge().GetValue())
+	tests := []struct {
+		name        string
+		metricsName string
+		wants       string
+	}{
+		{
+			name:        "test container count",
+			metricsName: "kubelet_running_containers",
+			wants: `
+# HELP kubelet_running_containers [ALPHA] Number of containers currently running
+# TYPE kubelet_running_containers gauge
+kubelet_running_containers{container_state="exited"} 1
+kubelet_running_containers{container_state="running"} 1
+kubelet_running_containers{container_state="unknown"} 2
+`,
+		},
+		{
+			name:        "test pod count",
+			metricsName: "kubelet_running_pods",
+			wants: `
+# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pods gauge
+kubelet_running_pods 2
+`,
+		},
+	}
 
-	// assert for container count with label "unknown"
-	actualMetricUnknownContainerCount := &dto.Metric{}
-	expectedMetricUnknownContainerCount := float64(2)
-	metrics.RunningContainerCount.WithLabelValues(string(kubecontainer.ContainerStateUnknown)).Write(actualMetricUnknownContainerCount)
-	assert.Equal(t, expectedMetricUnknownContainerCount, actualMetricUnknownContainerCount.GetGauge().GetValue())
-
-	// assert for running pod count
-	actualMetricRunningPodCount := &dto.Metric{}
-	metrics.RunningPodCount.Write(actualMetricRunningPodCount)
-	expectedMetricRunningPodCount := float64(2)
-	assert.Equal(t, expectedMetricRunningPodCount, actualMetricRunningPodCount.GetGauge().GetValue())
-
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), tc.metricsName); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

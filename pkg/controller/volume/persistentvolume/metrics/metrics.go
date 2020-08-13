@@ -20,12 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/klog"
 	metricutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -59,64 +56,73 @@ type PVCLister interface {
 // Register all metrics for pv controller.
 func Register(pvLister PVLister, pvcLister PVCLister) {
 	registerMetrics.Do(func() {
-		legacyregistry.RawMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
+		legacyregistry.CustomMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
 		legacyregistry.MustRegister(volumeOperationErrorsMetric)
 	})
 }
 
 func newPVAndPVCCountCollector(pvLister PVLister, pvcLister PVCLister) *pvAndPVCCountCollector {
-	return &pvAndPVCCountCollector{pvLister, pvcLister}
+	return &pvAndPVCCountCollector{pvLister: pvLister, pvcLister: pvcLister}
 }
 
 // Custom collector for current pod and container counts.
 type pvAndPVCCountCollector struct {
+	metrics.BaseStableCollector
+
 	// Cache for accessing information about PersistentVolumes.
 	pvLister PVLister
 	// Cache for accessing information about PersistentVolumeClaims.
 	pvcLister PVCLister
 }
 
-var (
-	boundPVCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", pvControllerSubsystem, boundPVKey),
-		"Gauge measuring number of persistent volume currently bound",
-		[]string{storageClassLabel}, nil)
-	unboundPVCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", pvControllerSubsystem, unboundPVKey),
-		"Gauge measuring number of persistent volume currently unbound",
-		[]string{storageClassLabel}, nil)
+// Check if our collector implements necessary collector interface
+var _ metrics.StableCollector = &pvAndPVCCountCollector{}
 
-	boundPVCCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", pvControllerSubsystem, boundPVCKey),
+var (
+	boundPVCountDesc = metrics.NewDesc(
+		metrics.BuildFQName("", pvControllerSubsystem, boundPVKey),
+		"Gauge measuring number of persistent volume currently bound",
+		[]string{storageClassLabel}, nil,
+		metrics.ALPHA, "")
+	unboundPVCountDesc = metrics.NewDesc(
+		metrics.BuildFQName("", pvControllerSubsystem, unboundPVKey),
+		"Gauge measuring number of persistent volume currently unbound",
+		[]string{storageClassLabel}, nil,
+		metrics.ALPHA, "")
+
+	boundPVCCountDesc = metrics.NewDesc(
+		metrics.BuildFQName("", pvControllerSubsystem, boundPVCKey),
 		"Gauge measuring number of persistent volume claim currently bound",
-		[]string{namespaceLabel}, nil)
-	unboundPVCCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", pvControllerSubsystem, unboundPVCKey),
+		[]string{namespaceLabel}, nil,
+		metrics.ALPHA, "")
+	unboundPVCCountDesc = metrics.NewDesc(
+		metrics.BuildFQName("", pvControllerSubsystem, unboundPVCKey),
 		"Gauge measuring number of persistent volume claim currently unbound",
-		[]string{namespaceLabel}, nil)
+		[]string{namespaceLabel}, nil,
+		metrics.ALPHA, "")
 
 	volumeOperationErrorsMetric = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "volume_operation_total_errors",
-			Help:           "Total volume operation erros",
+			Help:           "Total volume operation errors",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin_name", "operation_name"})
 )
 
-func (collector *pvAndPVCCountCollector) Describe(ch chan<- *prometheus.Desc) {
+func (collector *pvAndPVCCountCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- boundPVCountDesc
 	ch <- unboundPVCountDesc
 	ch <- boundPVCCountDesc
 	ch <- unboundPVCCountDesc
 }
 
-func (collector *pvAndPVCCountCollector) Collect(ch chan<- prometheus.Metric) {
+func (collector *pvAndPVCCountCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	collector.pvCollect(ch)
 	collector.pvcCollect(ch)
 }
 
-func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) {
+func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- metrics.Metric) {
 	boundNumberByStorageClass := make(map[string]int)
 	unboundNumberByStorageClass := make(map[string]int)
 	for _, pvObj := range collector.pvLister.List() {
@@ -131,32 +137,22 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 		}
 	}
 	for storageClassName, number := range boundNumberByStorageClass {
-		metric, err := prometheus.NewConstMetric(
+		ch <- metrics.NewLazyConstMetric(
 			boundPVCountDesc,
-			prometheus.GaugeValue,
+			metrics.GaugeValue,
 			float64(number),
 			storageClassName)
-		if err != nil {
-			klog.Warningf("Create bound pv number metric failed: %v", err)
-			continue
-		}
-		ch <- metric
 	}
 	for storageClassName, number := range unboundNumberByStorageClass {
-		metric, err := prometheus.NewConstMetric(
+		ch <- metrics.NewLazyConstMetric(
 			unboundPVCountDesc,
-			prometheus.GaugeValue,
+			metrics.GaugeValue,
 			float64(number),
 			storageClassName)
-		if err != nil {
-			klog.Warningf("Create unbound pv number metric failed: %v", err)
-			continue
-		}
-		ch <- metric
 	}
 }
 
-func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric) {
+func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
 	boundNumberByNamespace := make(map[string]int)
 	unboundNumberByNamespace := make(map[string]int)
 	for _, pvcObj := range collector.pvcLister.List() {
@@ -171,28 +167,18 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 		}
 	}
 	for namespace, number := range boundNumberByNamespace {
-		metric, err := prometheus.NewConstMetric(
+		ch <- metrics.NewLazyConstMetric(
 			boundPVCCountDesc,
-			prometheus.GaugeValue,
+			metrics.GaugeValue,
 			float64(number),
 			namespace)
-		if err != nil {
-			klog.Warningf("Create bound pvc number metric failed: %v", err)
-			continue
-		}
-		ch <- metric
 	}
 	for namespace, number := range unboundNumberByNamespace {
-		metric, err := prometheus.NewConstMetric(
+		ch <- metrics.NewLazyConstMetric(
 			unboundPVCCountDesc,
-			prometheus.GaugeValue,
+			metrics.GaugeValue,
 			float64(number),
 			namespace)
-		if err != nil {
-			klog.Warningf("Create unbound pvc number metric failed: %v", err)
-			continue
-		}
-		ch <- metric
 	}
 }
 
@@ -228,7 +214,7 @@ type OperationStartTimeCache struct {
 // NewOperationStartTimeCache creates a operation timestamp cache
 func NewOperationStartTimeCache() OperationStartTimeCache {
 	return OperationStartTimeCache{
-		cache: sync.Map{}, //[string]operationTimestamp {}
+		cache: sync.Map{}, // [string]operationTimestamp {}
 	}
 }
 

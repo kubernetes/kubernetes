@@ -30,10 +30,23 @@ import (
 
 var (
 	ErrNoContext   = errors.New("no context chosen")
-	ErrEmptyConfig = errors.New("no configuration has been provided")
+	ErrEmptyConfig = NewEmptyConfigError("no configuration has been provided, try setting KUBERNETES_MASTER environment variable")
 	// message is for consistency with old behavior
 	ErrEmptyCluster = errors.New("cluster has no server defined")
 )
+
+// NewEmptyConfigError returns an error wrapping the given message which IsEmptyConfig() will recognize as an empty config error
+func NewEmptyConfigError(message string) error {
+	return &errEmptyConfig{message}
+}
+
+type errEmptyConfig struct {
+	message string
+}
+
+func (e *errEmptyConfig) Error() string {
+	return e.message
+}
 
 type errContextNotFound struct {
 	ContextName string
@@ -60,9 +73,14 @@ func IsContextNotFound(err error) bool {
 func IsEmptyConfig(err error) bool {
 	switch t := err.(type) {
 	case errConfigurationInvalid:
-		return len(t) == 1 && t[0] == ErrEmptyConfig
+		if len(t) != 1 {
+			return false
+		}
+		_, ok := t[0].(*errEmptyConfig)
+		return ok
 	}
-	return err == ErrEmptyConfig
+	_, ok := err.(*errEmptyConfig)
+	return ok
 }
 
 // errConfigurationInvalid is a set of errors indicating the configuration is invalid.
@@ -86,9 +104,39 @@ func (e errConfigurationInvalid) Error() string {
 	return fmt.Sprintf("invalid configuration: %v", utilerrors.NewAggregate(e).Error())
 }
 
-// Errors implements the AggregateError interface
+// Errors implements the utilerrors.Aggregate interface
 func (e errConfigurationInvalid) Errors() []error {
 	return e
+}
+
+// Is implements the utilerrors.Aggregate interface
+func (e errConfigurationInvalid) Is(target error) bool {
+	return e.visit(func(err error) bool {
+		return errors.Is(err, target)
+	})
+}
+
+func (e errConfigurationInvalid) visit(f func(err error) bool) bool {
+	for _, err := range e {
+		switch err := err.(type) {
+		case errConfigurationInvalid:
+			if match := err.visit(f); match {
+				return match
+			}
+		case utilerrors.Aggregate:
+			for _, nestedErr := range err.Errors() {
+				if match := f(nestedErr); match {
+					return match
+				}
+			}
+		default:
+			if match := f(err); match {
+				return match
+			}
+		}
+	}
+
+	return false
 }
 
 // IsConfigurationInvalid returns true if the provided error indicates the configuration is invalid.
@@ -177,6 +225,11 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 			validationErrors = append(validationErrors, fmt.Errorf("default cluster has no server defined"))
 		} else {
 			validationErrors = append(validationErrors, fmt.Errorf("no server found for cluster %q", clusterName))
+		}
+	}
+	if proxyURL := clusterInfo.ProxyURL; proxyURL != "" {
+		if _, err := parseProxyURL(proxyURL); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %v", proxyURL, clusterName, err))
 		}
 	}
 	// Make sure CA data and CA file aren't both specified

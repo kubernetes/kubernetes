@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.15] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.9] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,15 +26,15 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.15
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.9
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.3.15
+LATEST_ETCD_VERSION?=3.4.9
 
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=3
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -61,26 +61,28 @@ endif
 
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
-# golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
-GOLANG_VERSION?=1.12.9
+# golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
+GOLANG_VERSION?=1.12.17
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/debian-base:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:v2.1.3
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/debian-base-arm:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:v2.1.3
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/debian-base-arm64:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:v2.1.3
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/debian-base-ppc64le:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:v2.1.3
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/debian-base-s390x:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:v2.1.3
 endif
+
+RUNNERIMAGE?=gcr.io/distroless/static:latest
 
 build:
 	# Explicitly copy files to the temp directory
@@ -91,7 +93,10 @@ build:
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
-	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR)
+	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
+	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
 
@@ -113,11 +118,16 @@ else
 		arch_prefix="GOARM=$(GOARM)"
         endif
 
+	# use '/go/src/go.etcd.io/etcd' to build etcd 3.4 and later.
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
+		etcd_build_dir="/go/src/github.com/coreos/etcd"; \
+		if [ $$(echo $$version | cut -d. -f2) -gt 3 ]; then \
+			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
+		fi; \
 		docker run --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
-			"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
-			&& cd /go/src/github.com/coreos/etcd \
+			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
+			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
 			&& $(arch_prefix) GOARCH=$(ARCH) ./build \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
@@ -135,6 +145,7 @@ endif
 
 	# Replace BASEIMAGE with the real base image
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
+	cd $(TEMP_DIR) && sed -i.bak 's|RUNNERIMAGE|$(RUNNERIMAGE)|g' Dockerfile
 
 	# And build the image
 	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(TEMP_DIR)

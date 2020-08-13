@@ -226,10 +226,10 @@ func TestNewInformerWatcher(t *testing.T) {
 
 			lw := &cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return fake.CoreV1().Secrets("").List(options)
+					return fake.CoreV1().Secrets("").List(context.TODO(), options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return fake.CoreV1().Secrets("").Watch(options)
+					return fake.CoreV1().Secrets("").Watch(context.TODO(), options)
 				},
 			}
 			_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})

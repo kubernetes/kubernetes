@@ -8,7 +8,7 @@ import "gonum.org/v1/gonum/blas"
 
 // Dgebd2 reduces an m×n matrix A to upper or lower bidiagonal form by an orthogonal
 // transformation.
-//  Q^T * A * P = B
+//  Qᵀ * A * P = B
 // if m >= n, B is upper diagonal, otherwise B is lower bidiagonal.
 // d is the diagonal, len = min(m,n)
 // e is the off-diagonal len = min(m,n)-1

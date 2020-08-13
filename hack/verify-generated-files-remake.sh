@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script verifies that the expected results are obtained when creating each
+# type of file(e.g. codegen tool itself, a file in a package that needs codegen,
+# and etc.) for verification and then generating the code(executes
+# `make generated_files`).
+# Usage: `hack/verify-generated-files-remake.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -298,6 +304,7 @@ X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after touching src file:"
     echo "  ${X:-(none)}" | tr '\n' ' '
@@ -331,7 +338,7 @@ assert_clean
 touch "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go"
 echo > api/api-rules/violation_exceptions.list
 echo > api/api-rules/codegen_violation_exceptions.list
-if make generated_files >/dev/null; then
+if make generated_files >/dev/null 2>&1; then
     echo "Expected make generated_files to fail with API violations."
     echo ""
     exit 1
@@ -342,6 +349,7 @@ X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after updating violation files:"
     echo "  ${X:-(none)}" | tr '\n' ' '

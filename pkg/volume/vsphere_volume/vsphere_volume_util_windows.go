@@ -1,3 +1,4 @@
+// +build !providerless
 // +build windows
 
 /*
@@ -24,7 +25,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type diskInfoResult struct {

@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,13 +63,20 @@ var _ Leases = &storageLeases{}
 // ListLeases retrieves a list of the current master IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
 	ipInfoList := &corev1.EndpointsList{}
-	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, "0", storage.Everything, ipInfoList); err != nil {
+	storageOpts := storage.ListOptions{
+		ResourceVersion:      "0",
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+		Predicate:            storage.Everything,
+	}
+	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
 		return nil, err
 	}
 
-	ipList := make([]string, len(ipInfoList.Items))
-	for i, ip := range ipInfoList.Items {
-		ipList[i] = ip.Subsets[0].Addresses[0].IP
+	ipList := make([]string, 0, len(ipInfoList.Items))
+	for _, ip := range ipInfoList.Items {
+		if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 && len(ip.Subsets[0].Addresses[0].IP) > 0 {
+			ipList = append(ipList, ip.Subsets[0].Addresses[0].IP)
+		}
 	}
 
 	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
@@ -189,10 +196,14 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
 	}
 
+	// Don't use the EndpointSliceMirroring controller to mirror this to
+	// EndpointSlices. This may change in the future.
+	skipMirrorChanged := setSkipMirrorTrue(e)
+
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
-	if formatCorrect && ipCorrect && portsCorrect {
-		return nil
+	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
 
 	if !formatCorrect {

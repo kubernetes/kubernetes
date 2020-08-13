@@ -435,7 +435,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		gotDeletions := 0
 		for _, action := range fake.Actions() {
-			if "delete" == action.GetVerb() {
+			if action.GetVerb() == "delete" {
 				gotDeletions++
 			}
 		}

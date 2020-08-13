@@ -24,7 +24,7 @@ import (
 	"path"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/server/mux"
 )
@@ -121,6 +121,7 @@ func StringFlagPutHandler(setter StringFlagSetterFunc) http.HandlerFunc {
 // writePlainText renders a simple string response.
 func writePlainText(statusCode int, text string, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(statusCode)
 	fmt.Fprintln(w, text)
 }

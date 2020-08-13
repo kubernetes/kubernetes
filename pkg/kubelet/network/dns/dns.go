@@ -33,7 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 )
 
@@ -230,7 +230,11 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "search" {
-			searches = fields[1:]
+			// Normalise search fields so the same domain with and without trailing dot will only count once, to avoid hitting search validation limits.
+			searches = []string{}
+			for _, s := range fields[1:] {
+				searches = append(searches, strings.TrimSuffix(s, "."))
+			}
 		}
 		if fields[0] == "options" {
 			options = fields[1:]

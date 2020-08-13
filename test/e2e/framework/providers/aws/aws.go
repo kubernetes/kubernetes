@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
@@ -99,6 +100,29 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	request.AvailabilityZone = aws.String(zone)
 	request.Size = aws.Int64(10)
 	request.VolumeType = aws.String(awscloud.DefaultVolumeType)
+
+	// We need to tag the volume so that locked-down IAM configurations can still mount it
+	if framework.TestContext.CloudConfig.ClusterTag != "" {
+		clusterID := framework.TestContext.CloudConfig.ClusterTag
+
+		legacyTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterLegacy),
+			Value: aws.String(clusterID),
+		}
+
+		newTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterPrefix + clusterID),
+			Value: aws.String(awscloud.ResourceLifecycleOwned),
+		}
+
+		tagSpecification := &ec2.TagSpecification{
+			ResourceType: aws.String(ec2.ResourceTypeVolume),
+			Tags:         []*ec2.Tag{legacyTag, newTag},
+		}
+
+		request.TagSpecifications = append(request.TagSpecifications, tagSpecification)
+	}
+
 	response, err := client.CreateVolume(request)
 	if err != nil {
 		return "", err
@@ -142,7 +166,7 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 
 // DeletePVSource deletes a persistent volume source
 func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
+	return e2epv.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
 }
 
 func newAWSClient(zone string) *ec2.EC2 {

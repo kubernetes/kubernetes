@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -51,7 +49,7 @@ var (
 			Name:      "http_requests_duration_seconds",
 			Help:      "Duration in seconds to serve http requests",
 			// Use DefBuckets for now, will customize the buckets if necessary.
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"method", "path", "server_type", "long_running"},

@@ -19,6 +19,7 @@ reviewers:
 - yagonobre
 - ereslibre
 - SataQiu
+- yastij
 # Might want to add @xiangpengzhao, @stealthybox, @liztio and @chuckha back in the future
 labels:
 - area/kubeadm

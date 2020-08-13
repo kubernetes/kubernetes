@@ -4,5 +4,7 @@ reviewers:
   - BenTheElder
   - cblecker
 approvers:
+  - BenTheElder
   - cblecker
+emeritus_approvers:
   - rmmh

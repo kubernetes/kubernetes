@@ -24,7 +24,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
@@ -59,7 +59,9 @@ func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregat
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
 		queue: workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay), "APIServiceOpenAPIAggregationControllerQueue1"),
+			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay),
+			"open_api_aggregation_controller",
+		),
 		downloader: downloader,
 	}
 
@@ -102,9 +104,9 @@ func (c *AggregationController) processNextWorkItem() bool {
 	if aggregator.IsLocalAPIService(key.(string)) {
 		// for local delegation targets that are aggregated once per second, log at
 		// higher level to avoid flooding the log
-		klog.V(5).Infof("OpenAPI AggregationController: Processing item %s", key)
+		klog.V(6).Infof("OpenAPI AggregationController: Processing item %s", key)
 	} else {
-		klog.Infof("OpenAPI AggregationController: Processing item %s", key)
+		klog.V(4).Infof("OpenAPI AggregationController: Processing item %s", key)
 	}
 
 	action, err := c.syncHandler(key.(string))

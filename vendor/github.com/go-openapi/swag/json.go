@@ -99,7 +99,7 @@ func ConcatJSON(blobs ...[]byte) []byte {
 	last := len(blobs) - 1
 	for blobs[last] == nil || bytes.Equal(blobs[last], nullJSON) {
 		// strips trailing null objects
-		last = last - 1
+		last--
 		if last < 0 {
 			// there was nothing but "null"s or nil...
 			return nil

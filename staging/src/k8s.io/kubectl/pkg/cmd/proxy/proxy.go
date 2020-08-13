@@ -19,23 +19,52 @@ package proxy
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/klog"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/proxy"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+// ProxyOptions have the data required to perform the proxy operation
+type ProxyOptions struct {
+	// Common user flags
+	staticDir     string
+	staticPrefix  string
+	apiPrefix     string
+	acceptPaths   string
+	rejectPaths   string
+	acceptHosts   string
+	rejectMethods string
+	port          int
+	address       string
+	disableFilter bool
+	unixSocket    string
+	keepalive     time.Duration
+
+	clientConfig *rest.Config
+	filter       *proxy.FilterServer
+
+	genericclioptions.IOStreams
+}
+
+const (
+	defaultPort         = 8001
+	defaultStaticPrefix = "/static/"
+	defaultAPIPrefix    = "/"
+	defaultAddress      = "127.0.0.1"
+)
+
 var (
-	defaultPort = 8001
-	proxyLong   = templates.LongDesc(i18n.T(`
+	proxyLong = templates.LongDesc(i18n.T(`
 		Creates a proxy server or application-level gateway between localhost and
 		the Kubernetes API Server. It also allows serving static content over specified
 		HTTP path. All incoming data enters through one port and gets forwarded to
@@ -70,8 +99,25 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
+// NewProxyOptions creates the options for proxy
+func NewProxyOptions(ioStreams genericclioptions.IOStreams) *ProxyOptions {
+	return &ProxyOptions{
+		IOStreams:     ioStreams,
+		staticPrefix:  defaultStaticPrefix,
+		apiPrefix:     defaultAPIPrefix,
+		acceptPaths:   proxy.DefaultPathAcceptRE,
+		rejectPaths:   proxy.DefaultPathRejectRE,
+		acceptHosts:   proxy.DefaultHostAcceptRE,
+		rejectMethods: proxy.DefaultMethodRejectRE,
+		port:          defaultPort,
+		address:       defaultAddress,
+	}
+}
+
 // NewCmdProxy returns the proxy Cobra command
-func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdProxy(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewProxyOptions(ioStreams)
+
 	cmd := &cobra.Command{
 		Use:                   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		DisableFlagsInUseLine: true,
@@ -79,87 +125,96 @@ func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Long:                  proxyLong,
 		Example:               proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunProxy(f, streams.Out, cmd)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunProxy())
 		},
 	}
-	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
-	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
-	cmd.Flags().StringP("api-prefix", "", "/", "Prefix to serve the proxied API under.")
-	cmd.Flags().String("accept-paths", proxy.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
-	cmd.Flags().String("reject-paths", proxy.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject. Paths specified here will be rejected even accepted by --accept-paths.")
-	cmd.Flags().String("accept-hosts", proxy.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
-	cmd.Flags().String("reject-methods", proxy.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject (example --reject-methods='POST,PUT,PATCH'). ")
-	cmd.Flags().IntP("port", "p", defaultPort, "The port on which to run the proxy. Set to 0 to pick a random port.")
-	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
-	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
-	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
-	cmd.Flags().Duration("keepalive", 0, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
+
+	cmd.Flags().StringVarP(&o.staticDir, "www", "w", o.staticDir, "Also serve static files from the given directory under the specified prefix.")
+	cmd.Flags().StringVarP(&o.staticPrefix, "www-prefix", "P", o.staticPrefix, "Prefix to serve static files under, if static file directory is specified.")
+	cmd.Flags().StringVarP(&o.apiPrefix, "api-prefix", "", o.apiPrefix, "Prefix to serve the proxied API under.")
+	cmd.Flags().StringVar(&o.acceptPaths, "accept-paths", o.acceptPaths, "Regular expression for paths that the proxy should accept.")
+	cmd.Flags().StringVar(&o.rejectPaths, "reject-paths", o.rejectPaths, "Regular expression for paths that the proxy should reject. Paths specified here will be rejected even accepted by --accept-paths.")
+	cmd.Flags().StringVar(&o.acceptHosts, "accept-hosts", o.acceptHosts, "Regular expression for hosts that the proxy should accept.")
+	cmd.Flags().StringVar(&o.rejectMethods, "reject-methods", o.rejectMethods, "Regular expression for HTTP methods that the proxy should reject (example --reject-methods='POST,PUT,PATCH'). ")
+	cmd.Flags().IntVarP(&o.port, "port", "p", o.port, "The port on which to run the proxy. Set to 0 to pick a random port.")
+	cmd.Flags().StringVarP(&o.address, "address", "", o.address, "The IP address on which to serve on.")
+	cmd.Flags().BoolVar(&o.disableFilter, "disable-filter", o.disableFilter, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
+	cmd.Flags().StringVarP(&o.unixSocket, "unix-socket", "u", o.unixSocket, "Unix socket on which to run the proxy.")
+	cmd.Flags().DurationVar(&o.keepalive, "keepalive", o.keepalive, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
 	return cmd
 }
 
-// RunProxy checks given arguments and executes command
-func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	path := cmdutil.GetFlagString(cmd, "unix-socket")
-	port := cmdutil.GetFlagInt(cmd, "port")
-	address := cmdutil.GetFlagString(cmd, "address")
-
-	if port != defaultPort && path != "" {
-		return errors.New("Don't specify both --unix-socket and --port")
-	}
-
+// Complete adapts from the command line args and factory to the data required.
+func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
+	o.clientConfig = clientConfig
 
-	staticPrefix := cmdutil.GetFlagString(cmd, "www-prefix")
-	if !strings.HasSuffix(staticPrefix, "/") {
-		staticPrefix += "/"
-	}
-	staticDir := cmdutil.GetFlagString(cmd, "www")
-	if staticDir != "" {
-		fileInfo, err := os.Stat(staticDir)
-		if err != nil {
-			klog.Warning("Failed to stat static file directory "+staticDir+": ", err)
-		} else if !fileInfo.IsDir() {
-			klog.Warning("Static file directory " + staticDir + " is not a directory")
-		}
+	if !strings.HasSuffix(o.staticPrefix, "/") {
+		o.staticPrefix += "/"
 	}
 
-	apiProxyPrefix := cmdutil.GetFlagString(cmd, "api-prefix")
-	if !strings.HasSuffix(apiProxyPrefix, "/") {
-		apiProxyPrefix += "/"
+	if !strings.HasSuffix(o.apiPrefix, "/") {
+		o.apiPrefix += "/"
 	}
-	filter := &proxy.FilterServer{
-		AcceptPaths:   proxy.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-paths")),
-		RejectPaths:   proxy.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-paths")),
-		AcceptHosts:   proxy.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
-		RejectMethods: proxy.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-methods")),
-	}
-	if cmdutil.GetFlagBool(cmd, "disable-filter") {
-		if path == "" {
+
+	if o.disableFilter {
+		if o.unixSocket == "" {
 			klog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
 		}
-		filter = nil
+		o.filter = nil
+	} else {
+		o.filter = &proxy.FilterServer{
+			AcceptPaths:   proxy.MakeRegexpArrayOrDie(o.acceptPaths),
+			RejectPaths:   proxy.MakeRegexpArrayOrDie(o.rejectPaths),
+			AcceptHosts:   proxy.MakeRegexpArrayOrDie(o.acceptHosts),
+			RejectMethods: proxy.MakeRegexpArrayOrDie(o.rejectMethods),
+		}
+	}
+	return nil
+}
+
+// Validate checks to the ProxyOptions to see if there is sufficient information to run the command.
+func (o ProxyOptions) Validate() error {
+	if o.port != defaultPort && o.unixSocket != "" {
+		return errors.New("cannot set --unix-socket and --port at the same time")
 	}
 
-	keepalive := cmdutil.GetFlagDuration(cmd, "keepalive")
+	if o.staticDir != "" {
+		fileInfo, err := os.Stat(o.staticDir)
+		if err != nil {
+			klog.Warning("Failed to stat static file directory "+o.staticDir+": ", err)
+		} else if !fileInfo.IsDir() {
+			klog.Warning("Static file directory " + o.staticDir + " is not a directory")
+		}
+	}
 
-	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig, keepalive)
+	return nil
+}
+
+// RunProxy checks given arguments and executes command
+func (o ProxyOptions) RunProxy() error {
+	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive)
+
+	if err != nil {
+		return err
+	}
 
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)
 	var l net.Listener
-	if path == "" {
-		l, err = server.Listen(address, port)
+	if o.unixSocket == "" {
+		l, err = server.Listen(o.address, o.port)
 	} else {
-		l, err = server.ListenUnix(path)
+		l, err = server.ListenUnix(o.unixSocket)
 	}
 	if err != nil {
-		klog.Fatal(err)
+		return err
 	}
-	fmt.Fprintf(out, "Starting to serve on %s\n", l.Addr().String())
-	klog.Fatal(server.ServeOnListener(l))
-	return nil
+	fmt.Fprintf(o.IOStreams.Out, "Starting to serve on %s\n", l.Addr().String())
+	return server.ServeOnListener(l)
 }

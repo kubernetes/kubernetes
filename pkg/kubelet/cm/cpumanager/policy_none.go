@@ -18,8 +18,9 @@ package cpumanager
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 type nonePolicy struct{}
@@ -38,14 +39,19 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(s state.State) {
+func (p *nonePolicy) Start(s state.State) error {
 	klog.Info("[cpumanager] none policy: Start")
-}
-
-func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
 	return nil
 }
 
-func (p *nonePolicy) RemoveContainer(s state.State, containerID string) error {
+func (p *nonePolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+	return nil
+}
+
+func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+	return nil
+}
+
+func (p *nonePolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }

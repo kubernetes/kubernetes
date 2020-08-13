@@ -11,7 +11,6 @@ package hcsschema
 
 //  Passed to HcsRpc_ModifyProcess
 type ProcessModifyRequest struct {
-
 	Operation string `json:"Operation,omitempty"`
 
 	ConsoleSize *ConsoleSize `json:"ConsoleSize,omitempty"`

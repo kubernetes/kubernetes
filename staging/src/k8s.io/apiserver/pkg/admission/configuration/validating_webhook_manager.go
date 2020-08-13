@@ -21,13 +21,13 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
-	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
+	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -41,7 +41,7 @@ type validatingWebhookConfigurationManager struct {
 var _ generic.Source = &validatingWebhookConfigurationManager{}
 
 func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
-	informer := f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
+	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
 		configuration: &atomic.Value{},
 		lister:        informer.Lister(),
@@ -80,7 +80,7 @@ func (v *validatingWebhookConfigurationManager) updateConfiguration() {
 	v.configuration.Store(mergeValidatingWebhookConfigurations(configurations))
 }
 
-func mergeValidatingWebhookConfigurations(configurations []*v1beta1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
+func mergeValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
 	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
 	accessors := []webhook.WebhookAccessor{}
 	for _, c := range configurations {
@@ -97,7 +97,7 @@ func mergeValidatingWebhookConfigurations(configurations []*v1beta1.ValidatingWe
 	return accessors
 }
 
-type ValidatingWebhookConfigurationSorter []*v1beta1.ValidatingWebhookConfiguration
+type ValidatingWebhookConfigurationSorter []*v1.ValidatingWebhookConfiguration
 
 func (a ValidatingWebhookConfigurationSorter) ByName(i, j int) bool {
 	return a[i].Name < a[j].Name

@@ -17,10 +17,16 @@ limitations under the License.
 package helpers
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -114,4 +120,65 @@ func HasLBFinalizer(service *v1.Service) bool {
 		}
 	}
 	return false
+}
+
+// LoadBalancerStatusEqual checks if load balancer status are equal
+func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
+	return ingressSliceEqual(l.Ingress, r.Ingress)
+}
+
+// PatchService patches the given service's Status or ObjectMeta based on the original and
+// updated ones. Change to spec will be ignored.
+func PatchService(c corev1.CoreV1Interface, oldSvc, newSvc *v1.Service) (*v1.Service, error) {
+	// Reset spec to make sure only patch for Status or ObjectMeta.
+	newSvc.Spec = oldSvc.Spec
+
+	patchBytes, err := getPatchBytes(oldSvc, newSvc)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+
+}
+
+func getPatchBytes(oldSvc, newSvc *v1.Service) ([]byte, error) {
+	oldData, err := json.Marshal(oldSvc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal oldData for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
+	}
+
+	newData, err := json.Marshal(newSvc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal newData for svc %s/%s: %v", newSvc.Namespace, newSvc.Name, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Service{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
+	}
+	return patchBytes, nil
+
+}
+
+func ingressSliceEqual(lhs, rhs []v1.LoadBalancerIngress) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for i := range lhs {
+		if !ingressEqual(&lhs[i], &rhs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
+	if lhs.IP != rhs.IP {
+		return false
+	}
+	if lhs.Hostname != rhs.Hostname {
+		return false
+	}
+	return true
 }

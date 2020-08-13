@@ -10,6 +10,7 @@ go_library(
         "output_interceptor_win.go",
         "server.go",
         "syscall_dup_linux_arm64.go",
+        "syscall_dup_linux_riscv64.go",
         "syscall_dup_solaris.go",
         "syscall_dup_unix.go",
     ],
@@ -24,6 +25,9 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/github.com/hpcloud/tail:go_default_library",
         ],
@@ -31,6 +35,9 @@ go_library(
             "//vendor/github.com/hpcloud/tail:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/github.com/hpcloud/tail:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

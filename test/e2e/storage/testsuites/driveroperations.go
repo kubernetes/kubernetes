@@ -37,16 +37,16 @@ func GetDriverNameWithFeatureTags(driver TestDriver) string {
 	return fmt.Sprintf("[Driver: %s]%s", dInfo.Name, dInfo.FeatureTag)
 }
 
-// CreateVolume creates volume for test unless dynamicPV test
+// CreateVolume creates volume for test unless dynamicPV or CSI ephemeral inline volume test
 func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns.TestVolType) TestVolume {
 	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
+	case testpatterns.InlineVolume, testpatterns.PreprovisionedPV:
 		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
 			return pDriver.CreateVolume(config, volType)
 		}
-	case testpatterns.DynamicPV:
+	case testpatterns.CSIInlineVolume,
+		testpatterns.GenericEphemeralVolume,
+		testpatterns.DynamicPV:
 		// No need to create volume
 	default:
 		framework.Failf("Invalid volType specified: %v", volType)
@@ -97,8 +97,9 @@ func GetSnapshotClass(
 				// Name must be unique, so let's base it on namespace name
 				"name": ns + "-" + suffix,
 			},
-			"snapshotter": snapshotter,
-			"parameters":  parameters,
+			"driver":         snapshotter,
+			"parameters":     parameters,
+			"deletionPolicy": "Delete",
 		},
 	}
 

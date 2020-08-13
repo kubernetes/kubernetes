@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,14 +31,15 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	describeutil "k8s.io/kubectl/pkg/describe/versioned"
-	"k8s.io/kubectl/pkg/util/printers"
+	"k8s.io/kubectl/pkg/describe"
 	rbacutil "k8s.io/kubectl/pkg/util/rbac"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -76,7 +78,7 @@ var (
 		kubectl auth can-i create pods --all-namespaces
 
 		# Check to see if I can list deployments in my current namespace
-		kubectl auth can-i list deployments.extensions
+		kubectl auth can-i list deployments.apps
 
 		# Check to see if I can do everything in my current namespace ("*" means all)
 		kubectl auth can-i '*' '*'
@@ -222,7 +224,7 @@ func (o *CanIOptions) RunAccessList() error {
 			Namespace: o.Namespace,
 		},
 	}
-	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -257,7 +259,7 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 		}
 	}
 
-	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -365,7 +367,7 @@ func printAccessHeaders(out io.Writer) error {
 
 func printAccess(out io.Writer, rules []rbacv1.PolicyRule) error {
 	for _, r := range rules {
-		if _, err := fmt.Fprintf(out, "%s\t%v\t%v\t%v\n", describeutil.CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs); err != nil {
+		if _, err := fmt.Fprintf(out, "%s\t%v\t%v\t%v\n", describe.CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs); err != nil {
 			return err
 		}
 	}

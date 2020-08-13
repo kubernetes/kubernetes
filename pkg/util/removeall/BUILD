@@ -11,8 +11,8 @@ go_test(
     srcs = ["removeall_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/util/mount:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 
@@ -20,7 +20,7 @@ go_library(
     name = "go_default_library",
     srcs = ["removeall.go"],
     importpath = "k8s.io/kubernetes/pkg/util/removeall",
-    deps = ["//pkg/util/mount:go_default_library"],
+    deps = ["//vendor/k8s.io/utils/mount:go_default_library"],
 )
 
 filegroup(

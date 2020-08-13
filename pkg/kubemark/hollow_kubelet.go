@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/klog/v2"
+	"k8s.io/utils/mount"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -29,9 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
@@ -57,8 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils"
-
-	"k8s.io/klog"
 )
 
 type HollowKubelet struct {
@@ -98,22 +98,24 @@ func NewHollowKubelet(
 	client *clientset.Clientset,
 	heartbeatClient *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	dockerClientConfig *dockershim.ClientConfig,
+	imageService internalapi.ImageManagerService,
+	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
 	d := &kubelet.Dependencies{
-		KubeClient:         client,
-		HeartbeatClient:    heartbeatClient,
-		DockerClientConfig: dockerClientConfig,
-		CAdvisorInterface:  cadvisorInterface,
-		Cloud:              nil,
-		OSInterface:        &containertest.FakeOS{},
-		ContainerManager:   containerManager,
-		VolumePlugins:      volumePlugins(),
-		TLSOptions:         nil,
-		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Mounter:            mount.New("" /* default mount path */),
-		Subpather:          &subpath.FakeSubpath{},
-		HostUtil:           hostutil.NewFakeHostUtil(nil),
+		KubeClient:           client,
+		HeartbeatClient:      heartbeatClient,
+		RemoteRuntimeService: runtimeService,
+		RemoteImageService:   imageService,
+		CAdvisorInterface:    cadvisorInterface,
+		Cloud:                nil,
+		OSInterface:          &containertest.FakeOS{},
+		ContainerManager:     containerManager,
+		VolumePlugins:        volumePlugins(),
+		TLSOptions:           nil,
+		OOMAdjuster:          oom.NewFakeOOMAdjuster(),
+		Mounter:              &mount.FakeMounter{},
+		Subpather:            &subpath.FakeSubpath{},
+		HostUtil:             hostutil.NewFakeHostUtil(nil),
 	}
 
 	return &HollowKubelet{
@@ -134,30 +136,34 @@ func (hk *HollowKubelet) Run() {
 	select {}
 }
 
+// HollowKubletOptions contains settable parameters for hollow kubelet.
+type HollowKubletOptions struct {
+	NodeName            string
+	KubeletPort         int
+	KubeletReadOnlyPort int
+	MaxPods             int
+	PodsPerCore         int
+	NodeLabels          map[string]string
+}
+
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
 // usual defaults are applied for fields we do not override.
-func GetHollowKubeletConfig(
-	nodeName string,
-	kubeletPort int,
-	kubeletReadOnlyPort int,
-	maxPods int,
-	podsPerCore int) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
-
+func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
 	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
 	f := options.NewKubeletFlags()
-	f.EnableServer = true
 	f.RootDirectory = testRootDir
-	f.HostnameOverride = nodeName
+	f.HostnameOverride = opt.NodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
+	f.NodeLabels = opt.NodeLabels
+	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
-	f.ProviderID = fmt.Sprintf("kubemark://%v", nodeName)
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -166,21 +172,23 @@ func GetHollowKubeletConfig(
 	}
 
 	c.StaticPodURL = ""
+	c.EnableServer = true
 	c.Address = "0.0.0.0" /* bind address */
-	c.Port = int32(kubeletPort)
-	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
+	c.Port = int32(opt.KubeletPort)
+	c.ReadOnlyPort = int32(opt.KubeletReadOnlyPort)
 	c.StaticPodPath = podFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
-	c.NodeStatusReportFrequency.Duration = time.Minute
+	c.NodeStatusReportFrequency.Duration = 5 * time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
-	c.MaxPods = int32(maxPods)
-	c.PodsPerCore = int32(podsPerCore)
+	c.MaxPods = int32(opt.MaxPods)
+	c.PodsPerCore = int32(opt.PodsPerCore)
 	c.ClusterDNS = []string{}
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
+	c.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
 	c.VolumeStatsAggPeriod.Duration = time.Minute
 	c.CgroupRoot = ""
 	c.CPUCFSQuota = true

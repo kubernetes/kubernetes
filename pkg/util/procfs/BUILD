@@ -17,9 +17,13 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/util/procfs",
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -33,6 +37,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
         ],

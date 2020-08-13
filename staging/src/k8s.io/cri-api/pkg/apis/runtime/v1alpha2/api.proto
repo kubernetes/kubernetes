@@ -216,6 +216,13 @@ enum NamespaceMode {
     // For example, a container with a PID namespace of NODE expects to view
     // all of the processes on the host running the kubelet.
     NODE      = 2;
+    // TARGET targets the namespace of another container. When this is specified,
+    // a target_id must be specified in NamespaceOption and refer to a container
+    // previously created with NamespaceMode CONTAINER. This containers namespace
+    // will be made to match that of container target_id.
+    // For example, a container with a PID namespace of TARGET expects to view
+    // all of the processes that container target_id can view.
+    TARGET    = 3;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -227,12 +234,16 @@ message NamespaceOption {
     // PID namespace for this container/sandbox.
     // Note: The CRI default is POD, but the v1.PodSpec default is CONTAINER.
     // The kubelet's runtime manager will set this to CONTAINER explicitly for v1 pods.
-    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE
+    // Namespaces currently set by the kubelet: POD, CONTAINER, NODE, TARGET
     NamespaceMode pid = 2;
     // IPC namespace for this container/sandbox.
     // Note: There is currently no way to set CONTAINER scoped IPC in the Kubernetes API.
     // Namespaces currently set by the kubelet: POD, NODE
     NamespaceMode ipc = 3;
+    // Target Container ID for NamespaceMode of TARGET. This container must have been
+    // previously created in the same pod. It is not possible to specify different targets
+    // for each namespace.
+    string target_id = 4;
 }
 
 // Int64Value is the wrapper of int64.
@@ -295,11 +306,11 @@ message LinuxPodSandboxConfig {
 // PodSandbox in its user interface for better user experience. For example,
 // the runtime can construct a unique PodSandboxName based on the metadata.
 message PodSandboxMetadata {
-    // Pod name of the sandbox. Same as the pod name in the PodSpec.
+    // Pod name of the sandbox. Same as the pod name in the Pod ObjectMeta.
     string name = 1;
-    // Pod UID of the sandbox. Same as the pod UID in the PodSpec.
+    // Pod UID of the sandbox. Same as the pod UID in the Pod ObjectMeta.
     string uid = 2;
-    // Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+    // Pod namespace of the sandbox. Same as the pod namespace in the Pod ObjectMeta.
     string namespace = 3;
     // Attempt number of creating the sandbox. Default: 0.
     uint32 attempt = 4;
@@ -512,11 +523,14 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
-// ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageID or imageDigest), but in the
-// future it will include more detailed information about the different image types.
+// ImageSpec is an internal representation of an image.
 message ImageSpec {
+    // Container's Image field (e.g. imageID or imageDigest).
     string image = 1;
+    // Unstructured key-value map holding arbitrary metadata.
+    // ImageSpec Annotations can be used to help the runtime target specific
+    // images in multi-arch images.
+    map<string, string> annotations = 2;
 }
 
 message KeyValue {
@@ -543,6 +557,19 @@ message LinuxContainerResources {
     string cpuset_cpus = 6;
     // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
     string cpuset_mems = 7;
+    // List of HugepageLimits to limit the HugeTLB usage of container per page size. Default: nil (not specified).
+    repeated HugepageLimit hugepage_limits = 8;
+}
+
+// HugepageLimit corresponds to the file`hugetlb.<hugepagesize>.limit_in_byte` in container level cgroup.
+// For example, `PageSize=1GB`, `Limit=1073741824` means setting `1073741824` bytes to hugetlb.1GB.limit_in_bytes.
+message HugepageLimit {
+    // The value of PageSize has the format <size><unit-prefix>B (2MB, 1GB),
+    // and must match the <hugepagesize> of the corresponding control file found in `hugetlb.<hugepagesize>.limit_in_bytes`.
+    // The values of <unit-prefix> are intended to be parsed using base 1024("1KB" = 1024, "1MB" = 1048576, etc).
+    string page_size = 1;
+    // limit in bytes of hugepagesize HugeTLB usage.
+    uint64 limit = 2;
 }
 
 // SELinuxOption are the labels to be applied to the container.
@@ -758,8 +785,8 @@ message ContainerConfig {
 
     // Configuration specific to Linux containers.
     LinuxContainerConfig linux = 15;
-   // Configuration specific to Windows containers.
-   WindowsContainerConfig windows = 16;
+    // Configuration specific to Windows containers.
+    WindowsContainerConfig windows = 16;
 }
 
 message CreateContainerRequest {
@@ -1041,6 +1068,8 @@ message Image {
     // User name that will run the command(s). This is used if UID is not set
     // and no user is specified when creating container.
     string username = 6;
+    // ImageSpec for image which includes annotations
+    ImageSpec spec = 7;
 }
 
 message ListImagesResponse {

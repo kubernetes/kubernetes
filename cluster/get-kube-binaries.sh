@@ -114,12 +114,15 @@ function detect_client_info() {
       i?86*)
         CLIENT_ARCH="386"
         ;;
+      ppc64le*)
+        CLIENT_ARCH="ppc64le"
+        ;;
       s390x*)
         CLIENT_ARCH="s390x"
         ;;
       *)
         echo "Unknown, unsupported architecture (${machine})." >&2
-        echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
+        echo "Supported architectures x86_64, i686, arm, arm64, ppc64le, s390x." >&2
         echo "Bailing out." >&2
         exit 3
         ;;
@@ -143,22 +146,11 @@ function sha1sum_file() {
   fi
 }
 
-# Get default service account credentials of the VM.
-GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
-function get-credentials {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
-    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
-}
-
-function valid-storage-scope {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -q "auth/devstorage"
-}
-
 function download_tarball() {
   local -r download_path="$1"
   local -r file="$2"
   local trace_on="off"
-  if [[ -o xtrace ]]; then 
+  if [[ -o xtrace ]]; then
     trace_on="on"
     set +x
   fi
@@ -166,10 +158,10 @@ function download_tarball() {
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
-    local curl_headers=""
+    curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
-       [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
-      curl_headers="Authorization: Bearer $(get-credentials)"
+       [[ "$url" =~ ^https://storage.googleapis.com.* ]]; then
+      curl_headers="Authorization: Bearer $(gcloud auth print-access-token)"
     fi
     curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
   elif [[ $(which wget) ]]; then

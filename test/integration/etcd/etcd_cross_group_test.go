@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,12 +37,6 @@ import (
 func TestCrossGroupStorage(t *testing.T) {
 	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
 		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/deployments"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/daemonsets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/replicasets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/podsecuritypolicies"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/networkpolicies"] = "true"
 	})
 	defer master.Cleanup()
 
@@ -50,7 +44,7 @@ func TestCrossGroupStorage(t *testing.T) {
 
 	crossGroupResources := map[schema.GroupVersionKind][]Resource{}
 
-	master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
+	master.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{})
 
 	// Group by persisted GVK
 	for _, resourceToPersist := range master.Resources {
@@ -100,7 +94,7 @@ func TestCrossGroupStorage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			actual, err := resourceClient.Create(obj, metav1.CreateOptions{})
+			actual, err := resourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -114,11 +108,11 @@ func TestCrossGroupStorage(t *testing.T) {
 			)
 			for _, resource := range resources {
 				clients[resource.Mapping.Resource] = master.Dynamic.Resource(resource.Mapping.Resource).Namespace(ns)
-				versionedData[resource.Mapping.Resource], err = clients[resource.Mapping.Resource].Get(name, metav1.GetOptions{})
+				versionedData[resource.Mapping.Resource], err = clients[resource.Mapping.Resource].Get(context.TODO(), name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("error finding resource via %s: %v", resource.Mapping.Resource.GroupVersion().String(), err)
 				}
-				watches[resource.Mapping.Resource], err = clients[resource.Mapping.Resource].Watch(metav1.ListOptions{ResourceVersion: actual.GetResourceVersion()})
+				watches[resource.Mapping.Resource], err = clients[resource.Mapping.Resource].Watch(context.TODO(), metav1.ListOptions{ResourceVersion: actual.GetResourceVersion()})
 				if err != nil {
 					t.Fatalf("error opening watch via %s: %v", resource.Mapping.Resource.GroupVersion().String(), err)
 				}
@@ -167,7 +161,7 @@ func TestCrossGroupStorage(t *testing.T) {
 
 				// Ensure everyone can do a direct get and gets the right version
 				for clientResource, client := range clients {
-					obj, err := client.Get(name, metav1.GetOptions{})
+					obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 					if err != nil {
 						t.Errorf("error looking up %s after persisting %s", clientResource.GroupVersion().String(), resource.Mapping.Resource.GroupVersion().String())
 						continue

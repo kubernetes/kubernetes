@@ -22,7 +22,7 @@ import (
 	"bytes"
 	"fmt"
 
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	"sync"
 )
@@ -124,5 +124,5 @@ func (timer *TestPhaseTimer) PrintJSON() string {
 			data.DataItems[0].Labels["ended"] = "false"
 		}
 	}
-	return e2emetrics.PrettyPrintJSON(data)
+	return framework.PrettyPrintJSON(data)
 }

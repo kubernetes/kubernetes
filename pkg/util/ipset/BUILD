@@ -9,7 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/ipset",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

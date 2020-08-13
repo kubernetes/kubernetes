@@ -46,7 +46,7 @@ func TestOperationExecutor_RegisterPlugin_ConcurrentRegisterPlugin(t *testing.T)
 	ch, quit, oe := setup()
 	for i := 0; i < numPluginsToRegister; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
-		oe.RegisterPlugin(socketPath, false /* foundInDeprecatedDir */, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToRegister) {
 		t.Fatalf("Unable to start register operations in Concurrent for plugins")
@@ -57,7 +57,7 @@ func TestOperationExecutor_RegisterPlugin_SerialRegisterPlugin(t *testing.T) {
 	ch, quit, oe := setup()
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 	for i := 0; i < numPluginsToRegister; i++ {
-		oe.RegisterPlugin(socketPath, false /* foundInDeprecatedDir */, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
+		oe.RegisterPlugin(socketPath, time.Now(), nil /* plugin handlers */, nil /* actual state of the world updator */)
 
 	}
 	if !isOperationRunSerially(ch, quit) {
@@ -69,7 +69,8 @@ func TestOperationExecutor_UnregisterPlugin_ConcurrentUnregisterPlugin(t *testin
 	ch, quit, oe := setup()
 	for i := 0; i < numPluginsToUnregister; i++ {
 		socketPath := "socket-path" + strconv.Itoa(i)
-		oe.UnregisterPlugin(socketPath, nil /* plugin handlers */, nil /* actual state of the world updator */)
+		pluginInfo := cache.PluginInfo{SocketPath: socketPath}
+		oe.UnregisterPlugin(pluginInfo, nil /* actual state of the world updator */)
 
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToUnregister) {
@@ -81,7 +82,8 @@ func TestOperationExecutor_UnregisterPlugin_SerialUnregisterPlugin(t *testing.T)
 	ch, quit, oe := setup()
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 	for i := 0; i < numPluginsToUnregister; i++ {
-		oe.UnregisterPlugin(socketPath, nil /* plugin handlers */, nil /* actual state of the world updator */)
+		pluginInfo := cache.PluginInfo{SocketPath: socketPath}
+		oe.UnregisterPlugin(pluginInfo, nil /* actual state of the world updator */)
 
 	}
 	if !isOperationRunSerially(ch, quit) {
@@ -103,7 +105,6 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 
 func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
-	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
@@ -116,8 +117,7 @@ func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnregisterPluginFunc(
-	socketPath string,
-	pluginHandlers map[string]cache.PluginHandler,
+	pluginInfo cache.PluginInfo,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
 	opFunc := func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)

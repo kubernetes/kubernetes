@@ -272,10 +272,10 @@ func TestSetCRDCondition(t *testing.T) {
 		}
 		for i := range tc.expectedcrdCondition {
 			if !IsCRDConditionEquivalent(&tc.expectedcrdCondition[i], &crd.Status.Conditions[i]) {
-				t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition, crd.Status.Conditions)
+				t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition[i], crd.Status.Conditions[i])
 			}
 			if crd.Status.Conditions[i].LastTransitionTime.IsZero() {
-				t.Errorf("%q lastTransitionTime should not be null: %v", tc.name, i, crd.Status.Conditions)
+				t.Errorf("%q/%d lastTransitionTime should not be null: %v", tc.name, i, crd.Status.Conditions[i])
 			}
 		}
 	}

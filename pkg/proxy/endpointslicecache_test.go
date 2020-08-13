@@ -21,8 +21,10 @@ import (
 	"reflect"
 	"testing"
 
-	discovery "k8s.io/api/discovery/v1alpha1"
+	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -41,12 +43,12 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false},
 				},
-				makeServicePortName("ns1", "svc1", "port-1"): {
+				makeServicePortName("ns1", "svc1", "port-1", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: false},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: false},
@@ -60,7 +62,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 2, 3, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
@@ -79,7 +81,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 4, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
@@ -98,9 +100,9 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 10, 6, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.10:80"},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.4:80"},
@@ -127,7 +129,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns2", 3, 3, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
@@ -148,13 +150,17 @@ func TestEndpointsMapFromESC(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
+		t.Run(name, func(t *testing.T) {
+			esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
 
-		for _, endpointSlice := range tc.endpointSlices {
-			esCache.Update(endpointSlice)
-		}
+			cmc := newCacheMutationCheck(tc.endpointSlices)
+			for _, endpointSlice := range tc.endpointSlices {
+				esCache.updatePending(endpointSlice, false)
+			}
 
-		compareEndpointsMapsStr(t, name, esCache.EndpointsMap(tc.namespacedName), tc.expectedMap)
+			compareEndpointsMapsStr(t, esCache.getEndpointsMap(tc.namespacedName, esCache.trackerByServiceMap[tc.namespacedName].pending), tc.expectedMap)
+			cmc.Check(t)
+		})
 	}
 }
 
@@ -172,32 +178,173 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: spToEndpointMap{
-				{NamespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"}, Port: "port-0"}: {
-					"10.0.1.1": &BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false},
-					"10.0.1.2": &BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
-					"10.0.1.3": &BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false},
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1": &BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Topology: map[string]string{"kubernetes.io/hostname": "host2"}},
+					"10.0.1.2": &BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Topology: map[string]string{"kubernetes.io/hostname": "host1"}},
+					"10.0.1.3": &BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Topology: map[string]string{"kubernetes.io/hostname": "host2"}},
 				},
 			},
 		},
 	}
 
 	for name, tc := range testCases {
-		esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
+		t.Run(name, func(t *testing.T) {
+			esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
 
-		for _, endpointSlice := range tc.endpointSlices {
-			esCache.Update(endpointSlice)
-		}
+			for _, endpointSlice := range tc.endpointSlices {
+				esCache.updatePending(endpointSlice, false)
+			}
 
-		got := esCache.endpointInfoByServicePort(tc.namespacedName)
-		if !reflect.DeepEqual(got, tc.expectedMap) {
-			t.Errorf("[%s] endpointInfoByServicePort does not match. Want: %+v, Got: %+v", name, tc.expectedMap, got)
-		}
+			got := esCache.endpointInfoByServicePort(tc.namespacedName, esCache.trackerByServiceMap[tc.namespacedName].pending)
+			if !reflect.DeepEqual(got, tc.expectedMap) {
+				t.Errorf("endpointInfoByServicePort does not match. Want: %+v, Got: %+v", tc.expectedMap, got)
+			}
+		})
+	}
+}
 
+func TestEsInfoChanged(t *testing.T) {
+	p80 := int32(80)
+	p443 := int32(443)
+	tcpProto := v1.ProtocolTCP
+	port80 := discovery.EndpointPort{Port: &p80, Name: utilpointer.StringPtr("http"), Protocol: &tcpProto}
+	port443 := discovery.EndpointPort{Port: &p443, Name: utilpointer.StringPtr("https"), Protocol: &tcpProto}
+	endpoint1 := discovery.Endpoint{Addresses: []string{"10.0.1.0"}}
+	endpoint2 := discovery.Endpoint{Addresses: []string{"10.0.1.1"}}
+
+	objMeta := metav1.ObjectMeta{
+		Name:      "foo",
+		Namespace: "bar",
+		Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
+	}
+
+	testCases := map[string]struct {
+		cache         *EndpointSliceCache
+		initialSlice  *discovery.EndpointSlice
+		updatedSlice  *discovery.EndpointSlice
+		expectChanged bool
+	}{
+		"identical slices, ports only": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port80},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port80},
+			},
+			expectChanged: false,
+		},
+		"identical slices, ports out of order": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443, port80},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port80, port443},
+			},
+			expectChanged: false,
+		},
+		"port removed": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443, port80},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+			},
+			expectChanged: true,
+		},
+		"port added": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443, port80},
+			},
+			expectChanged: true,
+		},
+		"identical with endpoints": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+				Endpoints:  []discovery.Endpoint{endpoint1, endpoint2},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+				Endpoints:  []discovery.Endpoint{endpoint1, endpoint2},
+			},
+			expectChanged: false,
+		},
+		"identical with endpoints out of order": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+				Endpoints:  []discovery.Endpoint{endpoint1, endpoint2},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+				Endpoints:  []discovery.Endpoint{endpoint2, endpoint1},
+			},
+			expectChanged: false,
+		},
+		"identical with endpoint added": {
+			cache: NewEndpointSliceCache("", nil, nil, nil),
+			initialSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+				Endpoints:  []discovery.Endpoint{endpoint1},
+			},
+			updatedSlice: &discovery.EndpointSlice{
+				ObjectMeta: objMeta,
+				Ports:      []discovery.EndpointPort{port443},
+				Endpoints:  []discovery.Endpoint{endpoint2, endpoint1},
+			},
+			expectChanged: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			cmc := newCacheMutationCheck([]*discovery.EndpointSlice{tc.initialSlice})
+
+			if tc.initialSlice != nil {
+				tc.cache.updatePending(tc.initialSlice, false)
+				tc.cache.checkoutChanges()
+			}
+
+			serviceKey, sliceKey, err := endpointSliceCacheKeys(tc.updatedSlice)
+			if err != nil {
+				t.Fatalf("Expected no error calling endpointSliceCacheKeys(): %v", err)
+			}
+
+			esInfo := newEndpointSliceInfo(tc.updatedSlice, false)
+			changed := tc.cache.esInfoChanged(serviceKey, sliceKey, esInfo)
+
+			if tc.expectChanged != changed {
+				t.Errorf("Expected esInfoChanged() to return %t, got %t", tc.expectChanged, changed)
+			}
+
+			cmc.Check(t)
+		})
 	}
 }
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
-	ipAddressType := discovery.AddressTypeIP
+	tcpProtocol := v1.ProtocolTCP
+
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%d", serviceName, sliceNum),
@@ -205,14 +352,15 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports:       []discovery.EndpointPort{},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 	}
 
 	for i, portNum := range portNums {
 		endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-			Name: utilpointer.StringPtr(fmt.Sprintf("port-%d", i)),
-			Port: portNum,
+			Name:     utilpointer.StringPtr(fmt.Sprintf("port-%d", i)),
+			Port:     portNum,
+			Protocol: &tcpProtocol,
 		})
 	}
 
@@ -236,4 +384,46 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 func generateEndpointSlice(serviceName, namespace string, sliceNum, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
 	return generateEndpointSliceWithOffset(serviceName, namespace, sliceNum, sliceNum, numEndpoints, unreadyMod, hosts, portNums)
+}
+
+// cacheMutationCheck helps ensure that cached objects have not been changed
+// in any way throughout a test run.
+type cacheMutationCheck struct {
+	objects []cacheObject
+}
+
+// cacheObject stores a reference to an original object as well as a deep copy
+// of that object to track any mutations in the original object.
+type cacheObject struct {
+	original runtime.Object
+	deepCopy runtime.Object
+}
+
+// newCacheMutationCheck initializes a cacheMutationCheck with EndpointSlices.
+func newCacheMutationCheck(endpointSlices []*discovery.EndpointSlice) cacheMutationCheck {
+	cmc := cacheMutationCheck{}
+	for _, endpointSlice := range endpointSlices {
+		cmc.Add(endpointSlice)
+	}
+	return cmc
+}
+
+// Add appends a runtime.Object and a deep copy of that object into the
+// cacheMutationCheck.
+func (cmc *cacheMutationCheck) Add(o runtime.Object) {
+	cmc.objects = append(cmc.objects, cacheObject{
+		original: o,
+		deepCopy: o.DeepCopyObject(),
+	})
+}
+
+// Check verifies that no objects in the cacheMutationCheck have been mutated.
+func (cmc *cacheMutationCheck) Check(t *testing.T) {
+	for _, o := range cmc.objects {
+		if !reflect.DeepEqual(o.original, o.deepCopy) {
+			// Cached objects can't be safely mutated and instead should be deep
+			// copied before changed in any way.
+			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
+		}
+	}
 }

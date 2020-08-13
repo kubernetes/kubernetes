@@ -73,7 +73,7 @@ import (
 // It is incremented whenever an incompatibility between the generated code and
 // proto package is introduced; the generated code references
 // a constant, proto.ProtoPackageIsVersionN (where N is generatedCodeVersion).
-const generatedCodeVersion = 2
+const generatedCodeVersion = 3
 
 // A Plugin provides functionality to add to the output during Go code generation,
 // such as to produce RPC stubs.
@@ -2233,389 +2233,12 @@ type oneofSubField struct {
 	getterDef     string                               // Default for getters, e.g. "nil", `""` or "Default_MessageType_FieldName"
 	protoDef      string                               // Default value as defined in the proto file, e.g "yoshi" or "5"
 	deprecated    string                               // Deprecation comment, if any.
-	wireType      string                               // gogo. We can set this on creation, instead of using a function
-}
-
-// wireTypeName returns a textual wire type, needed for oneof sub fields in generated code.
-func (f *oneofSubField) wireTypeName() string {
-	return f.wireType
 }
 
 // typedNil prints a nil casted to the pointer to this field.
-// - for XXX_OneofFuncs
+// - for XXX_OneofWrappers
 func (f *oneofSubField) typedNil(g *Generator) {
 	g.P("(*", f.oneofTypeName, ")(nil),")
-}
-
-// marshalCase prints the case matching this oneof subfield in the marshalling code.
-func (f *oneofSubField) marshalCase(g *Generator, mc *msgCtx) {
-	// if field.OneofIndex == nil || int(*field.OneofIndex) != oi {
-	// continue
-	// }
-	g.P("case *", f.oneofTypeName, ":")
-	var pre, post string
-	val := "x." + f.goName // overridden for TYPE_BOOL
-	canFail := false       // only TYPE_MESSAGE and TYPE_GROUP can fail
-	switch f.protoType {
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		pre = "b.EncodeFixed64(" + g.Pkg["math"] + ".Float64bits("
-		post = "))"
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		pre = "b.EncodeFixed32(uint64(" + g.Pkg["math"] + ".Float32bits("
-		post = ")))"
-	case descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64:
-		pre, post = "b.EncodeVarint(uint64(", "))"
-	case descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		pre, post = "b.EncodeVarint(uint64(", "))"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		pre, post = "b.EncodeFixed64(uint64(", "))"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		pre, post = "b.EncodeFixed32(uint64(", "))"
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		// bool needs special handling.
-		g.P("t := uint64(0)")
-		g.P("if ", val, " { t = 1 }")
-		val = "t"
-		pre, post = "b.EncodeVarint(", ")"
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		pre, post = "b.EncodeStringBytes(", ")"
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		pre, post = "b.Marshal(", ")"
-		canFail = true
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		pre, post = "b.EncodeMessage(", ")"
-		canFail = true
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		pre, post = "b.EncodeRawBytes(", ")"
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
-		pre, post = "b.EncodeZigzag32(uint64(", "))"
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
-		pre, post = "b.EncodeZigzag64(uint64(", "))"
-	default:
-		g.Fail("unhandled oneof field type ", f.protoType.String())
-	}
-	g.P("_ = b.EncodeVarint(", f.fieldNumber, "<<3|", g.Pkg["proto"], ".", f.wireTypeName(), ")")
-	if f.protoType == descriptor.FieldDescriptorProto_TYPE_BYTES && gogoproto.IsCustomType(f.protoField) {
-		g.P(`dAtA, err := `, val, `.Marshal()`)
-		g.P(`if err != nil {`)
-		g.In()
-		g.P(`return err`)
-		g.Out()
-		g.P(`}`)
-		val = "dAtA"
-	} else if gogoproto.IsStdType(f.protoField) {
-		pkg := g.useTypes()
-		ptr := ""
-		fnname := ""
-		if gogoproto.IsNullable(f.protoField) {
-			ptr = "*"
-		}
-		if gogoproto.IsStdTime(f.protoField) {
-			fnname = "Time"
-		} else if gogoproto.IsStdDuration(f.protoField) {
-			fnname = "Duration"
-		} else if gogoproto.IsStdDouble(f.protoField) {
-			fnname = "Double"
-		} else if gogoproto.IsStdFloat(f.protoField) {
-			fnname = "Float"
-		} else if gogoproto.IsStdInt64(f.protoField) {
-			fnname = "Int64"
-		} else if gogoproto.IsStdUInt64(f.protoField) {
-			fnname = "UInt64"
-		} else if gogoproto.IsStdInt32(f.protoField) {
-			fnname = "Int32"
-		} else if gogoproto.IsStdUInt32(f.protoField) {
-			fnname = "UInt32"
-		} else if gogoproto.IsStdBool(f.protoField) {
-			fnname = "Bool"
-		} else if gogoproto.IsStdString(f.protoField) {
-			fnname = "String"
-		} else if gogoproto.IsStdBytes(f.protoField) {
-			fnname = "Bytes"
-		} else {
-			panic("internal error")
-		}
-		g.P(`dAtA, err := `, pkg, `.Std`, fnname, `Marshal(`, ptr, val, `)`)
-		g.P(`if err != nil {`)
-		g.In()
-		g.P(`return err`)
-		g.Out()
-		g.P(`}`)
-		val = "dAtA"
-		pre, post = "b.EncodeRawBytes(", ")"
-	}
-	if !canFail {
-		g.P("_ = ", pre, val, post)
-	} else {
-		g.P("if err := ", pre, val, post, "; err != nil {")
-		g.In()
-		g.P("return err")
-		g.Out()
-		g.P("}")
-	}
-	if f.protoType == descriptor.FieldDescriptorProto_TYPE_GROUP {
-		g.P("_ = b.EncodeVarint(", f.fieldNumber, "<<3|", g.Pkg["proto"], ".WireEndGroup)")
-	}
-}
-
-// unmarshalCase prints the case matching this oneof subfield in the unmarshalling code.
-func (f *oneofSubField) unmarshalCase(g *Generator, origOneofName string, oneofName string, mc *msgCtx) {
-	// if field.OneofIndex == nil {
-	// continue
-	// }
-	g.P("case ", f.fieldNumber, ": // ", origOneofName, ".", f.getProtoName())
-	g.P("if wire != ", g.Pkg["proto"], ".", f.wireTypeName(), " {")
-	g.P("return true, ", g.Pkg["proto"], ".ErrInternalBadWireType")
-	g.P("}")
-	lhs := "x, err" // overridden for TYPE_MESSAGE and TYPE_GROUP
-	var dec, cast, cast2 string
-	switch f.protoType {
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		dec, cast = "b.DecodeFixed64()", g.Pkg["math"]+".Float64frombits"
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		dec, cast, cast2 = "b.DecodeFixed32()", "uint32", g.Pkg["math"]+".Float32frombits"
-	case descriptor.FieldDescriptorProto_TYPE_INT64:
-		dec, cast = "b.DecodeVarint()", "int64"
-	case descriptor.FieldDescriptorProto_TYPE_UINT64:
-		dec = "b.DecodeVarint()"
-	case descriptor.FieldDescriptorProto_TYPE_INT32:
-		dec, cast = "b.DecodeVarint()", "int32"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
-		dec = "b.DecodeFixed64()"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
-		dec, cast = "b.DecodeFixed32()", "uint32"
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		dec = "b.DecodeVarint()"
-		// handled specially below
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		dec = "b.DecodeStringBytes()"
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		g.P("msg := new(", f.goType[1:], ")") // drop star
-		lhs = "err"
-		dec = "b.DecodeGroup(msg)"
-		// handled specially below
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if gogoproto.IsStdType(f.protoField) {
-			dec = "b.DecodeRawBytes(true)"
-		} else {
-			g.P("msg := new(", f.goType[1:], ")") // drop star
-			lhs = "err"
-			dec = "b.DecodeMessage(msg)"
-		}
-		// handled specially below
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		dec = "b.DecodeRawBytes(true)"
-	case descriptor.FieldDescriptorProto_TYPE_UINT32:
-		dec, cast = "b.DecodeVarint()", "uint32"
-	case descriptor.FieldDescriptorProto_TYPE_ENUM:
-		dec, cast = "b.DecodeVarint()", f.goType
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		dec, cast = "b.DecodeFixed32()", "int32"
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		dec, cast = "b.DecodeFixed64()", "int64"
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
-		dec, cast = "b.DecodeZigzag32()", "int32"
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
-		dec, cast = "b.DecodeZigzag64()", "int64"
-	default:
-		g.Fail("unhandled oneof field type ", f.protoType.String())
-	}
-	g.P(lhs, " := ", dec)
-	val := "x"
-	if f.protoType == descriptor.FieldDescriptorProto_TYPE_BYTES && gogoproto.IsCustomType(f.protoField) {
-		g.P(`if err != nil {`)
-		g.In()
-		g.P(`return true, err`)
-		g.Out()
-		g.P(`}`)
-		_, ctyp, err := GetCustomType(f.protoField)
-		if err != nil {
-			panic(err)
-		}
-		g.P(`var cc `, ctyp)
-		g.P(`c := &cc`)
-		g.P(`err = c.Unmarshal(`, val, `)`)
-		val = "*c"
-	} else if gogoproto.IsStdType(f.protoField) {
-		var stdtype string
-		var fnname string
-		if gogoproto.IsStdTime(f.protoField) {
-			stdtype = "time.Time"
-			fnname = "Time"
-		} else if gogoproto.IsStdDuration(f.protoField) {
-			stdtype = "time.Duration"
-			fnname = "Duration"
-		} else if gogoproto.IsStdDouble(f.protoField) {
-			stdtype = "float64"
-			fnname = "Double"
-		} else if gogoproto.IsStdFloat(f.protoField) {
-			stdtype = "float32"
-			fnname = "Float"
-		} else if gogoproto.IsStdInt64(f.protoField) {
-			stdtype = "int64"
-			fnname = "Int64"
-		} else if gogoproto.IsStdUInt64(f.protoField) {
-			stdtype = "uint64"
-			fnname = "UInt64"
-		} else if gogoproto.IsStdInt32(f.protoField) {
-			stdtype = "int32"
-			fnname = "Int32"
-		} else if gogoproto.IsStdUInt32(f.protoField) {
-			stdtype = "uint32"
-			fnname = "UInt32"
-		} else if gogoproto.IsStdBool(f.protoField) {
-			stdtype = "bool"
-			fnname = "Bool"
-		} else if gogoproto.IsStdString(f.protoField) {
-			stdtype = "string"
-			fnname = "String"
-		} else if gogoproto.IsStdBytes(f.protoField) {
-			stdtype = "[]byte"
-			fnname = "Bytes"
-		} else {
-			panic("internal error")
-		}
-
-		pkg := g.useTypes()
-		g.P(`if err != nil {`)
-		g.In()
-		g.P(`return true, err`)
-		g.Out()
-		g.P(`}`)
-		g.P(`c := new(`, stdtype, `)`)
-		g.P(`if err2 := `, pkg, `.Std`, fnname, `Unmarshal(c, `, val, `); err2 != nil {`)
-		g.In()
-		g.P(`return true, err`)
-		g.Out()
-		g.P(`}`)
-		val = "c"
-	}
-	if cast != "" {
-		val = cast + "(" + val + ")"
-	}
-	if cast2 != "" {
-		val = cast2 + "(" + val + ")"
-	}
-	switch f.protoType {
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		val += " != 0"
-	case descriptor.FieldDescriptorProto_TYPE_GROUP,
-		descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if !gogoproto.IsStdType(f.protoField) {
-			val = "msg"
-		}
-	}
-	if gogoproto.IsCastType(f.protoField) {
-		_, typ, err := getCastType(f.protoField)
-		if err != nil {
-			g.Fail(err.Error())
-		}
-		val = typ + "(" + val + ")"
-	}
-	g.P("m.", oneofName, " = &", f.oneofTypeName, "{", val, "}")
-	g.P("return true, err")
-}
-
-// sizerCase prints the case matching this oneof subfield in the sizer code.
-func (f *oneofSubField) sizerCase(g *Generator) {
-	// if field.OneofIndex == nil || int(*field.OneofIndex) != oi {
-	// 	continue
-	// }
-	g.P("case *", f.oneofTypeName, ":")
-	val := "x." + f.goName
-	var varint, fixed string
-	switch f.protoType {
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		fixed = "8"
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		fixed = "4"
-	case descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64,
-		descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		varint = val
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		fixed = "8"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		fixed = "4"
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		fixed = "1"
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		fixed = "len(" + val + ")"
-		varint = fixed
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		fixed = g.Pkg["proto"] + ".Size(" + val + ")"
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if gogoproto.IsStdType(f.protoField) {
-			pkg := g.useTypes()
-			if gogoproto.IsNullable(f.protoField) {
-				val = "*" + val
-			}
-			if gogoproto.IsStdTime(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdTime(", val, ")")
-			} else if gogoproto.IsStdDuration(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdDuration(", val, ")")
-			} else if gogoproto.IsStdDouble(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdDouble(", val, ")")
-			} else if gogoproto.IsStdFloat(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdFloat(", val, ")")
-			} else if gogoproto.IsStdInt64(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdInt64(", val, ")")
-			} else if gogoproto.IsStdUInt64(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdUInt64(", val, ")")
-			} else if gogoproto.IsStdInt32(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdInt32(", val, ")")
-			} else if gogoproto.IsStdUInt32(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdUInt32(", val, ")")
-			} else if gogoproto.IsStdBool(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdBool(", val, ")")
-			} else if gogoproto.IsStdString(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdString(", val, ")")
-			} else if gogoproto.IsStdBytes(f.protoField) {
-				g.P("s := ", pkg, ".SizeOfStdBytes(", val, ")")
-			} else {
-				panic("internal error")
-			}
-		} else {
-			g.P("s := ", g.Pkg["proto"], ".Size(", val, ")")
-		}
-		fixed = "s"
-		varint = fixed
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		if gogoproto.IsCustomType(f.protoField) {
-			fixed = val + ".Size()"
-		} else {
-			fixed = "len(" + val + ")"
-		}
-		varint = fixed
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
-		varint = "(uint32(" + val + ") << 1) ^ uint32((int32(" + val + ") >> 31))"
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
-		varint = "uint64(" + val + " << 1) ^ uint64((int64(" + val + ") >> 63))"
-	default:
-		g.Fail("unhandled oneof field type ", f.protoType.String())
-	}
-	// Tag and wire varint is known statically,
-	// so don't generate code for that part of the size computation.
-	tagAndWireSize := proto.SizeVarint(uint64(f.fieldNumber << 3)) // wire doesn't affect varint size
-	g.P("n += ", tagAndWireSize, " // tag and wire")
-	if varint != "" {
-		g.P("n += ", g.Pkg["proto"], ".SizeVarint(uint64(", varint, "))")
-	}
-	if fixed != "" {
-		g.P("n += ", fixed)
-	}
-	if f.protoType == descriptor.FieldDescriptorProto_TYPE_GROUP {
-		g.P("n += ", tagAndWireSize, " // tag and wire")
-	}
 }
 
 // getProtoDef returns the default value explicitly stated in the proto file, e.g "yoshi" or "5".
@@ -2896,73 +2519,17 @@ func (g *Generator) generateOneofFuncs(mc *msgCtx, topLevelFields []topLevelFiel
 	if len(ofields) == 0 {
 		return
 	}
-	enc := "_" + mc.goName + "_OneofMarshaler"
-	dec := "_" + mc.goName + "_OneofUnmarshaler"
-	size := "_" + mc.goName + "_OneofSizer"
-	encSig := "(msg " + g.Pkg["proto"] + ".Message, b *" + g.Pkg["proto"] + ".Buffer) error"
-	decSig := "(msg " + g.Pkg["proto"] + ".Message, tag, wire int, b *" + g.Pkg["proto"] + ".Buffer) (bool, error)"
-	sizeSig := "(msg " + g.Pkg["proto"] + ".Message) (n int)"
 
 	// OneofFuncs
-	g.P("// XXX_OneofFuncs is for the internal use of the proto package.")
-	g.P("func (*", mc.goName, ") XXX_OneofFuncs() (func", encSig, ", func", decSig, ", func", sizeSig, ", []interface{}) {")
-	g.P("return ", enc, ", ", dec, ", ", size, ", []interface{}{")
+	g.P("// XXX_OneofWrappers is for the internal use of the proto package.")
+	g.P("func (*", mc.goName, ") XXX_OneofWrappers() []interface{} {")
+	g.P("return []interface{}{")
 	for _, of := range ofields {
 		for _, sf := range of.subFields {
 			sf.typedNil(g)
 		}
 	}
 	g.P("}")
-	g.P("}")
-	g.P()
-
-	// marshaler
-	g.P("func ", enc, encSig, " {")
-	g.P("m := msg.(*", mc.goName, ")")
-	for _, of := range ofields {
-		g.P("// ", of.getProtoName())
-		g.P("switch x := m.", of.goName, ".(type) {")
-		for _, sf := range of.subFields {
-			sf.marshalCase(g, mc)
-		}
-		g.P("case nil:")
-		g.P("default: return ", g.Pkg["fmt"], `.Errorf("`, mc.goName, ".", of.goName, ` has unexpected type %T", x)`)
-		g.P("}")
-	}
-	g.P("return nil")
-	g.P("}")
-	g.P()
-
-	// unmarshaler
-	g.P("func ", dec, decSig, " {")
-	g.P("m := msg.(*", mc.goName, ")")
-	g.P("switch tag {")
-	for _, of := range ofields {
-		for _, sf := range of.subFields {
-			sf.unmarshalCase(g, of.getProtoName(), of.goName, mc)
-		}
-	}
-	g.P("default: return false, nil")
-	g.P("}")
-	g.P("}")
-	g.P()
-
-	// sizer
-	g.P("func ", size, sizeSig, " {")
-	g.P("m := msg.(*", mc.goName, ")")
-	for _, of := range ofields {
-		g.P("// ", of.getProtoName())
-		g.P("switch x := m.", of.goName, ".(type) {")
-		for _, sf := range of.subFields {
-			// also fills in field.wire
-			sf.sizerCase(g)
-		}
-		g.P("case nil:")
-		g.P("default:")
-		g.P("panic(", g.Pkg["fmt"], ".Sprintf(\"proto: unexpected type %T in oneof\", x))")
-		g.P("}")
-	}
-	g.P("return n")
 	g.P("}")
 	g.P()
 }
@@ -3005,16 +2572,17 @@ func (g *Generator) generateOneofDecls(mc *msgCtx, topLevelFields []topLevelFiel
 		if gogoproto.IsProtoSizer(g.file.FileDescriptorProto, mc.message.DescriptorProto) {
 			g.P(`ProtoSize() int`)
 		}
+		if gogoproto.HasCompare(g.file.FileDescriptorProto, mc.message.DescriptorProto) {
+			g.P(`Compare(interface{}) int`)
+		}
 		g.Out()
 		g.P("}")
 	}
 	g.P()
 	for _, of := range ofields {
 		for i, sf := range of.subFields {
-			_, wiretype := g.GoType(mc.message, sf.protoField)
-			tag := "protobuf:" + g.goTag(mc.message, sf.protoField, wiretype)
 			fieldFullPath := fmt.Sprintf("%s,%d,%d", mc.message.path, messageFieldPath, i)
-			g.P("type ", Annotate(mc.message.file, fieldFullPath, sf.oneofTypeName), " struct{ ", Annotate(mc.message.file, fieldFullPath, sf.goName), " ", sf.goType, " `", tag, "` }")
+			g.P("type ", Annotate(mc.message.file, fieldFullPath, sf.oneofTypeName), " struct{ ", Annotate(mc.message.file, fieldFullPath, sf.goName), " ", sf.goType, " `", sf.tags, "` }")
 			if !gogoproto.IsStdType(sf.protoField) && !gogoproto.IsCustomType(sf.protoField) && !gogoproto.IsCastType(sf.protoField) {
 				g.RecordTypeUse(sf.protoField.GetTypeName())
 			}
@@ -3362,7 +2930,6 @@ func (g *Generator) generateMessage(message *Descriptor) {
 			}
 
 			oneofField := oFields[*field.OneofIndex]
-			tag = "protobuf:" + g.goTag(message, field, wiretype)
 			sf := oneofSubField{
 				fieldCommon: fieldCommon{
 					goName:     fieldName,
@@ -3380,7 +2947,6 @@ func (g *Generator) generateMessage(message *Descriptor) {
 				protoDef:      field.GetDefaultValue(),
 				oneofTypeName: tname,
 				deprecated:    fieldDeprecated,
-				wireType:      wireTypeName(field),
 			}
 
 			oneofField.subFields = append(oneofField.subFields, &sf)
@@ -3818,44 +3384,6 @@ func IsScalar(field *descriptor.FieldDescriptorProto) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func wireTypeName(field *descriptor.FieldDescriptorProto) string {
-	switch *field.Type {
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		return "WireFixed64"
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		return "WireFixed32"
-	case descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64:
-		return "WireVarint"
-	case descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		return "WireVarint"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		return "WireFixed64"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		return "WireFixed32"
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		return "WireVarint"
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		return "WireBytes"
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		return "WireStartGroup"
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		return "WireBytes"
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return "WireBytes"
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
-		return "WireVarint"
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return "WireVarint"
-	default:
-		return "WireVarint"
 	}
 }
 

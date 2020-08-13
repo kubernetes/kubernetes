@@ -28,6 +28,11 @@ set -x
 
 . "${1}"
 
+# Until all GOPATH references are removed from all build scripts as well,
+# explicitly disable module mode to avoid picking up user-set GO111MODULE preferences.
+# As individual scripts make use of go modules, they can explicitly set GO111MODULE=on
+export GO111MODULE=off
+
 # indirectly generates test/e2e/generated/bindata.go too
 make generated_files
 

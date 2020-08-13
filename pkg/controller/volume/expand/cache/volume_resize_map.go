@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -27,7 +28,7 @@ import (
 	commontypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -202,7 +203,7 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 		return fmt.Errorf("Error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
-	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, commontypes.StrategicMergePatchType, patchBytes)
+	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(context.TODO(), pvClone.Name, commontypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 
 	if updateErr != nil {
 		klog.V(4).Infof("Error updating pv %q with error : %v", pvClone.Name, updateErr)

@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -38,13 +39,16 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // This file contains the controller base functionality, i.e. framework to
@@ -73,7 +77,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
-		broadcaster.StartLogging(klog.Infof)
+		broadcaster.StartStructuredLogging(0)
 		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: p.KubeClient.CoreV1().Events("")})
 		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}
@@ -123,9 +127,21 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
 	controller.podLister = p.PodInformer.Lister()
+	controller.podIndexer = p.PodInformer.Informer().GetIndexer()
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
 	controller.NodeLister = p.NodeInformer.Lister()
 	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
+
+	// This custom indexer will index pods by its PVC keys. Then we don't need
+	// to iterate all pods every time to find pods which reference given PVC.
+	if err := common.AddPodPVCIndexerIfNotPresent(controller.podIndexer); err != nil {
+		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+	}
+
+	csiTranslator := csitrans.New()
+	controller.translator = csiTranslator
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
+
 	return controller, nil
 }
 
@@ -208,8 +224,11 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 
 // deleteVolume runs in worker thread and handles "volume deleted" event.
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
-	_ = ctrl.volumes.store.Delete(volume)
-	klog.V(4).Infof("volume %q deleted", volume.Name)
+	if err := ctrl.volumes.store.Delete(volume); err != nil {
+		klog.Errorf("volume %q deletion encountered : %v", volume.Name, err)
+	} else {
+		klog.V(4).Infof("volume %q deleted", volume.Name)
+	}
 	// record deletion metric if a deletion start timestamp is in the cache
 	// the following calls will be a no-op if there is nothing for this volume in the cache
 	// end of timestamp cache entry lifecycle, "RecordMetric" will do the clean
@@ -253,7 +272,9 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 // Unit test [5-5] [5-6] [5-7]
 // deleteClaim runs in worker thread and handles "claim deleted" event.
 func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeClaim) {
-	_ = ctrl.claims.Delete(claim)
+	if err := ctrl.claims.Delete(claim); err != nil {
+		klog.Errorf("claim %q deletion encountered : %v", claim.Name, err)
+	}
 	claimKey := claimToClaimKey(claim)
 	klog.V(4).Infof("claim %q deleted", claimKey)
 	// clean any possible unfinished provision start timestamp from cache
@@ -295,6 +316,89 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	metrics.Register(ctrl.volumes.store, ctrl.claims)
 
 	<-stopCh
+}
+
+func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	// TODO: update[Claim|Volume]MigrationAnnotations can be optimized to not
+	// copy the claim/volume if no modifications are required. Though this
+	// requires some refactoring as well as an interesting change in the
+	// semantics of the function which may be undesirable. If no copy is made
+	// when no modifications are required this function could sometimes return a
+	// copy of the volume and sometimes return a ref to the original
+	claimClone := claim.DeepCopy()
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	if !modified {
+		return claimClone, nil
+	}
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	_, err = ctrl.storeClaimUpdate(newClaim)
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	return newClaim, nil
+}
+
+func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	volumeClone := volume.DeepCopy()
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, pvutil.AnnDynamicallyProvisioned)
+	if !modified {
+		return volumeClone, nil
+	}
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	_, err = ctrl.storeVolumeUpdate(newVol)
+	if err != nil {
+		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
+	}
+	return newVol, nil
+
+}
+
+// updateMigrationAnnotations takes an Annotations map and checks for a
+// provisioner name using the provisionerKey. It will then add a
+// "volume.beta.kubernetes.io/migrated-to" annotation if migration with the CSI
+// driver name for that provisioner is "on" based on feature flags, it will also
+// remove the annotation is migration is "off" for that provisioner in rollback
+// scenarios. Returns true if the annotations map was modified and false otherwise.
+func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, provisionerKey string) bool {
+	var csiDriverName string
+	var err error
+
+	if ann == nil {
+		// No annotations so we can't get the provisioner and don't know whether
+		// this is migrated - no change
+		return false
+	}
+	provisioner, ok := ann[provisionerKey]
+	if !ok {
+		// Volume not dynamically provisioned. Ignore
+		return false
+	}
+
+	migratedToDriver := ann[pvutil.AnnMigratedTo]
+	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
+		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
+		if err != nil {
+			klog.Errorf("Could not update volume migration annotations. Migration enabled for plugin %s but could not find corresponding driver name: %v", provisioner, err)
+			return false
+		}
+		if migratedToDriver != csiDriverName {
+			ann[pvutil.AnnMigratedTo] = csiDriverName
+			return true
+		}
+	} else {
+		if migratedToDriver != "" {
+			// Migration annotation exists but the driver isn't migrated currently
+			delete(ann, pvutil.AnnMigratedTo)
+			return true
+		}
+	}
+	return false
 }
 
 // volumeWorker processes items from volumeQueue. It must run only once,
@@ -449,7 +553,8 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
 	}

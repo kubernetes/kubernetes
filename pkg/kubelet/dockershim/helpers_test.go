@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -17,7 +19,10 @@ limitations under the License.
 package dockershim
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -25,9 +30,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
@@ -63,7 +68,7 @@ func TestGetApparmorSecurityOpts(t *testing.T) {
 		expectedOpts: []string{},
 	}, {
 		msg:          "AppArmor local profile",
-		config:       makeConfig(apparmor.ProfileNamePrefix + "foo"),
+		config:       makeConfig(v1.AppArmorBetaProfileNamePrefix + "foo"),
 		expectedOpts: []string{"apparmor=foo"},
 	}}
 
@@ -331,4 +336,105 @@ func TestGenerateMountBindings(t *testing.T) {
 	result := generateMountBindings(mounts)
 
 	assert.Equal(t, expectedResult, result)
+}
+
+func TestLimitedWriter(t *testing.T) {
+	max := func(x, y int64) int64 {
+		if x > y {
+			return x
+		}
+		return y
+	}
+	for name, tc := range map[string]struct {
+		w        bytes.Buffer
+		toWrite  string
+		limit    int64
+		wants    string
+		wantsErr error
+	}{
+		"nil": {},
+		"neg": {
+			toWrite:  "a",
+			wantsErr: errMaximumWrite,
+			limit:    -1,
+		},
+		"1byte-over": {
+			toWrite:  "a",
+			wantsErr: errMaximumWrite,
+		},
+		"1byte-maxed": {
+			toWrite: "a",
+			wants:   "a",
+			limit:   1,
+		},
+		"1byte-under": {
+			toWrite: "a",
+			wants:   "a",
+			limit:   2,
+		},
+		"6byte-over": {
+			toWrite:  "foobar",
+			wants:    "foo",
+			limit:    3,
+			wantsErr: errMaximumWrite,
+		},
+		"6byte-maxed": {
+			toWrite: "foobar",
+			wants:   "foobar",
+			limit:   6,
+		},
+		"6byte-under": {
+			toWrite: "foobar",
+			wants:   "foobar",
+			limit:   20,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			limit := tc.limit
+			w := sharedLimitWriter(&tc.w, &limit)
+			n, err := w.Write([]byte(tc.toWrite))
+			if int64(n) > max(0, tc.limit) {
+				t.Fatalf("bytes written (%d) exceeds limit (%d)", n, tc.limit)
+			}
+			if (err != nil) != (tc.wantsErr != nil) {
+				if err != nil {
+					t.Fatal("unexpected error:", err)
+				}
+				t.Fatal("expected error:", err)
+			}
+			if err != nil {
+				if !errors.Is(err, tc.wantsErr) {
+					t.Fatal("expected error: ", tc.wantsErr, " instead of: ", err)
+				}
+				if !errors.Is(err, errMaximumWrite) {
+					return
+				}
+				// check contents for errMaximumWrite
+			}
+			if s := tc.w.String(); s != tc.wants {
+				t.Fatalf("expected %q instead of %q", tc.wants, s)
+			}
+		})
+	}
+
+	// test concurrency. run this test a bunch of times to attempt to flush
+	// out any data races or concurrency issues.
+	for i := 0; i < 1000; i++ {
+		var (
+			b1, b2 bytes.Buffer
+			limit  = int64(10)
+			w1     = sharedLimitWriter(&b1, &limit)
+			w2     = sharedLimitWriter(&b2, &limit)
+			ch     = make(chan struct{})
+			wg     sync.WaitGroup
+		)
+		wg.Add(2)
+		go func() { defer wg.Done(); <-ch; w1.Write([]byte("hello")) }()
+		go func() { defer wg.Done(); <-ch; w2.Write([]byte("world")) }()
+		close(ch)
+		wg.Wait()
+		if limit != 0 {
+			t.Fatalf("expected max limit to be reached, instead of %d", limit)
+		}
+	}
 }

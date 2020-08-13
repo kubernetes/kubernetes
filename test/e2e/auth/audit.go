@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -24,7 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +36,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -49,7 +50,7 @@ var (
 	watchTestTimeout int64 = 1
 	auditTestUser          = "kubecfg"
 
-	crd          = fixtures.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	crd          = fixtures.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
 	crdNamespace = strings.SplitN(crd.Name, ".", 2)[1]
 
@@ -63,7 +64,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	f := framework.NewDefaultFramework("audit")
 	var namespace string
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		namespace = f.Namespace.Name
 	})
 
@@ -83,22 +84,22 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 		f.PodClient().CreateSync(pod)
 
-		_, err := f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		_, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-pod")
 
-		podChan, err := f.PodClient().Watch(watchOptions)
+		podChan, err := f.PodClient().Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for pods")
 		podChan.Stop()
 
 		f.PodClient().Update(pod.Name, updatePod)
 
-		_, err = f.PodClient().List(metav1.ListOptions{})
+		_, err = f.PodClient().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods")
 
-		_, err = f.PodClient().Patch(pod.Name, types.JSONPatchType, patch)
+		_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch pod")
 
-		f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 		expectEvents(f, []utils.AuditEvent{
 			{
@@ -203,28 +204,28 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), appsv1.RecreateDeploymentStrategyType)
+		d := e2edeployment.NewDeployment("audit-deployment", int32(1), podLabels, "agnhost", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RecreateDeploymentStrategyType)
 
-		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
+		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create audit-deployment")
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).Get(d.Name, metav1.GetOptions{})
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-deployment")
 
-		deploymentChan, err := f.ClientSet.AppsV1().Deployments(namespace).Watch(watchOptions)
+		deploymentChan, err := f.ClientSet.AppsV1().Deployments(namespace).Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for deployments")
 		deploymentChan.Stop()
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).Update(d)
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).Update(context.TODO(), d, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update audit-deployment")
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).Patch(d.Name, types.JSONPatchType, patch)
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).Patch(context.TODO(), d.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch deployment")
 
-		_, err = f.ClientSet.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
+		_, err = f.ClientSet.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to create list deployments")
 
-		err = f.ClientSet.AppsV1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
+		err = f.ClientSet.AppsV1().Deployments(namespace).Delete(context.TODO(), "audit-deployment", metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete deployments")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -338,26 +339,26 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			},
 		}
 
-		_, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Create(configMap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create audit-configmap")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-configmap")
 
-		configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
+		configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for config maps")
 		configMapChan.Stop()
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(configMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update audit-configmap")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Patch(context.TODO(), configMap.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch configmap")
 
-		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list config maps")
 
-		err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-configmap")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -470,26 +471,26 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 				"top-secret": []byte("foo-bar"),
 			},
 		}
-		_, err := f.ClientSet.CoreV1().Secrets(namespace).Create(secret)
+		_, err := f.ClientSet.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create audit-secret")
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).Get(secret.Name, metav1.GetOptions{})
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get audit-secret")
 
-		secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(watchOptions)
+		secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(context.TODO(), watchOptions)
 		framework.ExpectNoError(err, "failed to create watch for secrets")
 		secretChan.Stop()
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(secret)
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update audit-secret")
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).Patch(secret.Name, types.JSONPatchType, patch)
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).Patch(context.TODO(), secret.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch secret")
 
-		_, err = f.ClientSet.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
+		_, err = f.ClientSet.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list secrets")
 
-		err = f.ClientSet.CoreV1().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-secret")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -599,9 +600,9 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to initialize apiExtensionClient")
 
-		crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+		crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
 		framework.ExpectNoError(err, "failed to create custom resource definition")
-		err = fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+		err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		framework.ExpectNoError(err, "failed to delete custom resource definition")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -655,8 +656,8 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	// test authorizer annotations, RBAC is required.
 	ginkgo.It("should audit API calls to get a pod with unauthorized user.", func() {
-		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
-			framework.Skipf("RBAC not enabled.")
+		if !e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+			e2eskipper.Skipf("RBAC not enabled.")
 		}
 
 		ginkgo.By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
@@ -669,7 +670,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		anonymousClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err)
 
-		_, err = anonymousClient.CoreV1().Pods(namespace).Get("another-audit-pod", metav1.GetOptions{})
+		_, err = anonymousClient.CoreV1().Pods(namespace).Get(context.TODO(), "another-audit-pod", metav1.GetOptions{})
 		expectForbidden(err)
 
 		expectEvents(f, []utils.AuditEvent{
@@ -702,7 +703,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 		impersonatedClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err)
 
-		_, err = impersonatedClient.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+		_, err = impersonatedClient.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods")
 
 		expectEvents(f, []utils.AuditEvent{
@@ -733,16 +734,16 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 	pollingTimeout := 5 * time.Minute
 	err := wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
 		// Fetch the log stream.
-		stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+		stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream(context.TODO())
 		if err != nil {
 			return false, err
 		}
 		defer stream.Close()
 		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, auditv1.SchemeGroupVersion)
 		if err != nil {
-			e2elog.Logf("Failed to observe audit events: %v", err)
+			framework.Logf("Failed to observe audit events: %v", err)
 		} else if len(missingReport.MissingEvents) > 0 {
-			e2elog.Logf(missingReport.String())
+			framework.Logf(missingReport.String())
 		}
 		return len(missingReport.MissingEvents) == 0, nil
 	})

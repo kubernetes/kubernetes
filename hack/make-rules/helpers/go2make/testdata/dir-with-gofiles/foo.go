@@ -16,5 +16,5 @@ limitations under the License.
 
 package gofiles
 
-func foo() {
+func Foo() {
 }

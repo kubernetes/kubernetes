@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 )
@@ -168,14 +169,14 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         corev1.SchemeGroupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					if req.URL.Path == "/namespaces/test/replicationcontrollers" {
-						return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
+					if req.URL.Path == "/namespaces/test/pods" {
+						return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -188,7 +189,6 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
 			cmd.Flags().Set("image", "nginx")
-			cmd.Flags().Set("generator", "run/v1")
 
 			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
@@ -205,7 +205,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
 				Image:     "nginx",
-				Generator: "run/v1",
+				Generator: generateversioned.RunPodV1GeneratorName,
 
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, os.Stdout)
@@ -327,7 +327,7 @@ func TestGenerateService(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			tf.Client = &fake.RESTClient{
@@ -353,7 +353,7 @@ func TestGenerateService(t *testing.T) {
 						if !apiequality.Semantic.DeepEqual(&test.service, svc) {
 							t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 						}
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -382,6 +382,8 @@ func TestGenerateService(t *testing.T) {
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, buff)
 				},
+
+				Namespace: "test",
 			}
 
 			cmd := &cobra.Command{}
@@ -390,7 +392,7 @@ func TestGenerateService(t *testing.T) {
 			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
-				opts.DryRun = true
+				opts.DryRunStrategy = cmdutil.DryRunClient
 			}
 
 			if len(test.port) > 0 {
@@ -398,7 +400,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params, "test")
+			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params)
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
@@ -440,16 +442,6 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "Invalid image name",
 		},
 		{
-			name: "test stdin replicas value",
-			args: []string{"test"},
-			flags: map[string]string{
-				"image":    "busybox",
-				"stdin":    "true",
-				"replicas": "2",
-			},
-			expectedErr: "stdin requires that replicas is 1",
-		},
-		{
 			name: "test rm errors when used on non-attached containers",
 			args: []string{"test"},
 			flags: map[string]string{
@@ -464,7 +456,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image":   "busybox",
 				"attach":  "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -474,7 +466,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image":   "busybox",
 				"stdin":   "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -485,7 +477,7 @@ func TestRunValidations(t *testing.T) {
 				"image":   "busybox",
 				"tty":     "true",
 				"stdin":   "true",
-				"dry-run": "true",
+				"dry-run": "client",
 			},
 			expectedErr: "can't be used with attached containers options",
 		},
@@ -505,9 +497,10 @@ func TestRunValidations(t *testing.T) {
 			defer tf.Cleanup()
 
 			_, _, codec := cmdtesting.NewExternalScheme()
+			ns := scheme.Codecs.WithoutConversion()
 			tf.Client = &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs,
-				Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
+				NegotiatedSerializer: ns,
+				Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 

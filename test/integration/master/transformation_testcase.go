@@ -27,10 +27,10 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/prometheus/client_golang/prometheus"
+	"go.etcd.io/etcd/clientv3"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +46,7 @@ import (
 
 const (
 	secretKey                = "api_key"
-	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b"
+	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b" // Fake value for testing.
 	encryptionConfigFileName = "encryption.conf"
 	testNamespace            = "secret-encryption-test"
 	testSecret               = "test-secret"
@@ -98,7 +98,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 func (e *transformTest) cleanUp() {
 	os.RemoveAll(e.configDir)
-	e.restClient.CoreV1().Namespaces().Delete(e.ns.Name, metav1.NewDeleteOptions(0))
+	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
 	e.kubeAPIServer.TearDownFn()
 }
 
@@ -133,7 +133,10 @@ func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefi
 	}
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
+	if err != nil {
+		e.logger.Errorf("failed to get Secret from %s, err: %v", testNamespace, err)
+	}
 	if secretVal != string(s.Data[secretKey]) {
 		e.logger.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
@@ -202,7 +205,7 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 		},
 	}
 
-	if _, err := e.restClient.CoreV1().Namespaces().Create(ns); err != nil {
+	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("unable to create testing namespace %v", err)
 	}
 
@@ -219,7 +222,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 			secretKey: []byte(secretVal),
 		},
 	}
-	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(secret); err != nil {
+	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("error while writing secret: %v", err)
 	}
 
@@ -241,7 +244,7 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 
 func (e *transformTest) printMetrics() error {
 	e.logger.Logf("Transformation Metrics:")
-	metrics, err := prometheus.DefaultGatherer.Gather()
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		return fmt.Errorf("failed to gather metrics: %s", err)
 	}

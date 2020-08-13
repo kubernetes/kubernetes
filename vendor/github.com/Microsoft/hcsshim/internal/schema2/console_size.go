@@ -10,7 +10,6 @@
 package hcsschema
 
 type ConsoleSize struct {
-
 	Height int32 `json:"Height,omitempty"`
 
 	Width int32 `json:"Width,omitempty"`

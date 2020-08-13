@@ -22,7 +22,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/args"

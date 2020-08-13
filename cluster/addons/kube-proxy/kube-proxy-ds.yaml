@@ -25,6 +25,7 @@ spec:
       priorityClassName: system-node-critical
       hostNetwork: true
       nodeSelector:
+        kubernetes.io/os: linux
         node.kubernetes.io/kube-proxy-ds-ready: "true"
       tolerations:
       - operator: "Exists"

@@ -21,6 +21,8 @@ import (
 	"os/exec"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -30,7 +32,7 @@ var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
 	f := framework.NewDefaultFramework("node-pools")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 	})
 
 	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func() {
@@ -98,7 +100,8 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 // label with the given node pool name.
 func nodesWithPoolLabel(f *framework.Framework, poolName string) int {
 	nodeCount := 0
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err)
 	for _, node := range nodeList.Items {
 		if poolLabel := node.Labels["cloud.google.com/gke-nodepool"]; poolLabel == poolName {
 			nodeCount++

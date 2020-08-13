@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -34,11 +35,19 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 	nodeNamesByZone := make(map[string][]string)
 	for i := range nodes {
 		node := &nodes[i]
-		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
-			zone = z
+
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+			continue
 		}
-		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomainStable]; ok {
+			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
+			continue
+		}
+
+		defaultZone := framework.TestContext.CloudConfig.Zone
+		nodeNamesByZone[defaultZone] = append(nodeNamesByZone[defaultZone], node.Name)
 	}
 
 	// Find the sole managed instance group name
@@ -76,7 +85,7 @@ func WaitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout 
 	for i := range nodes {
 		node := &nodes[i]
 		if err := wait.Poll(30*time.Second, timeout, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
 				return false, nil

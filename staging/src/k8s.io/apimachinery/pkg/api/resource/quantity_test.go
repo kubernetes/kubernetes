@@ -28,11 +28,6 @@ import (
 	inf "gopkg.in/inf.v0"
 )
 
-func amount(i int64, exponent int) infDecAmount {
-	// See the below test-- scale is the negative of an exponent.
-	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}
-}
-
 func dec(i int64, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
 	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}

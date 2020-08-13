@@ -17,7 +17,10 @@ limitations under the License.
 package plugins
 
 import (
+	"reflect"
 	"testing"
+
+	storage "k8s.io/api/storage/v1"
 )
 
 func TestKubernetesVolumeIDToEBSVolumeID(t *testing.T) {
@@ -62,5 +65,50 @@ func TestKubernetesVolumeIDToEBSVolumeID(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTranslateEBSInTreeStorageClassToCSI(t *testing.T) {
+	translator := NewAWSElasticBlockStoreCSITranslator()
+
+	cases := []struct {
+		name   string
+		sc     *storage.StorageClass
+		expSc  *storage.StorageClass
+		expErr bool
+	}{
+		{
+			name:  "translate normal",
+			sc:    NewStorageClass(map[string]string{"foo": "bar"}, nil),
+			expSc: NewStorageClass(map[string]string{"foo": "bar"}, nil),
+		},
+		{
+			name:  "translate empty map",
+			sc:    NewStorageClass(map[string]string{}, nil),
+			expSc: NewStorageClass(map[string]string{}, nil),
+		},
+
+		{
+			name:  "translate with fstype",
+			sc:    NewStorageClass(map[string]string{"fstype": "ext3"}, nil),
+			expSc: NewStorageClass(map[string]string{"csi.storage.k8s.io/fstype": "ext3"}, nil),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Logf("Testing %v", tc.name)
+		got, err := translator.TranslateInTreeStorageClassToCSI(tc.sc)
+		if err != nil && !tc.expErr {
+			t.Errorf("Did not expect error but got: %v", err)
+		}
+
+		if err == nil && tc.expErr {
+			t.Errorf("Expected error, but did not get one.")
+		}
+
+		if !reflect.DeepEqual(got, tc.expSc) {
+			t.Errorf("Got parameters: %v, expected :%v", got, tc.expSc)
+		}
+
 	}
 }

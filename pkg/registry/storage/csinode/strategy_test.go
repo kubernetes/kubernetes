@@ -23,10 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -47,7 +44,7 @@ func TestPrepareForCreate(t *testing.T) {
 		},
 	}
 
-	volumeLimitsEnabledCases := []struct {
+	volumeLimitsCases := []struct {
 		name     string
 		obj      *storage.CSINode
 		expected *storage.CSINode
@@ -64,32 +61,7 @@ func TestPrepareForCreate(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
-	for _, test := range volumeLimitsEnabledCases {
-		t.Run(test.name, func(t *testing.T) {
-			testPrepareForCreate(t, test.obj, test.expected)
-		})
-	}
-
-	volumeLimitsDisabledCases := []struct {
-		name     string
-		obj      *storage.CSINode
-		expected *storage.CSINode
-	}{
-		{
-			"empty allocatable",
-			emptyAllocatable,
-			emptyAllocatable,
-		},
-		{
-			"drop allocatable",
-			valid,
-			emptyAllocatable,
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, false)()
-	for _, test := range volumeLimitsDisabledCases {
+	for _, test := range volumeLimitsCases {
 		t.Run(test.name, func(t *testing.T) {
 			testPrepareForCreate(t, test.obj, test.expected)
 		})
@@ -140,7 +112,7 @@ func TestPrepareForUpdate(t *testing.T) {
 		},
 	}
 
-	volumeLimitsEnabledCases := []struct {
+	volumeLimitsCases := []struct {
 		name     string
 		old      *storage.CSINode
 		new      *storage.CSINode
@@ -166,35 +138,7 @@ func TestPrepareForUpdate(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
-	for _, test := range volumeLimitsEnabledCases {
-		t.Run(test.name, func(t *testing.T) {
-			testPrepareForUpdate(t, test.new, test.old, test.expected)
-		})
-	}
-
-	volumeLimitsDisabledCases := []struct {
-		name     string
-		old      *storage.CSINode
-		new      *storage.CSINode
-		expected *storage.CSINode
-	}{
-		{
-			"allow empty allocatable when it's not set",
-			emptyAllocatable,
-			emptyAllocatable,
-			emptyAllocatable,
-		},
-		{
-			"drop allocatable when it's not set",
-			emptyAllocatable,
-			valid,
-			emptyAllocatable,
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, false)()
-	for _, test := range volumeLimitsDisabledCases {
+	for _, test := range volumeLimitsCases {
 		t.Run(test.name, func(t *testing.T) {
 			testPrepareForUpdate(t, test.new, test.old, test.expected)
 		})

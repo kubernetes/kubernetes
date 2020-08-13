@@ -11,7 +11,7 @@ import "gonum.org/v1/gonum/blas"
 // than 11.
 //
 // H is represented in the form
-//  H = I - tau * v * v^T,
+//  H = I - tau * v * vᵀ,
 // where tau is a real scalar and v is a real vector. If tau = 0, then H is
 // taken to be the identity matrix.
 //

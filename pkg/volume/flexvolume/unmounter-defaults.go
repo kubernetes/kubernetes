@@ -17,8 +17,8 @@ limitations under the License.
 package flexvolume
 
 import (
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/mount"
 )
 
 type unmounterDefaults flexVolumeUnmounter

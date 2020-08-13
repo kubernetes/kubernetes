@@ -86,6 +86,8 @@ limitations under the License.
 // This file was generated using openssl by the gencerts.sh script
 // and holds raw certificates for the imagepolicy webhook tests.
 
+//lint:file-ignore U1000 Ignore all unused code, it's generated
+
 package imagepolicy
 EOF
 

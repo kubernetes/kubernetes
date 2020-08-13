@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
+	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -34,7 +35,7 @@ const (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the nodes and system:nodes group as expected
-var _ = KubeadmDescribe("nodes", func() {
+var _ = Describe("nodes", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("nodes")
@@ -45,7 +46,7 @@ var _ = KubeadmDescribe("nodes", func() {
 
 	ginkgo.It("should have CRI annotation", func() {
 		nodes, err := f.ClientSet.CoreV1().Nodes().
-			List(metav1.ListOptions{})
+			List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
 
 		// checks that the nodes have the CRI annotation

@@ -134,7 +134,7 @@ func ValidateInfo() (*dockertypes.Info, error) {
 		}
 		dockerInfo.ServerVersion = version.Version
 	}
-	version, err := parseVersion(dockerInfo.ServerVersion, version_re, 3)
+	version, err := parseVersion(dockerInfo.ServerVersion, versionRe, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -150,59 +150,51 @@ func ValidateInfo() (*dockertypes.Info, error) {
 	return &dockerInfo, nil
 }
 
-func Version() ([]int, error) {
-	ver, err := VersionString()
-	if err != nil {
-		return nil, err
-	}
-	return parseVersion(ver, version_re, 3)
-}
-
 func APIVersion() ([]int, error) {
 	ver, err := APIVersionString()
 	if err != nil {
 		return nil, err
 	}
-	return parseVersion(ver, apiversion_re, 2)
+	return parseVersion(ver, apiVersionRe, 2)
 }
 
 func VersionString() (string, error) {
-	docker_version := "Unknown"
+	dockerVersion := "Unknown"
 	client, err := Client()
 	if err == nil {
 		version, err := client.ServerVersion(defaultContext())
 		if err == nil {
-			docker_version = version.Version
+			dockerVersion = version.Version
 		}
 	}
-	return docker_version, err
+	return dockerVersion, err
 }
 
 func APIVersionString() (string, error) {
-	docker_api_version := "Unknown"
+	apiVersion := "Unknown"
 	client, err := Client()
 	if err == nil {
 		version, err := client.ServerVersion(defaultContext())
 		if err == nil {
-			docker_api_version = version.APIVersion
+			apiVersion = version.APIVersion
 		}
 	}
-	return docker_api_version, err
+	return apiVersion, err
 }
 
-func parseVersion(version_string string, regex *regexp.Regexp, length int) ([]int, error) {
-	matches := regex.FindAllStringSubmatch(version_string, -1)
+func parseVersion(versionString string, regex *regexp.Regexp, length int) ([]int, error) {
+	matches := regex.FindAllStringSubmatch(versionString, -1)
 	if len(matches) != 1 {
-		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", version_string, regex.String())
+		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", versionString, regex.String())
 	}
-	version_string_array := matches[0][1:]
-	version_array := make([]int, length)
-	for index, version_str := range version_string_array {
-		version, err := strconv.Atoi(version_str)
+	versionStringArray := matches[0][1:]
+	versionArray := make([]int, length)
+	for index, versionStr := range versionStringArray {
+		version, err := strconv.Atoi(versionStr)
 		if err != nil {
-			return nil, fmt.Errorf("error while parsing \"%v\" in \"%v\"", version_str, version_string)
+			return nil, fmt.Errorf("error while parsing \"%v\" in \"%v\"", versionStr, versionString)
 		}
-		version_array[index] = version
+		versionArray[index] = version
 	}
-	return version_array, nil
+	return versionArray, nil
 }

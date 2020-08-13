@@ -30,6 +30,8 @@ go_library(
         "expressrouteports.go",
         "expressrouteportslocations.go",
         "expressrouteserviceproviders.go",
+        "firewallpolicies.go",
+        "firewallpolicyrulegroups.go",
         "hubvirtualnetworkconnections.go",
         "inboundnatrules.go",
         "interfaceipconfigurations.go",

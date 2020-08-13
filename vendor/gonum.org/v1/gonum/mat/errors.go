@@ -37,7 +37,7 @@ const (
 	// in the matrix packages.
 	CondNorm = lapack.MaxRowSum
 
-	// CondNormTrans is the norm used to compute on A^T to get the same result as
+	// CondNormTrans is the norm used to compute on Aᵀ to get the same result as
 	// computing CondNorm on A.
 	CondNormTrans = lapack.MaxColumnSum
 )
@@ -114,26 +114,28 @@ type Error struct{ string }
 func (err Error) Error() string { return err.string }
 
 var (
-	ErrIndexOutOfRange     = Error{"matrix: index out of range"}
-	ErrRowAccess           = Error{"matrix: row index out of range"}
-	ErrColAccess           = Error{"matrix: column index out of range"}
-	ErrVectorAccess        = Error{"matrix: vector index out of range"}
-	ErrZeroLength          = Error{"matrix: zero length in matrix dimension"}
-	ErrRowLength           = Error{"matrix: row length mismatch"}
-	ErrColLength           = Error{"matrix: col length mismatch"}
-	ErrSquare              = Error{"matrix: expect square matrix"}
-	ErrNormOrder           = Error{"matrix: invalid norm order for matrix"}
-	ErrSingular            = Error{"matrix: matrix is singular"}
-	ErrShape               = Error{"matrix: dimension mismatch"}
-	ErrIllegalStride       = Error{"matrix: illegal stride"}
-	ErrPivot               = Error{"matrix: malformed pivot list"}
-	ErrTriangle            = Error{"matrix: triangular storage mismatch"}
-	ErrTriangleSet         = Error{"matrix: triangular set out of bounds"}
-	ErrBandSet             = Error{"matrix: band set out of bounds"}
-	ErrDiagSet             = Error{"matrix: diagonal set out of bounds"}
-	ErrSliceLengthMismatch = Error{"matrix: input slice length mismatch"}
-	ErrNotPSD              = Error{"matrix: input not positive symmetric definite"}
-	ErrFailedEigen         = Error{"matrix: eigendecomposition not successful"}
+	ErrNegativeDimension   = Error{"mat: negative dimension"}
+	ErrIndexOutOfRange     = Error{"mat: index out of range"}
+	ErrReuseNonEmpty       = Error{"mat: reuse of non-empty matrix"}
+	ErrRowAccess           = Error{"mat: row index out of range"}
+	ErrColAccess           = Error{"mat: column index out of range"}
+	ErrVectorAccess        = Error{"mat: vector index out of range"}
+	ErrZeroLength          = Error{"mat: zero length in matrix dimension"}
+	ErrRowLength           = Error{"mat: row length mismatch"}
+	ErrColLength           = Error{"mat: col length mismatch"}
+	ErrSquare              = Error{"mat: expect square matrix"}
+	ErrNormOrder           = Error{"mat: invalid norm order for matrix"}
+	ErrSingular            = Error{"mat: matrix is singular"}
+	ErrShape               = Error{"mat: dimension mismatch"}
+	ErrIllegalStride       = Error{"mat: illegal stride"}
+	ErrPivot               = Error{"mat: malformed pivot list"}
+	ErrTriangle            = Error{"mat: triangular storage mismatch"}
+	ErrTriangleSet         = Error{"mat: triangular set out of bounds"}
+	ErrBandSet             = Error{"mat: band set out of bounds"}
+	ErrDiagSet             = Error{"mat: diagonal set out of bounds"}
+	ErrSliceLengthMismatch = Error{"mat: input slice length mismatch"}
+	ErrNotPSD              = Error{"mat: input not positive symmetric definite"}
+	ErrFailedEigen         = Error{"mat: eigendecomposition not successful"}
 )
 
 // ErrorStack represents matrix handling errors that have been recovered by Maybe wrappers.

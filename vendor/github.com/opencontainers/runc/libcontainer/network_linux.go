@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/types"
 	"github.com/vishvananda/netlink"
 )
 
@@ -37,8 +38,8 @@ func getStrategy(tpe string) (networkStrategy, error) {
 }
 
 // Returns the network statistics for the network interfaces represented by the NetworkRuntimeInfo.
-func getNetworkInterfaceStats(interfaceName string) (*NetworkInterface, error) {
-	out := &NetworkInterface{Name: interfaceName}
+func getNetworkInterfaceStats(interfaceName string) (*types.NetworkInterface, error) {
+	out := &types.NetworkInterface{Name: interfaceName}
 	// This can happen if the network runtime information is missing - possible if the
 	// container was created by an old version of libcontainer.
 	if interfaceName == "" {

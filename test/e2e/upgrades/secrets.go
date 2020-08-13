@@ -17,13 +17,13 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -56,8 +56,8 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a secret")
 	var err error
-	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(t.secret); err != nil {
-		e2elog.Failf("unable to create test secret %s: %v", t.secret.Name, err)
+	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), t.secret, metav1.CreateOptions{}); err != nil {
+		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
 
 	ginkgo.By("Making sure the secret is consumable")
@@ -102,8 +102,9 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						fmt.Sprintf("--file_content=%s/data", volumeMountPath),
 						fmt.Sprintf("--file_mode=%s/data", volumeMountPath),
 					},

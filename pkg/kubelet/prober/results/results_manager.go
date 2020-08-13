@@ -40,14 +40,17 @@ type Manager interface {
 }
 
 // Result is the type for probe results.
-type Result bool
+type Result int
 
 const (
-	// Success is encoded as "true" (type Result)
-	Success Result = true
+	// Unknown is encoded as -1 (type Result)
+	Unknown Result = iota - 1
 
-	// Failure is encoded as "false" (type Result)
-	Failure Result = false
+	// Success is encoded as 0 (type Result)
+	Success
+
+	// Failure is encoded as 1 (type Result)
+	Failure
 )
 
 func (r Result) String() string {

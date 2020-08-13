@@ -16,7 +16,7 @@ limitations under the License.
 
 package generated
 
-import "k8s.io/klog"
+import "k8s.io/klog/v2"
 
 /*
 ReadOrDie reads a file from gobindata.

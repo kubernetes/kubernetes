@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -24,10 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -62,8 +65,8 @@ const legacyAPIServiceName = "v1."
 type ExtraConfig struct {
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
-	ProxyClientCert []byte
-	ProxyClientKey  []byte
+	ProxyClientCertFile string
+	ProxyClientKeyFile  string
 
 	// If present, the Dial method will be used for dialing out to delegate
 	// apiservers.
@@ -71,8 +74,6 @@ type ExtraConfig struct {
 
 	// Mechanism by which the Aggregator will resolve services. Required.
 	ServiceResolver ServiceResolver
-
-	EnableAggregatedDiscoveryTimeout bool
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -108,11 +109,9 @@ type APIAggregator struct {
 
 	delegateHandler http.Handler
 
-	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
-	// this to confirm the proxy's identity
-	proxyClientCert []byte
-	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	// proxyCurrentCertKeyContent holds he client cert used to identify this proxy. Backing APIServices use this to confirm the proxy's identity
+	proxyCurrentCertKeyContent certKeyFunc
+	proxyTransport             *http.Transport
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
@@ -135,7 +134,9 @@ type APIAggregator struct {
 	// openAPIAggregationController downloads and merges OpenAPI specs.
 	openAPIAggregationController *openapicontroller.AggregationController
 
-	enableAggregatedDiscoveryTimeout bool
+	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
+	// overwrites proxyTransport dialer if not nil
+	egressSelector *egressselector.EgressSelector
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -176,18 +177,17 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	s := &APIAggregator{
-		GenericAPIServer:                 genericServer,
-		delegateHandler:                  delegationTarget.UnprotectedHandler(),
-		proxyClientCert:                  c.ExtraConfig.ProxyClientCert,
-		proxyClientKey:                   c.ExtraConfig.ProxyClientKey,
-		proxyTransport:                   c.ExtraConfig.ProxyTransport,
-		proxyHandlers:                    map[string]*proxyHandler{},
-		handledGroups:                    sets.String{},
-		lister:                           informerFactory.Apiregistration().V1().APIServices().Lister(),
-		APIRegistrationInformers:         informerFactory,
-		serviceResolver:                  c.ExtraConfig.ServiceResolver,
-		openAPIConfig:                    openAPIConfig,
-		enableAggregatedDiscoveryTimeout: c.ExtraConfig.EnableAggregatedDiscoveryTimeout,
+		GenericAPIServer:           genericServer,
+		delegateHandler:            delegationTarget.UnprotectedHandler(),
+		proxyTransport:             c.ExtraConfig.ProxyTransport,
+		proxyHandlers:              map[string]*proxyHandler{},
+		handledGroups:              sets.String{},
+		lister:                     informerFactory.Apiregistration().V1().APIServices().Lister(),
+		APIRegistrationInformers:   informerFactory,
+		serviceResolver:            c.ExtraConfig.ServiceResolver,
+		openAPIConfig:              openAPIConfig,
+		egressSelector:             c.GenericConfig.EgressSelector,
+		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
 	}
 
 	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
@@ -195,23 +195,49 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
+	enabledVersions := sets.NewString()
+	for v := range apiGroupInfo.VersionedResourcesStorageMap {
+		enabledVersions.Insert(v)
+	}
+	if !enabledVersions.Has(v1.SchemeGroupVersion.Version) {
+		return nil, fmt.Errorf("API group/version %s must be enabled", v1.SchemeGroupVersion.String())
+	}
+
 	apisHandler := &apisHandler{
-		codecs: aggregatorscheme.Codecs,
-		lister: s.lister,
+		codecs:         aggregatorscheme.Codecs,
+		lister:         s.lister,
+		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
+	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {
+		aggregatorProxyCerts, err := dynamiccertificates.NewDynamicServingContentFromFiles("aggregator-proxy-cert", c.ExtraConfig.ProxyClientCertFile, c.ExtraConfig.ProxyClientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		if err := aggregatorProxyCerts.RunOnce(); err != nil {
+			return nil, err
+		}
+		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
+		s.proxyCurrentCertKeyContent = aggregatorProxyCerts.CurrentCertKeyContent
+
+		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(context genericapiserver.PostStartHookContext) error {
+			go aggregatorProxyCerts.Run(1, context.StopCh)
+			return nil
+		})
+	}
+
 	availableController, err := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().V1().APIServices(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.ApiregistrationV1(),
 		c.ExtraConfig.ProxyTransport,
-		c.ExtraConfig.ProxyClientCert,
-		c.ExtraConfig.ProxyClientKey,
+		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 		s.serviceResolver,
+		c.GenericConfig.EgressSelector,
 	)
 	if err != nil {
 		return nil, err
@@ -223,7 +249,13 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(context.StopCh)
+		handlerSyncedCh := make(chan struct{})
+		go apiserviceRegistrationController.Run(context.StopCh, handlerSyncedCh)
+		select {
+		case <-context.StopCh:
+		case <-handlerSyncedCh:
+		}
+
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
@@ -291,12 +323,11 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		localDelegate:                    s.delegateHandler,
-		proxyClientCert:                  s.proxyClientCert,
-		proxyClientKey:                   s.proxyClientKey,
-		proxyTransport:                   s.proxyTransport,
-		serviceResolver:                  s.serviceResolver,
-		enableAggregatedDiscoveryTimeout: s.enableAggregatedDiscoveryTimeout,
+		localDelegate:              s.delegateHandler,
+		proxyCurrentCertKeyContent: s.proxyCurrentCertKeyContent,
+		proxyTransport:             s.proxyTransport,
+		serviceResolver:            s.serviceResolver,
+		egressSelector:             s.egressSelector,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {

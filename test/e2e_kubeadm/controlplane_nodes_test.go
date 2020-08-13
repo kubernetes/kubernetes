@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,7 +34,7 @@ const (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the control-plane node as expected
-var _ = KubeadmDescribe("control-plane node", func() {
+var _ = Describe("control-plane node", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("control-plane node")
@@ -61,7 +62,7 @@ var _ = KubeadmDescribe("control-plane node", func() {
 func getControlPlaneNodes(c clientset.Interface) *corev1.NodeList {
 	selector := labels.Set{controlPlaneTaint: ""}.AsSelector()
 	masters, err := c.CoreV1().Nodes().
-		List(metav1.ListOptions{LabelSelector: selector.String()})
+		List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "error reading control-plane nodes")
 
 	return masters

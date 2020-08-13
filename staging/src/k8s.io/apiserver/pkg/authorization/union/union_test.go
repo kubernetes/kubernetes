@@ -17,6 +17,7 @@ limitations under the License.
 package union
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -31,7 +32,7 @@ type mockAuthzHandler struct {
 	err      error
 }
 
-func (mock *mockAuthzHandler) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	return mock.decision, "", mock.err
 }
 
@@ -40,7 +41,7 @@ func TestAuthorizationSecondPasses(t *testing.T) {
 	handler2 := &mockAuthzHandler{decision: authorizer.DecisionAllow}
 	authzHandler := New(handler1, handler2)
 
-	authorized, _, _ := authzHandler.Authorize(nil)
+	authorized, _, _ := authzHandler.Authorize(context.Background(), nil)
 	if authorized != authorizer.DecisionAllow {
 		t.Errorf("Unexpected authorization failure")
 	}
@@ -51,7 +52,7 @@ func TestAuthorizationFirstPasses(t *testing.T) {
 	handler2 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
 	authzHandler := New(handler1, handler2)
 
-	authorized, _, _ := authzHandler.Authorize(nil)
+	authorized, _, _ := authzHandler.Authorize(context.Background(), nil)
 	if authorized != authorizer.DecisionAllow {
 		t.Errorf("Unexpected authorization failure")
 	}
@@ -62,7 +63,7 @@ func TestAuthorizationNonePasses(t *testing.T) {
 	handler2 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
 	authzHandler := New(handler1, handler2)
 
-	authorized, _, _ := authzHandler.Authorize(nil)
+	authorized, _, _ := authzHandler.Authorize(context.Background(), nil)
 	if authorized == authorizer.DecisionAllow {
 		t.Errorf("Expected failed authorization")
 	}
@@ -73,7 +74,7 @@ func TestAuthorizationError(t *testing.T) {
 	handler2 := &mockAuthzHandler{err: fmt.Errorf("foo")}
 	authzHandler := New(handler1, handler2)
 
-	_, _, err := authzHandler.Authorize(nil)
+	_, _, err := authzHandler.Authorize(context.Background(), nil)
 	if err == nil {
 		t.Errorf("Expected error: %v", err)
 	}
@@ -257,7 +258,7 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 		t.Run(fmt.Sprintf("case %v", i), func(t *testing.T) {
 			authzHandler := New(c.authorizers...)
 
-			decision, _, _ := authzHandler.Authorize(nil)
+			decision, _, _ := authzHandler.Authorize(context.Background(), nil)
 			if decision != c.decision {
 				t.Errorf("Unexpected authorization failure: %v, expected: %v", decision, c.decision)
 			}

@@ -138,8 +138,27 @@ type RequestFailure interface {
 	RequestID() string
 }
 
-// NewRequestFailure returns a new request error wrapper for the given Error
-// provided.
+// NewRequestFailure returns a wrapped error with additional information for
+// request status code, and service requestID.
+//
+// Should be used to wrap all request which involve service requests. Even if
+// the request failed without a service response, but had an HTTP status code
+// that may be meaningful.
 func NewRequestFailure(err Error, statusCode int, reqID string) RequestFailure {
 	return newRequestError(err, statusCode, reqID)
+}
+
+// UnmarshalError provides the interface for the SDK failing to unmarshal data.
+type UnmarshalError interface {
+	awsError
+	Bytes() []byte
+}
+
+// NewUnmarshalError returns an initialized UnmarshalError error wrapper adding
+// the bytes that fail to unmarshal to the error.
+func NewUnmarshalError(err error, msg string, bytes []byte) UnmarshalError {
+	return &unmarshalError{
+		awsError: New("UnmarshalError", msg, err),
+		bytes:    bytes,
+	}
 }

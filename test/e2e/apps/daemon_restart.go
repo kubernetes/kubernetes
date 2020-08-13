@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -32,8 +33,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/master/ports"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -91,9 +95,12 @@ func (r *RestartDaemonConfig) String() string {
 // waitUp polls healthz of the daemon till it returns "ok" or the polling hits the pollTimeout
 func (r *RestartDaemonConfig) waitUp() {
 	framework.Logf("Checking if %v is up by polling for a 200 on its /healthz endpoint", r)
+	nullDev := "/dev/null"
+	if framework.NodeOSDistroIs("windows") {
+		nullDev = "NUL"
+	}
 	healthzCheck := fmt.Sprintf(
-		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
-
+		"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
 		result, err := e2essh.NodeExec(r.nodeName, healthzCheck, framework.TestContext.Provider)
 		framework.ExpectNoError(err)
@@ -114,8 +121,12 @@ func (r *RestartDaemonConfig) waitUp() {
 
 // kill sends a SIGTERM to the daemon
 func (r *RestartDaemonConfig) kill() {
+	killCmd := fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName)
+	if framework.NodeOSDistroIs("windows") {
+		killCmd = fmt.Sprintf("taskkill /im %v.exe /f", r.daemonName)
+	}
 	framework.Logf("Killing %v", r)
-	_, err := e2essh.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName), framework.TestContext.Provider)
+	_, err := e2essh.NodeExec(r.nodeName, killCmd, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
 }
 
@@ -168,7 +179,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 // and a list of nodenames across which these containers restarted.
 func getContainerRestarts(c clientset.Interface, ns string, labelSelector labels.Selector) (int, []string) {
 	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
-	pods, err := c.CoreV1().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 	framework.ExpectNoError(err)
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
@@ -196,7 +207,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// These tests require SSH
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		ns = f.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -209,7 +220,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			Replicas:    numPods,
 			CreatedPods: &[]*v1.Pod{},
 		}
-		framework.ExpectNoError(framework.RunRC(config))
+		framework.ExpectNoError(e2erc.RunRC(config))
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})
@@ -218,12 +229,12 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					options.LabelSelector = labelSelector.String()
-					obj, err := f.ClientSet.CoreV1().Pods(ns).List(options)
+					obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
 					return runtime.Object(obj), err
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					options.LabelSelector = labelSelector.String()
-					return f.ClientSet.CoreV1().Pods(ns).Watch(options)
+					return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
 				},
 			},
 			&v1.Pod{},
@@ -250,7 +261,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	ginkgo.It("Controller Manager should not create/delete replicas across restart", func() {
 
 		// Requires master ssh access.
-		framework.SkipUnlessProviderIs("gce", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
 			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
 		restarter.restart()
@@ -260,7 +271,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 		// to the same size achieves this, because the scale operation advances the RC's sequence number
 		// and awaits it to be observed and reported back in the RC's status.
-		framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true)
+		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true)
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
@@ -281,9 +292,9 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func() {
 
 		// Requires master ssh access.
-		framework.SkipUnlessProviderIs("gce", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-scheduler", ports.InsecureSchedulerPort, restartPollInterval, restartTimeout)
+			framework.GetMasterHost(), "kube-scheduler", kubeschedulerconfig.DefaultInsecureSchedulerPort, restartPollInterval, restartTimeout)
 
 		// Create pods while the scheduler is down and make sure the scheduler picks them up by
 		// scaling the rc to the same size.
@@ -291,9 +302,9 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		restarter.kill()
 		// This is best effort to try and create pods while the scheduler is down,
 		// since we don't know exactly when it is restarted after the kill signal.
-		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
+		framework.ExpectNoError(e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
 		restarter.waitUp()
-		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
+		framework.ExpectNoError(e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
 	})
 
 	ginkgo.It("Kubelet should not restart containers across restart", func() {
@@ -301,7 +312,6 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 		preRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if preRestarts != 0 {
@@ -316,6 +326,20 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		if postRestarts != preRestarts {
 			framework.DumpNodeDebugInfo(f.ClientSet, badNodes, framework.Logf)
 			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
+		}
+	})
+
+	ginkgo.It("Kube-proxy should recover after being killed accidentally", func() {
+		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
+		if err != nil {
+			framework.Logf("Unexpected error occurred: %v", err)
+		}
+		for _, ip := range nodeIPs {
+			restarter := NewRestartConfig(
+				ip, "kube-proxy", ports.ProxyHealthzPort, restartPollInterval, restartTimeout)
+			// restart method will kill the kube-proxy process and wait for recovery,
+			// if not able to recover, will throw test failure.
+			restarter.restart()
 		}
 	})
 })

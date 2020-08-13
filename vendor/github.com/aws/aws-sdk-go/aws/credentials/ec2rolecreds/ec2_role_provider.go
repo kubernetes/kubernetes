@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/internal/sdkuri"
 )
 
@@ -142,7 +143,8 @@ func requestCredList(client *ec2metadata.EC2Metadata) ([]string, error) {
 	}
 
 	if err := s.Err(); err != nil {
-		return nil, awserr.New("SerializationError", "failed to read EC2 instance role from metadata service", err)
+		return nil, awserr.New(request.ErrCodeSerialization,
+			"failed to read EC2 instance role from metadata service", err)
 	}
 
 	return credsList, nil
@@ -164,7 +166,7 @@ func requestCred(client *ec2metadata.EC2Metadata, credsName string) (ec2RoleCred
 	respCreds := ec2RoleCredRespBody{}
 	if err := json.NewDecoder(strings.NewReader(resp)).Decode(&respCreds); err != nil {
 		return ec2RoleCredRespBody{},
-			awserr.New("SerializationError",
+			awserr.New(request.ErrCodeSerialization,
 				fmt.Sprintf("failed to decode %s EC2 instance role credentials", credsName),
 				err)
 	}

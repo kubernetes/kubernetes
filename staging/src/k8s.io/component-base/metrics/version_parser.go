@@ -18,9 +18,11 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/blang/semver"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"regexp"
+
+	"github.com/blang/semver"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 const (

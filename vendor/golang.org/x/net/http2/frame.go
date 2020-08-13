@@ -643,7 +643,7 @@ func (f *Framer) WriteData(streamID uint32, endStream bool, data []byte) error {
 	return f.WriteDataPadded(streamID, endStream, data, nil)
 }
 
-// WriteData writes a DATA frame with optional padding.
+// WriteDataPadded writes a DATA frame with optional padding.
 //
 // If pad is nil, the padding bit is not sent.
 // The length of pad must not exceed 255 bytes.

@@ -83,8 +83,8 @@ kubectl create secret generic my-secret --from-file=path/to/bar
 {% endmethod %}
 
 {% panel style="success", title="Bootstrapping Config" %}
-Imperative commands can be used to bootstrap config by using `--dry-run -o yaml`.
-`kubectl create secret generic my-secret --from-file=path/to/bar --dry-run -o yaml`
+Imperative commands can be used to bootstrap config by using `--dry-run=client -o yaml`.
+`kubectl create secret generic my-secret --from-file=path/to/bar --dry-run=client -o yaml`
 {% endpanel %}
 
 {% method %}

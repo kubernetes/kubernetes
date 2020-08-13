@@ -23,10 +23,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // CacheComparer is an implementation of the Scheduler's cache comparer.
@@ -52,15 +52,15 @@ func (c *CacheComparer) Compare() error {
 		return err
 	}
 
-	snapshot := c.Cache.Snapshot()
+	dump := c.Cache.Dump()
 
 	pendingPods := c.PodQueue.PendingPods()
 
-	if missed, redundant := c.CompareNodes(nodes, snapshot.Nodes); len(missed)+len(redundant) != 0 {
+	if missed, redundant := c.CompareNodes(nodes, dump.Nodes); len(missed)+len(redundant) != 0 {
 		klog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
 	}
 
-	if missed, redundant := c.ComparePods(pods, pendingPods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
+	if missed, redundant := c.ComparePods(pods, pendingPods, dump.Nodes); len(missed)+len(redundant) != 0 {
 		klog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
 	}
 
@@ -68,7 +68,7 @@ func (c *CacheComparer) Compare() error {
 }
 
 // CompareNodes compares actual nodes with cached nodes.
-func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*schedulernodeinfo.NodeInfo) (missed, redundant []string) {
+func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*framework.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, node := range nodes {
 		actual = append(actual, node.Name)
@@ -83,7 +83,7 @@ func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*sch
 }
 
 // ComparePods compares actual pods with cached pods.
-func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*schedulernodeinfo.NodeInfo) (missed, redundant []string) {
+func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*framework.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, pod := range pods {
 		actual = append(actual, string(pod.UID))
@@ -91,8 +91,8 @@ func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[s
 
 	cached := []string{}
 	for _, nodeinfo := range nodeinfos {
-		for _, pod := range nodeinfo.Pods() {
-			cached = append(cached, string(pod.UID))
+		for _, p := range nodeinfo.Pods {
+			cached = append(cached, string(p.Pod.UID))
 		}
 	}
 	for _, pod := range waitingPods {

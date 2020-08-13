@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +42,7 @@ var replicasetsResource = schema.GroupVersionResource{Group: "apps", Version: "v
 var replicasetsKind = schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "ReplicaSet"}
 
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
-func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *appsv1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), &appsv1.ReplicaSet{})
 
@@ -51,7 +53,7 @@ func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *appsv
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *appsv1.ReplicaSetList, err error) {
+func (c *FakeReplicaSets) List(ctx context.Context, opts v1.ListOptions) (result *appsv1.ReplicaSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), &appsv1.ReplicaSetList{})
 
@@ -73,14 +75,14 @@ func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *appsv1.ReplicaSetLi
 }
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *FakeReplicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeReplicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(replicasetsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *FakeReplicaSets) Create(replicaSet *appsv1.ReplicaSet) (result *appsv1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Create(ctx context.Context, replicaSet *appsv1.ReplicaSet, opts v1.CreateOptions) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &appsv1.ReplicaSet{})
 
@@ -91,7 +93,7 @@ func (c *FakeReplicaSets) Create(replicaSet *appsv1.ReplicaSet) (result *appsv1.
 }
 
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *FakeReplicaSets) Update(replicaSet *appsv1.ReplicaSet) (result *appsv1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Update(ctx context.Context, replicaSet *appsv1.ReplicaSet, opts v1.UpdateOptions) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), &appsv1.ReplicaSet{})
 
@@ -103,7 +105,7 @@ func (c *FakeReplicaSets) Update(replicaSet *appsv1.ReplicaSet) (result *appsv1.
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicaSets) UpdateStatus(replicaSet *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
+func (c *FakeReplicaSets) UpdateStatus(ctx context.Context, replicaSet *appsv1.ReplicaSet, opts v1.UpdateOptions) (*appsv1.ReplicaSet, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), &appsv1.ReplicaSet{})
 
@@ -114,7 +116,7 @@ func (c *FakeReplicaSets) UpdateStatus(replicaSet *appsv1.ReplicaSet) (*appsv1.R
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *FakeReplicaSets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeReplicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &appsv1.ReplicaSet{})
 
@@ -122,15 +124,15 @@ func (c *FakeReplicaSets) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeReplicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOptions)
+func (c *FakeReplicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &appsv1.ReplicaSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *appsv1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, pt, data, subresources...), &appsv1.ReplicaSet{})
 
@@ -141,7 +143,7 @@ func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, su
 }
 
 // GetScale takes name of the replicaSet, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeReplicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c *FakeReplicaSets) GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetSubresourceAction(replicasetsResource, c.ns, "scale", replicaSetName), &autoscalingv1.Scale{})
 
@@ -152,7 +154,7 @@ func (c *FakeReplicaSets) GetScale(replicaSetName string, options v1.GetOptions)
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicaSets) UpdateScale(replicaSetName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c *FakeReplicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 

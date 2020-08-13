@@ -25,10 +25,11 @@ import (
 	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
 	versionapi "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/dialer"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 )
 
 type client struct {
@@ -37,22 +38,23 @@ type client struct {
 	versionService   versionapi.VersionClient
 }
 
-type containerdClient interface {
+type ContainerdClient interface {
 	LoadContainer(ctx context.Context, id string) (*containers.Container, error)
 	TaskPid(ctx context.Context, id string) (uint32, error)
 	Version(ctx context.Context) (string, error)
 }
 
 var once sync.Once
-var ctrdClient containerdClient = nil
+var ctrdClient ContainerdClient = nil
 
 const (
 	maxBackoffDelay   = 3 * time.Second
+	baseBackoffDelay  = 100 * time.Millisecond
 	connectionTimeout = 2 * time.Second
 )
 
 // Client creates a containerd client
-func Client(address, namespace string) (containerdClient, error) {
+func Client(address, namespace string) (ContainerdClient, error) {
 	var retErr error
 	once.Do(func() {
 		tryConn, err := net.DialTimeout("unix", address, connectionTimeout)
@@ -62,12 +64,17 @@ func Client(address, namespace string) (containerdClient, error) {
 		}
 		tryConn.Close()
 
+		connParams := grpc.ConnectParams{
+			Backoff: backoff.Config{
+				BaseDelay: baseBackoffDelay,
+				MaxDelay:  maxBackoffDelay,
+			},
+		}
 		gopts := []grpc.DialOption{
 			grpc.WithInsecure(),
-			grpc.WithDialer(dialer.Dialer),
+			grpc.WithContextDialer(dialer.ContextDialer),
 			grpc.WithBlock(),
-			grpc.WithBackoffMaxDelay(maxBackoffDelay),
-			grpc.WithTimeout(connectionTimeout),
+			grpc.WithConnectParams(connParams),
 		}
 		unary, stream := newNSInterceptors(namespace)
 		gopts = append(gopts,
@@ -75,7 +82,9 @@ func Client(address, namespace string) (containerdClient, error) {
 			grpc.WithStreamInterceptor(stream),
 		)
 
-		conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+		ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+		defer cancel()
+		conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 		if err != nil {
 			retErr = err
 			return

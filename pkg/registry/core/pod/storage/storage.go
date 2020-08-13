@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/core/pod"
+	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
 )
 
@@ -73,29 +73,30 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Pod{} },
 		NewListFunc:              func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:            pod.MatchPod,
+		PredicateFunc:            registrypod.MatchPod,
 		DefaultQualifiedResource: api.Resource("pods"),
 
-		CreateStrategy:      pod.Strategy,
-		UpdateStrategy:      pod.Strategy,
-		DeleteStrategy:      pod.Strategy,
+		CreateStrategy:      registrypod.Strategy,
+		UpdateStrategy:      registrypod.Strategy,
+		DeleteStrategy:      registrypod.Strategy,
 		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
-		AttrFunc:    pod.GetAttrs,
-		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": pod.NodeNameTriggerFunc},
+		AttrFunc:    registrypod.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
+		Indexers:    registrypod.Indexers(),
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return PodStorage{}, err
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = pod.StatusStrategy
+	statusStore.UpdateStrategy = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
-	ephemeralContainersStore.UpdateStrategy = pod.EphemeralContainersStrategy
+	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 
 	bindingREST := &BindingREST{store: store}
 	return PodStorage{
@@ -118,7 +119,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a pods location from its HostIP
 func (r *REST) ResourceLocation(ctx context.Context, name string) (*url.URL, http.RoundTripper, error) {
-	return pod.ResourceLocation(r, r.proxyTransport, ctx, name)
+	return registrypod.ResourceLocation(ctx, r, r.proxyTransport, name)
 }
 
 // Implement ShortNamesProvider

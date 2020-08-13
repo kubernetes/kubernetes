@@ -89,7 +89,7 @@ func openAndLockProjectFiles() (*os.File, *os.File, error) {
 	fProjid, err := os.OpenFile(projidFile, os.O_RDONLY|os.O_CREATE, 0644)
 	if err == nil {
 		// Check once more, to ensure nothing got changed out from under us
-		if err := projFilesAreOK(); err == nil {
+		if err = projFilesAreOK(); err == nil {
 			err = lockFile(fProjects)
 			if err == nil {
 				err = lockFile(fProjid)
@@ -165,7 +165,7 @@ func readProjectFiles(projects *os.File, projid *os.File) projectsList {
 
 func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.QuotaID, error) {
 	unusedQuotasSearched := 0
-	for id := common.FirstQuota; id == id; id++ {
+	for id := common.FirstQuota; true; id++ {
 		if _, ok := idMap[id]; !ok {
 			isInUse, err := getApplier(path).QuotaIDIsInUse(id)
 			if err != nil {
@@ -324,7 +324,7 @@ func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
 	if err == nil {
 		defer closeProjectFiles(fProjects, fProjid)
 		list := readProjectFiles(fProjects, fProjid)
-		writeProjid := true
+		var writeProjid bool
 		ID, writeProjid, err = addDirToProject(path, ID, &list)
 		if err == nil && ID != common.BadQuotaID {
 			if err = writeProjectFiles(fProjects, fProjid, writeProjid, list); err == nil {
@@ -345,7 +345,7 @@ func removeProjectID(path string, ID common.QuotaID) error {
 	if err == nil {
 		defer closeProjectFiles(fProjects, fProjid)
 		list := readProjectFiles(fProjects, fProjid)
-		writeProjid := true
+		var writeProjid bool
 		writeProjid, err = removeDirFromProject(path, ID, &list)
 		if err == nil {
 			if err = writeProjectFiles(fProjects, fProjid, writeProjid, list); err == nil {

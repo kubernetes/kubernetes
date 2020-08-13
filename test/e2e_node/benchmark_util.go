@@ -16,9 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -36,7 +37,9 @@ import (
 )
 
 const (
+	// TimeSeriesTag is the tag for time series.
 	TimeSeriesTag = "[Result:TimeSeries]"
+	// TimeSeriesEnd is the end tag for time series.
 	TimeSeriesEnd = "[Finish:TimeSeries]"
 )
 
@@ -47,7 +50,7 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
-	if err := ioutil.WriteFile(fileName, []byte(e2emetrics.PrettyPrintJSON(data)), 0644); err != nil {
+	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
 		framework.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
 	}
 }
@@ -82,7 +85,7 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1
 	timeSeries.ResourceData = rc.GetResourceTimeSeries()
 
 	if framework.TestContext.ReportDir == "" {
-		framework.Logf("%s %s\n%s", TimeSeriesTag, e2emetrics.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
+		framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
 		return
 	}
 	dumpDataToFile(timeSeries, timeSeries.Labels, "time_series")
@@ -154,7 +157,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []e2emetrics.PodLaten
 // name of the node, and the node capacities.
 func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
 	nodeName := framework.TestContext.NodeName
-	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
@@ -194,7 +197,7 @@ func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[stri
 // If an error occurs, nothing will be printed.
 func printPerfData(p *perftype.PerfData) {
 	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+	if str := framework.PrettyPrintJSON(p); str != "" {
 		framework.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }

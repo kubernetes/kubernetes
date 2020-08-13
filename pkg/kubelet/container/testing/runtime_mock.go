@@ -47,6 +47,11 @@ func (r *Mock) Type() string {
 	return args.Get(0).(string)
 }
 
+func (r *Mock) SupportsSingleFileMapping() bool {
+	args := r.Called()
+	return args.Get(0).(bool)
+}
+
 func (r *Mock) Version() (kubecontainer.Version, error) {
 	args := r.Called()
 	return args.Get(0).(kubecontainer.Version), args.Error(1)
@@ -132,7 +137,7 @@ func (r *Mock) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWr
 	return args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (r *Mock) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)
 }

@@ -111,28 +111,31 @@ func (r *ASCIIRenderer) TableRow(out *bytes.Buffer, text []byte)                
 func (r *ASCIIRenderer) TableHeaderCell(out *bytes.Buffer, text []byte, align int)        { r.fw(out, text) }
 func (r *ASCIIRenderer) TableCell(out *bytes.Buffer, text []byte, align int)              { r.fw(out, text) }
 func (r *ASCIIRenderer) Footnotes(out *bytes.Buffer, text func() bool)                    { text() }
-func (r *ASCIIRenderer) FootnoteItem(out *bytes.Buffer, name, text []byte, flags int)     { r.fw(out, text) }
-func (r *ASCIIRenderer) AutoLink(out *bytes.Buffer, link []byte, kind int)                { r.fw(out, link) }
-func (r *ASCIIRenderer) CodeSpan(out *bytes.Buffer, text []byte)                          { r.fw(out, text) }
-func (r *ASCIIRenderer) DoubleEmphasis(out *bytes.Buffer, text []byte)                    { r.fw(out, text) }
-func (r *ASCIIRenderer) Emphasis(out *bytes.Buffer, text []byte)                          { r.fw(out, text) }
-func (r *ASCIIRenderer) RawHtmlTag(out *bytes.Buffer, text []byte)                        { r.fw(out, text) }
-func (r *ASCIIRenderer) TripleEmphasis(out *bytes.Buffer, text []byte)                    { r.fw(out, text) }
-func (r *ASCIIRenderer) StrikeThrough(out *bytes.Buffer, text []byte)                     { r.fw(out, text) }
-func (r *ASCIIRenderer) FootnoteRef(out *bytes.Buffer, ref []byte, id int)                { r.fw(out, ref) }
-func (r *ASCIIRenderer) Entity(out *bytes.Buffer, entity []byte)                          { r.fw(out, entity) }
-func (r *ASCIIRenderer) Smartypants(out *bytes.Buffer, text []byte)                       { r.fw(out, text) }
-func (r *ASCIIRenderer) DocumentHeader(out *bytes.Buffer)                                 {}
-func (r *ASCIIRenderer) DocumentFooter(out *bytes.Buffer)                                 {}
-func (r *ASCIIRenderer) TocHeaderWithAnchor(text []byte, level int, anchor string)        {}
-func (r *ASCIIRenderer) TocHeader(text []byte, level int)                                 {}
-func (r *ASCIIRenderer) TocFinalize()                                                     {}
+func (r *ASCIIRenderer) FootnoteItem(out *bytes.Buffer, name, text []byte, flags int) {
+	r.fw(out, text)
+}
+func (r *ASCIIRenderer) AutoLink(out *bytes.Buffer, link []byte, kind int)         { r.fw(out, link) }
+func (r *ASCIIRenderer) CodeSpan(out *bytes.Buffer, text []byte)                   { r.fw(out, text) }
+func (r *ASCIIRenderer) DoubleEmphasis(out *bytes.Buffer, text []byte)             { r.fw(out, text) }
+func (r *ASCIIRenderer) Emphasis(out *bytes.Buffer, text []byte)                   { r.fw(out, text) }
+func (r *ASCIIRenderer) RawHtmlTag(out *bytes.Buffer, text []byte)                 { r.fw(out, text) }
+func (r *ASCIIRenderer) TripleEmphasis(out *bytes.Buffer, text []byte)             { r.fw(out, text) }
+func (r *ASCIIRenderer) StrikeThrough(out *bytes.Buffer, text []byte)              { r.fw(out, text) }
+func (r *ASCIIRenderer) FootnoteRef(out *bytes.Buffer, ref []byte, id int)         { r.fw(out, ref) }
+func (r *ASCIIRenderer) Entity(out *bytes.Buffer, entity []byte)                   { r.fw(out, entity) }
+func (r *ASCIIRenderer) Smartypants(out *bytes.Buffer, text []byte)                { r.fw(out, text) }
+func (r *ASCIIRenderer) DocumentHeader(out *bytes.Buffer)                          {}
+func (r *ASCIIRenderer) DocumentFooter(out *bytes.Buffer)                          {}
+func (r *ASCIIRenderer) TocHeaderWithAnchor(text []byte, level int, anchor string) {}
+func (r *ASCIIRenderer) TocHeader(text []byte, level int)                          {}
+func (r *ASCIIRenderer) TocFinalize()                                              {}
 
 func (r *ASCIIRenderer) Table(out *bytes.Buffer, header []byte, body []byte, columnData []int) {
 	r.fw(out, header, body)
 }
 
 func (r *ASCIIRenderer) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
+	out.WriteString(" ")
 	r.fw(out, link)
 }
 

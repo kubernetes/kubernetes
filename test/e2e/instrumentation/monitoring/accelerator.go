@@ -21,18 +21,21 @@ import (
 	"os"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"golang.org/x/oauth2/google"
-	gcm "google.golang.org/api/monitoring/v3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
+	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 )
 
 // Stackdriver container accelerator metrics, as described here:
@@ -45,7 +48,7 @@ var acceleratorMetrics = []string{
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
@@ -61,8 +64,9 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 
 	framework.ExpectNoError(err)
 
@@ -89,7 +93,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 					Args:    []string{"nvidia-smi && sleep infinity"},
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							gpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+							e2egpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
 						},
 					},
 				},

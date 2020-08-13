@@ -3,17 +3,18 @@ package hcn
 import (
 	"encoding/json"
 
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
 )
 
 // LoadBalancerPortMapping is associated with HostComputeLoadBalancer
 type LoadBalancerPortMapping struct {
-	Protocol     uint32                       `json:",omitempty"` // EX: TCP = 6, UDP = 17
-	InternalPort uint16                       `json:",omitempty"`
-	ExternalPort uint16                       `json:",omitempty"`
-	Flags        LoadBalancerPortMappingFlags `json:",omitempty"`
+	Protocol         uint32                       `json:",omitempty"` // EX: TCP = 6, UDP = 17
+	InternalPort     uint16                       `json:",omitempty"`
+	ExternalPort     uint16                       `json:",omitempty"`
+	DistributionType LoadBalancerDistribution     `json:",omitempty"` // EX: Distribute per connection = 0, distribute traffic of the same protocol per client IP = 1, distribute per client IP = 2
+	Flags            LoadBalancerPortMappingFlags `json:",omitempty"`
 }
 
 // HostComputeLoadBalancer represents software load balancer.
@@ -51,6 +52,18 @@ var (
 	LoadBalancerPortMappingFlagsUseMux LoadBalancerPortMappingFlags = 4
 	// LoadBalancerPortMappingFlagsPreserveDIP delivers packets with destination IP as the VIP.
 	LoadBalancerPortMappingFlagsPreserveDIP LoadBalancerPortMappingFlags = 8
+)
+
+// LoadBalancerDistribution specifies how the loadbalancer distributes traffic.
+type LoadBalancerDistribution uint32
+
+var (
+	// LoadBalancerDistributionNone is the default and loadbalances each connection to the same pod.
+	LoadBalancerDistributionNone LoadBalancerDistribution
+	// LoadBalancerDistributionSourceIPProtocol loadbalances all traffic of the same protocol from a client IP to the same pod.
+	LoadBalancerDistributionSourceIPProtocol LoadBalancerDistribution = 1
+	// LoadBalancerDistributionSourceIP loadbalances all traffic from a client IP to the same pod.
+	LoadBalancerDistributionSourceIP LoadBalancerDistribution = 2
 )
 
 func getLoadBalancer(loadBalancerGuid guid.GUID, query string) (*HostComputeLoadBalancer, error) {
@@ -148,7 +161,10 @@ func createLoadBalancer(settings string) (*HostComputeLoadBalancer, error) {
 }
 
 func modifyLoadBalancer(loadBalancerId string, settings string) (*HostComputeLoadBalancer, error) {
-	loadBalancerGuid := guid.FromString(loadBalancerId)
+	loadBalancerGuid, err := guid.FromString(loadBalancerId)
+	if err != nil {
+		return nil, errInvalidLoadBalancerID
+	}
 	// Open loadBalancer.
 	var (
 		loadBalancerHandle hcnLoadBalancer
@@ -189,7 +205,10 @@ func modifyLoadBalancer(loadBalancerId string, settings string) (*HostComputeLoa
 }
 
 func deleteLoadBalancer(loadBalancerId string) error {
-	loadBalancerGuid := guid.FromString(loadBalancerId)
+	loadBalancerGuid, err := guid.FromString(loadBalancerId)
+	if err != nil {
+		return errInvalidLoadBalancerID
+	}
 	var resultBuffer *uint16
 	hr := hcnDeleteLoadBalancer(&loadBalancerGuid, &resultBuffer)
 	if err := checkForErrors("hcnDeleteLoadBalancer", hr, resultBuffer); err != nil {

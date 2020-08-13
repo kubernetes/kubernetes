@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -220,9 +221,16 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	}
 
 	// Act
-	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */, volumeSpec)
-
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -287,16 +295,22 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */, volumeSpec)
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	// Act
-	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */, volumeSpec)
-
+	err = asw.AddPodToVolume(markVolumeOpts)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -388,8 +402,16 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.AddPodToVolume(
-		podName1, pod1.UID, generatedVolumeName1, mounter1, mapper1, volumeSpec1.Name(), "" /* volumeGidValue */, volumeSpec1)
+	markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
+		PodName:             podName1,
+		PodUID:              pod1.UID,
+		VolumeName:          generatedVolumeName1,
+		Mounter:             mounter1,
+		BlockVolumeMapper:   mapper1,
+		OuterVolumeSpecName: volumeSpec1.Name(),
+		VolumeSpec:          volumeSpec1,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts1)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -406,8 +428,16 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.AddPodToVolume(
-		podName2, pod2.UID, generatedVolumeName1, mounter2, mapper2, volumeSpec2.Name(), "" /* volumeGidValue */, volumeSpec2)
+	markVolumeOpts2 := operationexecutor.MarkVolumeOpts{
+		PodName:             podName2,
+		PodUID:              pod2.UID,
+		VolumeName:          generatedVolumeName1,
+		Mounter:             mounter2,
+		BlockVolumeMapper:   mapper2,
+		OuterVolumeSpecName: volumeSpec2.Name(),
+		VolumeSpec:          volumeSpec2,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts2)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -421,7 +451,6 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName2, volumeSpec2.Name(), asw)
 	verifyVolumeSpecNameInVolumeAsw(t, podName1, []*volume.Spec{volumeSpec1}, asw)
 	verifyVolumeSpecNameInVolumeAsw(t, podName2, []*volume.Spec{volumeSpec2}, asw)
-
 }
 
 // Calls AddPodToVolume() to add pod to empty data struct
@@ -484,9 +513,16 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	}
 
 	// Act
-	err = asw.AddPodToVolume(
-		podName, pod.UID, volumeName, mounter, mapper, volumeSpec.Name(), "" /* volumeGidValue */, volumeSpec)
-
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          volumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
 	// Assert
 	if err == nil {
 		t.Fatalf("AddPodToVolume did not fail. Expected: <\"no volume with the name ... exists in the list of attached volumes\"> Actual: <no error>")
@@ -554,6 +590,76 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
 	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeExistsInGloballyMountedVolumes(t, generatedVolumeName, asw)
+}
+
+func TestUncertainVolumeMounts(t *testing.T) {
+	// Arrange
+	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	devicePath := "fake/device/path"
+
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name-1",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec1 := &volume.Spec{Volume: &pod1.Spec.Volumes[0]}
+	generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
+		plugin, volumeSpec1)
+	require.NoError(t, err)
+
+	err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+	podName1 := util.GetUniquePodName(pod1)
+
+	mounter1, err := plugin.NewMounter(volumeSpec1, pod1, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
+		PodName:             podName1,
+		PodUID:              pod1.UID,
+		VolumeName:          generatedVolumeName1,
+		Mounter:             mounter1,
+		OuterVolumeSpecName: volumeSpec1.Name(),
+		VolumeSpec:          volumeSpec1,
+		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts1)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+	mountedVolumes := asw.GetMountedVolumesForPod(podName1)
+	volumeFound := false
+	for _, volume := range mountedVolumes {
+		if volume.InnerVolumeSpecName == volumeSpec1.Name() {
+			volumeFound = true
+		}
+	}
+	if volumeFound {
+		t.Fatalf("expected volume %s to be not found in asw", volumeSpec1.Name())
+	}
+
+	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1)
+	if volExists {
+		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
+	}
 }
 
 func verifyVolumeExistsInGloballyMountedVolumes(

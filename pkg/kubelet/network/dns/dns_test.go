@@ -21,10 +21,11 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -74,6 +75,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"search ", []string{}, []string{}, []string{}, false}, // search empty
 		{"search foo", []string{}, []string{"foo"}, []string{}, false},
 		{"search foo bar", []string{}, []string{"foo", "bar"}, []string{}, false},
+		{"search foo. bar", []string{}, []string{"foo", "bar"}, []string{}, false},
 		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}, []string{}, false},
 		{"search foo\nsearch bar", []string{}, []string{"bar"}, []string{}, false},
 		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}, []string{}, false},
@@ -631,7 +633,7 @@ func newTestPods(count int) []*v1.Pod {
 				HostNetwork: true,
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				UID:  types.UID(10000 + i),
+				UID:  types.UID(strconv.Itoa(10000 + i)),
 				Name: fmt.Sprintf("pod%d", i),
 			},
 		}

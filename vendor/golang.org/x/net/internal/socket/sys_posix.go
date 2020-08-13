@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build go1.9
-// +build darwin dragonfly freebsd linux netbsd openbsd solaris windows
+// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris windows
 
 package socket
 
@@ -34,7 +33,7 @@ func marshalSockaddr(ip net.IP, port int, zone string) []byte {
 	if ip4 := ip.To4(); ip4 != nil {
 		b := make([]byte, sizeofSockaddrInet)
 		switch runtime.GOOS {
-		case "android", "linux", "solaris", "windows":
+		case "android", "illumos", "linux", "solaris", "windows":
 			NativeEndian.PutUint16(b[:2], uint16(sysAF_INET))
 		default:
 			b[0] = sizeofSockaddrInet
@@ -47,7 +46,7 @@ func marshalSockaddr(ip net.IP, port int, zone string) []byte {
 	if ip6 := ip.To16(); ip6 != nil && ip.To4() == nil {
 		b := make([]byte, sizeofSockaddrInet6)
 		switch runtime.GOOS {
-		case "android", "linux", "solaris", "windows":
+		case "android", "illumos", "linux", "solaris", "windows":
 			NativeEndian.PutUint16(b[:2], uint16(sysAF_INET6))
 		default:
 			b[0] = sizeofSockaddrInet6
@@ -69,7 +68,7 @@ func parseInetAddr(b []byte, network string) (net.Addr, error) {
 	}
 	var af int
 	switch runtime.GOOS {
-	case "android", "linux", "solaris", "windows":
+	case "android", "illumos", "linux", "solaris", "windows":
 		af = int(NativeEndian.Uint16(b[:2]))
 	default:
 		af = int(b[1])

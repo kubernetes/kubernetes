@@ -50,10 +50,17 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        command:
-        - /bin/sh
-        - -c
-        - /kubemark --morph=kubelet --name=$(NODE_NAME) {{hollow_kubelet_params}} --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        command: [
+          "/kubemark",
+          "--morph=kubelet",
+          "--name=$(NODE_NAME)",
+          "--kubeconfig=/kubeconfig/kubelet.kubeconfig",
+          "$(CONTENT_TYPE)",
+          "--log-file=/var/log/kubelet-$(NODE_NAME).log",
+          "--logtostderr=false",
+          "--node-labels={{hollow_node_labels}}",
+          {{hollow_kubelet_params}}
+        ]
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -62,8 +69,8 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: 40m
-            memory: 100M
+            cpu: {{hollow_kubelet_millicpu}}m
+            memory: {{hollow_kubelet_mem_Ki}}Ki
         securityContext:
           privileged: true
       - name: hollow-proxy
@@ -78,10 +85,16 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        command:
-        - /bin/sh
-        - -c
-        - /kubemark --morph=proxy --name=$(NODE_NAME) {{hollow_proxy_params}} --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        command: [
+          "/kubemark",
+          "--morph=proxy",
+          "--name=$(NODE_NAME)",
+          "--kubeconfig=/kubeconfig/kubeproxy.kubeconfig",
+          "$(CONTENT_TYPE)",
+          "--log-file=/var/log/kubeproxy-$(NODE_NAME).log",
+          "--logtostderr=false",
+          {{hollow_proxy_params}}
+        ]
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
@@ -90,10 +103,10 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: {{HOLLOW_PROXY_CPU}}m
-            memory: {{HOLLOW_PROXY_MEM}}Ki
+            cpu: {{hollow_proxy_millicpu}}m
+            memory: {{hollow_proxy_mem_Ki}}Ki
       - name: hollow-node-problem-detector
-        image: k8s.gcr.io/node-problem-detector:v0.4.1
+        image: k8s.gcr.io/node-problem-detector:v0.8.0
         env:
         - name: NODE_NAME
           valueFrom:
@@ -117,8 +130,8 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: 20m
-            memory: 20Mi
+            cpu: {{npd_millicpu}}m
+            memory: {{npd_mem_Ki}}Ki
         securityContext:
           privileged: true
       # Keep the pod running on unreachable node for 15 minutes.

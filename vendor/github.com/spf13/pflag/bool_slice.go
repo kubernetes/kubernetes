@@ -71,6 +71,44 @@ func (s *boolSliceValue) String() string {
 	return "[" + out + "]"
 }
 
+func (s *boolSliceValue) fromString(val string) (bool, error) {
+	return strconv.ParseBool(val)
+}
+
+func (s *boolSliceValue) toString(val bool) string {
+	return strconv.FormatBool(val)
+}
+
+func (s *boolSliceValue) Append(val string) error {
+	i, err := s.fromString(val)
+	if err != nil {
+		return err
+	}
+	*s.value = append(*s.value, i)
+	return nil
+}
+
+func (s *boolSliceValue) Replace(val []string) error {
+	out := make([]bool, len(val))
+	for i, d := range val {
+		var err error
+		out[i], err = s.fromString(d)
+		if err != nil {
+			return err
+		}
+	}
+	*s.value = out
+	return nil
+}
+
+func (s *boolSliceValue) GetSlice() []string {
+	out := make([]string, len(*s.value))
+	for i, d := range *s.value {
+		out[i] = s.toString(d)
+	}
+	return out
+}
+
 func boolSliceConv(val string) (interface{}, error) {
 	val = strings.Trim(val, "[]")
 	// Empty string would cause a slice with one (empty) entry

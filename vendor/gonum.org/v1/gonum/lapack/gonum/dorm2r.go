@@ -8,10 +8,10 @@ import "gonum.org/v1/gonum/blas"
 
 // Dorm2r multiplies a general matrix C by an orthogonal matrix from a QR factorization
 // determined by Dgeqrf.
-//  C = Q * C    if side == blas.Left and trans == blas.NoTrans
-//  C = Q^T * C  if side == blas.Left and trans == blas.Trans
-//  C = C * Q    if side == blas.Right and trans == blas.NoTrans
-//  C = C * Q^T  if side == blas.Right and trans == blas.Trans
+//  C = Q * C   if side == blas.Left and trans == blas.NoTrans
+//  C = Qᵀ * C  if side == blas.Left and trans == blas.Trans
+//  C = C * Q   if side == blas.Right and trans == blas.NoTrans
+//  C = C * Qᵀ  if side == blas.Right and trans == blas.Trans
 // If side == blas.Left, a is a matrix of size m×k, and if side == blas.Right
 // a is of size n×k.
 //

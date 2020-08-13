@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/cadvisor/fs"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type FsHandler interface {
@@ -92,10 +92,11 @@ func (fh *realFsHandler) update() error {
 	fh.lastUpdate = time.Now()
 	if fh.rootfs != "" && rootErr == nil {
 		fh.usage.InodeUsage = rootUsage.Inodes
-		fh.usage.TotalUsageBytes = rootUsage.Bytes + extraUsage.Bytes
+		fh.usage.BaseUsageBytes = rootUsage.Bytes
+		fh.usage.TotalUsageBytes = rootUsage.Bytes
 	}
 	if fh.extraDir != "" && extraErr == nil {
-		fh.usage.BaseUsageBytes = rootUsage.Bytes
+		fh.usage.TotalUsageBytes += extraUsage.Bytes
 	}
 
 	// Combine errors into a single error to return
@@ -106,31 +107,30 @@ func (fh *realFsHandler) update() error {
 }
 
 func (fh *realFsHandler) trackUsage() {
-	fh.update()
 	longOp := time.Second
 	for {
+		start := time.Now()
+		if err := fh.update(); err != nil {
+			klog.Errorf("failed to collect filesystem stats - %v", err)
+			fh.period = fh.period * 2
+			if fh.period > maxBackoffFactor*fh.minPeriod {
+				fh.period = maxBackoffFactor * fh.minPeriod
+			}
+		} else {
+			fh.period = fh.minPeriod
+		}
+		duration := time.Since(start)
+		if duration > longOp {
+			// adapt longOp time so that message doesn't continue to print
+			// if the long duration is persistent either because of slow
+			// disk or lots of containers.
+			longOp = longOp + time.Second
+			klog.V(2).Infof("fs: disk usage and inodes count on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
+		}
 		select {
 		case <-fh.stopChan:
 			return
 		case <-time.After(fh.period):
-			start := time.Now()
-			if err := fh.update(); err != nil {
-				klog.Errorf("failed to collect filesystem stats - %v", err)
-				fh.period = fh.period * 2
-				if fh.period > maxBackoffFactor*fh.minPeriod {
-					fh.period = maxBackoffFactor * fh.minPeriod
-				}
-			} else {
-				fh.period = fh.minPeriod
-			}
-			duration := time.Since(start)
-			if duration > longOp {
-				// adapt longOp time so that message doesn't continue to print
-				// if the long duration is persistent either because of slow
-				// disk or lots of containers.
-				longOp = longOp + time.Second
-				klog.V(2).Infof("fs: disk usage and inodes count on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
-			}
 		}
 	}
 }

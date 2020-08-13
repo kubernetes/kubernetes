@@ -17,15 +17,17 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,8 +38,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	jws "k8s.io/cluster-bootstrap/token/jws"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // SignerOptions contains options for the Signer
@@ -51,7 +53,7 @@ type SignerOptions struct {
 	// TokenSecretNamespace string is the namespace for token Secrets.
 	TokenSecretNamespace string
 
-	// ConfigMapResynce is the time.Duration at which to fully re-list configmaps.
+	// ConfigMapResync is the time.Duration at which to fully re-list configmaps.
 	// If zero, re-list will be delayed as long as possible
 	ConfigMapResync time.Duration
 
@@ -105,7 +107,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 		syncQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bootstrap_signer_queue"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -242,7 +244,7 @@ func (e *Signer) signConfigMap() {
 }
 
 func (e *Signer) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

@@ -38,7 +38,7 @@ Differences between IPVS mode and IPTABLES mode are as follows:
 
 ### When IPVS falls back to IPTABLES
 IPVS proxier will employ IPTABLES in doing packet filtering, SNAT or masquerade.
-Specifically, IPVS proxier will use ipset to store source or destination address of traffics that need DROP or do masquerade, to make sure the number of IPTABLES rules be constant, no metter how many services we have.
+Specifically, IPVS proxier will use ipset to store source or destination address of traffics that need DROP or do masquerade, to make sure the number of IPTABLES rules be constant, no matter how many services we have.
 
 
 Here is the table of ipset sets that IPVS proxier used.
@@ -62,7 +62,7 @@ IPVS proxier will fall back on IPTABLES in the following scenarios.
 
 **1. kube-proxy starts with --masquerade-all=true**
 
-If kube-proxy starts with `--masquerade-all=true`, IPVS proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what IPTABLES proxier. Suppose kube-proxy have flag `--masquerade-all=true` specified, then the IPTABLES installed by IPVS proxier should be like what is shown below.
+If kube-proxy starts with `--masquerade-all=true`, IPVS proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what IPTABLES proxier. Suppose kube-proxy has flag `--masquerade-all=true` specified, then the IPTABLES installed by IPVS proxier should be like what is shown below.
 
 ```shell
 # iptables -t nat -nL
@@ -133,7 +133,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-CLU
 For loadBalancer type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-LOAD-BALANCER`.
 Specially when service's  `LoadBalancerSourceRanges` is specified or specified `externalTrafficPolicy=local`,
 IPVS proxier will create ipset sets `KUBE-LOAD-BALANCER-LOCAL`/`KUBE-LOAD-BALANCER-FW`/`KUBE-LOAD-BALANCER-SOURCE-CIDR`
-and install IPTABLES accordingly, which should looks like what is shown below.
+and install IPTABLES accordingly, which should look like what is shown below.
 
 ```shell
 # iptables -t nat -nL
@@ -183,8 +183,8 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOA
 **4. NodePort type service**
 
 For NodePort type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-NODE-PORT-TCP/KUBE-NODE-PORT-UDP`.
-When specified `externalTrafficPolicy=local`,IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TC/KUBE-NODE-PORT-LOCAL-UDP`
-and install IPTABLES accordingly, which should looks like what is shown below.
+When specified `externalTrafficPolicy=local`, IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TCP/KUBE-NODE-PORT-LOCAL-UDP`
+and install IPTABLES accordingly, which should look like what is shown below.
 
 Suppose service with TCP type nodePort.
 
@@ -223,7 +223,7 @@ KUBE-NODE-PORT  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUB
 **5. Service with externalIPs specified**
 
 For service with `externalIPs` specified, IPVS proxier will install IPTABLES with match of ipset `KUBE-EXTERNAL-IP`,
-Suppose we have service with `externalIPs` specified, IPTABLES rules should looks like what is shown below.
+Suppose we have service with `externalIPs` specified, IPTABLES rules should look like what is shown below.
 
 ```shell
 Chain PREROUTING (policy ACCEPT)
@@ -302,7 +302,7 @@ modprobe -- ip_vs_sh
 modprobe -- nf_conntrack_ipv4
 
 # to check loaded modules, use
-lsmod | grep -e ipvs -e nf_conntrack_ipv4
+lsmod | grep -e ip_vs -e nf_conntrack_ipv4
 # or
 cut -f1 -d " "  /proc/modules | grep -e ip_vs -e nf_conntrack_ipv4
  ```
@@ -323,7 +323,7 @@ export KUBE_PROXY_MODE=ipvs
 
 ### GCE Cluster
 
-Similar to local-up cluster, kube-proxy in [clusters running on GCE](https://kubernetes.io/docs/getting-started-guides/gce/) run in IPTABLES mode by default. Users need to  export the env `KUBE_PROXY_MODE=ipvs` before [starting a cluster](https://kubernetes.io/docs/getting-started-guides/gce/#starting-a-cluster):
+Similar to local-up cluster, kube-proxy in [clusters running on GCE](https://kubernetes.io/docs/getting-started-guides/gce/) run in IPTABLES mode by default. Users need to export the env `KUBE_PROXY_MODE=ipvs` before [starting a cluster](https://kubernetes.io/docs/getting-started-guides/gce/#starting-a-cluster):
 ```shell
 #before running one of the commands chosen to start a cluster:
 # curl -sS https://get.k8s.io | bash
@@ -369,7 +369,7 @@ Prot LocalAddress:Port Scheduler Flags
 TCP  10.0.0.1:443 rr persistent 10800
   -> 192.168.0.1:6443             Masq    1      1          0
 ```
-or similar logs occur in kube-proxy logs (for example, `/tmp/kube-proxy.log` for local-up cluster)  when the local cluster is running:
+or similar logs occur in kube-proxy logs (for example, `/tmp/kube-proxy.log` for local-up cluster) when the local cluster is running:
 ```
 Using ipvs Proxier.
 ```

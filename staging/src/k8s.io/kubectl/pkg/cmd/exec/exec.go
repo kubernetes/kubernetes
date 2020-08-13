@@ -17,12 +17,13 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
 	"time"
 
-	dockerterm "github.com/docker/docker/pkg/term"
+	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,10 +45,10 @@ import (
 var (
 	execExample = templates.Examples(i18n.T(`
 		# Get output from running 'date' command from pod mypod, using the first container by default
-		kubectl exec mypod date
+		kubectl exec mypod -- date
 
 		# Get output from running 'date' command in ruby-container from pod mypod
-		kubectl exec mypod -c ruby-container date
+		kubectl exec mypod -c ruby-container -- date
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod mypod
 		# and sends stdout/stderr from 'bash' back to the client
@@ -61,15 +62,14 @@ var (
 		kubectl exec mypod -i -t -- ls -t /usr
 
 		# Get output from running 'date' command from the first pod of the deployment mydeployment, using the first container by default
-		kubectl exec deploy/mydeployment date
+		kubectl exec deploy/mydeployment -- date
 
 		# Get output from running 'date' command from the first pod of the service myservice, using the first container by default
-		kubectl exec svc/myservice date
+		kubectl exec svc/myservice -- date
 		`))
 )
 
 const (
-	execUsageStr          = "expected 'exec (POD | TYPE/NAME) COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD or TYPE/NAME and COMMAND are required arguments for the exec command"
 	defaultPodExecTimeout = 60 * time.Second
 )
 
@@ -95,6 +95,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
+	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &options.FilenameOptions.Filenames, "to use to exec into the resource")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
@@ -145,9 +146,11 @@ type StreamOptions struct {
 // ExecOptions declare the arguments accepted by the Exec command
 type ExecOptions struct {
 	StreamOptions
+	resource.FilenameOptions
 
-	ResourceName string
-	Command      []string
+	ResourceName     string
+	Command          []string
+	EnforceNamespace bool
 
 	ParentCommandName       string
 	EnableSuggestedCmdUsage bool
@@ -165,17 +168,22 @@ type ExecOptions struct {
 
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
-	// Let kubectl exec follow rules for `--`, see #13004 issue
-	if len(argsIn) == 0 || argsLenAtDash == 0 {
-		return cmdutil.UsageErrorf(cmd, execUsageStr)
+	if len(argsIn) > 0 && argsLenAtDash != 0 {
+		p.ResourceName = argsIn[0]
+	}
+	if argsLenAtDash > -1 {
+		p.Command = argsIn[argsLenAtDash:]
+	} else if len(argsIn) > 1 {
+		fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		p.Command = argsIn[1:]
+	} else if len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0 {
+		fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		p.Command = argsIn[0:]
+		p.ResourceName = ""
 	}
 
-	p.ResourceName = argsIn[0]
-	p.Command = argsIn[1:]
-
 	var err error
-
-	p.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	p.Namespace, p.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -214,8 +222,8 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 // Validate checks that the provided exec options are specified.
 func (p *ExecOptions) Validate() error {
-	if len(p.PodName) == 0 && len(p.ResourceName) == 0 {
-		return fmt.Errorf("pod or type/name must be specified")
+	if len(p.PodName) == 0 && len(p.ResourceName) == 0 && len(p.FilenameOptions.Filenames) == 0 {
+		return fmt.Errorf("pod, type/name or --filename must be specified")
 	}
 	if len(p.Command) == 0 {
 		return fmt.Errorf("you must specify at least one command for the container")
@@ -285,14 +293,18 @@ func (p *ExecOptions) Run() error {
 	// since there are any other command run this function by providing Podname with PodsGetter
 	// and without resource builder, eg: `kubectl cp`.
 	if len(p.PodName) != 0 {
-		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(context.TODO(), p.PodName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 	} else {
 		builder := p.Builder().
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-			NamespaceParam(p.Namespace).DefaultNamespace().ResourceNames("pods", p.ResourceName)
+			FilenameParam(p.EnforceNamespace, &p.FilenameOptions).
+			NamespaceParam(p.Namespace).DefaultNamespace()
+		if len(p.ResourceName) > 0 {
+			builder = builder.ResourceNames("pods", p.ResourceName)
+		}
 
 		obj, err := builder.Do().Object()
 		if err != nil {

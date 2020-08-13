@@ -17,13 +17,13 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 
 	// Test multiple projections
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, multiple projections
 	   Description: A Pod is created with a projected volume source for secrets, configMap and downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the secrets, configMap values and the cpu and memory limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -63,12 +63,12 @@ var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
-			e2elog.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
-			e2elog.Failf("unable to create test secret %s: %v", secret.Name, err)
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
 		pod := projectedAllVolumeBasePod(podName, secretName, configMapName, nil, nil)
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 			},
 		}
 		f.TestContainerOutput("Check all projections for projected volume plugin", pod, 0, []string{
-			fmt.Sprintf("%s", podName),
+			podName,
 			"secret-value-1",
 			"configmap-value-1",
 		})

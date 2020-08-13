@@ -19,10 +19,12 @@ package wait
 import (
 	"context"
 	"errors"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -128,9 +130,15 @@ func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), pe
 // Close stopCh to stop. f may not be invoked if stop channel is already
 // closed. Pass NeverStop to if you don't want it stop.
 func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
-	var t *time.Timer
-	var sawTimeout bool
+	BackoffUntil(f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
+}
 
+// BackoffUntil loops until stop channel is closed, run f every duration given by BackoffManager.
+//
+// If sliding is true, the period is computed after f runs. If it is false then
+// period includes the runtime for f.
+func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan struct{}) {
+	var t clock.Timer
 	for {
 		select {
 		case <-stopCh:
@@ -138,13 +146,8 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		default:
 		}
 
-		jitteredPeriod := period
-		if jitterFactor > 0.0 {
-			jitteredPeriod = Jitter(period, jitterFactor)
-		}
-
 		if !sliding {
-			t = resetOrReuseTimer(t, jitteredPeriod, sawTimeout)
+			t = backoff.Backoff()
 		}
 
 		func() {
@@ -153,7 +156,7 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		}()
 
 		if sliding {
-			t = resetOrReuseTimer(t, jitteredPeriod, sawTimeout)
+			t = backoff.Backoff()
 		}
 
 		// NOTE: b/c there is no priority selection in golang
@@ -164,8 +167,7 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		select {
 		case <-stopCh:
 			return
-		case <-t.C:
-			sawTimeout = true
+		case <-t.C():
 		}
 	}
 }
@@ -202,6 +204,12 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // ConditionFunc returns true if the condition is satisfied, or an error
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
+
+// runConditionWithCrashProtection runs a ConditionFunc with crash protection
+func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
+	defer runtime.HandleCrash()
+	return condition()
+}
 
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
@@ -277,6 +285,105 @@ func contextForChannel(parentCh <-chan struct{}) (context.Context, context.Cance
 	return ctx, cancel
 }
 
+// BackoffManager manages backoff with a particular scheme based on its underlying implementation. It provides
+// an interface to return a timer for backoff, and caller shall backoff until Timer.C() drains. If the second Backoff()
+// is called before the timer from the first Backoff() call finishes, the first timer will NOT be drained and result in
+// undetermined behavior.
+// The BackoffManager is supposed to be called in a single-threaded environment.
+type BackoffManager interface {
+	Backoff() clock.Timer
+}
+
+type exponentialBackoffManagerImpl struct {
+	backoff              *Backoff
+	backoffTimer         clock.Timer
+	lastBackoffStart     time.Time
+	initialBackoff       time.Duration
+	backoffResetDuration time.Duration
+	clock                clock.Clock
+}
+
+// NewExponentialBackoffManager returns a manager for managing exponential backoff. Each backoff is jittered and
+// backoff will not exceed the given max. If the backoff is not called within resetDuration, the backoff is reset.
+// This backoff manager is used to reduce load during upstream unhealthiness.
+func NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration time.Duration, backoffFactor, jitter float64, c clock.Clock) BackoffManager {
+	return &exponentialBackoffManagerImpl{
+		backoff: &Backoff{
+			Duration: initBackoff,
+			Factor:   backoffFactor,
+			Jitter:   jitter,
+
+			// the current impl of wait.Backoff returns Backoff.Duration once steps are used up, which is not
+			// what we ideally need here, we set it to max int and assume we will never use up the steps
+			Steps: math.MaxInt32,
+			Cap:   maxBackoff,
+		},
+		backoffTimer:         nil,
+		initialBackoff:       initBackoff,
+		lastBackoffStart:     c.Now(),
+		backoffResetDuration: resetDuration,
+		clock:                c,
+	}
+}
+
+func (b *exponentialBackoffManagerImpl) getNextBackoff() time.Duration {
+	if b.clock.Now().Sub(b.lastBackoffStart) > b.backoffResetDuration {
+		b.backoff.Steps = math.MaxInt32
+		b.backoff.Duration = b.initialBackoff
+	}
+	b.lastBackoffStart = b.clock.Now()
+	return b.backoff.Step()
+}
+
+// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer for exponential backoff.
+// The returned timer must be drained before calling Backoff() the second time
+func (b *exponentialBackoffManagerImpl) Backoff() clock.Timer {
+	if b.backoffTimer == nil {
+		b.backoffTimer = b.clock.NewTimer(b.getNextBackoff())
+	} else {
+		b.backoffTimer.Reset(b.getNextBackoff())
+	}
+	return b.backoffTimer
+}
+
+type jitteredBackoffManagerImpl struct {
+	clock        clock.Clock
+	duration     time.Duration
+	jitter       float64
+	backoffTimer clock.Timer
+}
+
+// NewJitteredBackoffManager returns a BackoffManager that backoffs with given duration plus given jitter. If the jitter
+// is negative, backoff will not be jittered.
+func NewJitteredBackoffManager(duration time.Duration, jitter float64, c clock.Clock) BackoffManager {
+	return &jitteredBackoffManagerImpl{
+		clock:        c,
+		duration:     duration,
+		jitter:       jitter,
+		backoffTimer: nil,
+	}
+}
+
+func (j *jitteredBackoffManagerImpl) getNextBackoff() time.Duration {
+	jitteredPeriod := j.duration
+	if j.jitter > 0.0 {
+		jitteredPeriod = Jitter(j.duration, j.jitter)
+	}
+	return jitteredPeriod
+}
+
+// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer for jittered backoff.
+// The returned timer must be drained before calling Backoff() the second time
+func (j *jitteredBackoffManagerImpl) Backoff() clock.Timer {
+	backoff := j.getNextBackoff()
+	if j.backoffTimer == nil {
+		j.backoffTimer = j.clock.NewTimer(backoff)
+	} else {
+		j.backoffTimer.Reset(backoff)
+	}
+	return j.backoffTimer
+}
+
 // ExponentialBackoff repeats a condition check with exponential backoff.
 //
 // It repeatedly checks the condition and then sleeps, using `backoff.Step()`
@@ -289,7 +396,7 @@ func contextForChannel(parentCh <-chan struct{}) (context.Context, context.Cance
 // In all other cases, ErrWaitTimeout is returned.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 	for backoff.Steps > 0 {
-		if ok, err := condition(); err != nil || ok {
+		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
 			return err
 		}
 		if backoff.Steps == 1 {
@@ -335,7 +442,7 @@ func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) err
 }
 
 func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
-	done, err := condition()
+	done, err := runConditionWithCrashProtection(condition)
 	if err != nil {
 		return err
 	}
@@ -364,7 +471,7 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) error {
-	done, err := condition()
+	done, err := runConditionWithCrashProtection(condition)
 	if err != nil {
 		return err
 	}
@@ -431,7 +538,7 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 	for {
 		select {
 		case _, open := <-c:
-			ok, err := fn()
+			ok, err := runConditionWithCrashProtection(fn)
 			if err != nil {
 				return err
 			}
@@ -496,17 +603,4 @@ func poller(interval, timeout time.Duration) WaitFunc {
 
 		return ch
 	})
-}
-
-// resetOrReuseTimer avoids allocating a new timer if one is already in use.
-// Not safe for multiple threads.
-func resetOrReuseTimer(t *time.Timer, d time.Duration, sawTimeout bool) *time.Timer {
-	if t == nil {
-		return time.NewTimer(d)
-	}
-	if !t.Stop() && !sawTimeout {
-		<-t.C
-	}
-	t.Reset(d)
-	return t
 }

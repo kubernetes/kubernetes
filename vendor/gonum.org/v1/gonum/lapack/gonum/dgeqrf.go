@@ -85,7 +85,7 @@ func (impl Implementation) Dgeqrf(m, n int, a []float64, lda int, tau, work []fl
 			// Compute the QR factorization of the current block.
 			impl.Dgeqr2(m-i, ib, a[i*lda+i:], lda, tau[i:], work)
 			if i+ib < n {
-				// Form the triangular factor of the block reflector and apply H^T
+				// Form the triangular factor of the block reflector and apply Hᵀ
 				// In Dlarft, work becomes the T matrix.
 				impl.Dlarft(lapack.Forward, lapack.ColumnWise, m-i, ib,
 					a[i*lda+i:], lda,

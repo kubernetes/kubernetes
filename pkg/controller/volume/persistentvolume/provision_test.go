@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -145,10 +145,6 @@ var provision1Success = provisionCall{
 var provision2Success = provisionCall{
 	ret:                nil,
 	expectedParameters: class2Parameters,
-}
-
-var provisionAlphaSuccess = provisionCall{
-	ret: nil,
 }
 
 // Test single call to syncVolume, expecting provisioning to happen.
@@ -427,7 +423,7 @@ func TestProvisionSync(t *testing.T) {
 				// Inject errors to simulate crashed API server during
 				// kubeclient.PersistentVolumes.Create()
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
-				{Verb: "create", Resource: "persistentvolumes", Error: apierrs.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
+				{Verb: "create", Resource: "persistentvolumes", Error: apierrors.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
 			},
 			wrapTestWithPluginCalls(
 				nil, // recycle calls
@@ -453,8 +449,14 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			novolumes,
 			newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/MockCSIPlugin",
-				newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold)),
+			[]*v1.PersistentVolumeClaim{
+				annotateClaim(
+					newClaim("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
+					map[string]string{
+						pvutil.AnnStorageProvisioner: "vendor.com/MockCSIDriver",
+						pvutil.AnnMigratedTo:         "vendor.com/MockCSIDriver",
+					}),
+			},
 			[]string{"Normal ExternalProvisioning"},
 			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
 		},

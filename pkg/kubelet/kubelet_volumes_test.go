@@ -555,10 +555,14 @@ func (f *stubBlockVolume) SetUpDevice() (string, error) {
 	return "", nil
 }
 
-func (f stubBlockVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+func (f stubBlockVolume) MapPodDevice() error {
 	return nil
 }
 
 func (f *stubBlockVolume) TearDownDevice(mapPath string, devicePath string) error {
+	return nil
+}
+
+func (f *stubBlockVolume) UnmapPodDevice() error {
 	return nil
 }

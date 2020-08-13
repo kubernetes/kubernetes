@@ -107,8 +107,8 @@ func (*registerStream) isTransportResponseFrame() bool { return false }
 type headerFrame struct {
 	streamID   uint32
 	hf         []hpack.HeaderField
-	endStream  bool                       // Valid on server side.
-	initStream func(uint32) (bool, error) // Used only on the client side.
+	endStream  bool               // Valid on server side.
+	initStream func(uint32) error // Used only on the client side.
 	onWrite    func()
 	wq         *writeQuota    // write quota for the stream created.
 	cleanup    *cleanupStream // Valid on the server side.
@@ -637,21 +637,17 @@ func (l *loopyWriter) headerHandler(h *headerFrame) error {
 
 func (l *loopyWriter) originateStream(str *outStream) error {
 	hdr := str.itl.dequeue().(*headerFrame)
-	sendPing, err := hdr.initStream(str.id)
-	if err != nil {
+	if err := hdr.initStream(str.id); err != nil {
 		if err == ErrConnClosing {
 			return err
 		}
 		// Other errors(errStreamDrain) need not close transport.
 		return nil
 	}
-	if err = l.writeHeader(str.id, hdr.endStream, hdr.hf, hdr.onWrite); err != nil {
+	if err := l.writeHeader(str.id, hdr.endStream, hdr.hf, hdr.onWrite); err != nil {
 		return err
 	}
 	l.estdStreams[str.id] = str
-	if sendPing {
-		return l.pingHandler(&ping{data: [8]byte{}})
-	}
 	return nil
 }
 

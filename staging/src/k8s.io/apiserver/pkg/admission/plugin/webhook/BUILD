@@ -7,7 +7,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
@@ -49,7 +49,7 @@ go_test(
     srcs = ["accessors_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],

@@ -1,3 +1,19 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package console
 
 import (
@@ -8,10 +24,17 @@ import (
 
 var ErrNotAConsole = errors.New("provided file is not a console")
 
+type File interface {
+	io.ReadWriteCloser
+
+	// Fd returns its file descriptor
+	Fd() uintptr
+	// Name returns its file name
+	Name() string
+}
+
 type Console interface {
-	io.Reader
-	io.Writer
-	io.Closer
+	File
 
 	// Resize resizes the console to the provided window size
 	Resize(WinSize) error
@@ -26,10 +49,6 @@ type Console interface {
 	Reset() error
 	// Size returns the window size of the console
 	Size() (WinSize, error)
-	// Fd returns the console's file descriptor
-	Fd() uintptr
-	// Name returns the console's file name
-	Name() string
 }
 
 // WinSize specifies the window size of the console
@@ -54,7 +73,7 @@ func Current() Console {
 }
 
 // ConsoleFromFile returns a console using the provided file
-func ConsoleFromFile(f *os.File) (Console, error) {
+func ConsoleFromFile(f File) (Console, error) {
 	if err := checkConsole(f); err != nil {
 		return nil, err
 	}

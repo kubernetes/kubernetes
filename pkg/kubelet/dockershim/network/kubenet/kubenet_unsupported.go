@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!dockerless
 
 /*
 Copyright 2014 The Kubernetes Authors.

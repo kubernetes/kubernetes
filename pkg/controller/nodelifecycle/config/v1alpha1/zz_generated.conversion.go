@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.NodeLifecycleControllerConfiguration)(nil), (*config.NodeLifecycleControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLifecycleControllerConfiguration(a.(*v1alpha1.NodeLifecycleControllerConfiguration), b.(*config.NodeLifecycleControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeLifecycleControllerConfiguration)(nil), (*v1alpha1.NodeLifecycleControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(a.(*config.NodeLifecycleControllerConfiguration), b.(*v1alpha1.NodeLifecycleControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.NodeLifecycleControllerConfiguration)(nil), (*v1alpha1.NodeLifecycleControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(a.(*config.NodeLifecycleControllerConfiguration), b.(*v1alpha1.NodeLifecycleControllerConfiguration), scope)
 	}); err != nil {

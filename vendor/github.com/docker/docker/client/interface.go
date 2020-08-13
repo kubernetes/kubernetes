@@ -38,7 +38,7 @@ type CommonAPIClient interface {
 	ServerVersion(ctx context.Context) (types.Version, error)
 	NegotiateAPIVersion(ctx context.Context)
 	NegotiateAPIVersionPing(types.Ping)
-	DialSession(ctx context.Context, proto string, meta map[string][]string) (net.Conn, error)
+	DialHijack(ctx context.Context, url, proto string, meta map[string][]string) (net.Conn, error)
 	Dialer() func(context.Context) (net.Conn, error)
 	Close() error
 }

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -293,7 +293,7 @@ func GetNUMANodeInfo() (NUMANodeInfo, error) {
 	// nil NUMANodeInfo, indicating that no NUMA information is available
 	// on this machine. This should implicitly be interpreted as having a
 	// single NUMA node with id 0 for all CPUs.
-	nodelist, err := ioutil.ReadFile("/sys/devices/system/node/possible")
+	nodelist, err := ioutil.ReadFile("/sys/devices/system/node/online")
 	if err != nil {
 		return nil, nil
 	}

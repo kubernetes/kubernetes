@@ -41,7 +41,7 @@ import (
 
 	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -147,6 +147,8 @@ func addGrouplessTypes() {
 	scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
+
+	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
 }
 
 func addTestTypes() {
@@ -166,6 +168,8 @@ func addTestTypes() {
 	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
 	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
 	metav1.AddToGroupVersion(scheme, testGroupVersion)
+
+	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
 }
 
 func addNewTestTypes() {
@@ -175,6 +179,8 @@ func addNewTestTypes() {
 		&examplev1.Pod{},
 	)
 	metav1.AddToGroupVersion(scheme, newGroupVersion)
+
+	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
 }
 
 func init() {
@@ -377,7 +383,7 @@ func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
@@ -892,6 +898,10 @@ func (OnlyGetRESTStorage) NewList() runtime.Object {
 }
 
 func (OnlyGetRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	return nil, nil
+}
+
+func (OnlyGetRESTStorage) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return nil, nil
 }
 
@@ -1900,7 +1910,7 @@ func TestGetTable(t *testing.T) {
 		accept     string
 		params     url.Values
 		pretty     bool
-		expected   *metav1beta1.Table
+		expected   *metav1.Table
 		statusCode int
 		item       bool
 	}{
@@ -1935,14 +1945,14 @@ func TestGetTable(t *testing.T) {
 		{
 			item:   true,
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -1953,14 +1963,14 @@ func TestGetTable(t *testing.T) {
 				runtime.ContentTypeProtobuf + ";as=Table;v=v1beta1;g=meta.k8s.io",
 				"application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			}, ","),
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -1969,14 +1979,14 @@ func TestGetTable(t *testing.T) {
 			item:   true,
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -1984,14 +1994,14 @@ func TestGetTable(t *testing.T) {
 		{
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/test/link"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -2051,7 +2061,7 @@ func TestGetTable(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
-			var itemOut metav1beta1.Table
+			var itemOut metav1.Table
 			body, err := extractBody(resp, &itemOut)
 			if err != nil {
 				t.Fatal(err)
@@ -2117,14 +2127,14 @@ func TestWatchTable(t *testing.T) {
 				{
 					Type: "ADDED",
 					Object: runtime.RawExtension{
-						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 							},
-							Rows: []metav1beta1.TableRow{
+							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
@@ -2142,14 +2152,14 @@ func TestWatchTable(t *testing.T) {
 				{
 					Type: "ADDED",
 					Object: runtime.RawExtension{
-						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 							},
-							Rows: []metav1beta1.TableRow{
+							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
@@ -2158,10 +2168,10 @@ func TestWatchTable(t *testing.T) {
 				{
 					Type: "MODIFIED",
 					Object: runtime.RawExtension{
-						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							Rows: []metav1beta1.TableRow{
+							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
@@ -2182,7 +2192,7 @@ func TestWatchTable(t *testing.T) {
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 							},
@@ -2675,16 +2685,25 @@ func TestGetWithOptions(t *testing.T) {
 			t.Errorf("%s: unexpected response: %#v", test.name, resp)
 			continue
 		}
-		var itemOut genericapitesting.Simple
-		body, err := extractBody(resp, &itemOut)
+
+		var itemOut runtime.Object
+		if test.rootScoped {
+			itemOut = &genericapitesting.SimpleRoot{}
+		} else {
+			itemOut = &genericapitesting.Simple{}
+		}
+		body, err := extractBody(resp, itemOut)
 		if err != nil {
 			t.Errorf("%s: %v", test.name, err)
 			continue
 		}
-
-		if itemOut.Name != simpleStorage.item.Name {
-			t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
-			continue
+		if metadata, err := meta.Accessor(itemOut); err == nil {
+			if metadata.GetName() != simpleStorage.item.Name {
+				t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
+				continue
+			}
+		} else {
+			t.Errorf("%s: Couldn't get name from %#v: %v", test.name, itemOut, err)
 		}
 
 		var opts *genericapitesting.SimpleGetOptions
@@ -2789,7 +2808,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 func TestGetMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"get": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
+		errors: map[string]error{"get": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -2809,7 +2828,7 @@ func TestGetMissing(t *testing.T) {
 func TestGetRetryAfter(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"get": apierrs.NewServerTimeout(schema.GroupResource{Resource: "simples"}, "id", 2)},
+		errors: map[string]error{"get": apierrors.NewServerTimeout(schema.GroupResource{Resource: "simples"}, "id", 2)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -2912,7 +2931,7 @@ func TestConnectResponderError(t *testing.T) {
 	connectStorage := &ConnecterRESTStorage{}
 	connectStorage.handlerFunc = func() http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			connectStorage.receivedResponder.Error(apierrs.NewForbidden(schema.GroupResource{Resource: "simples"}, itemID, errors.New("you are terminated")))
+			connectStorage.receivedResponder.Error(apierrors.NewForbidden(schema.GroupResource{Resource: "simples"}, itemID, errors.New("you are terminated")))
 		})
 	}
 	storage := map[string]rest.Storage{
@@ -3258,7 +3277,7 @@ func TestDeleteMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"delete": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, ID)},
+		errors: map[string]error{"delete": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -3530,7 +3549,7 @@ func TestUpdateMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"update": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, ID)},
+		errors: map[string]error{"update": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
@@ -3568,7 +3587,7 @@ func TestCreateNotFound(t *testing.T) {
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
 			// See http://pr.k8s.io/486#discussion_r15037092.
-			errors: map[string]error{"create": apierrs.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
+			errors: map[string]error{"create": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 		},
 	})
 	server := httptest.NewServer(handler)
@@ -4204,7 +4223,7 @@ func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *m
 func TestDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
-			return nil, apierrs.NewAlreadyExists(schema.GroupResource{Resource: "foos"}, "bar")
+			return nil, apierrors.NewAlreadyExists(schema.GroupResource{Resource: "foos"}, "bar")
 		},
 	}
 	handler := handle(map[string]rest.Storage{"foo": &storage})

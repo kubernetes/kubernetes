@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -104,9 +104,9 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to reconcile.")
-	cmd.Flags().BoolVar(&o.DryRun, "dry-run", o.DryRun, "If true, display results but do not submit changes")
 	cmd.Flags().BoolVar(&o.RemoveExtraPermissions, "remove-extra-permissions", o.RemoveExtraPermissions, "If true, removes extra permissions added to roles")
 	cmd.Flags().BoolVar(&o.RemoveExtraSubjects, "remove-extra-subjects", o.RemoveExtraSubjects, "If true, removes extra subjects added to rolebindings")
+	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd
 }
@@ -120,6 +120,8 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
 	}
+
+	o.DryRun = getClientSideDryRun(cmd)
 
 	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -327,4 +329,15 @@ func (o *ReconcileOptions) printResults(object runtime.Object,
 			}
 		}
 	}
+}
+
+func getClientSideDryRun(cmd *cobra.Command) bool {
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		klog.Fatalf("error accessing --dry-run flag for command %s: %v", cmd.Name(), err)
+	}
+	if dryRunStrategy == cmdutil.DryRunServer {
+		klog.Fatalf("--dry-run=server for command %s is not supported yet", cmd.Name())
+	}
+	return dryRunStrategy == cmdutil.DryRunClient
 }

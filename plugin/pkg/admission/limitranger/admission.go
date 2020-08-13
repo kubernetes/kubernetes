@@ -167,7 +167,7 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRan
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
+			liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return nil, admission.NewForbidden(a, err)
 			}

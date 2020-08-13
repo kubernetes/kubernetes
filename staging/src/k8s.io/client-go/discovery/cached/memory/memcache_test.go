@@ -205,16 +205,22 @@ func TestServerGroupsFails(t *testing.T) {
 func TestPartialPermanentFailure(t *testing.T) {
 	fake := &fakeDiscovery{
 		groupList: &metav1.APIGroupList{
-			Groups: []metav1.APIGroup{{
-				Name: "astronomy",
-				Versions: []metav1.GroupVersionForDiscovery{{
-					GroupVersion: "astronomy/v8beta1",
-					Version:      "v8beta1",
-				}, {
-					GroupVersion: "astronomy2/v8beta1",
-					Version:      "v8beta1",
-				}},
-			}},
+			Groups: []metav1.APIGroup{
+				{
+					Name: "astronomy",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
+				{
+					Name: "astronomy2",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy2/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
+			},
 		},
 		resourceMap: map[string]*resourceMapEntry{
 			"astronomy/v8beta1": {
@@ -286,16 +292,22 @@ func TestPartialPermanentFailure(t *testing.T) {
 func TestPartialRetryableFailure(t *testing.T) {
 	fake := &fakeDiscovery{
 		groupList: &metav1.APIGroupList{
-			Groups: []metav1.APIGroup{{
-				Name: "astronomy",
-				Versions: []metav1.GroupVersionForDiscovery{{
-					GroupVersion: "astronomy/v8beta1",
-					Version:      "v8beta1",
-				}, {
-					GroupVersion: "astronomy2/v8beta1",
-					Version:      "v8beta1",
-				}},
-			}},
+			Groups: []metav1.APIGroup{
+				{
+					Name: "astronomy",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
+				{
+					Name: "astronomy2",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy2/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
+			},
 		},
 		resourceMap: map[string]*resourceMapEntry{
 			"astronomy/v8beta1": {

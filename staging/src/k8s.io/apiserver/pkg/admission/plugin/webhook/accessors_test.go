@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	fuzz "github.com/google/gofuzz"
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -30,7 +30,7 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 	f := fuzz.New()
 	for i := 0; i < 100; i++ {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
-			orig := &v1beta1.MutatingWebhook{}
+			orig := &v1.MutatingWebhook{}
 			f.Fuzz(orig)
 
 			// zero out any accessor type specific fields not included in the accessor
@@ -51,7 +51,7 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 			if _, ok := accessor.GetValidatingWebhook(); ok {
 				t.Errorf("expected GetValidatingWebhook to be nil for mutating webhook accessor")
 			}
-			copy := &v1beta1.MutatingWebhook{
+			copy := &v1.MutatingWebhook{
 				Name:                    accessor.GetName(),
 				ClientConfig:            accessor.GetClientConfig(),
 				Rules:                   accessor.GetRules(),
@@ -74,7 +74,7 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 	f := fuzz.New()
 	for i := 0; i < 100; i++ {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
-			orig := &v1beta1.ValidatingWebhook{}
+			orig := &v1.ValidatingWebhook{}
 			f.Fuzz(orig)
 			uid := fmt.Sprintf("test.configuration.admission/%s/0", orig.Name)
 			accessor := NewValidatingWebhookAccessor(uid, "test.configuration.admission", orig)
@@ -91,7 +91,7 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 			if _, ok := accessor.GetMutatingWebhook(); ok {
 				t.Errorf("expected GetMutatingWebhook to be nil for validating webhook accessor")
 			}
-			copy := &v1beta1.ValidatingWebhook{
+			copy := &v1.ValidatingWebhook{
 				Name:                    accessor.GetName(),
 				ClientConfig:            accessor.GetClientConfig(),
 				Rules:                   accessor.GetRules(),

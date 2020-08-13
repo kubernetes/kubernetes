@@ -19,3 +19,5 @@ reviewers:
 - copejon
 - verult
 - davidz627
+labels:
+- sig/storage

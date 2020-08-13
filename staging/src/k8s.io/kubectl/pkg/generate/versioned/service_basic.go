@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubectl/pkg/generate"
+	utilsnet "k8s.io/utils/net"
 )
 
 type ServiceCommonGeneratorV1 struct {
@@ -86,13 +87,9 @@ func (ServiceExternalNameGeneratorV1) ParamNames() []generate.GeneratorParam {
 func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	portStringSlice := strings.Split(portString, ":")
 
-	port, err := strconv.Atoi(portStringSlice[0])
+	port, err := utilsnet.ParsePort(portStringSlice[0], true)
 	if err != nil {
 		return 0, intstr.FromInt(0), err
-	}
-
-	if errs := validation.IsValidPortNum(port); len(errs) != 0 {
-		return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
 	}
 
 	if len(portStringSlice) == 1 {

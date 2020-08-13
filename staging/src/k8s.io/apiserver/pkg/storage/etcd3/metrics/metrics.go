@@ -49,14 +49,13 @@ var (
 		},
 		[]string{"resource"},
 	)
-
-	deprecatedEtcdRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
-		&compbasemetrics.SummaryOpts{
-			Name:           "etcd_request_latencies_summary",
-			Help:           "(Deprecated) Etcd request latency summary in microseconds for each operation and object type.",
+	dbTotalSize = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "etcd_db_total_size_in_bytes",
+			Help:           "Total size of the etcd database file physically allocated in bytes.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"operation", "type"},
+		[]string{"endpoint"},
 	)
 )
 
@@ -68,9 +67,7 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
-
-		// TODO(danielqsj): Remove the following metrics, they are deprecated
-		legacyregistry.MustRegister(deprecatedEtcdRequestLatenciesSummary)
+		legacyregistry.MustRegister(dbTotalSize)
 	})
 }
 
@@ -82,22 +79,19 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 // RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
-	deprecatedEtcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(sinceInMicroseconds(startTime))
 }
 
 // Reset resets the etcd_request_duration_seconds metric.
 func Reset() {
 	etcdRequestLatency.Reset()
-
-	deprecatedEtcdRequestLatenciesSummary.Reset()
-}
-
-// sinceInMicroseconds gets the time since the specified start in microseconds.
-func sinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
 
 // sinceInSeconds gets the time since the specified start in seconds.
 func sinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+// UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
+func UpdateEtcdDbSize(ep string, size int64) {
+	dbTotalSize.WithLabelValues(ep).Set(float64(size))
 }

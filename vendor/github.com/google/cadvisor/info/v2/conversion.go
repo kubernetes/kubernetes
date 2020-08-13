@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
@@ -101,7 +101,8 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 	var last *v1.ContainerStats
 	for _, val := range stats {
 		stat := &ContainerStats{
-			Timestamp: val.Timestamp,
+			Timestamp:        val.Timestamp,
+			ReferencedMemory: val.ReferencedMemory,
 		}
 		if spec.HasCpu {
 			stat.Cpu = &val.Cpu
@@ -115,6 +116,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		}
 		if spec.HasMemory {
 			stat.Memory = &val.Memory
+		}
+		if spec.HasHugetlb {
+			stat.Hugetlb = &val.Hugetlb
 		}
 		if spec.HasNetwork {
 			// TODO: Handle TcpStats
@@ -148,6 +152,15 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		if len(val.Accelerators) > 0 {
 			stat.Accelerators = val.Accelerators
 		}
+		if len(val.PerfStats) > 0 {
+			stat.PerfStats = val.PerfStats
+		}
+		if len(val.PerfUncoreStats) > 0 {
+			stat.PerfUncoreStats = val.PerfUncoreStats
+		}
+		if len(val.Resctrl.MemoryBandwidth) > 0 || len(val.Resctrl.Cache) > 0 {
+			stat.Resctrl = val.Resctrl
+		}
 		// TODO(rjnagal): Handle load stats.
 		newStats = append(newStats, stat)
 	}
@@ -162,10 +175,12 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 			Timestamp:        val.Timestamp,
 			HasCpu:           cont.Spec.HasCpu,
 			HasMemory:        cont.Spec.HasMemory,
+			HasHugetlb:       cont.Spec.HasHugetlb,
 			HasNetwork:       cont.Spec.HasNetwork,
 			HasFilesystem:    cont.Spec.HasFilesystem,
 			HasDiskIo:        cont.Spec.HasDiskIo,
 			HasCustomMetrics: cont.Spec.HasCustomMetrics,
+			ReferencedMemory: val.ReferencedMemory,
 		}
 		if stat.HasCpu {
 			stat.Cpu = val.Cpu
@@ -179,6 +194,9 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 		}
 		if stat.HasMemory {
 			stat.Memory = val.Memory
+		}
+		if stat.HasHugetlb {
+			stat.Hugetlb = val.Hugetlb
 		}
 		if stat.HasNetwork {
 			stat.Network.Interfaces = val.Network.Interfaces
@@ -194,6 +212,15 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 		}
 		if stat.HasCustomMetrics {
 			stat.CustomMetrics = val.CustomMetrics
+		}
+		if len(val.PerfStats) > 0 {
+			stat.PerfStats = val.PerfStats
+		}
+		if len(val.PerfUncoreStats) > 0 {
+			stat.PerfUncoreStats = val.PerfUncoreStats
+		}
+		if len(val.Resctrl.MemoryBandwidth) > 0 || len(val.Resctrl.Cache) > 0 {
+			stat.Resctrl = val.Resctrl
 		}
 		// TODO(rjnagal): Handle load stats.
 		stats = append(stats, stat)
@@ -259,6 +286,7 @@ func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace s
 		CreationTime:     specV1.CreationTime,
 		HasCpu:           specV1.HasCpu,
 		HasMemory:        specV1.HasMemory,
+		HasHugetlb:       specV1.HasHugetlb,
 		HasFilesystem:    specV1.HasFilesystem,
 		HasNetwork:       specV1.HasNetwork,
 		HasProcesses:     specV1.HasProcesses,

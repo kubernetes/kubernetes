@@ -136,9 +136,9 @@ type retryPolicy struct {
 	maxAttempts int
 
 	// Exponential backoff parameters. The initial retry attempt will occur at
-	// random(0, initialBackoffMS). In general, the nth attempt will occur at
+	// random(0, initialBackoff). In general, the nth attempt will occur at
 	// random(0,
-	//   min(initialBackoffMS*backoffMultiplier**(n-1), maxBackoffMS)).
+	//   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
 	//
 	// These fields are required and must be greater than zero.
 	initialBackoff    time.Duration
@@ -261,20 +261,17 @@ type jsonSC struct {
 }
 
 func init() {
-	internal.ParseServiceConfig = func(sc string) (interface{}, error) {
-		return parseServiceConfig(sc)
-	}
+	internal.ParseServiceConfigForTesting = parseServiceConfig
 }
-
-func parseServiceConfig(js string) (*ServiceConfig, error) {
+func parseServiceConfig(js string) *serviceconfig.ParseResult {
 	if len(js) == 0 {
-		return nil, fmt.Errorf("no JSON service config provided")
+		return &serviceconfig.ParseResult{Err: fmt.Errorf("no JSON service config provided")}
 	}
 	var rsc jsonSC
 	err := json.Unmarshal([]byte(js), &rsc)
 	if err != nil {
 		grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
-		return nil, err
+		return &serviceconfig.ParseResult{Err: err}
 	}
 	sc := ServiceConfig{
 		LB:                rsc.LoadBalancingPolicy,
@@ -288,7 +285,7 @@ func parseServiceConfig(js string) (*ServiceConfig, error) {
 			if len(lbcfg) != 1 {
 				err := fmt.Errorf("invalid loadBalancingConfig: entry %v does not contain exactly 1 policy/config pair: %q", i, lbcfg)
 				grpclog.Warningf(err.Error())
-				return nil, err
+				return &serviceconfig.ParseResult{Err: err}
 			}
 			var name string
 			var jsonCfg json.RawMessage
@@ -303,17 +300,25 @@ func parseServiceConfig(js string) (*ServiceConfig, error) {
 				var err error
 				sc.lbConfig.cfg, err = parser.ParseConfig(jsonCfg)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing loadBalancingConfig for policy %q: %v", name, err)
+					return &serviceconfig.ParseResult{Err: fmt.Errorf("error parsing loadBalancingConfig for policy %q: %v", name, err)}
 				}
 			} else if string(jsonCfg) != "{}" {
 				grpclog.Warningf("non-empty balancer configuration %q, but balancer does not implement ParseConfig", string(jsonCfg))
 			}
 			break
 		}
+		if sc.lbConfig == nil {
+			// We had a loadBalancingConfig field but did not encounter a
+			// supported policy.  The config is considered invalid in this
+			// case.
+			err := fmt.Errorf("invalid loadBalancingConfig: no supported policies found")
+			grpclog.Warningf(err.Error())
+			return &serviceconfig.ParseResult{Err: err}
+		}
 	}
 
 	if rsc.MethodConfig == nil {
-		return &sc, nil
+		return &serviceconfig.ParseResult{Config: &sc}
 	}
 	for _, m := range *rsc.MethodConfig {
 		if m.Name == nil {
@@ -322,7 +327,7 @@ func parseServiceConfig(js string) (*ServiceConfig, error) {
 		d, err := parseDuration(m.Timeout)
 		if err != nil {
 			grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
-			return nil, err
+			return &serviceconfig.ParseResult{Err: err}
 		}
 
 		mc := MethodConfig{
@@ -331,7 +336,7 @@ func parseServiceConfig(js string) (*ServiceConfig, error) {
 		}
 		if mc.retryPolicy, err = convertRetryPolicy(m.RetryPolicy); err != nil {
 			grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
-			return nil, err
+			return &serviceconfig.ParseResult{Err: err}
 		}
 		if m.MaxRequestMessageBytes != nil {
 			if *m.MaxRequestMessageBytes > int64(maxInt) {
@@ -356,13 +361,13 @@ func parseServiceConfig(js string) (*ServiceConfig, error) {
 
 	if sc.retryThrottling != nil {
 		if mt := sc.retryThrottling.MaxTokens; mt <= 0 || mt > 1000 {
-			return nil, fmt.Errorf("invalid retry throttling config: maxTokens (%v) out of range (0, 1000]", mt)
+			return &serviceconfig.ParseResult{Err: fmt.Errorf("invalid retry throttling config: maxTokens (%v) out of range (0, 1000]", mt)}
 		}
 		if tr := sc.retryThrottling.TokenRatio; tr <= 0 {
-			return nil, fmt.Errorf("invalid retry throttling config: tokenRatio (%v) may not be negative", tr)
+			return &serviceconfig.ParseResult{Err: fmt.Errorf("invalid retry throttling config: tokenRatio (%v) may not be negative", tr)}
 		}
 	}
-	return &sc, nil
+	return &serviceconfig.ParseResult{Config: &sc}
 }
 
 func convertRetryPolicy(jrp *jsonRetryPolicy) (p *retryPolicy, err error) {

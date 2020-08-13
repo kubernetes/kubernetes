@@ -24,7 +24,7 @@ import (
 	"k8s.io/code-generator/cmd/lister-gen/generators"
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/lister-gen/args"
 )
@@ -50,7 +50,7 @@ func main() {
 
 	// Run it.
 	if err := genericArgs.Execute(
-		generators.NameSystems(),
+		generators.NameSystems(util.PluralExceptionListToMapOrDie(customArgs.PluralExceptions)),
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {

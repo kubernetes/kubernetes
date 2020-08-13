@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -29,9 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -59,6 +62,10 @@ var (
 	// Specialized verbs and GroupResources
 	specialVerbs = map[string][]schema.GroupResource{
 		"use": {
+			{
+				Group:    "policy",
+				Resource: "podsecuritypolicies",
+			},
 			{
 				Group:    "extensions",
 				Resource: "podsecuritypolicies",
@@ -121,12 +128,16 @@ type CreateRoleOptions struct {
 	Resources     []ResourceOptions
 	ResourceNames []string
 
-	DryRun       bool
-	OutputFormat string
-	Namespace    string
-	Client       clientgorbacv1.RbacV1Interface
-	Mapper       meta.RESTMapper
-	PrintObj     func(obj runtime.Object) error
+	DryRunStrategy   cmdutil.DryRunStrategy
+	DryRunVerifier   *resource.DryRunVerifier
+	OutputFormat     string
+	Namespace        string
+	EnforceNamespace bool
+	Client           clientgorbacv1.RbacV1Interface
+	Mapper           meta.RESTMapper
+	PrintObj         func(obj runtime.Object) error
+	FieldManager     string
+	CreateAnnotation bool
 
 	genericclioptions.IOStreams
 }
@@ -145,7 +156,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	o := NewCreateRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 roleLong,
 		Long:                  roleLong,
@@ -165,7 +176,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	cmd.Flags().StringSliceVar(&o.Verbs, "verb", o.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
 	cmd.Flags().StringArrayVar(&o.ResourceNames, "resource-name", o.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
-
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
@@ -231,12 +242,23 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return err
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
-
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
 	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -245,7 +267,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -334,10 +356,27 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		return err
 	}
 	role.Rules = rules
+	if o.EnforceNamespace {
+		role.Namespace = o.Namespace
+	}
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, role, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
 
 	// Create role.
-	if !o.DryRun {
-		role, err = o.Client.Roles(o.Namespace).Create(role)
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(role.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		role, err = o.Client.Roles(o.Namespace).Create(context.TODO(), role, createOptions)
 		if err != nil {
 			return err
 		}

@@ -104,7 +104,7 @@ Improving test coverage and augmenting e2e tests with integration tests is also 
 Improving code coverage allows the project to move more quickly by reducing regressions issues that the SIG must field,
 and by providing a safety net for code reviewers ensuring changes don’t break existing functionality.
 
-[e2e tests]: https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md
+[e2e tests]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md
 
 - Write unit tests for functionality currently only covered by integration and [e2e tests].
    > Integration tests may run processes, such as the apiserver, but do so locally.

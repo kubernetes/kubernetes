@@ -7,13 +7,13 @@ package gonum
 import "gonum.org/v1/gonum/blas"
 
 // Dgehd2 reduces a block of a general n×n matrix A to upper Hessenberg form H
-// by an orthogonal similarity transformation Q^T * A * Q = H.
+// by an orthogonal similarity transformation Qᵀ * A * Q = H.
 //
 // The matrix Q is represented as a product of (ihi-ilo) elementary
 // reflectors
 //  Q = H_{ilo} H_{ilo+1} ... H_{ihi-1}.
 // Each H_i has the form
-//  H_i = I - tau[i] * v * v^T
+//  H_i = I - tau[i] * v * vᵀ
 // where v is a real vector with v[0:i+1] = 0, v[i+1] = 1 and v[ihi+1:n] = 0.
 // v[i+2:ihi+1] is stored on exit in A[i+2:ihi+1,i].
 //

@@ -20,16 +20,16 @@ const (
 	// ErrCodeLimitExceededFault for service response error code
 	// "LimitExceeded".
 	//
-	// You have already reached a limit for your Auto Scaling resources (for example,
-	// groups, launch configurations, or lifecycle hooks). For more information,
-	// see DescribeAccountLimits.
+	// You have already reached a limit for your Amazon EC2 Auto Scaling resources
+	// (for example, Auto Scaling groups, launch configurations, or lifecycle hooks).
+	// For more information, see DescribeAccountLimits.
 	ErrCodeLimitExceededFault = "LimitExceeded"
 
 	// ErrCodeResourceContentionFault for service response error code
 	// "ResourceContention".
 	//
-	// You already have a pending update to an Auto Scaling resource (for example,
-	// a group, instance, or load balancer).
+	// You already have a pending update to an Amazon EC2 Auto Scaling resource
+	// (for example, an Auto Scaling group, instance, or load balancer).
 	ErrCodeResourceContentionFault = "ResourceContention"
 
 	// ErrCodeResourceInUseFault for service response error code

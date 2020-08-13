@@ -19,7 +19,7 @@ package common
 import (
 	"github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -31,7 +31,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	f := framework.NewDefaultFramework("containers")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Docker containers, without command and arguments
 		Description: Default command and arguments from the docker image entrypoint MUST be used when Pod does not specify the container command
 	*/
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Docker containers, with arguments
 		Description: Default command and  from the docker image entrypoint MUST be used when Pod does not specify the container command but the arguments from Pod spec MUST override when specified.
 	*/
@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
 	// are ignored.
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Docker containers, with command
 		Description: Default command from the docker image entrypoint MUST NOT be used when Pod specifies the container command.  Command from Pod spec MUST override the command in the image.
 	*/
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Docker containers, with command and arguments
 		Description: Default command and arguments from the docker image entrypoint MUST NOT be used when Pod specifies the container command and arguments.  Command and arguments from Pod spec MUST override the command and arguments in the image.
 	*/

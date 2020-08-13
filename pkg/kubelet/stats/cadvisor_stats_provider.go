@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,8 +38,10 @@ import (
 )
 
 // cadvisorStatsProvider implements the containerStatsProvider interface by
-// getting the container stats from cAdvisor. This is needed by docker and rkt
-// integrations since they do not provide stats from CRI.
+// getting the container stats from cAdvisor. This is needed by
+// integrations which do not provide stats from CRI. See
+// `pkg/kubelet/cadvisor/util.go#UsingLegacyCadvisorStats` for the logic for
+// determining which integrations do not provide stats from CRI.
 type cadvisorStatsProvider struct {
 	// cadvisor is used to get the stats of the cgroup for the containers that
 	// are managed by pods.
@@ -118,7 +120,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		if containerName == leaky.PodInfraContainerName {
 			// Special case for infrastructure container which is hidden from
 			// the user and has network stats.
-			podStats.Network = cadvisorInfoToNetworkStats("pod:"+ref.Namespace+"_"+ref.Name, &cinfo)
+			podStats.Network = cadvisorInfoToNetworkStats(&cinfo)
 		} else {
 			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo))
 		}
@@ -133,7 +135,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		if vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID); found {
 			ephemeralStats = make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
 			copy(ephemeralStats, vstats.EphemeralVolumes)
-			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
+			podStats.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
 		}
 		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, nil, false)
 		// Lookup the pod-level cgroup's CPU and memory stats
@@ -142,6 +144,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
 			podStats.CPU = cpu
 			podStats.Memory = memory
+			podStats.ProcessStats = cadvisorInfoToProcessStats(podInfo)
 		}
 
 		status, found := p.statusProvider.GetPodStatus(podUID)
@@ -329,16 +332,11 @@ func removeTerminatedContainerInfo(containerInfo map[string]cadvisorapiv2.Contai
 			continue
 		}
 		sort.Sort(ByCreationTime(refs))
-		i := 0
-		for ; i < len(refs); i++ {
+		for i := len(refs) - 1; i >= 0; i-- {
 			if hasMemoryAndCPUInstUsage(&refs[i].cinfo) {
-				// Stops removing when we first see an info with non-zero
-				// CPU/Memory usage.
+				result[refs[i].cgroup] = refs[i].cinfo
 				break
 			}
-		}
-		for ; i < len(refs); i++ {
-			result[refs[i].cgroup] = refs[i].cinfo
 		}
 	}
 	return result

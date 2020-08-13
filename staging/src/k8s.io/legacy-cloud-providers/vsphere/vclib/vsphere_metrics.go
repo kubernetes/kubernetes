@@ -19,8 +19,6 @@ package vclib
 import (
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -103,17 +101,17 @@ func RecordvSphereMetric(actionName string, requestTime time.Time, err error) {
 
 func recordvSphereAPIMetric(actionName string, requestTime time.Time, err error) {
 	if err != nil {
-		vsphereAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+		vsphereAPIErrorMetric.With(metrics.Labels{"request": actionName}).Inc()
 	} else {
-		vsphereAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(calculateTimeTaken(requestTime))
+		vsphereAPIMetric.With(metrics.Labels{"request": actionName}).Observe(calculateTimeTaken(requestTime))
 	}
 }
 
 func recordvSphereOperationMetric(actionName string, requestTime time.Time, err error) {
 	if err != nil {
-		vsphereOperationErrorMetric.With(prometheus.Labels{"operation": actionName}).Inc()
+		vsphereOperationErrorMetric.With(metrics.Labels{"operation": actionName}).Inc()
 	} else {
-		vsphereOperationMetric.With(prometheus.Labels{"operation": actionName}).Observe(calculateTimeTaken(requestTime))
+		vsphereOperationMetric.With(metrics.Labels{"operation": actionName}).Observe(calculateTimeTaken(requestTime))
 	}
 }
 

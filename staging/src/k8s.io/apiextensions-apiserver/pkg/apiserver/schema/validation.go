@@ -311,6 +311,9 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 	if v.ForbiddenExtensions.XListType != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-list-type"), "must be undefined to be structural"))
 	}
+	if v.ForbiddenExtensions.XMapType != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-map-type"), "must be undefined to be structural"))
+	}
 
 	// forbid reasoning about metadata because it can lead to metadata restriction we don't want
 	if _, found := v.Properties["metadata"]; found {

@@ -34,16 +34,14 @@ import (
 	"testing"
 	"time"
 
-	cfsslconfig "github.com/cloudflare/cfssl/config"
-	cfsslsigner "github.com/cloudflare/cfssl/signer"
-	cfssllocal "github.com/cloudflare/cfssl/signer/local"
-
-	certapi "k8s.io/api/certificates/v1beta1"
+	certapi "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
+	"k8s.io/kubernetes/pkg/controller/certificates/authority"
 )
 
 // Test_buildClientCertificateManager validates that we can build a local client cert
@@ -280,7 +278,7 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	switch {
-	case req.Method == "POST" && req.URL.Path == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests":
+	case req.Method == "POST" && req.URL.Path == "/apis/certificates.k8s.io/v1/certificatesigningrequests":
 		csr, err := getCSR(req)
 		if err != nil {
 			t.Fatal(err)
@@ -297,34 +295,28 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		csr = csr.DeepCopy()
 		csr.ResourceVersion = "2"
-		var usages []string
-		for _, usage := range csr.Spec.Usages {
-			usages = append(usages, string(usage))
+		ca := &authority.CertificateAuthority{
+			Certificate: s.serverCA,
+			PrivateKey:  s.serverPrivateKey,
+			Backdate:    s.backdate,
 		}
-		policy := &cfsslconfig.Signing{
-			Default: &cfsslconfig.SigningProfile{
-				Usage:        usages,
-				Expiry:       time.Hour,
-				ExpiryString: time.Hour.String(),
-				Backdate:     s.backdate,
-			},
-		}
-		cfs, err := cfssllocal.NewSigner(s.serverPrivateKey, s.serverCA, cfsslsigner.DefaultSigAlgo(s.serverPrivateKey), policy)
+		cr, err := capihelper.ParseCSR(csr.Spec.Request)
 		if err != nil {
 			t.Fatal(err)
 		}
-		csr.Status.Certificate, err = cfs.Sign(cfsslsigner.SignRequest{
-			Request: string(csr.Spec.Request),
+		der, err := ca.Sign(cr.Raw, authority.PermissiveSigningPolicy{
+			TTL: time.Hour,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
+		csr.Status.Certificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 		csr.Status.Conditions = []certapi.CertificateSigningRequestCondition{
 			{Type: certapi.CertificateApproved},
 		}
 		s.csr = csr
 
-	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&limit=500&resourceVersion=0":
+	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1/certificatesigningrequests" && (req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&limit=500&resourceVersion=0" || req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr"):
 		if s.csr == nil {
 			t.Fatalf("no csr")
 		}
@@ -341,7 +333,7 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 
-	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&resourceVersion=2&watch=true":
+	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&resourceVersion=2&watch=true":
 		if s.csr == nil {
 			t.Fatalf("no csr")
 		}

@@ -984,6 +984,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 		pod                 *api.Pod
 		verifierAnnotations map[string]string
 		expectedAnnotations map[string]string
+		wantErr             bool
 	}{
 		{
 			test: "Add valid response annotations",
@@ -1029,6 +1030,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			expectedAnnotations: map[string]string{
 				"imagepolicywebhook.image-policy.k8s.io/foo-test": "false",
 			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -1058,6 +1060,14 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			attr = &fakeAttributes{attr, annotations}
 
 			err = wh.Validate(context.TODO(), attr, nil)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("%s: expected error making admission request: %v", tt.test, err)
+				}
+			} else if err != nil {
+				t.Errorf("%s: failed to admit: %v", tt.test, err)
+			}
+
 			if !reflect.DeepEqual(annotations, tt.expectedAnnotations) {
 				t.Errorf("got audit annotations: %v; want: %v", annotations, tt.expectedAnnotations)
 			}

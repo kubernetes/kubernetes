@@ -26,7 +26,9 @@ import (
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	openapiv2 "k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2"
@@ -48,6 +50,7 @@ import (
 const (
 	// Reference and Go types for built-in metadata
 	objectMetaSchemaRef = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+	listMetaSchemaRef   = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
 	listMetaType        = "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"
 	typeMetaType        = "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"
 
@@ -55,7 +58,8 @@ const (
 )
 
 var (
-	swaggerPartialObjectMetadataDescriptions = metav1beta1.PartialObjectMetadata{}.SwaggerDoc()
+	swaggerPartialObjectMetadataDescriptions     = metav1beta1.PartialObjectMetadata{}.SwaggerDoc()
+	swaggerPartialObjectMetadataListDescriptions = metav1beta1.PartialObjectMetadataList{}.SwaggerDoc()
 
 	nameToken      = "{name}"
 	namespaceToken = "{namespace}"
@@ -76,21 +80,28 @@ type Options struct {
 	// Strip value validation.
 	StripValueValidation bool
 
+	// Strip nullable.
+	StripNullable bool
+
 	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
 	AllowNonStructural bool
 }
 
 // BuildSwagger builds swagger for the given crd in the given version
-func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
+func BuildSwagger(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
 	var schema *structuralschema.Structural
-	s, err := apiextensions.GetSchemaForVersion(crd, version)
+	s, err := apiextensionshelpers.GetSchemaForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
 
 	if s != nil && s.OpenAPIV3Schema != nil {
-		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
-			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
+		internalCRDSchema := &apiextensionsinternal.CustomResourceValidation{}
+		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
+			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
+		}
+		if !validation.SchemaHasInvalidTypes(internalCRDSchema.OpenAPIV3Schema) {
+			if ss, err := structuralschema.NewStructural(internalCRDSchema.OpenAPIV3Schema); err == nil {
 				// skip non-structural schemas unless explicitly asked to produce swagger from them
 				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
 					schema = ss
@@ -100,6 +111,9 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 					}
 					if opts.StripValueValidation {
 						schema = schema.StripValueValidations()
+					}
+					if opts.StripNullable {
+						schema = schema.StripNullable()
 					}
 
 					schema = schema.Unfold()
@@ -145,7 +159,7 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 	routes = append(routes, b.buildRoute(root, "/{name}", "DELETE", "delete", "delete", status))
 	routes = append(routes, b.buildRoute(root, "/{name}", "PATCH", "patch", "patch", sample).Reads(patch))
 
-	subresources, err := apiextensions.GetSubresourcesForVersion(crd, version)
+	subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +459,8 @@ func (b *builder) buildListSchema() *spec.Schema {
 	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
 		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(name)).WithDescription(doc)).
-		SetProperty("metadata", getDefinition(listMetaType))
+		SetProperty("metadata", *spec.RefSchema(listMetaSchemaRef).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
+
 	addTypeMetaProperties(s)
 	s.AddExtension(endpoints.ROUTE_META_GVK, []map[string]string{
 		{
@@ -492,7 +507,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 	}
 }
 
-func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
+func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
 	b := &builder{
 		schema: &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
@@ -506,13 +521,12 @@ func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, sch
 		listKind: crd.Spec.Names.ListKind,
 		plural:   crd.Spec.Names.Plural,
 	}
-	if crd.Spec.Scope == apiextensions.NamespaceScoped {
+	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		b.namespaced = true
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	preserveUnknownFields := crd.Spec.PreserveUnknownFields != nil && *crd.Spec.PreserveUnknownFields
-	b.schema = b.buildKubeNative(schema, v2, preserveUnknownFields)
+	b.schema = b.buildKubeNative(schema, v2, crd.Spec.PreserveUnknownFields)
 	b.listSchema = b.buildListSchema()
 
 	return b

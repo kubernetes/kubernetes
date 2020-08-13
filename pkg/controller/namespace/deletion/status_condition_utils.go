@@ -48,16 +48,22 @@ var (
 		v1.NamespaceDeletionDiscoveryFailure,
 		v1.NamespaceDeletionGVParsingFailure,
 		v1.NamespaceDeletionContentFailure,
+		v1.NamespaceContentRemaining,
+		v1.NamespaceFinalizersRemaining,
 	}
 	okMessages = map[v1.NamespaceConditionType]string{
 		v1.NamespaceDeletionDiscoveryFailure: "All resources successfully discovered",
 		v1.NamespaceDeletionGVParsingFailure: "All legacy kube types successfully parsed",
-		v1.NamespaceDeletionContentFailure:   "All content successfully deleted",
+		v1.NamespaceDeletionContentFailure:   "All content successfully deleted, may be waiting on finalization",
+		v1.NamespaceContentRemaining:         "All content successfully removed",
+		v1.NamespaceFinalizersRemaining:      "All content-preserving finalizers finished",
 	}
 	okReasons = map[v1.NamespaceConditionType]string{
 		v1.NamespaceDeletionDiscoveryFailure: "ResourcesDiscovered",
 		v1.NamespaceDeletionGVParsingFailure: "ParsedGroupVersions",
 		v1.NamespaceDeletionContentFailure:   "ContentDeleted",
+		v1.NamespaceContentRemaining:         "ContentRemoved",
+		v1.NamespaceFinalizersRemaining:      "ContentHasNoFinalizers",
 	}
 )
 
@@ -90,6 +96,47 @@ func (u *namespaceConditionUpdater) ProcessDiscoverResourcesErr(err error) {
 	}
 	u.newConditions = append(u.newConditions, d)
 
+}
+
+// ProcessContentTotals may create conditions for NamespaceContentRemaining and NamespaceFinalizersRemaining.
+func (u *namespaceConditionUpdater) ProcessContentTotals(contentTotals allGVRDeletionMetadata) {
+	if len(contentTotals.gvrToNumRemaining) != 0 {
+		remainingResources := []string{}
+		for gvr, numRemaining := range contentTotals.gvrToNumRemaining {
+			if numRemaining == 0 {
+				continue
+			}
+			remainingResources = append(remainingResources, fmt.Sprintf("%s.%s has %d resource instances", gvr.Resource, gvr.Group, numRemaining))
+		}
+		// sort for stable updates
+		sort.Strings(remainingResources)
+		u.newConditions = append(u.newConditions, v1.NamespaceCondition{
+			Type:               v1.NamespaceContentRemaining,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "SomeResourcesRemain",
+			Message:            fmt.Sprintf("Some resources are remaining: %s", strings.Join(remainingResources, ", ")),
+		})
+	}
+
+	if len(contentTotals.finalizersToNumRemaining) != 0 {
+		remainingByFinalizer := []string{}
+		for finalizer, numRemaining := range contentTotals.finalizersToNumRemaining {
+			if numRemaining == 0 {
+				continue
+			}
+			remainingByFinalizer = append(remainingByFinalizer, fmt.Sprintf("%s in %d resource instances", finalizer, numRemaining))
+		}
+		// sort for stable updates
+		sort.Strings(remainingByFinalizer)
+		u.newConditions = append(u.newConditions, v1.NamespaceCondition{
+			Type:               v1.NamespaceFinalizersRemaining,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "SomeFinalizersRemain",
+			Message:            fmt.Sprintf("Some content in the namespace has finalizers remaining: %s", strings.Join(remainingByFinalizer, ", ")),
+		})
+	}
 }
 
 // ProcessDeleteContentErr creates error condition from multiple delete content errors.

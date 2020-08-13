@@ -17,10 +17,17 @@ limitations under the License.
 package endpoint
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {
@@ -74,16 +81,19 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 			union: sets.NewString(),
 		},
 	}
-	for _, testCase := range testCases {
-		retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
-		if !retval.Equal(testCase.xor) {
-			t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
-		}
 
-		retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
-		if !retval.Equal(testCase.union) {
-			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
-		}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
+			if !retval.Equal(testCase.xor) {
+				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
+			}
+
+			retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
+			if !retval.Equal(testCase.union) {
+				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
+			}
+		})
 	}
 }
 
@@ -92,9 +102,10 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 // 12 true cases.
 func TestShouldPodBeInEndpoints(t *testing.T) {
 	testCases := []struct {
-		name     string
-		pod      *v1.Pod
-		expected bool
+		name            string
+		pod             *v1.Pod
+		publishNotReady bool
+		expected        bool
 	}{
 		// Pod should not be in endpoints:
 		{
@@ -149,6 +160,23 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 				},
 			},
 			expected: false,
+		},
+		{
+			name: "Terminating Pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					PodIP: "1.2.3.4",
+				},
+			},
+			publishNotReady: false,
+			expected:        false,
 		},
 		// Pod should be in endpoints:
 		{
@@ -216,11 +244,423 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "Terminating Pod with publish not ready",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					PodIP: "1.2.3.4",
+				},
+			},
+			publishNotReady: true,
+			expected:        true,
+		},
 	}
+
 	for _, test := range testCases {
-		result := ShouldPodBeInEndpoints(test.pod)
-		if result != test.expected {
-			t.Errorf("%s: expected : %t, got: %t", test.name, test.expected, result)
+		t.Run(test.name, func(t *testing.T) {
+			result := ShouldPodBeInEndpoints(test.pod, test.publishNotReady)
+			if result != test.expected {
+				t.Errorf("expected: %t, got: %t", test.expected, result)
+			}
+		})
+	}
+}
+
+func TestShouldSetHostname(t *testing.T) {
+	testCases := map[string]struct {
+		pod      *v1.Pod
+		service  *v1.Service
+		expected bool
+	}{
+		"all matching": {
+			pod:      genSimplePod("ns", "foo", "svc-name"),
+			service:  genSimpleSvc("ns", "svc-name"),
+			expected: true,
+		},
+		"all matching, hostname not set": {
+			pod:      genSimplePod("ns", "", "svc-name"),
+			service:  genSimpleSvc("ns", "svc-name"),
+			expected: false,
+		},
+		"all set, different name/subdomain": {
+			pod:      genSimplePod("ns", "hostname", "subdomain"),
+			service:  genSimpleSvc("ns", "name"),
+			expected: false,
+		},
+		"all set, different namespace": {
+			pod:      genSimplePod("ns1", "hostname", "svc-name"),
+			service:  genSimpleSvc("ns2", "svc-name"),
+			expected: false,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			result := ShouldSetHostname(testCase.pod, testCase.service)
+			if result != testCase.expected {
+				t.Errorf("expected: %t, got: %t", testCase.expected, result)
+			}
+		})
+	}
+}
+
+func genSimplePod(namespace, hostname, subdomain string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Hostname:  hostname,
+			Subdomain: subdomain,
+		},
+	}
+}
+
+func genSimpleSvc(namespace, name string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+
+func TestServiceSelectorCache_GetPodServiceMemberships(t *testing.T) {
+	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
+	for i := 0; i < 3; i++ {
+		service := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("service-%d", i),
+				Namespace: "test",
+			},
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{
+					"app": fmt.Sprintf("test-%d", i),
+				},
+			},
 		}
+		fakeInformerFactory.Core().V1().Services().Informer().GetStore().Add(service)
+	}
+	var pods []*v1.Pod
+	for i := 0; i < 5; i++ {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test",
+				Name:      fmt.Sprintf("test-pod-%d", i),
+				Labels: map[string]string{
+					"app":   fmt.Sprintf("test-%d", i),
+					"label": fmt.Sprintf("label-%d", i),
+				},
+			},
+		}
+		pods = append(pods, pod)
+	}
+
+	cache := NewServiceSelectorCache()
+	tests := []struct {
+		name   string
+		pod    *v1.Pod
+		expect sets.String
+	}{
+		{
+			name:   "get servicesMemberships for pod-0",
+			pod:    pods[0],
+			expect: sets.NewString("test/service-0"),
+		},
+		{
+			name:   "get servicesMemberships for pod-1",
+			pod:    pods[1],
+			expect: sets.NewString("test/service-1"),
+		},
+		{
+			name:   "get servicesMemberships for pod-2",
+			pod:    pods[2],
+			expect: sets.NewString("test/service-2"),
+		},
+		{
+			name:   "get servicesMemberships for pod-3",
+			pod:    pods[3],
+			expect: sets.NewString(),
+		},
+		{
+			name:   "get servicesMemberships for pod-4",
+			pod:    pods[4],
+			expect: sets.NewString(),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			services, err := cache.GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
+			if err != nil {
+				t.Errorf("Error from cache.GetPodServiceMemberships: %v", err)
+			} else if !services.Equal(test.expect) {
+				t.Errorf("Expect service %v, but got %v", test.expect, services)
+			}
+		})
+	}
+}
+
+func TestServiceSelectorCache_Update(t *testing.T) {
+	var selectors []labels.Selector
+	for i := 0; i < 5; i++ {
+		selector := labels.Set(map[string]string{"app": fmt.Sprintf("test-%d", i)}).AsSelectorPreValidated()
+		selectors = append(selectors, selector)
+	}
+	tests := []struct {
+		name   string
+		key    string
+		cache  *ServiceSelectorCache
+		update map[string]string
+		expect labels.Selector
+	}{
+		{
+			name:   "add test/service-0",
+			key:    "test/service-0",
+			cache:  generateServiceSelectorCache(map[string]labels.Selector{}),
+			update: map[string]string{"app": "test-0"},
+			expect: selectors[0],
+		},
+		{
+			name:   "add test/service-1",
+			key:    "test/service-1",
+			cache:  generateServiceSelectorCache(map[string]labels.Selector{"test/service-0": selectors[0]}),
+			update: map[string]string{"app": "test-1"},
+			expect: selectors[1],
+		},
+		{
+			name:   "update test/service-2",
+			key:    "test/service-2",
+			cache:  generateServiceSelectorCache(map[string]labels.Selector{"test/service-2": selectors[2]}),
+			update: map[string]string{"app": "test-0"},
+			expect: selectors[0],
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			selector := test.cache.Update(test.key, test.update)
+			if !reflect.DeepEqual(selector, test.expect) {
+				t.Errorf("Expect selector %v , but got %v", test.expect, selector)
+			}
+		})
+	}
+}
+
+func generateServiceSelectorCache(cache map[string]labels.Selector) *ServiceSelectorCache {
+	return &ServiceSelectorCache{
+		cache: cache,
+	}
+}
+
+func BenchmarkGetPodServiceMemberships(b *testing.B) {
+	// init fake service informer.
+	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
+	for i := 0; i < 1000; i++ {
+		service := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("service-%d", i),
+				Namespace: "test",
+			},
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{
+					"app": fmt.Sprintf("test-%d", i),
+				},
+			},
+		}
+		fakeInformerFactory.Core().V1().Services().Informer().GetStore().Add(service)
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "test-pod-0",
+			Labels: map[string]string{
+				"app": "test-0",
+			},
+		},
+	}
+
+	cache := NewServiceSelectorCache()
+	expect := sets.NewString("test/service-0")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		services, err := cache.GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), pod)
+		if err != nil {
+			b.Fatalf("Error from GetPodServiceMemberships(): %v", err)
+		}
+		if len(services) != len(expect) {
+			b.Errorf("Expect services size %d, but got: %v", len(expect), len(services))
+		}
+	}
+}
+
+func Test_podChanged(t *testing.T) {
+	testCases := []struct {
+		testName      string
+		modifier      func(*v1.Pod, *v1.Pod)
+		podChanged    bool
+		labelsChanged bool
+	}{
+		{
+			testName:      "no changes",
+			modifier:      func(old, new *v1.Pod) {},
+			podChanged:    false,
+			labelsChanged: false,
+		}, {
+			testName: "change NodeName",
+			modifier: func(old, new *v1.Pod) {
+				new.Spec.NodeName = "changed"
+			},
+			// NodeName can only change before the pod has an IP, and we don't care about the
+			// pod yet at that point so we ignore this change
+			podChanged:    false,
+			labelsChanged: false,
+		}, {
+			testName: "change ResourceVersion",
+			modifier: func(old, new *v1.Pod) {
+				new.ObjectMeta.ResourceVersion = "changed"
+			},
+			// ResourceVersion is intentionally ignored if nothing else changed
+			podChanged:    false,
+			labelsChanged: false,
+		}, {
+			testName: "add primary IPv4",
+			modifier: func(old, new *v1.Pod) {
+				new.Status.PodIP = "1.2.3.4"
+				new.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "modify primary IPv4",
+			modifier: func(old, new *v1.Pod) {
+				old.Status.PodIP = "1.2.3.4"
+				old.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
+				new.Status.PodIP = "2.3.4.5"
+				new.Status.PodIPs = []v1.PodIP{{IP: "2.3.4.5"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "add primary IPv6",
+			modifier: func(old, new *v1.Pod) {
+				new.Status.PodIP = "fd00:10:96::1"
+				new.Status.PodIPs = []v1.PodIP{{IP: "fd00:10:96::1"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "modify primary IPv6",
+			modifier: func(old, new *v1.Pod) {
+				old.Status.PodIP = "fd00:10:96::1"
+				old.Status.PodIPs = []v1.PodIP{{IP: "fd00:10:96::1"}}
+				new.Status.PodIP = "fd00:10:96::2"
+				new.Status.PodIPs = []v1.PodIP{{IP: "fd00:10:96::2"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "add secondary IP",
+			modifier: func(old, new *v1.Pod) {
+				old.Status.PodIP = "1.2.3.4"
+				old.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
+				new.Status.PodIP = "1.2.3.4"
+				new.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "fd00:10:96::1"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "modify secondary IP",
+			modifier: func(old, new *v1.Pod) {
+				old.Status.PodIP = "1.2.3.4"
+				old.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "fd00:10:96::1"}}
+				new.Status.PodIP = "1.2.3.4"
+				new.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "fd00:10:96::2"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "remove secondary IP",
+			modifier: func(old, new *v1.Pod) {
+				old.Status.PodIP = "1.2.3.4"
+				old.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "fd00:10:96::1"}}
+				new.Status.PodIP = "1.2.3.4"
+				new.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "change readiness",
+			modifier: func(old, new *v1.Pod) {
+				new.Status.Conditions[0].Status = v1.ConditionTrue
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "mark for deletion",
+			modifier: func(old, new *v1.Pod) {
+				now := metav1.NewTime(time.Now().UTC())
+				new.ObjectMeta.DeletionTimestamp = &now
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "add label",
+			modifier: func(old, new *v1.Pod) {
+				new.Labels["label"] = "new"
+			},
+			podChanged:    false,
+			labelsChanged: true,
+		}, {
+			testName: "modify label",
+			modifier: func(old, new *v1.Pod) {
+				old.Labels["label"] = "old"
+				new.Labels["label"] = "new"
+			},
+			podChanged:    false,
+			labelsChanged: true,
+		}, {
+			testName: "remove label",
+			modifier: func(old, new *v1.Pod) {
+				old.Labels["label"] = "old"
+			},
+			podChanged:    false,
+			labelsChanged: true,
+		},
+	}
+
+	orig := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "pod",
+			Labels:    map[string]string{"foo": "bar"},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{Type: v1.PodReady, Status: v1.ConditionFalse},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			old := orig.DeepCopy()
+			new := old.DeepCopy()
+			tc.modifier(old, new)
+
+			podChanged, labelsChanged := podEndpointsChanged(old, new)
+			if podChanged != tc.podChanged {
+				t.Errorf("Expected podChanged to be %t, got %t", tc.podChanged, podChanged)
+			}
+			if labelsChanged != tc.labelsChanged {
+				t.Errorf("Expected labelsChanged to be %t, got %t", tc.labelsChanged, labelsChanged)
+			}
+		})
 	}
 }

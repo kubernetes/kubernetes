@@ -28,18 +28,17 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/describe"
-	versioneddescribe "k8s.io/kubectl/pkg/describe/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("non-default")
 	defer tf.Cleanup()
@@ -47,7 +46,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -59,7 +58,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -67,11 +66,11 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
@@ -79,7 +78,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
 	tf.WithNamespace("non-default")
 
@@ -92,18 +91,18 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
 func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	_, _, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -115,7 +114,7 @@ func TestDescribeObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -126,25 +125,25 @@ func TestDescribeObject(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
-	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
 func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -153,7 +152,7 @@ func TestDescribeListObjects(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -167,11 +166,11 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -180,7 +179,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
@@ -193,11 +192,11 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -206,7 +205,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
@@ -245,6 +244,59 @@ func TestDescribeHelpMessage(t *testing.T) {
 	}
 }
 
+func TestDescribeNoResourcesFound(t *testing.T) {
+	testNS := "testns"
+	testCases := []struct {
+		name           string
+		flags          map[string]string
+		namespace      string
+		expectedOutput string
+		expectedErr    string
+	}{
+		{
+			name:           "all namespaces",
+			flags:          map[string]string{"all-namespaces": "true"},
+			expectedOutput: "",
+			expectedErr:    "No resources found\n",
+		},
+		{
+			name:           "all in namespace",
+			namespace:      testNS,
+			expectedOutput: "",
+			expectedErr:    "No resources found in " + testNS + " namespace.\n",
+		},
+	}
+	cmdtesting.InitTestErrorHandler(t)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pods, _, _ := cmdtesting.EmptyTestData()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+			defer tf.Cleanup()
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+			}
+
+			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+
+			cmd := NewCmdDescribe("kubectl", tf, streams)
+			for name, value := range testCase.flags {
+				_ = cmd.Flags().Set(name, value)
+			}
+			cmd.Run(cmd, []string{"pods"})
+
+			if e, a := testCase.expectedOutput, buf.String(); e != a {
+				t.Errorf("Unexpected output:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+			if e, a := testCase.expectedErr, errbuf.String(); e != a {
+				t.Errorf("Unexpected error:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+		})
+	}
+}
+
 type testDescriber struct {
 	Name, Namespace string
 	Settings        describe.DescriberSettings
@@ -257,6 +309,6 @@ func (t *testDescriber) Describe(namespace, name string, describerSettings descr
 	t.Settings = describerSettings
 	return t.Output, t.Err
 }
-func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.Describer, error) {
+func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
 	return t, nil
 }

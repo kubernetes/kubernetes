@@ -35,6 +35,7 @@ go_test(
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/config:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",

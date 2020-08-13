@@ -18,13 +18,13 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 )
@@ -166,7 +166,6 @@ func TestIsProxyableHostname(t *testing.T) {
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service
-		svcName    types.NamespacedName
 		shouldSkip bool
 	}{
 		{
@@ -177,7 +176,6 @@ func TestShouldSkipService(t *testing.T) {
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: true,
 		},
 		{
@@ -188,7 +186,6 @@ func TestShouldSkipService(t *testing.T) {
 					ClusterIP: "",
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: true,
 		},
 		{
@@ -200,7 +197,6 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeExternalName,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: true,
 		},
 		{
@@ -212,7 +208,6 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeClusterIP,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: false,
 		},
 		{
@@ -224,7 +219,6 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeNodePort,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: false,
 		},
 		{
@@ -236,13 +230,12 @@ func TestShouldSkipService(t *testing.T) {
 					Type:      v1.ServiceTypeLoadBalancer,
 				},
 			},
-			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
 			shouldSkip: false,
 		},
 	}
 
 	for i := range testCases {
-		skip := ShouldSkipService(testCases[i].svcName, testCases[i].service)
+		skip := ShouldSkipService(testCases[i].service)
 		if skip != testCases[i].shouldSkip {
 			t.Errorf("case %d: expect %v, got %v", i, testCases[i].shouldSkip, skip)
 		}
@@ -260,6 +253,7 @@ func TestGetNodeAddressses(t *testing.T) {
 		nw            *fake.FakeNetwork
 		itfAddrsPairs []InterfaceAddrsPair
 		expected      sets.String
+		expectedErr   error
 	}{
 		{ // case 0
 			cidrs: []string{"10.20.30.0/24"},
@@ -375,7 +369,8 @@ func TestGetNodeAddressses(t *testing.T) {
 					addrs: []net.Addr{fake.AddrStruct{Val: "127.0.0.1/8"}},
 				},
 			},
-			expected: sets.NewString(),
+			expected:    nil,
+			expectedErr: fmt.Errorf("no addresses found for cidrs %v", []string{"10.20.30.0/24", "100.200.201.0/24"}),
 		},
 		{ // case 8
 			cidrs: []string{},
@@ -455,9 +450,10 @@ func TestGetNodeAddressses(t *testing.T) {
 			testCases[i].nw.AddInterfaceAddr(&pair.itf, pair.addrs)
 		}
 		addrList, err := GetNodeAddresses(testCases[i].cidrs, testCases[i].nw)
-		if err != nil {
+		if !reflect.DeepEqual(err, testCases[i].expectedErr) {
 			t.Errorf("case [%d], unexpected error: %v", i, err)
 		}
+
 		if !addrList.Equal(testCases[i].expected) {
 			t.Errorf("case [%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expected, addrList)
 		}
@@ -535,5 +531,98 @@ func TestShuffleStrings(t *testing.T) {
 		if _, exists := m[k]; !exists {
 			t.Errorf("Element %v missing from shuffled slice", k)
 		}
+	}
+}
+
+func TestFilterIncorrectIPVersion(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		ipString        []string
+		wantIPv6        bool
+		expectCorrect   []string
+		expectIncorrect []string
+	}{
+		{
+			desc:            "empty input IPv4",
+			ipString:        []string{},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "empty input IPv6",
+			ipString:        []string{},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv4 and receive IPv6",
+			ipString:        []string{"fd00:20::1"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4",
+			ipString:        []string{"192.168.200.2"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2", "192.1.34.23", "fd00:20::1", "2001:db9::3"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1", "2001:db9::3"},
+			expectIncorrect: []string{"192.168.200.2", "192.1.34.23"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2", "192.1.34.23", "fd00:20::1", "2001:db9::3"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2", "192.1.34.23"},
+			expectIncorrect: []string{"fd00:20::1", "2001:db9::3"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2", "192.1.34.23"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2", "192.1.34.23"},
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2", "192.1.34.23"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2", "192.1.34.23"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1", "2001:db9::3"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1", "2001:db9::3"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1", "2001:db9::3"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1", "2001:db9::3"},
+			expectIncorrect: nil,
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.desc, func(t *testing.T) {
+			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, testcase.wantIPv6)
+			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, incorrect) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, incorrect)
+			}
+		})
 	}
 }

@@ -530,7 +530,7 @@ func (r Region) String() string {
 // Note that not all regions have a 3-letter ISO code.
 // In such cases this method returns "ZZZ".
 func (r Region) ISO3() string {
-	return r.regionID.String()
+	return r.regionID.ISO3()
 }
 
 // M49 returns the UN M.49 encoding of r, or 0 if this encoding

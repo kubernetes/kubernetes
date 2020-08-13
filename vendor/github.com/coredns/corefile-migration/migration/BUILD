@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "migrate.go",
         "notice.go",
+        "plugins.go",
         "versions.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/coredns/corefile-migration/migration",

@@ -23,13 +23,14 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,7 +43,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -60,10 +61,10 @@ type debugError interface {
 // source is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
 func AddSourceToErr(verb string, source string, err error) error {
 	if source != "" {
-		if statusError, ok := err.(kerrors.APIStatus); ok {
+		if statusError, ok := err.(apierrors.APIStatus); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
-			return &kerrors.StatusError{ErrStatus: status}
+			return &apierrors.StatusError{ErrStatus: status}
 		}
 		return fmt.Errorf("error when %s %q: %v", verb, source, err)
 	}
@@ -88,7 +89,7 @@ func DefaultBehaviorOnFatal() {
 // fatal prints the message (if provided) and then exits. If V(2) or greater,
 // klog.Fatal is invoked for extended information.
 func fatal(msg string, code int) {
-	if klog.V(2) {
+	if klog.V(2).Enabled() {
 		klog.FatalDepth(2, msg)
 	}
 	if len(msg) > 0 {
@@ -114,6 +115,18 @@ func CheckErr(err error) {
 	checkErr(err, fatalErrHandler)
 }
 
+// CheckDiffErr prints a user friendly error to STDERR and exits with a
+// non-zero and non-one exit code. Unrecognized errors will be printed
+// with an "error: " prefix.
+//
+// This method is meant specifically for `kubectl diff` and may be used
+// by other commands.
+func CheckDiffErr(err error) {
+	checkErr(err, func(msg string, code int) {
+		fatalErrHandler(msg, code+1)
+	})
+}
+
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(err error, handleErr func(string, int)) {
@@ -129,11 +142,15 @@ func checkErr(err error, handleErr func(string, int)) {
 	switch {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
-	case kerrors.IsInvalid(err):
-		details := err.(*kerrors.StatusError).Status().Details
-		s := fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
-		if len(details.Kind) == 0 && len(details.Name) == 0 {
-			s = "The request is invalid"
+	case apierrors.IsInvalid(err):
+		details := err.(*apierrors.StatusError).Status().Details
+		s := "The request is invalid"
+		if details == nil {
+			handleErr(s, DefaultErrorExitCode)
+			return
+		}
+		if len(details.Kind) != 0 || len(details.Name) != 0 {
+			s = fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
 		}
 		if len(details.Causes) > 0 {
 			errs := statusCausesToAggrError(details.Causes)
@@ -198,7 +215,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		klog.V(4).Infof(debugErr.DebugError())
 	}
-	status, isStatus := err.(kerrors.APIStatus)
+	status, isStatus := err.(apierrors.APIStatus)
 	switch {
 	case isStatus:
 		switch s := status.Status(); {
@@ -209,7 +226,7 @@ func StandardErrorMessage(err error) (string, bool) {
 		default:
 			return fmt.Sprintf("Error from server: %s", err.Error()), true
 		}
-	case kerrors.IsUnexpectedObjectError(err):
+	case apierrors.IsUnexpectedObjectError(err):
 		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
 	}
 	switch t := err.(type) {
@@ -255,7 +272,7 @@ func MultilineError(prefix string, err error) string {
 // Returns true if a case exists to handle the error type, or false otherwise.
 func PrintErrorWithCauses(err error, errOut io.Writer) bool {
 	switch t := err.(type) {
-	case *kerrors.StatusError:
+	case *apierrors.StatusError:
 		errorDetails := t.Status().Details
 		if errorDetails != nil {
 			fmt.Fprintf(errOut, "error: %s %q is invalid\n\n", errorDetails.Kind, errorDetails.Name)
@@ -405,13 +422,21 @@ func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
 func AddDryRunFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmd.Flags().String(
+		"dry-run",
+		"none",
+		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`,
+	)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+}
+
+func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager string) {
+	cmd.Flags().StringVar(p, "field-manager", defaultFieldManager, "Name of the manager used to track field ownership.")
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
 	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
-	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
@@ -430,6 +455,7 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 // TODO: need to take a pass at other generator commands to use this set of flags
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
+	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	AddDryRunFlag(cmd)
 }
 
@@ -494,8 +520,71 @@ func GetFieldManagerFlag(cmd *cobra.Command) string {
 	return GetFlagString(cmd, "field-manager")
 }
 
-func GetDryRunFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "dry-run")
+type DryRunStrategy int
+
+const (
+	// DryRunNone indicates the client will make all mutating calls
+	DryRunNone DryRunStrategy = iota
+
+	// DryRunClient, or client-side dry-run, indicates the client will prevent
+	// making mutating calls such as CREATE, PATCH, and DELETE
+	DryRunClient
+
+	// DryRunServer, or server-side dry-run, indicates the client will send
+	// mutating calls to the APIServer with the dry-run parameter to prevent
+	// persisting changes.
+	//
+	// Note that clients sending server-side dry-run calls should verify that
+	// the APIServer and the resource supports server-side dry-run, and otherwise
+	// clients should fail early.
+	//
+	// If a client sends a server-side dry-run call to an APIServer that doesn't
+	// support server-side dry-run, then the APIServer will persist changes inadvertently.
+	DryRunServer
+)
+
+func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
+	var dryRunFlag = GetFlagString(cmd, "dry-run")
+	b, err := strconv.ParseBool(dryRunFlag)
+	// The flag is not a boolean
+	if err != nil {
+		switch dryRunFlag {
+		case cmd.Flag("dry-run").NoOptDefVal:
+			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
+			return DryRunClient, nil
+		case "client":
+			return DryRunClient, nil
+		case "server":
+			return DryRunServer, nil
+		case "none":
+			return DryRunNone, nil
+		default:
+			return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
+		}
+	}
+	// The flag was a boolean
+	if b {
+		klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "client")
+		return DryRunClient, nil
+	}
+	klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "none")
+	return DryRunNone, nil
+}
+
+// PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy
+//
+// TODO(juanvallejo): This can be cleaned up even further by creating
+// a PrintFlags struct that binds the --dry-run flag, and whose
+// ToPrinter method returns a printer that understands how to print
+// this success message.
+func PrintFlagsWithDryRunStrategy(printFlags *genericclioptions.PrintFlags, dryRunStrategy DryRunStrategy) *genericclioptions.PrintFlags {
+	switch dryRunStrategy {
+	case DryRunClient:
+		printFlags.Complete("%s (dry run)")
+	case DryRunServer:
+		printFlags.Complete("%s (server dry run)")
+	}
+	return printFlags
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args

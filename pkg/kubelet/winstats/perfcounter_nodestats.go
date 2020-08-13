@@ -32,7 +32,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/windows"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // MemoryStatusEx is the same as Windows structure MEMORYSTATUSEX
@@ -78,19 +78,14 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 		return err
 	}
 
-	kernelVersion, err := getKernelVersion()
-	if err != nil {
-		return err
-	}
-
-	osImageVersion, err := getOSImageVersion()
+	osInfo, err := GetOSInfo()
 	if err != nil {
 		return err
 	}
 
 	p.nodeInfo = nodeInfo{
-		kernelVersion:               kernelVersion,
-		osImageVersion:              osImageVersion,
+		kernelVersion:               osInfo.GetPatchVersion(),
+		osImageVersion:              osInfo.ProductName,
 		memoryPhysicalCapacityBytes: memory,
 		startTime:                   time.Now(),
 	}

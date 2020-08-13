@@ -19,11 +19,13 @@ package common
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -33,7 +35,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for name, namespace and ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify Pod Name, namespace and IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
@@ -72,14 +74,14 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		expectations := []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
 			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
-			fmt.Sprintf("POD_IP=%v|%v", framework.RegexIPv4, framework.RegexIPv6),
+			fmt.Sprintf("POD_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for host ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
@@ -98,7 +100,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		}
 
 		expectations := []string{
-			fmt.Sprintf("HOST_IP=%v|%v", framework.RegexIPv4, framework.RegexIPv6),
+			fmt.Sprintf("HOST_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
@@ -155,7 +157,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory request set through environment variables at runtime in the container.
 	*/
@@ -206,7 +208,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for default CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory limits set through environment variables at runtime in the container.
 	*/
@@ -256,7 +258,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: DownwardAPI, environment for Pod UID
 	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/
@@ -287,7 +289,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessLocalEphemeralStorageEnabled()
+			e2eskipper.SkipUnlessLocalEphemeralStorageEnabled()
 		})
 
 		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {

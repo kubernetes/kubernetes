@@ -154,8 +154,8 @@ func (rsStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// ReplicaSetToSelectableFields returns a field set that represents the object.
-func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
+// ToSelectableFields returns a field set that represents the object.
+func ToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
@@ -167,9 +167,9 @@ func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	rs, ok := obj.(*apps.ReplicaSet)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a ReplicaSet.")
+		return nil, nil, fmt.Errorf("given object is not a ReplicaSet")
 	}
-	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), nil
+	return labels.Set(rs.ObjectMeta.Labels), ToSelectableFields(rs), nil
 }
 
 // MatchReplicaSet is the filter used by the generic etcd backend to route
@@ -187,6 +187,7 @@ type rsStatusStrategy struct {
 	rsStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = rsStatusStrategy{Strategy}
 
 func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

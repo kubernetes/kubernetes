@@ -195,6 +195,21 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			err: false, // no error for backwards compatibility
 		},
+		{
+			// disable all beta resources
+			runtimeConfig: map[string]string{
+				"api/beta": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
 	}
 	for index, test := range testCases {
 		t.Log(scheme.PrioritizedVersionsAllGroups())

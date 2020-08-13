@@ -17,11 +17,12 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -46,13 +47,13 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
 		ginkgo.By("Creating a pod with an invalid username")
 		podInvalid := f.PodClient().Create(runAsUserNamePod(toPtr("FooLish")))
 
-		e2elog.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
-		framework.ExpectNoError(f.WaitForPodTerminated(podInvalid.Name, ""))
+		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
 
-		podInvalid, _ = f.PodClient().Get(podInvalid.Name, metav1.GetOptions{})
+		podInvalid, _ = f.PodClient().Get(context.TODO(), podInvalid.Name, metav1.GetOptions{})
 		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]
-		if "ContainerCannotRun" != podTerminatedReason {
-			e2elog.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun', not: '%q'", podTerminatedReason)
+		if podTerminatedReason != "ContainerCannotRun" && podTerminatedReason != "StartError" {
+			framework.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun' or 'StartError', not: '%q'", podTerminatedReason)
 		}
 	})
 

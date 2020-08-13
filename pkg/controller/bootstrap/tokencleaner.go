@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -32,10 +33,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // TokenCleanerOptions contains options for the TokenCleaner
@@ -82,7 +83,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 	}
 
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -191,17 +192,22 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
 	if alreadyExpired {
 		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
-		var options *metav1.DeleteOptions
+		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
-			options = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &secret.UID}}
+			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}
 		}
-		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(secret.Name, options)
+		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, options)
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
 	} else if ttl > 0 {
-		tc.queue.AddAfter(o, ttl)
+		key, err := controller.KeyFunc(o)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		tc.queue.AddAfter(key, ttl)
 	}
 }

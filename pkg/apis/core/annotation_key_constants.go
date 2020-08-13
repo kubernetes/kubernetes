@@ -26,7 +26,7 @@ const (
 	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
 	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
 
-	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
+	// MirrorPodAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
@@ -39,33 +39,32 @@ const (
 
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
+	// Deprecated: set a pod security context `seccompProfile` field.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
 
 	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
 	// to one container of a pod.
+	// Deprecated: set a container security context `seccompProfile` field.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
 
 	// SeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
+	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	SeccompProfileRuntimeDefault string = "runtime/default"
 
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
-	// This is now deprecated and should be replaced by SeccompProfileRuntimeDefault.
+	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
 
-	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
+	// ObjectTTLAnnotationKey represents a suggestion for kubelet for how long it can cache
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
-	// BootstrapCheckpointAnnotationKey represents a Resource (Pod) that should be checkpointed by
-	// the kubelet prior to running
-	BootstrapCheckpointAnnotationKey string = "node.kubernetes.io/bootstrap-checkpoint"
-
-	// annotation key prefix used to identify non-convertible json paths.
+	// NonConvertibleAnnotationPrefix annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 
 	kubectlPrefix = "kubectl.kubernetes.io/"

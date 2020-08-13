@@ -20,9 +20,14 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "//conditions:default": [],
@@ -41,6 +46,10 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/k8s.io/utils/exec:go_default_library",
+            "//vendor/k8s.io/utils/exec/testing:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/exec/testing:go_default_library",

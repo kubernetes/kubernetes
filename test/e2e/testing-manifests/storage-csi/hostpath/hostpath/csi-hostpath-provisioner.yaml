@@ -40,12 +40,16 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          # TODO: replace with official 1.4.0 release when ready
-          image: quay.io/k8scsi/csi-provisioner:v1.4.0-rc1
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v1.6.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
-            - --connection-timeout=15s
+            - --feature-gates=Topology=true
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
           volumeMounts:
             - mountPath: /csi
               name: socket-dir

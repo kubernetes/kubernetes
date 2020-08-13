@@ -107,11 +107,11 @@ func (spec *Spec) Summary(suiteID string) *types.SpecSummary {
 		NumberOfSamples:        spec.subject.Samples(),
 		ComponentTexts:         componentTexts,
 		ComponentCodeLocations: componentCodeLocations,
-		State:        spec.getState(),
-		RunTime:      runTime,
-		Failure:      spec.failure,
-		Measurements: spec.measurementsReport(),
-		SuiteID:      suiteID,
+		State:                  spec.getState(),
+		RunTime:                runTime,
+		Failure:                spec.failure,
+		Measurements:           spec.measurementsReport(),
+		SuiteID:                suiteID,
 	}
 }
 

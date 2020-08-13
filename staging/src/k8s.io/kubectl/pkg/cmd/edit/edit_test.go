@@ -128,7 +128,7 @@ func TestEdit(t *testing.T) {
 					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 				}
 			}
-			return &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
+			return &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
 		}
 		if step.StepType != "request" {
 			t.Fatalf("%s, step %d: expected request step, got %s %s", name, i, req.Method, req.URL.Path)
