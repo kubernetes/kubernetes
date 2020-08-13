@@ -360,6 +360,7 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		desc              string
 		service           v1.Service
 		expectCreateError bool
+		wrongRGAtDelete   bool
 	}{
 		{
 			desc:    "external service should be created and deleted successfully",
@@ -377,6 +378,12 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 			desc:              "annotated service with different resourceGroup shouldn't be created but should be deleted successfully",
 			service:           getResourceGroupTestService("test4", "random-rg", "1.2.3.4", 80),
 			expectCreateError: true,
+		},
+		{
+			desc:              "annotated service with different resourceGroup shouldn't be created but should be deleted successfully",
+			service:           getResourceGroupTestService("service5", "random-rg", "", 80),
+			expectCreateError: true,
+			wrongRGAtDelete:   true,
 		},
 	}
 
@@ -404,6 +411,9 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		}
 
 		// finally, delete it.
+		if c.wrongRGAtDelete {
+			az.LoadBalancerResourceGroup = "nil"
+		}
 		err = az.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, &c.service)
 		assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
 		result, rerr := az.LoadBalancerClient.List(context.Background(), az.Config.ResourceGroup)
