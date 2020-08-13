@@ -69,7 +69,7 @@ dependencies:
       match: const etcdImage
 
   - name: "golang"
-    version: 1.13.14
+    version: 1.13.15
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -114,12 +114,12 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.13.14-1
+    version: v1.13.15-1
     refPaths:
     - path: build/build-image/cross/VERSION
 
   - name: "repo-infra"
-    version: 0.0.8
+    version: 0.0.12
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
