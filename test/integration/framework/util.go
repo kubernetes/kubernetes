@@ -21,7 +21,6 @@ package framework
 import (
 	"context"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	testutils "k8s.io/kubernetes/test/utils"
 )
