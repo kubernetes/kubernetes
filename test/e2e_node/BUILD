@@ -156,7 +156,6 @@ go_test(
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/podresources/v1alpha1:go_default_library",
-        "//pkg/kubelet/apis/resourcemetrics/v1alpha1:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
