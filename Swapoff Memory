@@ -1,0 +1,11 @@
+<!-- kind debug -->
+The Kubernetes scheduler determines the best available node on which to deploy newly created pods. 
+If memory swapping is allowed to occur on a host system, this can lead to performance and stability issues within Kubernetes.
+
+To disable the swapoff memory
+***Note : To make changes in the fstab file you need sudo privileges.
+1.) Use sudo vim /etc/fstab OR go to dir /etc and use sudo vim fstab
+2.) Comment off /swap.img line and save the changes in the file by using :wq
+
+3.)If still it shows swapoff memory issue use:
+$sudo swapoff -a
