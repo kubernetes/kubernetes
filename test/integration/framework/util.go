@@ -21,6 +21,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -146,12 +147,12 @@ func IsNodeReady(node *v1.Node) bool {
 
 // IsConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
 func IsConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, false, klog.Infof)
 }
 
 // IsConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
 func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, true, klog.Infof)
 }
 
 // isConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.

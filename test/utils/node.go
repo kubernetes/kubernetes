@@ -19,7 +19,6 @@ package utils
 import (
 	"fmt"
 	"k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -52,7 +51,7 @@ func GetNodeCondition(status *v1.NodeStatus, conditionType v1.NodeConditionType)
 	return -1, nil
 }
 
-func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
+func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool, logFunc func(fmt string, args ...interface{})) bool {
 	// Check the node readiness condition (logging all).
 	for _, cond := range node.Status.Conditions {
 		// Ensure that the condition type and the status matches as desired.
@@ -81,7 +80,7 @@ func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						klog.Infof(msg)
+						logFunc(msg)
 					}
 					return false
 				}
@@ -90,7 +89,7 @@ func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 					return true
 				}
 				if !silent {
-					klog.Infof("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					logFunc("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 				}
 				return false
@@ -99,7 +98,7 @@ func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				return true
 			}
 			if !silent {
-				klog.Infof("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+				logFunc("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 			}
 			return false
@@ -107,7 +106,7 @@ func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 
 	}
 	if !silent {
-		klog.Infof("Couldn't find condition %v on node %v", conditionType, node.Name)
+		logFunc("Couldn't find condition %v on node %v", conditionType, node.Name)
 	}
 	return false
 }

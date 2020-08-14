@@ -90,12 +90,12 @@ func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) string {
 
 // IsConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
 func IsConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, false, e2elog.Logf)
 }
 
 // IsConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
 func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
+	return testutils.IsNodeConditionSetAsExpected(node, conditionType, wantTrue, true, e2elog.Logf)
 }
 
 // isConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
