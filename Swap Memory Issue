@@ -1,0 +1,13 @@
+```release-note
+NONE
+```
+<!-- /kind a warning about a deprecation -->
+
+Disable Swap Memory
+
+*Use sudo privilege to modify the file.
+1.) $sudo vim /etc/fstab
+2.) Commit /swap line and save the changes and exit by using :wq command
+
+If still swap memory issue is not resolved use command:
+3.) sudo swapoff -a
