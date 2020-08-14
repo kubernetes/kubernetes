@@ -645,6 +645,12 @@ const (
 	//
 	// Disables Accelerator Metrics Collected by Kubelet
 	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
+
+	// owner: @KielChan
+	// alpha: v1.20
+	//
+	// Enables cadvisor metrics in kubelet by set CadvisorMetrics=cpu,sched,memory,disk,network,tcp
+	CustomCadvisorMetrics featuregate.Feature = "CustomCadvisorMetrics"
 )
 
 func init() {
@@ -744,6 +750,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinOverlay:                                     {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 	DisableAcceleratorUsageMetrics:                 {Default: false, PreRelease: featuregate.Alpha},
+	CustomCadvisorMetrics:                          {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

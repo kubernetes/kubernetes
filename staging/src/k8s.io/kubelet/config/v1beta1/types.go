@@ -804,6 +804,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// This option specifies the metrics enabled for cadvisor interface work background.
+	// Only if feature gates CustomCadvisorMetrics set to be true, it will accept custom configuration like:
+	// cpu,sched,memory,disk,network,tcp
+	// Default: []
+	// +optional
+	CadvisorMetrics []string `json:"cadvisorMetrics,omitempty"`
 }
 
 type KubeletAuthorizationMode string

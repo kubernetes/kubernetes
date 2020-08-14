@@ -55,7 +55,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/routes"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
@@ -64,7 +63,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
@@ -148,9 +146,10 @@ func ListenAndServeKubeletServer(
 	enableContentionProfiling,
 	redirectContainerStreaming,
 	enableSystemLogHandler bool,
+	metricSet cadvisormetrics.MetricSet,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, enableSystemLogHandler, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, enableSystemLogHandler, metricSet, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -170,9 +169,9 @@ func ListenAndServeKubeletServer(
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool, metricSet cadvisormetrics.MetricSet) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, nil)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, metricSet, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -228,6 +227,7 @@ func NewServer(
 	enableContentionProfiling,
 	redirectContainerStreaming,
 	enableSystemLogHandler bool,
+	metricSet cadvisormetrics.MetricSet,
 	criHandler http.Handler) Server {
 	server := Server{
 		host:                       host,
@@ -241,7 +241,7 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
+	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints, metricSet)
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers(criHandler)
 		// To maintain backward compatibility serve logs only when enableDebuggingHandlers is also enabled
@@ -319,7 +319,7 @@ func (s *Server) getMetricMethodBucket(method string) string {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
+func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool, metricSet cadvisormetrics.MetricSet) {
 	s.addMetricsBucketMatcher("healthz")
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
@@ -351,29 +351,12 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 
-	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:     struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
-		cadvisormetrics.CpuLoadMetrics:      struct{}{},
-		cadvisormetrics.DiskIOMetrics:       struct{}{},
-		cadvisormetrics.DiskUsageMetrics:    struct{}{},
-		cadvisormetrics.NetworkUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:          struct{}{},
-		cadvisormetrics.ProcessMetrics:      struct{}{},
-	}
-
-	// Only add the Accelerator metrics if the feature is inactive
-	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
-		includedMetrics.Add(cadvisormetrics.MetricKind(cadvisormetrics.AcceleratorUsageMetrics))
-	}
-
 	cadvisorOpts := cadvisorv2.RequestOptions{
 		IdType:    cadvisorv2.TypeName,
 		Count:     1,
 		Recursive: true,
 	}
-	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), metricSet, clock.RealClock{}, cadvisorOpts))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)

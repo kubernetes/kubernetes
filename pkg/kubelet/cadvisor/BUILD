@@ -25,15 +25,14 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//pkg/features:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
-            "//vendor/github.com/google/cadvisor/container:go_default_library",
             "//vendor/github.com/google/cadvisor/container/containerd/install:go_default_library",
             "//vendor/github.com/google/cadvisor/container/crio/install:go_default_library",
             "//vendor/github.com/google/cadvisor/container/docker/install:go_default_library",
@@ -44,14 +43,10 @@ go_library(
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/azure:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/gce:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
-            "//vendor/k8s.io/klog/v2:go_default_library",
             "//vendor/k8s.io/utils/pointer:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/features:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
-            "//vendor/github.com/google/cadvisor/container:go_default_library",
             "//vendor/github.com/google/cadvisor/container/containerd/install:go_default_library",
             "//vendor/github.com/google/cadvisor/container/crio/install:go_default_library",
             "//vendor/github.com/google/cadvisor/container/docker/install:go_default_library",
@@ -62,7 +57,6 @@ go_library(
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/azure:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/gce:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
-            "//vendor/k8s.io/klog/v2:go_default_library",
             "//vendor/k8s.io/utils/pointer:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
@@ -80,6 +74,7 @@ go_test(
         "@io_bazel_rules_go//go/platform:android": [
             "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//vendor/github.com/google/cadvisor/container:go_default_library",
             "//vendor/github.com/google/cadvisor/container/crio:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -87,6 +82,7 @@ go_test(
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//vendor/github.com/google/cadvisor/container:go_default_library",
             "//vendor/github.com/google/cadvisor/container/crio:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

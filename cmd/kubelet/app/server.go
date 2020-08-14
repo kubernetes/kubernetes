@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -626,7 +627,19 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		usingLegacyStats := cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
+
+		usingLocalStorageCapacityIsolation := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation)
+		disableAcceleratorUsageMetrics := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableAcceleratorUsageMetrics)
+
+		metricSet := cadvisor.DefaultCadvisorMetricSet(usingLegacyStats, usingLocalStorageCapacityIsolation, disableAcceleratorUsageMetrics)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CustomCadvisorMetrics) && len(s.CadvisorMetrics) > 0 {
+			metricSet = cadvisor.CustomCadvisorMetricSet(usingLegacyStats, usingLocalStorageCapacityIsolation, disableAcceleratorUsageMetrics, s.CadvisorMetrics)
+		}
+		// passing metricSet to kubelet cadvisor API by CadvisorMetricSet
+		kubeDeps.CadvisorMetricSet = metricSet
+
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, metricSet)
 		if err != nil {
 			return err
 		}
@@ -1156,11 +1169,11 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 	// start the kubelet server
 	if enableServer {
 		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth,
-			enableCAdvisorJSONEndpoints, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling, kubeCfg.EnableSystemLogHandler)
+			enableCAdvisorJSONEndpoints, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling, kubeCfg.EnableSystemLogHandler, kubeDeps.CadvisorMetricSet)
 
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), enableCAdvisorJSONEndpoints)
+		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), enableCAdvisorJSONEndpoints, kubeDeps.CadvisorMetricSet)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
 		go k.ListenAndServePodResources()

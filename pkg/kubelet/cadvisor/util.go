@@ -19,10 +19,12 @@ package cadvisor
 import (
 	goruntime "runtime"
 
+	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -32,6 +34,19 @@ const (
 	// Please keep this in sync with the one in:
 	// github.com/google/cadvisor/container/crio/client.go
 	CrioSocket = "/var/run/crio/crio.sock"
+)
+
+var (
+	// IncludedMetrics refers to default cadvisor metrics collected.
+	IncludedMetrics = cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:     struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
+		cadvisormetrics.CpuLoadMetrics:      struct{}{},
+		cadvisormetrics.DiskIOMetrics:       struct{}{},
+		cadvisormetrics.NetworkUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:          struct{}{},
+		cadvisormetrics.ProcessMetrics:      struct{}{},
+	}
 )
 
 // CapacityFromMachineInfo returns the capacity of the resources from the machine info.
@@ -76,4 +91,48 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 	return (runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
 		runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
+}
+
+// DefaultCadvisorMetricSet returns default metrics set for cadivsor interface of kubelet work background.
+func DefaultCadvisorMetricSet(usingLegacyStats, usingLocalStorageCapacityIsolation, disableAcceleratorUsageMetrics bool) cadvisormetrics.MetricSet {
+	metricSet := cadvisormetrics.MetricSet{}
+	for metricKind := range IncludedMetrics {
+		metricSet.Add(metricKind)
+	}
+
+	if usingLegacyStats || usingLocalStorageCapacityIsolation {
+		metricSet.Add(cadvisormetrics.DiskUsageMetrics)
+	}
+
+	if !disableAcceleratorUsageMetrics {
+		metricSet.Add(cadvisormetrics.AcceleratorUsageMetrics)
+	}
+
+	return metricSet
+}
+
+// CustomCadvisorMetricSet returns custom metrics set for cadvisor interface of kubelet work background.
+// If feature gate CustomCadvisorMetrics equals to true,
+// cadivsor interface can work with metrics specified.
+func CustomCadvisorMetricSet(usingLegacyStats, usingLocalStorageCapacityIsolation, disableAcceleratorUsageMetrics bool, cadvisorMetricList []string) cadvisormetrics.MetricSet {
+	metricSet := cadvisormetrics.MetricSet{}
+	for _, metric := range cadvisorMetricList {
+		if !cadvisormetrics.AllMetrics.Has(cadvisormetrics.MetricKind(metric)) {
+			klog.Warningf("illegal cadvisor metric kind provided: %q", metric)
+			continue
+		}
+		metricSet.Add(cadvisormetrics.MetricKind(metric))
+	}
+
+	// mapping usingLegacyStats and local storage feature gate, if false, remove custom disk metric from set.
+	if !usingLegacyStats && !usingLocalStorageCapacityIsolation {
+		delete(metricSet, cadvisormetrics.DiskUsageMetrics)
+	}
+
+	// if disable accelerator usage metric feature gate enabled, just remove it from set.
+	if disableAcceleratorUsageMetrics {
+		delete(metricSet, cadvisormetrics.AcceleratorUsageMetrics)
+	}
+
+	return metricSet
 }

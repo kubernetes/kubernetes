@@ -52,6 +52,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -351,6 +352,7 @@ func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler,
 		false,
 		redirectContainerStreaming,
 		enableSystemLogHandler,
+		cadvisor.IncludedMetrics,
 		fw.criHandler)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)

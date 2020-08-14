@@ -44,9 +44,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -85,22 +83,8 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, metricSet cadvisormetrics.MetricSet) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
-
-	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:         struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
-		cadvisormetrics.CpuLoadMetrics:          struct{}{},
-		cadvisormetrics.DiskIOMetrics:           struct{}{},
-		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
-		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:              struct{}{},
-		cadvisormetrics.ProcessMetrics:          struct{}{},
-	}
-	if usingLegacyStats || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
-		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
-	}
 
 	duration := maxHousekeepingInterval
 	housekeepingConfig := manager.HouskeepingConfig{
@@ -109,7 +93,7 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	}
 
 	// Create the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, includedMetrics, http.DefaultClient, cgroupRoots, "")
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, metricSet, http.DefaultClient, cgroupRoots, "")
 	if err != nil {
 		return nil, err
 	}

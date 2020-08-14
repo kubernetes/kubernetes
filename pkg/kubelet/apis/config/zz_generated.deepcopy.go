@@ -186,6 +186,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		copy(*out, *in)
 	}
 	out.Logging = in.Logging
+	if in.CadvisorMetrics != nil {
+		in, out := &in.CadvisorMetrics, &out.CadvisorMetrics
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

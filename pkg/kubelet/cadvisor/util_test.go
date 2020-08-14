@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/crio"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
@@ -54,4 +55,55 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 
 func TestCrioSocket(t *testing.T) {
 	assert.EqualValues(t, CrioSocket, crio.CrioSocket, "CrioSocket in this package must equal the one in github.com/google/cadvisor/container/crio/client.go")
+}
+
+func TestDefaultCadvisorMetricSet(t *testing.T) {
+	usingLegacyStatsTable := []bool{false, true}
+	usingLocalStorageCapacityIsolationTable := []bool{false, false}
+	disableAcceleratorUsageMetricsTable := []bool{true, false}
+
+	metricSetWithNoDiskUsageAndNoAccelerator := cadvisormetrics.MetricSet{}
+	for metricKind := range IncludedMetrics {
+		metricSetWithNoDiskUsageAndNoAccelerator.Add(metricKind)
+	}
+	metricSetWithDiskUsageAndAccelerator := cadvisormetrics.MetricSet{}
+	for metricKind := range IncludedMetrics {
+		metricSetWithDiskUsageAndAccelerator.Add(metricKind)
+	}
+	metricSetWithDiskUsageAndAccelerator.Add(cadvisormetrics.DiskUsageMetrics)
+	metricSetWithDiskUsageAndAccelerator.Add(cadvisormetrics.AcceleratorUsageMetrics)
+
+	expectedTable := []cadvisormetrics.MetricSet{metricSetWithNoDiskUsageAndNoAccelerator, metricSetWithDiskUsageAndAccelerator}
+
+	for idx := 0; idx < len(usingLegacyStatsTable); idx++ {
+		actual := DefaultCadvisorMetricSet(usingLegacyStatsTable[idx], usingLocalStorageCapacityIsolationTable[idx], disableAcceleratorUsageMetricsTable[idx])
+		if !reflect.DeepEqual(actual, expectedTable[idx]) {
+			t.Errorf("test default metric set for cadvisor error, expected: %+v, actual: %+v", expectedTable[idx], actual)
+		}
+	}
+}
+
+func TestCustomCadvisorMetricSet(t *testing.T) {
+	usingLegacyStatsTable := []bool{false, true}
+	usingLocalStorageCapacityIsolationTable := []bool{false, false}
+	disableAcceleratorUsageMetricsTable := []bool{true, false}
+	customMetricSet := []string{"cpu", "memory", "disk", "illegal"}
+
+	metricSet1 := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:    struct{}{},
+		cadvisormetrics.MemoryUsageMetrics: struct{}{},
+	}
+	metricSet2 := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:    struct{}{},
+		cadvisormetrics.MemoryUsageMetrics: struct{}{},
+		cadvisormetrics.DiskUsageMetrics:   struct{}{},
+	}
+	expectedTable := []cadvisormetrics.MetricSet{metricSet1, metricSet2}
+
+	for idx := 0; idx < len(usingLegacyStatsTable); idx++ {
+		actual := CustomCadvisorMetricSet(usingLegacyStatsTable[idx], usingLocalStorageCapacityIsolationTable[idx], disableAcceleratorUsageMetricsTable[idx], customMetricSet)
+		if !reflect.DeepEqual(actual, expectedTable[idx]) {
+			t.Errorf("test custom metric set for cadvisor error, expected: %+v, actual: %+v", expectedTable[idx], actual)
+		}
+	}
 }

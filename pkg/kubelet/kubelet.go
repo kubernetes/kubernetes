@@ -39,6 +39,7 @@ import (
 	"k8s.io/utils/mount"
 	utilnet "k8s.io/utils/net"
 
+	cadvisormetrics "github.com/google/cadvisor/container"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -190,8 +191,8 @@ type Bootstrap interface {
 	GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler bool)
-	ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool)
+	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler bool, metricSet cadvisormetrics.MetricSet)
+	ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool, metricSet cadvisormetrics.MetricSet)
 	ListenAndServePodResources()
 	Run(<-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
@@ -206,6 +207,7 @@ type Dependencies struct {
 	// Injected Dependencies
 	Auth                    server.AuthInterface
 	CAdvisorInterface       cadvisor.Interface
+	CadvisorMetricSet       cadvisormetrics.MetricSet
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
 	DockerOptions           *DockerOptions
@@ -2134,13 +2136,13 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 }
 
 // ListenAndServe runs the kubelet HTTP server.
-func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, enableSystemLogHandler, kl.criHandler)
+func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler bool, metricSet cadvisormetrics.MetricSet) {
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, enableSystemLogHandler, metricSet, kl.criHandler)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
-func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, enableCAdvisorJSONEndpoints)
+func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, enableCAdvisorJSONEndpoints bool, metricSet cadvisormetrics.MetricSet) {
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, enableCAdvisorJSONEndpoints, metricSet)
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service

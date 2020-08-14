@@ -363,6 +363,11 @@ type KubeletConfiguration struct {
 	Logging componentbaseconfig.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
+	// This option specifies the metrics enabled for cadvisor interface work background.
+	// Only if feature gates CustomCadvisorMetrics set to be true, it will accept custom configuration like:
+	// cpu,sched,memory,disk,network,tcp
+	// +optional
+	CadvisorMetrics []string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

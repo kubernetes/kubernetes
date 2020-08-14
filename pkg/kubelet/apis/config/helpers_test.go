@@ -147,6 +147,7 @@ var (
 		"Authorization.Mode",
 		"Authorization.Webhook.CacheAuthorizedTTL.Duration",
 		"Authorization.Webhook.CacheUnauthorizedTTL.Duration",
+		"CadvisorMetrics[*]",
 		"CPUCFSQuota",
 		"CPUCFSQuotaPeriod.Duration",
 		"CPUManagerPolicy",

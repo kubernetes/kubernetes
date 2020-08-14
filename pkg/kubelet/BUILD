@@ -145,6 +145,7 @@ go_library(
         "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
+        "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
