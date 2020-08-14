@@ -8,7 +8,6 @@ filters:
     - smarterclayton
     - thockin
     - liggitt
-    # - bgrant0607 # manual escalations only
     reviewers:
     - lavalamp
     - smarterclayton
