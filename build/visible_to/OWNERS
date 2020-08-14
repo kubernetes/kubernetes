@@ -10,7 +10,6 @@ reviewers:
   - smarterclayton
   - thockin
 approvers:
-  - bgrant0607
   - brendandburns
   - dchen1107
   - lavalamp
@@ -21,5 +20,6 @@ approvers:
   - thockin
   - wojtek-t
 emeritus_approvers:
+  - bgrant0607
   - ixdy
   - jbeda

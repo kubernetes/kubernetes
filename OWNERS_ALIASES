@@ -222,6 +222,7 @@ aliases:
     - krzyzacy
     - ixdy
     - spiffxp
+    - dims
   sig-testing-approvers:
     - bentheelder
     - cblecker
@@ -333,7 +334,6 @@ aliases:
     - smarterclayton
     - thockin
     - liggitt
-    # - bgrant0607 # manual escalations only
 
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
@@ -424,6 +424,7 @@ aliases:
     - soltysh
     - piosz
     - jsafrane
+    - dims
 
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
@@ -449,6 +450,7 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - andrewsykim
     - cheftako
+    - dims
 
   # sig-cluster-lifecycle-api-reviewers:
   #   -
@@ -493,7 +495,6 @@ aliases:
     - soltysh
   feature-approvers:
     - andrewsykim     # Cloud Provider
-    - bgrant0607      # Architecture
     - brancz          # Instrumentation
     - ahg-g           # Scheduling
     - calebamiles     # Release
@@ -528,7 +529,6 @@ aliases:
 
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
-    - bgrant0607
     - smarterclayton
     - johnbelamaric
     - spiffxp
