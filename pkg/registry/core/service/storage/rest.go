@@ -205,12 +205,6 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 		}
 	}
 
-	// Handle ExternalTraffic related fields during service creation.
-	if apiservice.NeedsHealthCheck(service) {
-		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
-			return nil, errors.NewInternalError(err)
-		}
-	}
 	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
@@ -618,18 +612,6 @@ func containsNodePort(serviceNodePorts []ServiceNodePort, serviceNodePort Servic
 	return false
 }
 
-// Loop through the service ports list, find one with the same port number and
-// NodePort specified, return this NodePort otherwise return 0.
-func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
-	for i := range servicePorts {
-		servicePort := servicePorts[i]
-		if port == int(servicePort.Port) && servicePort.NodePort != 0 {
-			return int(servicePort.NodePort)
-		}
-	}
-	return 0
-}
-
 // allocateHealthCheckNodePort allocates health check node port to service.
 func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	healthCheckNodePort := service.Spec.HealthCheckNodePort
@@ -696,51 +678,99 @@ func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool,
 }
 
 func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
-	svcPortToNodePort := map[int]int{}
-	for i := range service.Spec.Ports {
-		servicePort := &service.Spec.Ports[i]
-		allocatedNodePort := svcPortToNodePort[int(servicePort.Port)]
-		if allocatedNodePort == 0 {
-			// This will only scan forward in the service.Spec.Ports list because any matches
-			// before the current port would have been found in svcPortToNodePort. This is really
-			// looking for any user provided values.
-			np := findRequestedNodePort(int(servicePort.Port), service.Spec.Ports)
-			if np != 0 {
-				err := nodePortOp.Allocate(np)
-				if err != nil {
-					// TODO: when validation becomes versioned, this gets more complicated.
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), np, err.Error())}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
-				}
-				servicePort.NodePort = int32(np)
-				svcPortToNodePort[int(servicePort.Port)] = np
-			} else {
-				nodePort, err := nodePortOp.AllocateNext()
-				if err != nil {
-					// TODO: what error should be returned here?  It's not a
-					// field-level validation failure (the field is valid), and it's
-					// not really an internal error.
-					return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
-				}
-				servicePort.NodePort = int32(nodePort)
-				svcPortToNodePort[int(servicePort.Port)] = nodePort
-			}
-		} else if int(servicePort.NodePort) != allocatedNodePort {
-			// TODO(xiangpengzhao): do we need to allocate a new NodePort in this case?
-			// Note: the current implementation is better, because it saves a NodePort.
-			if servicePort.NodePort == 0 {
-				servicePort.NodePort = int32(allocatedNodePort)
-			} else {
-				err := nodePortOp.Allocate(int(servicePort.NodePort))
-				if err != nil {
-					// TODO: when validation becomes versioned, this gets more complicated.
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
-				}
-			}
+	needHealthCheck := apiservice.NeedsHealthCheck(service)
+	healthPort := int(service.Spec.HealthCheckNodePort)
+
+	specPath := field.NewPath("spec")
+
+	// We would allocate explicitly specified NodePorts first, then the remaining NodePorts.
+
+	// When allocating NodePorts set by users, we would iterate over all ports to set the
+	// empty NodePort which has the same service port as others first.
+	// For example, If we have the following spec:
+	//
+	// ports:
+	// - port: 53
+	//   name: "p1"
+	//   protocol: TCP
+	//   nodePort: 30001
+	// - port: 53
+	//   name: "p2"
+	//   protocol: UDP
+	// - port: 53
+	//   name: "p3"
+	//   protocol: SCTP
+	//   nodePort: 30002
+	//
+	// We would set the nodePort of "p2" to 30002 rather than allocating a new one
+	// to save one port.
+
+	// Phase 1: allocate explicitly specified NodePorts
+	if needHealthCheck && healthPort > 0 {
+		err := allocateHealthCheckNodePort(service, nodePortOp)
+		if err != nil {
+			el := field.ErrorList{field.Invalid(specPath.Child("healthCheckNodePort"), healthPort, err.Error())}
+			return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 	}
 
+	// === Set the nodePort of ports which has the same service port as others
+	// A map from service port to explicitly specified NodePort
+	specifiedNodePorts := map[int32]int32{}
+	for _, servicePort := range service.Spec.Ports {
+		if servicePort.NodePort > 0 {
+			specifiedNodePorts[servicePort.Port] = servicePort.NodePort
+		}
+	}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		nodePort, visited := specifiedNodePorts[servicePort.Port]
+		if visited && servicePort.NodePort == 0 {
+			servicePort.NodePort = nodePort
+		}
+	}
+
+	// === Allocate explicitly specified NodePorts
+	svcPortToAllocatedNodePort := map[int32]int32{}
+	for i, servicePort := range service.Spec.Ports {
+		allocatedNodePort, visited := svcPortToAllocatedNodePort[servicePort.Port]
+		// Same port with different protocol
+		if visited && allocatedNodePort == servicePort.NodePort {
+			continue
+		}
+		if servicePort.NodePort > 0 {
+			err := nodePortOp.Allocate(int(servicePort.NodePort))
+			if err != nil {
+				el := field.ErrorList{field.Invalid(
+					specPath.Child("ports").Index(i).Child("nodePort"),
+					servicePort.NodePort,
+					err.Error())}
+				return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+			}
+			svcPortToAllocatedNodePort[servicePort.Port] = servicePort.NodePort
+		}
+	}
+
+	// Phase 2: allocate remaining NodePorts
+	if needHealthCheck && healthPort == 0 {
+		err := allocateHealthCheckNodePort(service, nodePortOp)
+		if err != nil {
+			// TODO: what error should be returned here?  It's not a
+			// field-level validation failure (the field is valid), and it's
+			// not really an internal error.
+			return errors.NewInternalError(err)
+		}
+	}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort == 0 {
+			nodePort, err := nodePortOp.AllocateNext()
+			if err != nil {
+				return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+			}
+			servicePort.NodePort = int32(nodePort)
+		}
+	}
 	return nil
 }
 

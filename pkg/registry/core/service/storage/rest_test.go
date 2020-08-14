@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -172,11 +173,45 @@ func (s *serviceStorage) StorageVersion() runtime.GroupVersioner {
 	panic("not implemented")
 }
 
+func generateRandomNodePort() int32 {
+	return int32(rand.IntnRange(30001, 30999))
+}
+
+type TestConfig struct {
+	pods          *api.PodList
+	portRangeSize int
+}
+
+type Option func(config *TestConfig)
+
+func WithPodList(pods *api.PodList) Option {
+	return func(config *TestConfig) {
+		config.pods = pods
+	}
+}
+
+func WithPortRangeSize(size int) Option {
+	return func(config *TestConfig) {
+		config.portRangeSize = size
+	}
+}
+
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
-	return NewTestRESTWithPods(t, endpoints, nil, ipFamilies)
+	return NewTestRESTWithOptions(t, endpoints, ipFamilies)
 }
 
 func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.PodList, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+	return NewTestRESTWithOptions(t, endpoints, ipFamilies, WithPodList(pods))
+}
+
+func NewTestRESTWithOptions(t *testing.T, endpoints *api.EndpointsList, ipFamilies []api.IPFamily, options ...Option) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+	config := TestConfig{
+		portRangeSize: 1000,
+	}
+	for _, opt := range options {
+		opt(&config)
+	}
+
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 
 	serviceStorage := &serviceStorage{}
@@ -190,7 +225,8 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if pods != nil && len(pods.Items) > 0 {
+	if config.pods != nil && len(config.pods.Items) > 0 {
+		pods := config.pods
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range pods.Items {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods.Items[ix].Name)
@@ -245,7 +281,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		}
 	}
 
-	portRange := utilnet.PortRange{Base: 30000, Size: 1000}
+	portRange := utilnet.PortRange{Base: 30000, Size: config.portRangeSize}
 	portAllocator, err := portallocator.NewPortAllocator(portRange)
 	if err != nil {
 		t.Fatalf("cannot create port allocator %v", err)
@@ -291,9 +327,14 @@ func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, 
 	if len(serviceNodePorts) == 0 {
 		t.Errorf("Failed to find NodePorts of service : %s", srv.Name)
 	}
-	for i := range serviceNodePorts {
-		nodePort := serviceNodePorts[i]
-		rest.serviceNodePorts.Release(nodePort)
+
+	if srv.Spec.HealthCheckNodePort > 0 {
+		serviceNodePorts = append(serviceNodePorts, int(srv.Spec.HealthCheckNodePort))
+	}
+	for _, nodePort := range serviceNodePorts {
+		if err := rest.serviceNodePorts.Release(nodePort); err != nil {
+			t.Fatalf("Failed to release NodePort %d: %v", nodePort, err)
+		}
 	}
 }
 
@@ -2145,6 +2186,200 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	}
 }
 
+func TestServiceRegistryCreateServiceMultipleNodePortsWithSameProtocol(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+	defer server.Terminate(t)
+
+	const count = 3
+	// The `PortAllocator` seems to allocate the first port randomly,
+	// So we run the test multiple times to ensure the NodePort is correctly allocated.
+	for i := 0; i < count; i++ {
+		svc := &api.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nodeport-service",
+			},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeNodePort,
+				// The order of ports matters here
+				Ports: []api.ServicePort{{
+					Name:       "tcp-port",
+					Port:       1111,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+					NodePort:   30080,
+				}, {
+					Name:       "udp-port",
+					Port:       1111,
+					Protocol:   api.ProtocolUDP,
+					TargetPort: intstr.FromInt(6502),
+				}, {
+					Name:       "sctp-port",
+					Port:       1111,
+					Protocol:   api.ProtocolSCTP,
+					TargetPort: intstr.FromInt(6502),
+					NodePort:   30081,
+				}},
+			},
+		}
+		createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		if createdSvc == nil || err != nil {
+			t.Fatalf("Round %d: Unexpected failure creating service: %v", i, err)
+		}
+		createdService := createdSvc.(*api.Service)
+		for _, servicePort := range createdService.Spec.Ports {
+			switch servicePort.NodePort {
+			case 0:
+				t.Fatalf("Round %d: Empty NodePort for %s", i, servicePort.Name)
+			case 30080, 30081:
+			default:
+				t.Fatalf("Round %d: Unexpected NodePort for %s: %d", i, servicePort.Name, servicePort.NodePort)
+			}
+		}
+		releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+	}
+}
+
+// Validates the allocated service nodePort should not conflict with the user-specified nodePort.
+func TestServiceRegistryCreateServiceNodePortAllocationAndUserAllocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	storage, registry, server := NewTestRESTWithOptions(t, nil, singleStackIPv4, WithPortRangeSize(2))
+	defer server.Terminate(t)
+
+	userNodePorts := []int32{30000, 30001}
+	const count = 5
+	// The `PortAllocator` seems to allocate the first port randomly,
+	// So we run the test multiple times to ensure the NodePort is correctly allocated.
+	for i := 0; i < count; i++ {
+		for _, nodePort := range userNodePorts {
+			svc := &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nodeport-service",
+				},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					// The order of ports matters here
+					Ports: []api.ServicePort{{
+						Name:       "auto",
+						Port:       1111,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}, {
+						Name:       "user",
+						Port:       2222,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+						NodePort:   nodePort,
+					}},
+				},
+			}
+			createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if createdSvc == nil || err != nil {
+				t.Fatalf("Round %d: Unexpected failure creating service: %v", i, err)
+			}
+			releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+		}
+	}
+}
+
+// Validates the allocated service nodePort and healthCheck nodePort should not
+// conflict with the user-specified nodePort.
+func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocationAndUserAllocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	storage, registry, server := NewTestRESTWithOptions(t, nil, singleStackIPv4, WithPortRangeSize(3))
+	defer server.Terminate(t)
+
+	userNodePorts := []int32{30000, 30001, 30002}
+	const count = 5
+	// The `PortAllocator` seems to allocate the first port randomly,
+	// So we run the test multiple times to ensure the NodePort is correctly allocated.
+	for i := 0; i < count; i++ {
+		for _, nodePort := range userNodePorts {
+			svc := &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "external-lb-esipp",
+				},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeLoadBalancer,
+					// The order of ports matters here
+					Ports: []api.ServicePort{{
+						Name:       "auto",
+						Port:       1111,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}, {
+						Name:       "user",
+						Port:       2222,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+						NodePort:   nodePort,
+					}},
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+				},
+			}
+			createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if createdSvc == nil || err != nil {
+				t.Fatalf("Round %d: Unexpected failure creating service: %v", i, err)
+			}
+			releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+		}
+	}
+}
+
+// Validates the allocated service nodePort should not conflict with
+// the specified healthCheck nodePort and the user-specified nodePort.
+func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocationAndUserAllocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	storage, registry, server := NewTestRESTWithOptions(t, nil, singleStackIPv4, WithPortRangeSize(3))
+	defer server.Terminate(t)
+
+	userNodePorts := []int32{30000, 30001, 30002}
+	healthPorts := []int32{30001, 30002, 30000}
+	const count = 5
+	// The `PortAllocator` seems to allocate the first port randomly,
+	// So we run the test multiple times to ensure the NodePort is correctly allocated.
+	for i := 0; i < count; i++ {
+		for j := range userNodePorts {
+			svc := &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "external-lb-esipp",
+				},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeLoadBalancer,
+					// The order of ports matters here
+					Ports: []api.ServicePort{{
+						Name:       "auto",
+						Port:       1111,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}, {
+						Name:       "user",
+						Port:       2222,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+						NodePort:   userNodePorts[j],
+					}},
+					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+					HealthCheckNodePort:   healthPorts[j],
+				},
+			}
+			createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if createdSvc == nil || err != nil {
+				t.Fatalf("Round %d: Unexpected failure creating service: %v", i, err)
+			}
+			releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
+		}
+	}
+}
+
 // Validate allocation of a nodePort when ExternalTrafficPolicy is set to Local
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.T) {
@@ -2187,6 +2422,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 // Validate using the user specified nodePort when ExternalTrafficPolicy is set to Local
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *testing.T) {
+	randomNodePort := generateRandomNodePort()
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
 	defer server.Terminate(t)
@@ -2200,12 +2436,9 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
 				TargetPort: intstr.FromInt(6502),
-				// hard-code NodePort to make sure it doesn't conflict with the healthport.
-				// TODO: remove this once http://issue.k8s.io/93922 fixes auto-allocation conflicting with user-specified health check ports
-				NodePort: 30500,
 			}},
 			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
-			HealthCheckNodePort:   30501,
+			HealthCheckNodePort:   randomNodePort,
 		},
 	}
 	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -2222,8 +2455,8 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	}
-	if port != 30501 {
-		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", 30501, port)
+	if port != randomNodePort {
+		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", randomNodePort, port)
 	}
 	if port != 0 {
 		// Release the health check node port at the end of the test case.
@@ -2664,8 +2897,7 @@ func TestInitNodePorts(t *testing.T) {
 		} else if !reflect.DeepEqual(serviceNodePorts, test.expectSpecifiedNodePorts) {
 			t.Errorf("%q: expected NodePorts %v, but got %v", test.name, test.expectSpecifiedNodePorts, serviceNodePorts)
 		}
-		for i := range serviceNodePorts {
-			nodePort := serviceNodePorts[i]
+		for _, nodePort := range serviceNodePorts {
 			// Release the node port at the end of the test case.
 			storage.serviceNodePorts.Release(nodePort)
 		}
