@@ -313,6 +313,10 @@ func (c *Controller) syncService(key string) error {
 		}
 		return err
 	}
+	if service.DeletionTimestamp != nil {
+		klog.V(5).Infof("skip deleted service %q", key)
+		return nil
+	}
 
 	if service.Spec.Selector == nil {
 		// services without a selector receive no endpoint slices from this controller;
