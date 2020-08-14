@@ -1415,8 +1415,8 @@ metadata:
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("creating an pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			// Agnhost image generates logs for a total of 100 lines over 20s.
-			framework.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, nsFlag, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
+			// Agnhost image generates logs for a total of 100 lines over 30s.
+			framework.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, nsFlag, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "30s")
 		})
 		ginkgo.AfterEach(func() {
 			framework.RunKubectlOrDie(ns, "delete", "pod", podName, nsFlag)
@@ -1484,6 +1484,51 @@ metadata:
 			olderOut := framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--since=24h")
 			older := len(strings.Split(olderOut, "\n"))
 			gomega.Expect(recent).To(gomega.BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recentOut, olderOut)
+
+			ginkgo.By("restricting since a specific timestamp")
+			out = framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--timestamps")
+			framework.Logf("got output %q", out)
+			var slow, fast *time.Time
+			for _, line := range strings.Split(out, "\n") {
+				words := strings.Split(line, " ")
+				if len(words) > 0 && len(words[0]) > 0 {
+					timestamp, err := time.Parse(time.RFC3339Nano, words[0])
+					if err != nil {
+						timestamp, err = time.Parse(time.RFC3339, words[0])
+						if err != nil {
+							framework.Failf("expected %q to be RFC3339 or RFC3339Nano", words[0])
+						}
+					}
+					if slow == nil {
+						slow = &timestamp
+					} else {
+						fast = &timestamp
+						if fast.Sub(*slow) < time.Second {
+							break
+						}
+						slow = fast
+					}
+				}
+			}
+			for _, timestamp := range []*time.Time{slow, fast} {
+				if timestamp == nil {
+					break
+				}
+				sinceFlag := fmt.Sprintf("--since-time=%s", timestamp.Format(time.RFC3339Nano))
+				out = framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--timestamps", sinceFlag)
+				lines := strings.Split(out, "\n")
+				gomega.Expect(len(lines)).To(gomega.BeNumerically(">", 0))
+				words := strings.Split(lines[0], " ")
+				gomega.Expect(len(words)).To(gomega.BeNumerically(">", 1))
+				actualTimestamp, err := time.Parse(time.RFC3339Nano, words[0])
+				if err != nil {
+					actualTimestamp, err = time.Parse(time.RFC3339, words[0])
+					if err != nil {
+						framework.Failf("expected %q to be RFC3339 or RFC3339Nano", words[0])
+					}
+				}
+				framework.ExpectEqual(actualTimestamp, *timestamp)
+			}
 		})
 	})
 
