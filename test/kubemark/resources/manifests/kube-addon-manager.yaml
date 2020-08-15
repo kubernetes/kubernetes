@@ -9,11 +9,11 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-addon-manager
-    image: {{kube_docker_registry}}/kube-addon-manager:v9.1.1
+    image: gcr.io/jsand-k8s-test/addon-manager:latest
     command:
-    - /bin/bash
-    - -c
-    - /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    - /cluster-addons-bootstrap
+    - --log_file=/var/log/kube-addon-manager.log
+    - --logtostderr=false
     resources:
       requests:
         cpu: 5m
