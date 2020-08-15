@@ -32,7 +32,6 @@ import (
 
 var _ = SIGDescribe("Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
-	ns := f.Namespace.Name
 
 	var cs clientset.Interface
 
@@ -115,6 +114,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 		ginkgo.By("verifying device access in Windows testing Pod")
+		ns := f.Namespace.Name
 		command := []string{"cmd.exe", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
 		expectedString  := "Todo: DirectX Version: DirectX 12"
 		_, err = framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
