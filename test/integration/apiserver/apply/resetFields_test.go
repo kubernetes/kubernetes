@@ -19,7 +19,6 @@ package apiserver
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -130,39 +129,13 @@ func TestApplyResetFields(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				True := true
-				obj, err := dynamicClient.
+				// an unforced apply should not conflict if the resetfields are set correctly
+				_, err = dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, statusYAML, metav1.PatchOptions{FieldManager: "apply_status_test", Force: &True}, "status")
+					Patch(context.TODO(), name, types.ApplyPatchType, statusYAML, metav1.PatchOptions{FieldManager: "apply_status_test"}, "status")
 				if err != nil {
 					t.Fatalf("Failed to apply: %v", err)
-				}
-
-				accessor, err := meta.Accessor(obj)
-				if err != nil {
-					t.Fatalf("Failed to get meta accessor: %v:\n%v", err, obj)
-				}
-
-				managedFields := accessor.GetManagedFields()
-				if managedFields == nil {
-					t.Fatal("Empty managed fields")
-				}
-
-				createFields, err := getManagedFieldsFor(managedFields, "create_test")
-				if err != nil {
-					t.Fatal(err)
-				}
-				statusFields, err := getManagedFieldsFor(managedFields, "apply_status_test")
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				// TODO: test for full object applies to status (~~status~~/spec wiping on status strategies)
-				for field := range createFields {
-					if _, exists := statusFields[field]; exists {
-						t.Errorf("found overlapping field ownership: %v", field)
-					}
 				}
 
 				if err := rsc.Delete(context.TODO(), name, *metav1.NewDeleteOptions(0)); err != nil {
@@ -171,18 +144,4 @@ func TestApplyResetFields(t *testing.T) {
 			})
 		}
 	}
-}
-
-func getManagedFieldsFor(managedFields []metav1.ManagedFieldsEntry, manager string) (map[string]interface{}, error) {
-	for _, entry := range managedFields {
-		if entry.Manager == manager {
-
-			fields := make(map[string]interface{})
-			if err := json.Unmarshal(entry.FieldsV1.Raw, &fields); err != nil {
-				return nil, err
-			}
-			return fields, nil
-		}
-	}
-	return nil, fmt.Errorf("manager not found: %s", manager)
 }
