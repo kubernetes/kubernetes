@@ -30,42 +30,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-/*
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: directx-device-plugin
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      name: directx-device-plugin
-  template:
-    metadata:
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ""
-      labels:
-        name: directx-device-plugin
-    spec:
-      tolerations:
-      - key: CriticalAddonsOnly
-        operator: Exists
-      containers:
-      - name: hostdev
-        image: localhost:5000/directxplugin
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - name: device-plugin
-          mountPath: /var/lib/kubelet/device-plugins
-      volumes:
-      - name: device-plugin
-        hostPath:
-          path: /var/lib/kubelet/device-plugins
-      nodeSelector:
-        kubernetes.io/os: windows
-*/
-
 var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 	ns := f.Namespace.Name
@@ -78,7 +42,7 @@ var _ = SIGDescribe("Services", func() {
 		cs = f.ClientSet
 	})
 	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
-                ginkgo.By("creating Windows device plugin daemonset")
+		ginkgo.By("creating Windows device plugin daemonset")
 		dsName := "directx-device-plugin"
 		daemonsetNameLabel := "daemonset-name"
 		image := "directxplugin"
@@ -151,9 +115,9 @@ var _ = SIGDescribe("Services", func() {
 		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 		ginkgo.By("verifying device access in Windows testing Pod")
-                command := []string{"cmd.exe", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
+		command := []string{"cmd.exe", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
                 expectedString  := "Todo: DirectX Version: DirectX 12"
-                _, err = framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
-                framework.ExpectNoError(err, "failed: didn't find expected string in dxdiag output.")
+		_, err = framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
+		framework.ExpectNoError(err, "failed: didn't find expected string in dxdiag output.")
 	})
 })
