@@ -10,6 +10,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/fieldpath:go_default_library",
     ],
 )
 

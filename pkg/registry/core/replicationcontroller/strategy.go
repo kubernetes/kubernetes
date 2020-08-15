@@ -41,7 +41,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.

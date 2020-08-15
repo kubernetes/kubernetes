@@ -46,7 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/klog/v2"
 )

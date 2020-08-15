@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.

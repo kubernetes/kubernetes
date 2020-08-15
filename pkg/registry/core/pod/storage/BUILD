@@ -78,7 +78,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/v3/fieldpath:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/fieldpath:go_default_library",
     ],
 )
 

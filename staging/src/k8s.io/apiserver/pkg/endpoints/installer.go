@@ -46,7 +46,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (

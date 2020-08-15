@@ -140,7 +140,7 @@ require (
 	k8s.io/system-validators v1.2.0
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/kustomize v2.0.3+incompatible
-	sigs.k8s.io/structured-merge-diff/v3 v3.0.1-0.20200706213357-43c19bbb7fba
+	sigs.k8s.io/structured-merge-diff/v4 v4.0.1
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -501,6 +501,7 @@ replace (
 	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
+	sigs.k8s.io/structured-merge-diff/v3 => sigs.k8s.io/structured-merge-diff/v3 v3.0.1-0.20200706213357-43c19bbb7fba
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.1
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

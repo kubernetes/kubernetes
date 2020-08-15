@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
