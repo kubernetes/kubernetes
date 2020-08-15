@@ -116,7 +116,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		command := []string{"cmd.exe", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
-                expectedString  := "Todo: DirectX Version: DirectX 12"
+		expectedString  := "Todo: DirectX Version: DirectX 12"
 		_, err = framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
 		framework.ExpectNoError(err, "failed: didn't find expected string in dxdiag output.")
 	})
