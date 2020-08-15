@@ -84,9 +84,8 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		allOptions = append(allOptions, options...)
 		allOptions = append(allOptions, sensitiveOptions...)
 		if len(allOptions) < 2 {
-			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
+			return fmt.Errorf("mount options(%q) should have at least 2 options, current number:%d, source:%q, target:%q",
 				sanitizedOptionsForLogging, len(allOptions), source, target)
-			return nil
 		}
 
 		// currently only cifs mount is supported
