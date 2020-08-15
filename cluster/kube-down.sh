@@ -10,11 +10,11 @@
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tear down a Kubernetes cluster.
+# Tearing down a Kubernetes cluster.
 
 set -o errexit
 set -o nounset
@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
-fi
+
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
@@ -37,4 +37,4 @@ verify-kube-binaries
 echo "... calling kube-down" >&2
 kube-down
 
-echo "Done"
+echo "Done tearing down kube"
