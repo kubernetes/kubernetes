@@ -31,6 +31,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type GenericREST struct {
@@ -47,10 +48,11 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 		DefaultQualifiedResource: api.Resource("services"),
 		ReturnDeletedObject:      true,
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
-		ExportStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ExportStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -60,7 +62,9 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = service.NewServiceStatusStrategy(strategy)
+	statusStrategy := service.NewServiceStatusStrategy(strategy)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 	return &GenericREST{store}, &StatusREST{store: &statusStore}, nil
 }
 
@@ -98,4 +102,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
