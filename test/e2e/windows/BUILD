@@ -7,7 +7,7 @@ go_library(
     srcs = [
         "cpu_limits.go",
         "density.go",
-        "device_plugin.go";
+        "device_plugin.go",
         "dns.go",
         "framework.go",
         "gmsa_full.go",
