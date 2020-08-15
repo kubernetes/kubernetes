@@ -1,6 +1,6 @@
 # Building Kubernetes
 
-Building Kubernetes is easy if you take advantage of the containerized build environment. This document will help guide you through understanding this build process.
+Building Kubernetes is easy if you take advantage of the containerized build environment. This document will aid in guiding you to understand this build process.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ The following scripts are found in the [`build/`](.) directory. Note that all sc
   *  `build/run.sh make test`: Run all unit tests
   *  `build/run.sh make test-integration`: Run integration test
   *  `build/run.sh make test-cmd`: Run CLI tests
-* [`build/copy-output.sh`](copy-output.sh): This will copy the contents of `_output/dockerized/bin` from the Docker container to the local `_output/dockerized/bin`. It will also copy out specific file patterns that are generated as part of the build process. This is run automatically as part of `build/run.sh`.
+* [`build/copy-output.sh`](copy-output.sh): This will copy the contents of `_output/dockerized/bin` from the Docker container to the local `_output/dockerized/bin`. It will also copy specific file patterns that are generated as part of the build process. This runs automatically as a part of `build/run.sh`.
 * [`build/make-clean.sh`](make-clean.sh): Clean out the contents of `_output`, remove any locally built container images and remove the data container.
 * [`build/shell.sh`](shell.sh): Drop into a `bash` shell in a build container with a snapshot of the current repo code.
 
@@ -39,7 +39,7 @@ The scripts directly under [`build/`](.) are used to build and test.  They will 
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
-There are 3 different containers instances that are run from this image.  The first is a "data" container to store all data that needs to persist across to support incremental builds. Next there is an "rsync" container that is used to transfer data in and out to the data container.  Lastly there is a "build" container that is used for actually doing build actions.  The data container persists across runs while the rsync and build containers are deleted after each use.
+There are 3 different containers instances that are run from this image.  The first is a "data" container to store all the data that needs to persist across, to support incremental builds. Next there is an "rsync" container that is used to transfer data in and out to the data container.  Lastly there is a "build" container that is used for actually doing build actions.  The data container persists across runs while the rsync and build containers are deleted after each use.
 
 `rsync` is used transparently behind the scenes to efficiently move data in and out of the container.  This will use an ephemeral port picked by Docker.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.
 
@@ -118,7 +118,7 @@ The Kubernetes build environment supports the [`SOURCE_DATE_EPOCH` environment
 variable](https://reproducible-builds.org/specs/source-date-epoch/) specified by
 the Reproducible Builds project, which can be set to a UNIX epoch timestamp.
 This will be used for the build timestamps embedded in compiled Go binaries,
-and maybe someday also Docker images.
+and maybe also Docker images.
 
 One reasonable setting for this variable is to use the commit timestamp from the
 tip of the tree being built; this is what the Kubernetes CI system uses. For
