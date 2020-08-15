@@ -37,6 +37,7 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // customResourceStrategy implements behavior for CustomResources.
@@ -70,6 +71,23 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 
 func (a customResourceStrategy) NamespaceScoped() bool {
 	return a.namespaceScoped
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (a customResourceStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{}
+
+	if a.status != nil {
+		fields["apiextensions.k8s.io/v1"] = fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		)
+		fields["apiextensions.k8s.io/v1beta1"] = fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		)
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a CustomResource before creation.
