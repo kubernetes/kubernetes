@@ -30,8 +30,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Services", func() {
-	f := framework.NewDefaultFramework("services")
+var _ = SIGDescribe("Device Plugin", func() {
+	f := framework.NewDefaultFramework("device-plugin")
 	ns := f.Namespace.Name
 
 	var cs clientset.Interface
