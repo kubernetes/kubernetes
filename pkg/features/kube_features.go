@@ -714,6 +714,12 @@ const (
 	//
 	// Allows control if NodePorts shall be created for services with "type: LoadBalancer" by defining the spec.AllocateLoadBalancerNodePorts field (bool)
 	ServiceLBNodePortControl featuregate.Feature = "ServiceLBNodePortControl"
+
+	// owner: @janosi
+	// alpha: v1.20
+	//
+	// Enables the usage of different protocols in the same Service with type=LoadBalancer
+	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
 )
 
 func init() {
@@ -821,6 +827,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
+	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

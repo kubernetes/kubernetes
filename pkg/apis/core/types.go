@@ -3475,12 +3475,23 @@ const (
 	ServiceExternalTrafficPolicyTypeCluster ServiceExternalTrafficPolicyType = "Cluster"
 )
 
+// These are the valid conditions of a service.
+const (
+	// LoadBalancerPortsError represents the condition of the requested ports
+	// on the cloud load balancer instance.
+	LoadBalancerPortsError = "LoadBalancerPortsError"
+)
+
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	// +optional
 	LoadBalancer LoadBalancerStatus
+
+	// Current service condition
+	// +optional
+	Conditions []metav1.Condition
 }
 
 // LoadBalancerStatus represents the status of a load-balancer
@@ -3503,6 +3514,11 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string
+
+	// Ports is a list of records of service ports
+	// If used, every port defined in the service should have an entry in it
+	// +optional
+	Ports []PortStatus
 }
 
 const (
@@ -5394,4 +5410,33 @@ type TopologySpreadConstraint struct {
 	// in their corresponding topology domain.
 	// +optional
 	LabelSelector *metav1.LabelSelector
+}
+
+// These are the built-in errors for PortStatus.
+const (
+	// MixedProtocolNotSupported error in PortStatus means that the cloud provider
+	// can't ensure the port on the load balancer because mixed values of protocols
+	// on the same LoadBalancer type of Service are not supported by the cloud provider.
+	MixedProtocolNotSupported = "MixedProtocolNotSupported"
+)
+
+// PortStatus represents the error condition of a service port
+type PortStatus struct {
+	// Port is the port number of the service port of which status is recorded here
+	Port int32
+	// Protocol is the protocol of the service port of which status is recorded here
+	Protocol Protocol
+	// Error is to record the problem with the service port
+	// The format of the error shall comply with the following rules:
+	// - built-in error values shall be specified in this file and those shall use
+	//   CamelCase names
+	// - cloud provider specific error values must have names that comply with the
+	//   format foo.example.com/CamelCase.
+	// ---
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	// +optional
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+	// +kubebuilder:validation:MaxLength=316
+	Error *string
 }
