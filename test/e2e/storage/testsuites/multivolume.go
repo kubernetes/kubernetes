@@ -411,6 +411,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
+	framework.LogPodStartErrorIfAny(pod, err)
 	framework.ExpectNoError(err)
 
 	byteLen := 64
@@ -491,6 +492,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()
 		framework.ExpectNoError(err)
+		framework.LogPodStartErrorIfAny(pod, err)
 		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		pods = append(pods, pod)
 		framework.ExpectNoError(err, fmt.Sprintf("get pod%d", index))
@@ -646,5 +648,6 @@ func initializeVolume(cs clientset.Interface, ns string, pvc *v1.PersistentVolum
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
+	framework.LogPodStartErrorIfAny(pod, err)
 	framework.ExpectNoError(err)
 }

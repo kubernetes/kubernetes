@@ -26,6 +26,8 @@ import (
 	"github.com/onsi/ginkgo"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
@@ -40,6 +42,23 @@ func log(level string, format string, args ...interface{}) {
 // Logf logs the info.
 func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
+}
+
+// LogPodStartErrorIfAny is mainly used for logging a pod that failed to start. It should be used for
+// logging pods that were created but could not get running for some reason.
+// This is useful for debugging when a particular test flakes.
+func LogPodStartErrorIfAny(pod *v1.Pod, err error) {
+	if err != nil && pod != nil {
+		podKey := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+		pvcNames := sets.NewString()
+		for _, volume := range pod.Spec.Volumes {
+			pvcSource := volume.PersistentVolumeClaim
+			if pvcSource != nil {
+				pvcNames.Insert(pvcSource.ClaimName)
+			}
+		}
+		Logf("error starting pod(name=%s, UID=%s), claims(%+v)", podKey, pod.UID, pvcNames.List())
+	}
 }
 
 // Failf logs the fail info, including a stack trace.

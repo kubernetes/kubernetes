@@ -196,6 +196,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	for i, pvclaims := range totalpvclaims {
 		nodeSelector := nodeSelectorList[i%len(nodeSelectorList)]
 		pod, err := e2epod.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
+		framework.LogPodStartErrorIfAny(pod, err)
 		framework.ExpectNoError(err)
 		totalpods = append(totalpods, pod)
 

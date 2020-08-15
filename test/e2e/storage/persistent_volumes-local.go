@@ -1031,7 +1031,9 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *i
 		SeLinuxLabel: selinuxLabel,
 		FsGroup:      fsGroup,
 	}
-	return e2epod.CreateSecPod(config.client, &podConfig, framework.PodStartShortTimeout)
+	pod, err := e2epod.CreateSecPod(config.client, &podConfig, framework.PodStartShortTimeout)
+	framework.LogPodStartErrorIfAny(pod, err)
+	return pod, err
 }
 
 func createWriteCmd(testDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) string {

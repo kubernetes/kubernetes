@@ -361,6 +361,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 			var pod *v1.Pod
 			pod, err := e2epod.CreatePod(t.Client, claim.Namespace, nil /* nodeSelector */, []*v1.PersistentVolumeClaim{claim}, true /* isPrivileged */, "" /* command */)
 			// Delete pod now, otherwise PV can't be deleted below
+			framework.LogPodStartErrorIfAny(pod, err)
 			framework.ExpectNoError(err)
 			e2epod.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
 		}
@@ -606,6 +607,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		pod, err = e2epod.CreateUnschedulablePod(t.Client, namespace, nodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
 	} else {
 		pod, err = e2epod.CreatePod(t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
+		framework.LogPodStartErrorIfAny(pod, err)
 	}
 	framework.ExpectNoError(err)
 	defer func() {

@@ -168,6 +168,7 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 						NodeSelection:       l.config.ClientNodeSelection,
 					}
 					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, framework.PodStartTimeout)
+					framework.LogPodStartErrorIfAny(l.pod, err)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 					if pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil {

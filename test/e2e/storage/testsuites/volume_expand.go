@@ -176,6 +176,8 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
 			}()
+			framework.LogPodStartErrorIfAny(l.pod, err)
+
 			framework.ExpectNoError(err, "While creating pods for resizing")
 
 			ginkgo.By("Deleting the previously created pod")
@@ -219,6 +221,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
 			}()
+			framework.LogPodStartErrorIfAny(l.pod2, err)
 			framework.ExpectNoError(err, "while recreating pod for resizing")
 
 			ginkgo.By("Waiting for file system resize to finish")

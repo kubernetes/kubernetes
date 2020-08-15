@@ -100,9 +100,11 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	namespace := c.f.Namespace.Name
 	p := c.Create(pod)
-	ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
+	err := e2epod.WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace)
+	LogPodStartErrorIfAny(p, err)
+	ExpectNoError(err)
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
-	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
+	p, err = c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
 }

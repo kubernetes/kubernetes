@@ -18,12 +18,13 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -91,6 +92,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		ginkgo.By("Creating a Pod that becomes Running and therefore is actively using the PVC")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pod, err = e2epod.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
+		framework.LogPodStartErrorIfAny(pod, err)
 		framework.ExpectNoError(err, "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		ginkgo.By("Waiting for PVC to become Bound")

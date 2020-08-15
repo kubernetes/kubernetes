@@ -335,7 +335,9 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
 		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, metav1.DeleteOptions{}))
 	} else {
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
+		err = e2epod.WaitForPodRunningInNamespace(client, serverPod)
+		framework.LogPodStartErrorIfAny(serverPod, err)
+		framework.ExpectNoError(err)
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
 			pod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
@@ -444,6 +446,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
 	}
 	if err != nil {
+		framework.LogPodStartErrorIfAny(clientPod, err)
 		e2epod.DeletePodOrFail(client, clientPod.Namespace, clientPod.Name)
 		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 		return nil, err

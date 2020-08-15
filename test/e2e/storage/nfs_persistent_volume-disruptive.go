@@ -180,6 +180,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 			ginkgo.By("Attaching both PVC's to a single pod")
 			clientPod, err = e2epod.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
+			framework.LogPodStartErrorIfAny(clientPod, err)
 			framework.ExpectNoError(err)
 		})
 

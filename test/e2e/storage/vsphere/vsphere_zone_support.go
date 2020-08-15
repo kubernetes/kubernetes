@@ -396,6 +396,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
+	framework.LogPodStartErrorIfAny(pod, err)
 	framework.ExpectNoError(err)
 
 	if volumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {

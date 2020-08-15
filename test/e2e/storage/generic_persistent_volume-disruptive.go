@@ -113,6 +113,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
 	pod, err := e2epod.CreateSecPod(c, &podConfig, framework.PodStartTimeout)
+	framework.LogPodStartErrorIfAny(pod, err)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

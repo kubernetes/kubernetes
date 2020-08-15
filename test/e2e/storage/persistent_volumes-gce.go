@@ -52,6 +52,7 @@ func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig e2epv.Pers
 
 	ginkgo.By("Creating the Client Pod")
 	clientPod, err := e2epod.CreateClientPod(c, ns, pvc)
+	framework.LogPodStartErrorIfAny(clientPod, err)
 	framework.ExpectNoError(err)
 	return clientPod, pv, pvc
 }

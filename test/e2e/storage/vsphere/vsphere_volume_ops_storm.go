@@ -24,7 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -109,6 +109,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 
 		ginkgo.By("Creating pod to attach PVs to the node")
 		pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
+		framework.LogPodStartErrorIfAny(pod, err)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verify all volumes are accessible and available in the pod")

@@ -213,6 +213,7 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		nodeSelector := nodeSelectorList[nodeSelectorIndex%len(nodeSelectorList)]
 		// Create pod to attach Volume to Node
 		pod, err := e2epod.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
+		framework.LogPodStartErrorIfAny(pod, err)
 		framework.ExpectNoError(err)
 
 		for _, pv := range persistentvolumes {
