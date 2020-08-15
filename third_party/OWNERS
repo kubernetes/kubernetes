@@ -6,6 +6,7 @@ reviewers:
   - smarterclayton
   - thockin
 approvers:
+  - dep-approvers
   - lavalamp
   - smarterclayton
   - thockin
