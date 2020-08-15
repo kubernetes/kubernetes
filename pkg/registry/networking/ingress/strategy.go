@@ -18,6 +18,7 @@ package ingress
 
 import (
 	"context"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // ingressStrategy implements verification logic for Replication Ingress.
@@ -41,6 +43,24 @@ var Strategy = ingressStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped returns true because all Ingress' need to be within a namespace.
 func (ingressStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (ingressStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"extensions/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"networking.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"networking.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of an Ingress before creation.
@@ -107,6 +127,24 @@ type ingressStatusStrategy struct {
 
 // StatusStrategy implements logic used to validate and prepare for updates of the status subresource
 var StatusStrategy = ingressStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (ingressStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"extensions/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"networking.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"networking.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (ingressStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
