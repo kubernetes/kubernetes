@@ -33,12 +33,12 @@ import (
 var _ = SIGDescribe("Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
 
-	var cs clientset.Interface
+//	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		//Only for Windows containers
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
-		cs = f.ClientSet
+//		cs = f.ClientSet
 	})
 	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
 		ginkgo.By("creating Windows device plugin daemonset")
