@@ -17,10 +17,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/images/directx-device-plugin/pkg/gpu-detection"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
-	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	dm "k8s.io/kubelet/pkg/cm/devicemanager"
 	"os"
 	"path"
 	"time"
@@ -95,12 +95,12 @@ func main() {
 			ID: gpuInfo.PNPDeviceID,
 			Health: getGPUHealth(&gpuInfo),
 		})
-		glog.Infof("GPU %s id: %s", gpuInfo.Name, gpuInfo.PNPDeviceID)
+		klog.Infof("GPU %s id: %s", gpuInfo.Name, gpuInfo.PNPDeviceID)
 	}
 
-	glog.Infof("pluginSocksDir: %s", pluginSocksDir)
+	klog.Infof("pluginSocksDir: %s", pluginSocksDir)
 	socketPath := path.Join(pluginSocksDir, "directx.sock")
-	glog.Infof("socketPath: %s", socketPath)
+	klog.Infof("socketPath: %s", socketPath)
 	dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
 	if err := dp1.Start(); err != nil {
 		panic(err)
