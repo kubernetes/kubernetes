@@ -17,7 +17,7 @@ package gpu_detection
 import (
 	"fmt"
 	"github.com/StackExchange/wmi"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 	"strings"
 )
 
@@ -58,6 +58,6 @@ func GetGPUInfo(id string) *GPUInfo {
 			return &gpu
 		}
 	}
-	glog.Errorf("GPU not found for : %s", id)
+	klog.Errorf("GPU not found for : %s", id)
 	return nil
 }
