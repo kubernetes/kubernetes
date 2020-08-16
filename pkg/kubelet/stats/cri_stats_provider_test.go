@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -424,7 +425,6 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(4, len(stats))
-
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
 		podStatsMap[s.PodRef] = s
