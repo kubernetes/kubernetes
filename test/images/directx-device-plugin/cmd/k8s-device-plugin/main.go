@@ -101,7 +101,7 @@ func main() {
 	klog.Infof("pluginSocksDir: %s", pluginSocksDir)
 	socketPath := path.Join(pluginSocksDir, "directx.sock")
 	klog.Infof("socketPath: %s", socketPath)
-	dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
+	dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
 	if err := dp1.Start(); err != nil {
 		panic(err)
 
